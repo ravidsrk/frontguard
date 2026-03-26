@@ -1,0 +1,8 @@
+node_modules
+dist
+.frontguard-debug
+*.tsbuildinfo
+auth.json
+.env
+.env.*
+*.log

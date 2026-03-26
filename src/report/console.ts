@@ -1,0 +1,265 @@
+/**
+ * Console reporter for Frontguard.
+ *
+ * Renders real-time progress with spinners during the pipeline run,
+ * then prints a rich summary table with route statuses, regressions,
+ * warnings, and AI analysis.
+ *
+ * @module report/console
+ */
+
+import chalk from 'chalk';
+import ora, { type Ora } from 'ora';
+import type { Reporter, PipelineStage, RunResult, DiffResult } from '../core/types.js';
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const STAGE_LABELS: Record<PipelineStage, string> = {
+  init: '⚙  Loading config',
+  discover: '🔍 Discovering routes',
+  filter: '📊 Filtering',
+  render: '🖥  Rendering',
+  compare: '🔍 Comparing',
+  analyze: '🤖 Analyzing',
+  report: '📄 Reporting',
+};
+
+const STATUS_ICONS: Record<string, string> = {
+  pass: chalk.green('✓'),
+  changed: chalk.yellow('⚠'),
+  regression: chalk.red('✘'),
+  new: chalk.blue('★'),
+  error: chalk.red('⚠'),
+  flaky: chalk.yellow('~'),
+};
+
+// ---------------------------------------------------------------------------
+// Progress Bar Helper
+// ---------------------------------------------------------------------------
+
+function progressBar(current: number, total: number, width = 20): string {
+  const ratio = total > 0 ? Math.min(current / total, 1) : 0;
+  const filled = Math.round(ratio * width);
+  const empty = width - filled;
+  return `[${chalk.green('█'.repeat(filled))}${chalk.gray('░'.repeat(empty))}] ${current}/${total}`;
+}
+
+// ---------------------------------------------------------------------------
+// Console Reporter
+// ---------------------------------------------------------------------------
+
+export class ConsoleReporter implements Reporter {
+  private spinner: Ora | null = null;
+  private currentStage: PipelineStage | null = null;
+
+  onStageStart(stage: PipelineStage, detail?: string): void {
+    this.currentStage = stage;
+    const label = STAGE_LABELS[stage] ?? stage;
+    const text = detail ? `${label} ${chalk.dim(`— ${detail}`)}` : label;
+
+    this.spinner = ora({
+      text,
+      color: 'cyan',
+      spinner: 'dots',
+    }).start();
+  }
+
+  onStageProgress(stage: PipelineStage, current: number, total: number, detail?: string): void {
+    if (!this.spinner) return;
+
+    const label = STAGE_LABELS[stage] ?? stage;
+    const bar = progressBar(current, total);
+    const detailSuffix = detail ? ` ${chalk.dim(detail)}` : '';
+    this.spinner.text = `${label} ${bar}${detailSuffix}`;
+  }
+
+  onStageComplete(stage: PipelineStage, detail?: string): void {
+    if (this.spinner) {
+      const label = STAGE_LABELS[stage] ?? stage;
+      const text = detail ? `${label} ${chalk.dim(`— ${detail}`)}` : label;
+      this.spinner.succeed(text);
+      this.spinner = null;
+    }
+    this.currentStage = null;
+  }
+
+  onError(error: Error): void {
+    if (this.spinner) {
+      this.spinner.fail(chalk.red(error.message));
+      this.spinner = null;
+    } else {
+      console.error(chalk.red(`\n  ✘ ${error.message}`));
+    }
+  }
+
+  onComplete(result: RunResult): void {
+    if (this.spinner) {
+      this.spinner.stop();
+      this.spinner = null;
+    }
+
+    console.log('');
+    this.printRouteTable(result);
+    this.printRegressions(result);
+    this.printWarnings(result);
+    this.printSummary(result);
+  }
+
+  // -------------------------------------------------------------------------
+  // Route Table
+  // -------------------------------------------------------------------------
+
+  private printRouteTable(result: RunResult): void {
+    const viewports = [...new Set(result.diffs.map((d) => d.viewport))].sort((a, b) => a - b);
+    const routes = [...new Set(result.diffs.map((d) => d.route.path))];
+
+    if (routes.length === 0) {
+      console.log(chalk.dim('  No routes tested.'));
+      return;
+    }
+
+    // Header
+    const vpHeaders = viewports.map((vp) => chalk.dim(padCenter(`${vp}px`, 8)));
+    const routeColWidth = Math.max(30, ...routes.map((r) => r.length + 2));
+    const header = `  ${chalk.bold(padRight('Route', routeColWidth))}${vpHeaders.join(' ')}`;
+    console.log(header);
+    console.log(chalk.dim(`  ${'─'.repeat(routeColWidth + viewports.length * 9)}`));
+
+    // Rows
+    for (const route of routes) {
+      const cells = viewports.map((vp) => {
+        const diff = result.diffs.find((d) => d.route.path === route && d.viewport === vp);
+        if (!diff) return chalk.dim(padCenter('–', 8));
+        const icon = STATUS_ICONS[diff.status] ?? chalk.dim('?');
+        return padCenter(icon, 8);
+      });
+
+      const routeLabel = padRight(route, routeColWidth);
+      console.log(`  ${routeLabel}${cells.join(' ')}`);
+    }
+
+    console.log('');
+  }
+
+  // -------------------------------------------------------------------------
+  // Regressions Detail
+  // -------------------------------------------------------------------------
+
+  private printRegressions(result: RunResult): void {
+    const regressions = result.diffs.filter((d) => d.status === 'regression');
+    if (regressions.length === 0) return;
+
+    console.log(chalk.red.bold(`  ✘ REGRESSIONS (${regressions.length})`));
+    console.log('');
+
+    for (const diff of regressions) {
+      const label = `${diff.route.path} @ ${diff.viewport}px`;
+      console.log(chalk.red(`    ${label}`));
+      console.log(chalk.dim(`    Diff: ${diff.diffPercentage.toFixed(2)}% pixels changed`));
+
+      if (diff.aiAnalysis) {
+        const ai = diff.aiAnalysis;
+        const severityColor =
+          ai.severity === 'critical' ? chalk.red :
+          ai.severity === 'warning' ? chalk.yellow :
+          chalk.blue;
+
+        console.log(chalk.dim(`    AI: `) + severityColor(`[${ai.severity}]`) + ` ${ai.explanation}`);
+        if (ai.suggestedFix) {
+          console.log(chalk.dim(`    Fix: `) + ai.suggestedFix);
+        }
+        console.log(chalk.dim(`    Confidence: ${Math.round(ai.confidence * 100)}%`));
+      }
+
+      console.log('');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Warnings Detail
+  // -------------------------------------------------------------------------
+
+  private printWarnings(result: RunResult): void {
+    const warnings = result.diffs.filter((d) => d.status === 'changed');
+    if (warnings.length === 0) return;
+
+    console.log(chalk.yellow.bold(`  ⚠ WARNINGS (${warnings.length})`));
+    console.log('');
+
+    for (const diff of warnings) {
+      const label = `${diff.route.path} @ ${diff.viewport}px`;
+      console.log(chalk.yellow(`    ${label}`));
+      console.log(chalk.dim(`    Diff: ${diff.diffPercentage.toFixed(2)}% pixels changed`));
+
+      if (diff.aiAnalysis) {
+        console.log(chalk.dim(`    AI: `) + diff.aiAnalysis.explanation);
+      }
+
+      console.log('');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Summary
+  // -------------------------------------------------------------------------
+
+  private printSummary(result: RunResult): void {
+    const { summary, timing, config } = result;
+
+    const parts: string[] = [];
+
+    if (summary.regressions > 0) {
+      parts.push(chalk.red(`${summary.regressions} regression${summary.regressions !== 1 ? 's' : ''}`));
+    }
+    if (summary.warnings > 0) {
+      parts.push(chalk.yellow(`${summary.warnings} warning${summary.warnings !== 1 ? 's' : ''}`));
+    }
+    if (summary.passed > 0) {
+      parts.push(chalk.green(`${summary.passed} passed`));
+    }
+    if (summary.newPages > 0) {
+      parts.push(chalk.blue(`${summary.newPages} new`));
+    }
+    if (summary.errors > 0) {
+      parts.push(chalk.red(`${summary.errors} error${summary.errors !== 1 ? 's' : ''}`));
+    }
+
+    console.log(`  ${parts.join(chalk.dim(' · '))}`);
+
+    // Report path
+    const reportPath = `${config.outputDir}/report.html`;
+    console.log(chalk.dim(`  Report: ${reportPath}`));
+
+    // Timing
+    const totalSec = (timing.total / 1000).toFixed(1);
+    const breakdown = [
+      timing.discovery > 0 ? `discover ${(timing.discovery / 1000).toFixed(1)}s` : null,
+      timing.render > 0 ? `render ${(timing.render / 1000).toFixed(1)}s` : null,
+      timing.compare > 0 ? `compare ${(timing.compare / 1000).toFixed(1)}s` : null,
+      timing.ai > 0 ? `AI ${(timing.ai / 1000).toFixed(1)}s` : null,
+    ].filter(Boolean).join(', ');
+
+    console.log(chalk.dim(`  Done in ${totalSec}s${breakdown ? ` (${breakdown})` : ''}`));
+    console.log('');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// String Helpers
+// ---------------------------------------------------------------------------
+
+function padRight(str: string, width: number): string {
+  return str.length >= width ? str : str + ' '.repeat(width - str.length);
+}
+
+function padCenter(str: string, width: number): string {
+  // Strip ANSI for length calculation
+  const stripped = str.replace(/\u001b\[[0-9;]*m/g, '');
+  const remaining = width - stripped.length;
+  if (remaining <= 0) return str;
+  const left = Math.floor(remaining / 2);
+  const right = remaining - left;
+  return ' '.repeat(left) + str + ' '.repeat(right);
+}
