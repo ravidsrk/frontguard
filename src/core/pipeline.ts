@@ -21,11 +21,25 @@ import type {
 } from './types.js';
 import { discoverRoutes } from '../discovery/crawler.js';
 import { discoverRoutesFromFilesystem } from '../discovery/filesystem.js';
+import { smartFilter } from '../graph/filter.js';
 import { renderPages } from '../render/playwright.js';
 import { compareScreenshot, createNewPageResult } from '../diff/pixel.js';
 import { analyzeWithAI } from '../diff/ai-vision.js';
 import { GitOrphanStorage } from '../storage/git-orphan.js';
+import { detectPreviewUrl, waitForUrl } from '../utils/preview-url.js';
 import { logger } from '../utils/logger.js';
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** URL patterns that indicate no real base URL has been configured. */
+const DEFAULT_URL_PATTERNS = [
+  'http://localhost',
+  'https://localhost',
+  'http://127.0.0.1',
+  'https://127.0.0.1',
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -84,6 +98,35 @@ export async function runPipeline(
     ai: 0,
     total: 0,
   };
+
+  // -----------------------------------------------------------------------
+  // Stage 0: PREVIEW URL DETECTION
+  // -----------------------------------------------------------------------
+  const isDefaultUrl =
+    !config.baseUrl ||
+    DEFAULT_URL_PATTERNS.some((pattern) => config.baseUrl.startsWith(pattern));
+
+  if (isDefaultUrl) {
+    const previewUrl = detectPreviewUrl();
+    if (previewUrl) {
+      logger.info(`Using preview URL: ${previewUrl}`);
+      config = { ...config, baseUrl: previewUrl };
+
+      // Wait for the deployment to be ready before proceeding
+      const isReady = await waitForUrl(previewUrl, {
+        maxAttempts: 10,
+        intervalMs: 15_000,
+      });
+
+      if (!isReady) {
+        logger.warn(
+          `Preview URL ${previewUrl} is not responding — proceeding anyway (may fail during render)`,
+        );
+      }
+    } else {
+      logger.debug('No preview URL detected — using configured baseUrl');
+    }
+  }
 
   // -----------------------------------------------------------------------
   // Stage 1: DISCOVER
@@ -145,14 +188,42 @@ export async function runPipeline(
   }
 
   // -----------------------------------------------------------------------
-  // Stage 2: FILTER (placeholder for dependency graph)
+  // Stage 2: FILTER (dependency graph analysis)
   // -----------------------------------------------------------------------
-  reporter.onStageStart('filter', 'Filtering routes…');
-  logger.info(
-    `Dependency graph: skipped (not yet implemented), rendering all ${routes.length} routes`,
-  );
-  const filteredRoutes = routes; // pass through for now
-  reporter.onStageComplete('filter', `${filteredRoutes.length} route(s) to render`);
+  let filteredRoutes: Route[] = routes;
+
+  reporter.onStageStart('filter', 'Analyzing dependency graph…');
+  try {
+    const [filterResult, filterDuration] = await timed(async () =>
+      smartFilter(routes, config),
+    );
+
+    filteredRoutes = filterResult.filtered;
+    const skippedCount = filterResult.skipped.length;
+
+    if (skippedCount > 0) {
+      logger.info(
+        `Smart filter: ${filterResult.reason} (${filterDuration}ms)`,
+      );
+      logger.info(
+        `Skipped ${skippedCount} unaffected route(s): ${filterResult.skipped.map((r) => r.path).join(', ')}`,
+      );
+    } else {
+      logger.info(
+        `Smart filter: ${filterResult.reason} (${filterDuration}ms)`,
+      );
+    }
+
+    reporter.onStageComplete(
+      'filter',
+      `${filteredRoutes.length}/${routes.length} route(s) to render — ${filterResult.reason}`,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn(`Smart filter failed: ${msg} — rendering all ${routes.length} routes`);
+    filteredRoutes = routes;
+    reporter.onStageComplete('filter', `${filteredRoutes.length} route(s) to render (filter failed, rendering all)`);
+  }
 
   const totalCombinations =
     filteredRoutes.length * config.viewports.length * config.browsers.length;
