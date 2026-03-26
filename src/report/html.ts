@@ -18,10 +18,16 @@ import { logger } from '../utils/logger.js';
 // ---------------------------------------------------------------------------
 
 export class HTMLReporter implements Reporter {
+  private errors: Error[] = [];
+
   onStageStart(_stage: PipelineStage, _detail?: string): void {}
   onStageProgress(_stage: PipelineStage, _current: number, _total: number, _detail?: string): void {}
   onStageComplete(_stage: PipelineStage, _detail?: string): void {}
-  onError(_error: Error): void {}
+
+  onError(error: Error): void {
+    this.errors.push(error);
+    logger.error(`Pipeline error captured for HTML report: ${error.message}`);
+  }
 
   onComplete(result: RunResult): void {
     try {
@@ -51,22 +57,26 @@ export class HTMLReporter implements Reporter {
 <style>${getCSS()}</style>
 </head>
 <body>
+${renderErrorBanner(this.errors)}
 ${renderHeader(result)}
 <div class="layout">
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <h3>Routes</h3>
-      <div class="filter-buttons" id="filters">
-        <button class="filter-btn active" data-filter="all">All (${routes.length})</button>
-        <button class="filter-btn" data-filter="regression">✘ Regressions (${result.summary.regressions})</button>
-        <button class="filter-btn" data-filter="changed">⚠ Warnings (${result.summary.warnings})</button>
-        <button class="filter-btn" data-filter="new">★ New (${result.summary.newPages})</button>
-        <button class="filter-btn" data-filter="pass">✓ Passed (${result.summary.passed})</button>
+      <div class="filter-buttons" id="filters" role="toolbar" aria-label="Filter routes by status">
+        <button class="filter-btn active" data-filter="all" aria-label="Show all routes">All (${routes.length})</button>
+        <button class="filter-btn" data-filter="regression" aria-label="Show regressions only">✘ Regressions (${result.summary.regressions})</button>
+        <button class="filter-btn" data-filter="changed" aria-label="Show warnings only">⚠ Warnings (${result.summary.warnings})</button>
+        <button class="filter-btn" data-filter="new" aria-label="Show new pages only">★ New (${result.summary.newPages})</button>
+        <button class="filter-btn" data-filter="pass" aria-label="Show passed pages only">✓ Passed (${result.summary.passed})</button>
       </div>
     </div>
-    <ul class="route-list" id="route-list">
+    <ul class="route-list" id="route-list" role="listbox" aria-label="Route list">
       ${routeData.map((r, i) => renderSidebarItem(r.path, r.status, i)).join('\n      ')}
     </ul>
+    <div class="empty-filter-state" id="empty-filter-state" style="display:none" aria-live="polite">
+      <p>No routes match this filter</p>
+    </div>
   </aside>
   <main class="main" id="main">
     <div class="placeholder" id="placeholder">
@@ -125,7 +135,7 @@ function statusIcon(status: string): string {
     case 'changed': return '<span class="icon icon-warning">⚠</span>';
     case 'regression': return '<span class="icon icon-regression">✘</span>';
     case 'new': return '<span class="icon icon-new">★</span>';
-    case 'error': return '<span class="icon icon-regression">⚠</span>';
+    case 'error': return '<span class="icon icon-regression">✘</span>';
     case 'flaky': return '<span class="icon icon-warning">~</span>';
     default: return '<span class="icon">?</span>';
   }
@@ -152,6 +162,24 @@ function bufferToDataUri(buf: Buffer | undefined): string {
 // ---------------------------------------------------------------------------
 // Render Functions
 // ---------------------------------------------------------------------------
+
+function renderErrorBanner(errors: Error[]): string {
+  if (errors.length === 0) return '';
+
+  const errorItems = errors.map((e) =>
+    `<li>${escapeHtml(e.message)}${e.stack ? `<pre class="error-stack">${escapeHtml(e.stack)}</pre>` : ''}</li>`
+  ).join('\n');
+
+  return `<div class="error-banner">
+  <div class="error-banner-header">
+    <span class="error-banner-icon">🚨</span>
+    <strong>${errors.length} Pipeline Error${errors.length !== 1 ? 's' : ''} Occurred</strong>
+  </div>
+  <ul class="error-banner-list">
+    ${errorItems}
+  </ul>
+</div>`;
+}
 
 function renderHeader(result: RunResult): string {
   const s = result.summary;
@@ -253,6 +281,47 @@ function getCSS(): string {
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
 }
 
+/* Error Banner */
+.error-banner {
+  background: rgba(248, 81, 73, 0.15);
+  border: 2px solid var(--red);
+  border-radius: 8px;
+  margin: 16px 24px;
+  padding: 16px;
+}
+.error-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: var(--red);
+  margin-bottom: 12px;
+}
+.error-banner-icon { font-size: 20px; }
+.error-banner-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.error-banner-list li {
+  background: rgba(248, 81, 73, 0.08);
+  border-left: 3px solid var(--red);
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  border-radius: 0 4px 4px 0;
+}
+.error-stack {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -326,6 +395,7 @@ body {
 .filter-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
 .route-list { list-style: none; }
+.empty-filter-state { padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
 .route-item {
   display: flex;
   align-items: center;
@@ -486,20 +556,29 @@ function getJS(): string {
   });
 
   // Filter buttons
+  var emptyState = document.getElementById('empty-filter-state');
   filterBtns.forEach(function(btn) {
     btn.addEventListener('click', function() {
       filterBtns.forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
 
       var filter = btn.dataset.filter;
+      var visibleCount = 0;
 
       routeItems.forEach(function(item) {
         if (filter === 'all') {
           item.style.display = '';
+          visibleCount++;
         } else {
-          item.style.display = item.dataset.status === filter ? '' : 'none';
+          var show = item.dataset.status === filter;
+          item.style.display = show ? '' : 'none';
+          if (show) visibleCount++;
         }
       });
+
+      if (emptyState) {
+        emptyState.style.display = visibleCount === 0 ? '' : 'none';
+      }
     });
   });
 

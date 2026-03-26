@@ -152,6 +152,57 @@ See [`docs/`](./docs/) for:
 - **M4** 🔲 AI analysis against real PRs
 - **M5** 🔲 Documentation site + launch
 
+## Validating AI Accuracy
+
+Frontguard's value depends on AI vision models correctly classifying visual changes. The validation framework tests this empirically with 10 synthetic test cases and a scaffold for real-world PR validation.
+
+**Synthetic validation** (`scripts/validate-ai.ts`) — generates 10 programmatic before/after screenshot pairs using `pngjs` with known ground truth:
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| 1 | Identical images (red square) | pass — no regression |
+| 2 | Color change (blue→red button) | regression / critical |
+| 3 | Content change (price $49→$59) | content_update |
+| 4 | Layout break (50px shift + overflow) | regression / critical |
+| 5 | Missing element (nav bar removed) | regression / critical |
+| 6 | Added element (new banner + badge) | intentional |
+| 7 | Spacing change (subtle 5px shift) | intentional / info |
+| 8 | Full theme change (light→dark) | intentional |
+| 9 | Overflow (wider element on mobile) | regression / warning |
+| 10 | Image swap (green→purple region) | content_update |
+
+For each pair the script generates a pixel diff via `pixelmatch`, calls `analyzeWithAI()`, compares the classification and severity against expected values, and prints a results table. Missing API keys are handled gracefully with a clear error message.
+
+```bash
+# Set your AI provider key
+export FRONTGUARD_OPENAI_KEY=sk-...
+# Or: export FRONTGUARD_ANTHROPIC_KEY=sk-ant-...
+
+# Run the 10-case synthetic validation suite
+npx tsx scripts/validate-ai.ts
+
+# Optional: configure provider and model
+VALIDATION_PROVIDER=anthropic VALIDATION_MODEL=claude-sonnet-4-20250514 npx tsx scripts/validate-ai.ts
+```
+
+**Real-world validation** (`scripts/validate-ai-real.ts`) — scaffold for validating against actual GitHub PRs:
+
+```bash
+# Single PR
+npx tsx scripts/validate-ai-real.ts --repo shadcn-ui/ui --pr 1234
+
+# With ground truth expectations
+npx tsx scripts/validate-ai-real.ts --repo shadcn-ui/ui --pr 1234 \
+  --ground-truth ground-truth/shadcn-1234.json
+
+# Batch mode
+npx tsx scripts/validate-ai-real.ts --batch ground-truth/cases.json
+```
+
+Accepts `--repo` and `--pr` flags, clones the repo, checks out base/head refs, and scaffolds the before/after rendering pipeline. Key stages (framework detection, dev server startup, Playwright capture) are marked as TODOs for Phase 2 implementation.
+
+Results are saved to `validation-results/` as JSON for tracking accuracy over time.
+
 ## Environment Variables
 
 ```bash

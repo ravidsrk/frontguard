@@ -1,0 +1,178 @@
+{
+  "timestamp": "2026-03-26T14:32:08.439Z",
+  "provider": "openai",
+  "model": "gpt-4o",
+  "summary": {
+    "total": 10,
+    "classificationAccuracy": "60",
+    "severityAccuracy": "80",
+    "fullMatchAccuracy": "60",
+    "errors": 0
+  },
+  "cases": [
+    {
+      "name": "Identical images (red square)",
+      "expectedClassification": "pass",
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "pass",
+      "gotSeverity": "none",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 1,
+      "explanation": "Images are pixel-identical — passed diff gate",
+      "duration": 57
+    },
+    {
+      "name": "Color change (blue→red button)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical",
+        "warning"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": false,
+      "confidence": 0.95,
+      "explanation": "The button color has changed from blue to red.",
+      "duration": 3160
+    },
+    {
+      "name": "Content change ($49→$59)",
+      "expectedClassification": [
+        "content_update"
+      ],
+      "expectedSeverity": [
+        "info",
+        "warning"
+      ],
+      "gotClassification": "content_update",
+      "gotSeverity": "info",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "A single character or small text element was modified in the content, as indicated by the minor change in the pixel diff overlay.",
+      "duration": 3125
+    },
+    {
+      "name": "Layout break (shifted 50px)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "critical",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "The text and button components in the content area have shifted to the right, causing misalignment. This is not aligned with the expected layout where elements should remain centered within their containers.",
+      "duration": 3198
+    },
+    {
+      "name": "Missing element (nav bar removed)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": false,
+      "confidence": 0.9,
+      "explanation": "The sidebar menu seems to have changed. The icons and text seem to have shifted slightly, possibly indicating a redesign or update.",
+      "duration": 3022
+    },
+    {
+      "name": "Added element (banner + badge)",
+      "expectedClassification": [
+        "intentional",
+        "content_update"
+      ],
+      "expectedSeverity": [
+        "info",
+        "warning"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "A new search bar with a green background and search button was added to the top of the page.",
+      "duration": 1867
+    },
+    {
+      "name": "Spacing change (5px shift)",
+      "expectedClassification": [
+        "intentional"
+      ],
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "content_update",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "The content, specifically the text lines and button text, has changed, but the layout remains intact.",
+      "duration": 2005
+    },
+    {
+      "name": "Theme change (light→dark)",
+      "expectedClassification": [
+        "intentional"
+      ],
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "The color scheme of the interface has been changed from a light theme to a dark theme, affecting the background and text colors.",
+      "duration": 2384
+    },
+    {
+      "name": "Overflow (wider element)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical",
+        "warning"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "critical",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "The vertical spacing between sections has changed, causing overlap. The upper section is encroaching into the space of the lower section.",
+      "duration": 2774
+    },
+    {
+      "name": "Image swap (color region)",
+      "expectedClassification": [
+        "content_update"
+      ],
+      "expectedSeverity": [
+        "info",
+        "warning"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": true,
+      "confidence": 0.9,
+      "explanation": "The color of the banner has changed from green to purple, which suggests a deliberate design alteration.",
+      "duration": 2650
+    }
+  ]
+}

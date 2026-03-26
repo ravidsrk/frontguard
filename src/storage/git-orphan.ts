@@ -8,8 +8,8 @@
  * @module storage/git-orphan
  */
 
-import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { BaselineStorage, BaselineManifest, BrowserEngine } from '../core/types.js';
@@ -18,25 +18,21 @@ import { logger } from '../utils/logger.js';
 /**
  * Converts a route path to a safe filesystem path for baseline storage.
  *
- * - Strips leading slash
- * - Preserves directory structure
+ * - Strips leading slashes and normalises path traversal attempts
+ * - Preserves directory structure for safe characters only
  * - Converts `/` root to `_root`
  *
  * @example
  * sanitizeRoutePath('/checkout/step-1') // => 'checkout/step-1'
  * sanitizeRoutePath('/')                // => '_root'
+ * sanitizeRoutePath('../../etc/passwd') // => '____etc_passwd'
  */
 function sanitizeRoutePath(route: string): string {
-  if (route === '/') return '_root';
-  // Strip leading slash, keep internal structure
-  let sanitized = route.startsWith('/') ? route.slice(1) : route;
-  // Remove trailing slash
-  if (sanitized.endsWith('/')) {
-    sanitized = sanitized.slice(0, -1);
-  }
-  // Replace any characters unsafe for paths
-  sanitized = sanitized.replace(/[<>:"|?*]/g, '_');
-  return sanitized;
+  // Strip leading slashes, collapse path traversal
+  let sanitized = route.replace(/^\/+/, '').replace(/\.\./g, '_');
+  if (!sanitized || sanitized === '.') sanitized = '_root';
+  // Allow only safe characters: alphanumeric, underscore, hyphen, forward slash
+  return sanitized.replace(/[^a-zA-Z0-9_\-\/]/g, '_');
 }
 
 /**
@@ -46,54 +42,6 @@ function sanitizeRoutePath(route: string): string {
  */
 function baselinePath(route: string, viewport: number, browser: BrowserEngine): string {
   return `baselines/${sanitizeRoutePath(route)}/${viewport}/${browser}.png`;
-}
-
-/**
- * Executes a git command synchronously in the given directory.
- * Returns stdout as a trimmed string.
- *
- * @throws Error with descriptive message on failure
- */
-function git(args: string, cwd: string): string {
-  try {
-    return execSync(`git ${args}`, {
-      cwd,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 30_000,
-    }).trim();
-  } catch (err: unknown) {
-    const message = err instanceof Error ? (err as NodeJS.ErrnoException).message : String(err);
-    throw new Error(`git ${args.split(' ')[0]} failed: ${message}`);
-  }
-}
-
-/**
- * Executes a git command and returns the raw Buffer stdout.
- * Used for reading binary blobs (PNG files) from the tree.
- */
-function gitBuffer(args: string, cwd: string): Buffer {
-  return execSync(`git ${args}`, {
-    cwd,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    timeout: 30_000,
-  });
-}
-
-/**
- * Checks whether a git command succeeds (exit code 0).
- */
-function gitCheck(args: string, cwd: string): boolean {
-  try {
-    execSync(`git ${args}`, {
-      cwd,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 10_000,
-    });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -119,6 +67,82 @@ export class GitOrphanStorage implements BaselineStorage {
     this.branch = branch;
   }
 
+  // ---------------------------------------------------------------------------
+  // Safe git command helpers (shell-injection-proof)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Executes a git command synchronously using execFileSync (no shell).
+   * Arguments are passed as an array, preventing shell injection.
+   * Runs in this.repoDir by default.
+   */
+  private git(...args: string[]): string {
+    return this.gitIn(this.repoDir, ...args);
+  }
+
+  /**
+   * Executes a git command in a specific directory.
+   */
+  private gitIn(cwd: string, ...args: string[]): string {
+    try {
+      return execFileSync('git', args, {
+        cwd,
+        encoding: 'utf-8',
+        timeout: 30_000,
+      }).trim();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? (err as NodeJS.ErrnoException).message : String(err);
+      throw new Error(`git ${args[0]} failed: ${message}`);
+    }
+  }
+
+  /**
+   * Executes a git command and returns the raw Buffer stdout.
+   * Used for reading binary blobs (PNG files) from the tree.
+   */
+  private gitBuffer(...args: string[]): Buffer {
+    return execFileSync('git', args, {
+      cwd: this.repoDir,
+      timeout: 30_000,
+    });
+  }
+
+  /**
+   * Checks whether a git command succeeds (exit code 0).
+   */
+  private gitCheck(...args: string[]): boolean {
+    try {
+      execFileSync('git', args, {
+        cwd: this.repoDir,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 10_000,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Checks whether a git command succeeds in a specific directory.
+   */
+  private gitCheckIn(cwd: string, ...args: string[]): boolean {
+    try {
+      execFileSync('git', args, {
+        cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 10_000,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
+
   /**
    * Initialise the orphan branch storage.
    *
@@ -129,7 +153,7 @@ export class GitOrphanStorage implements BaselineStorage {
    */
   async init(): Promise<void> {
     // Verify git repo
-    if (!gitCheck('rev-parse --is-inside-work-tree', this.repoDir)) {
+    if (!this.gitCheck('rev-parse', '--is-inside-work-tree')) {
       throw new Error(
         'frontguard requires a git repository. ' +
           'Run "git init" or clone your project first.'
@@ -137,14 +161,14 @@ export class GitOrphanStorage implements BaselineStorage {
     }
 
     // Handle shallow clones
-    const isShallow = git('rev-parse --is-shallow-repository', this.repoDir);
+    const isShallow = this.git('rev-parse', '--is-shallow-repository');
     if (isShallow === 'true') {
       logger.debug('Shallow clone detected — fetching orphan branch');
       try {
-        git(`fetch origin ${this.branch} --depth=1`, this.repoDir);
+        this.git('fetch', 'origin', this.branch, '--depth=1');
         // Create local tracking branch if fetch succeeded
         if (!this.branchExists()) {
-          git(`branch ${this.branch} FETCH_HEAD`, this.repoDir);
+          this.git('branch', this.branch, 'FETCH_HEAD');
         }
       } catch {
         logger.debug('Branch not on remote yet (shallow), will create locally');
@@ -176,7 +200,7 @@ export class GitOrphanStorage implements BaselineStorage {
     const path = baselinePath(route, viewport, browser);
 
     try {
-      return gitBuffer(`show ${this.branch}:${path}`, this.repoDir);
+      return this.gitBuffer('show', `${this.branch}:${path}`);
     } catch {
       return null;
     }
@@ -218,7 +242,7 @@ export class GitOrphanStorage implements BaselineStorage {
     this.ensureInitialized();
 
     try {
-      const raw = git(`show ${this.branch}:manifest.json`, this.repoDir);
+      const raw = this.git('show', `${this.branch}:manifest.json`);
       return JSON.parse(raw) as BaselineManifest;
     } catch {
       return null;
@@ -248,7 +272,7 @@ export class GitOrphanStorage implements BaselineStorage {
 
     try {
       // Check if the branch has any baselines/ entries
-      const tree = git(`ls-tree --name-only ${this.branch}`, this.repoDir);
+      const tree = this.git('ls-tree', '--name-only', this.branch);
       return tree.includes('baselines');
     } catch {
       return false;
@@ -263,7 +287,7 @@ export class GitOrphanStorage implements BaselineStorage {
    * Checks if the orphan branch exists locally.
    */
   private branchExists(): boolean {
-    return gitCheck(`rev-parse --verify ${this.branch}`, this.repoDir);
+    return this.gitCheck('rev-parse', '--verify', this.branch);
   }
 
   /**
@@ -274,42 +298,40 @@ export class GitOrphanStorage implements BaselineStorage {
    * is not available (very old git).
    */
   private async createOrphanBranch(): Promise<void> {
-    const tmpDir = join(tmpdir(), `frontguard-init-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-
-    try {
-      // Get the current branch/ref to restore later
+    // Try worktree approach first (safer — never touches main working tree)
+    if (this.supportsWorktree()) {
+      await this.createOrphanViaWorktree();
+    } else {
+      // Get the current branch/ref to restore after checkout-based fallback
       let originalRef: string;
       try {
-        originalRef = git('symbolic-ref --short HEAD', this.repoDir);
+        originalRef = this.git('symbolic-ref', '--short', 'HEAD');
       } catch {
         // Detached HEAD
-        originalRef = git('rev-parse HEAD', this.repoDir);
+        originalRef = this.git('rev-parse', 'HEAD');
       }
-
-      // Try worktree approach first (safer)
-      if (this.supportsWorktree()) {
-        await this.createOrphanViaWorktree(tmpDir);
-      } else {
-        await this.createOrphanViaCheckout(originalRef);
-      }
-    } finally {
-      // Clean up temp dir
-      if (existsSync(tmpDir)) {
-        rmSync(tmpDir, { recursive: true, force: true });
-      }
+      await this.createOrphanViaCheckout(originalRef);
     }
   }
 
   /**
    * Create orphan branch using git worktree (preferred, non-destructive).
+   *
+   * All destructive operations (checkout --orphan, rm -rf) happen inside
+   * a temporary worktree directory — the main working tree is never touched.
    */
-  private async createOrphanViaWorktree(tmpDir: string): Promise<void> {
-    try {
-      // Create orphan branch
-      git(`checkout --orphan ${this.branch}`, this.repoDir);
-      git('rm -rf .', this.repoDir);
+  private async createOrphanViaWorktree(): Promise<void> {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'frontguard-init-'));
 
-      // Write initial manifest
+    try {
+      // Add a detached worktree in the temp directory
+      this.git('worktree', 'add', '--detach', tmpDir);
+
+      // Inside the worktree, create the orphan branch
+      this.gitIn(tmpDir, 'checkout', '--orphan', this.branch);
+      this.gitIn(tmpDir, 'rm', '-rf', '.');
+
+      // Write initial manifest into the temp worktree
       const manifest: BaselineManifest = {
         schemaVersion: 1,
         createdBy: 'frontguard@0.1.0',
@@ -317,45 +339,39 @@ export class GitOrphanStorage implements BaselineStorage {
         routes: {},
       };
       writeFileSync(
-        join(this.repoDir, 'manifest.json'),
+        join(tmpDir, 'manifest.json'),
         JSON.stringify(manifest, null, 2) + '\n'
       );
 
-      git('add manifest.json', this.repoDir);
-      git('commit -m "Initialize frontguard baselines"', this.repoDir);
-
-      // Switch back to original branch
-      let originalRef: string;
+      this.gitIn(tmpDir, 'add', 'manifest.json');
+      this.gitIn(tmpDir, 'commit', '-m', 'Initialize frontguard baselines');
+    } finally {
+      // Always clean up the worktree
       try {
-        // The orphan creation detaches us, so get original from reflog
-        const reflog = git('reflog show --format=%gs -1 HEAD@{1}', this.repoDir);
-        // Try to find original branch from stash or just use main/master
-        originalRef = this.findDefaultBranch();
+        this.git('worktree', 'remove', tmpDir, '--force');
       } catch {
-        originalRef = this.findDefaultBranch();
+        if (existsSync(tmpDir)) {
+          rmSync(tmpDir, { recursive: true, force: true });
+        }
+        try {
+          this.git('worktree', 'prune');
+        } catch {
+          // Non-fatal
+        }
       }
-
-      git(`checkout ${originalRef}`, this.repoDir);
-    } catch (err) {
-      // If checkout fails, try to recover
-      const defaultBranch = this.findDefaultBranch();
-      try {
-        git(`checkout ${defaultBranch}`, this.repoDir);
-      } catch {
-        // Last resort
-        logger.warn('Could not switch back to original branch automatically');
-      }
-      throw err;
     }
   }
 
   /**
    * Create orphan branch via checkout (fallback for old git versions).
+   *
+   * ⚠️  This touches the main working tree. Used only when git worktree
+   * is unavailable. The working tree is restored to originalRef after.
    */
   private async createOrphanViaCheckout(originalRef: string): Promise<void> {
     try {
-      git(`checkout --orphan ${this.branch}`, this.repoDir);
-      git('rm -rf .', this.repoDir);
+      this.git('checkout', '--orphan', this.branch);
+      this.git('rm', '-rf', '.');
 
       const manifest: BaselineManifest = {
         schemaVersion: 1,
@@ -368,13 +384,13 @@ export class GitOrphanStorage implements BaselineStorage {
         JSON.stringify(manifest, null, 2) + '\n'
       );
 
-      git('add manifest.json', this.repoDir);
-      git('commit -m "Initialize frontguard baselines"', this.repoDir);
-      git(`checkout ${originalRef}`, this.repoDir);
+      this.git('add', 'manifest.json');
+      this.git('commit', '-m', 'Initialize frontguard baselines');
+      this.git('checkout', originalRef);
     } catch (err) {
       // Attempt recovery
       try {
-        git(`checkout ${originalRef}`, this.repoDir);
+        this.git('checkout', originalRef);
       } catch {
         logger.warn('Could not switch back to original branch automatically');
       }
@@ -398,28 +414,28 @@ export class GitOrphanStorage implements BaselineStorage {
     const maxAttempts = 2;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const worktreeDir = join(
-        tmpdir(),
-        `frontguard-wt-${Date.now()}-${Math.random().toString(36).slice(2)}`
-      );
+      const worktreeDir = mkdtempSync(join(tmpdir(), 'frontguard-wt-'));
 
       try {
+        // Remove the empty temp dir so git worktree can create it
+        rmSync(worktreeDir, { recursive: true, force: true });
+
         // Add a temporary worktree for the orphan branch
-        git(`worktree add "${worktreeDir}" ${this.branch}`, this.repoDir);
+        this.git('worktree', 'add', worktreeDir, this.branch);
 
         // Apply the write operation
         writeFn(worktreeDir);
 
         // Stage, commit, and push from the worktree
-        git('add -A', worktreeDir);
+        this.gitIn(worktreeDir, 'add', '-A');
 
         // Check if there are changes to commit
-        if (gitCheck('diff --cached --quiet', worktreeDir)) {
+        if (this.gitCheckIn(worktreeDir, 'diff', '--cached', '--quiet')) {
           logger.debug('No changes to commit to baseline branch');
           return;
         }
 
-        git(`commit -m "${commitMessage}"`, worktreeDir);
+        this.gitIn(worktreeDir, 'commit', '-m', commitMessage);
         logger.debug(`Committed to ${this.branch}: ${commitMessage}`);
         return;
       } catch (err) {
@@ -449,7 +465,7 @@ export class GitOrphanStorage implements BaselineStorage {
       } finally {
         // Always clean up the worktree
         try {
-          git(`worktree remove "${worktreeDir}" --force`, this.repoDir);
+          this.git('worktree', 'remove', worktreeDir, '--force');
         } catch {
           // Manual cleanup if worktree remove fails
           if (existsSync(worktreeDir)) {
@@ -457,7 +473,7 @@ export class GitOrphanStorage implements BaselineStorage {
           }
           // Prune stale worktree references
           try {
-            git('worktree prune', this.repoDir);
+            this.git('worktree', 'prune');
           } catch {
             // Non-fatal
           }
@@ -470,7 +486,7 @@ export class GitOrphanStorage implements BaselineStorage {
    * Checks if `git worktree` is supported.
    */
   private supportsWorktree(): boolean {
-    return gitCheck('worktree list', this.repoDir);
+    return this.gitCheck('worktree', 'list');
   }
 
   /**
@@ -479,20 +495,20 @@ export class GitOrphanStorage implements BaselineStorage {
   private findDefaultBranch(): string {
     // Try symbolic ref first
     try {
-      return git('symbolic-ref --short HEAD', this.repoDir);
+      return this.git('symbolic-ref', '--short', 'HEAD');
     } catch {
       // Detached HEAD or orphan — check for common defaults
     }
 
     for (const branch of ['main', 'master', 'develop']) {
-      if (gitCheck(`rev-parse --verify ${branch}`, this.repoDir)) {
+      if (this.gitCheck('rev-parse', '--verify', branch)) {
         return branch;
       }
     }
 
     // Last resort: try to get from remote
     try {
-      const remote = git('remote show origin', this.repoDir);
+      const remote = this.git('remote', 'show', 'origin');
       const match = remote.match(/HEAD branch:\s*(\S+)/);
       if (match) return match[1];
     } catch {

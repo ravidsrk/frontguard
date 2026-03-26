@@ -1,0 +1,177 @@
+{
+  "timestamp": "2026-03-26T14:25:59.898Z",
+  "provider": "openai",
+  "model": "gpt-4o",
+  "summary": {
+    "total": 10,
+    "classificationAccuracy": "70",
+    "severityAccuracy": "90",
+    "fullMatchAccuracy": "70",
+    "errors": 0
+  },
+  "cases": [
+    {
+      "name": "Identical pages",
+      "expectedClassification": "pass",
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "pass",
+      "gotSeverity": "none",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 1,
+      "explanation": "Images are pixel-identical — passed diff gate",
+      "duration": 58
+    },
+    {
+      "name": "Color change (button blue→red)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical",
+        "warning"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": false,
+      "confidence": 0.9,
+      "explanation": "The color of the button has changed from blue to red.",
+      "duration": 3160
+    },
+    {
+      "name": "Text content update ($49→$59)",
+      "expectedClassification": [
+        "content_update"
+      ],
+      "expectedSeverity": [
+        "info",
+        "warning"
+      ],
+      "gotClassification": "content_update",
+      "gotSeverity": "info",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "A small piece of text or symbol has changed in the content, but the overall layout and design remain the same.",
+      "duration": 2257
+    },
+    {
+      "name": "Layout break (shifted 50px)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "critical",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "Content is overflowing beyond the container boundaries.",
+      "duration": 3184
+    },
+    {
+      "name": "Font change (subtle rendering)",
+      "expectedClassification": [
+        "intentional"
+      ],
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "content_update",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "Text content within the boxes has been updated, but the layout and design remain unchanged.",
+      "duration": 2032
+    },
+    {
+      "name": "Missing element (sidebar gone)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "critical",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "The sidebar is missing in the current version, which is present in the baseline. This affects navigation.",
+      "duration": 2204
+    },
+    {
+      "name": "Added element (banner + badge)",
+      "expectedClassification": [
+        "intentional",
+        "content_update"
+      ],
+      "expectedSeverity": [
+        "info",
+        "warning"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "A new search bar was added to the top of the page, and the surrounding area was styled with a green background, indicating a likely design change.",
+      "duration": 2246
+    },
+    {
+      "name": "Responsive breakage (overflow)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical",
+        "warning"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "critical",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "The content layout has shifted to the right causing alignment issues, potentially due to margin or padding changes.",
+      "duration": 2570
+    },
+    {
+      "name": "Dark mode toggle",
+      "expectedClassification": [
+        "intentional"
+      ],
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 1,
+      "explanation": "The screenshots show a shift to a dark mode theme with changes in background and text color.",
+      "duration": 3583
+    },
+    {
+      "name": "Subtle spacing (2px shift)",
+      "expectedClassification": [
+        "intentional"
+      ],
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "content_update",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "Text content within boxes has changed but the layout remains intact.",
+      "duration": 3792
+    }
+  ]
+}

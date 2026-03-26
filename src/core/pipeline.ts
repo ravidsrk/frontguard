@@ -9,6 +9,9 @@
  * @module core/pipeline
  */
 
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type {
   FrontguardConfig,
   Route,
@@ -28,6 +31,77 @@ import { analyzeWithAI } from '../diff/ai-vision.js';
 import { GitOrphanStorage } from '../storage/git-orphan.js';
 import { detectPreviewUrl, waitForUrl } from '../utils/preview-url.js';
 import { logger } from '../utils/logger.js';
+
+// ---------------------------------------------------------------------------
+// Memory Management Helpers
+// ---------------------------------------------------------------------------
+
+/** Default number of AI calls to run in parallel. */
+const AI_BATCH_SIZE = 5;
+
+/** Number of screenshots to render in each memory-management chunk. */
+const RENDER_CHUNK_SIZE = 10;
+
+/**
+ * Dispose large image buffers on a DiffResult that is not flagged as changed.
+ * Passing pages don't need their images kept in memory for reports — the
+ * HTML reporter can read them lazily from a temp directory if needed.
+ */
+function disposeBuffers(diff: DiffResult): void {
+  diff.baselineImage = undefined;
+  diff.currentImage = undefined;
+  diff.diffImage = undefined;
+}
+
+/**
+ * Persist an image buffer to a temp directory and return the path.
+ * Returns empty string if the buffer is undefined.
+ */
+function persistBufferToTemp(
+  tempDir: string,
+  key: string,
+  buf: Buffer | undefined,
+): string {
+  if (!buf || buf.length === 0) return '';
+  const safeName = key.replace(/[^a-zA-Z0-9_-]/g, '_') + '.png';
+  const filePath = join(tempDir, safeName);
+  writeFileSync(filePath, buf);
+  return filePath;
+}
+
+/**
+ * Read an image buffer back from a temp file path.
+ * Returns undefined if path is empty or the file doesn't exist.
+ */
+function readBufferFromTemp(filePath: string): Buffer | undefined {
+  if (!filePath) return undefined;
+  try {
+    return readFileSync(filePath);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Process items in parallel batches using Promise.allSettled.
+ */
+async function processBatched<T, R>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<Array<{ status: 'fulfilled'; value: R } | { status: 'rejected'; reason: unknown }>> {
+  const results: Array<{ status: 'fulfilled'; value: R } | { status: 'rejected'; reason: unknown }> = [];
+
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.allSettled(
+      batch.map((item, batchIndex) => fn(item, i + batchIndex)),
+    );
+    results.push(...batchResults);
+  }
+
+  return results;
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -271,9 +345,17 @@ export async function runPipeline(
   }
 
   // -----------------------------------------------------------------------
-  // Stage 4: COMPARE
+  // Stage 4: COMPARE (with memory management)
   // -----------------------------------------------------------------------
   const diffs: DiffResult[] = [];
+
+  // Create a temp directory for persisting images of changed pages
+  // so we can free memory during comparison and restore lazily for reports.
+  const tempDir = join(tmpdir(), `frontguard-${Date.now()}`);
+  mkdirSync(tempDir, { recursive: true });
+
+  // Track temp file paths for changed diffs so we can restore buffers for reporting
+  const tempPaths = new Map<number, { baseline: string; current: string; diff: string }>();
 
   reporter.onStageStart('compare', 'Comparing against baselines…');
   try {
@@ -315,6 +397,27 @@ export async function runPipeline(
           }
 
           diffs.push(diff);
+          const diffIndex = diffs.length - 1;
+
+          // Memory optimization: persist changed/regression images to temp dir
+          // and free the buffers. Passing diffs don't need images at all.
+          const isChanged = diff.status === 'changed' || diff.status === 'regression' || diff.status === 'new';
+          if (isChanged) {
+            const key = `${diffIndex}_${shot.route.path}_${shot.viewport}_${shot.browser}`;
+            tempPaths.set(diffIndex, {
+              baseline: persistBufferToTemp(tempDir, `${key}_baseline`, diff.baselineImage),
+              current: persistBufferToTemp(tempDir, `${key}_current`, diff.currentImage),
+              diff: persistBufferToTemp(tempDir, `${key}_diff`, diff.diffImage),
+            });
+            // Free in-memory buffers now that they're persisted to disk
+            disposeBuffers(diff);
+          } else {
+            // Not changed — no need to keep buffers at all
+            disposeBuffers(diff);
+          }
+
+          // Null out the screenshot buffer — it's been compared and is no longer needed
+          (shot as { buffer: Buffer | null }).buffer = null!;
 
           reporter.onStageProgress(
             'compare',
@@ -345,26 +448,45 @@ export async function runPipeline(
     reporter.onStageComplete('compare', `Failed: ${msg}`);
   }
 
+  // Free the screenshots array — all data has been extracted
+  screenshots = [];
+
   // -----------------------------------------------------------------------
-  // Stage 5: ANALYZE (optional — AI)
+  // Stage 5: ANALYZE (optional — AI, parallelised in batches)
   // -----------------------------------------------------------------------
   if (config.ai) {
-    const changedDiffs = diffs.filter(
-      (d) => d.status === 'changed' || d.status === 'regression',
-    );
+    // Restore image buffers from temp for changed diffs so AI can analyze them
+    const changedDiffsWithIndices: Array<{ diff: DiffResult; index: number }> = [];
+    for (let i = 0; i < diffs.length; i++) {
+      const d = diffs[i];
+      if (d.status === 'changed' || d.status === 'regression') {
+        // Restore buffers from temp so AI can access the images
+        const paths = tempPaths.get(i);
+        if (paths) {
+          d.baselineImage = readBufferFromTemp(paths.baseline);
+          d.currentImage = readBufferFromTemp(paths.current);
+          d.diffImage = readBufferFromTemp(paths.diff);
+        }
+        changedDiffsWithIndices.push({ diff: d, index: i });
+      }
+    }
 
-    if (changedDiffs.length > 0) {
+    if (changedDiffsWithIndices.length > 0) {
       reporter.onStageStart(
         'analyze',
-        `Analyzing ${changedDiffs.length} change(s) with ${config.ai.provider}/${config.ai.model}…`,
+        `Analyzing ${changedDiffsWithIndices.length} change(s) with ${config.ai.provider}/${config.ai.model} (batch size: ${AI_BATCH_SIZE})…`,
       );
+
+      const aiConfig = config.ai;
+      let completed = 0;
 
       try {
         const [, duration] = await timed(async () => {
-          for (let i = 0; i < changedDiffs.length; i++) {
-            const diff = changedDiffs[i];
-            try {
-              const analysis = await analyzeWithAI(diff, config.ai!);
+          await processBatched(
+            changedDiffsWithIndices,
+            AI_BATCH_SIZE,
+            async ({ diff }) => {
+              const analysis = await analyzeWithAI(diff, aiConfig);
               diff.aiAnalysis = analysis;
 
               // If AI says intentional with high confidence, downgrade regression → warning status
@@ -380,26 +502,30 @@ export async function runPipeline(
                 diff.status = 'changed';
               }
 
+              completed++;
               reporter.onStageProgress(
                 'analyze',
-                i + 1,
-                changedDiffs.length,
+                completed,
+                changedDiffsWithIndices.length,
                 `${diff.route.path} → ${analysis.classification} (${(analysis.confidence * 100).toFixed(0)}%)`,
               );
-            } catch (err) {
-              logger.warn(
-                `AI analysis failed for ${diff.route.path}: ${err instanceof Error ? err.message : String(err)}`,
-              );
-            }
-          }
+
+              return analysis;
+            },
+          );
         });
 
         timing.ai = duration;
-        reporter.onStageComplete('analyze', `Analyzed ${changedDiffs.length} change(s) in ${duration}ms`);
+        reporter.onStageComplete('analyze', `Analyzed ${changedDiffsWithIndices.length} change(s) in ${duration}ms`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         logger.error(`AI analysis stage failed: ${msg}`);
         reporter.onStageComplete('analyze', `Failed: ${msg}`);
+      }
+
+      // Free AI buffers again after analysis — they'll be restored for reporting
+      for (const { diff } of changedDiffsWithIndices) {
+        disposeBuffers(diff);
       }
     } else {
       logger.debug('No changed pages to analyze with AI');
@@ -407,8 +533,22 @@ export async function runPipeline(
   }
 
   // -----------------------------------------------------------------------
-  // Stage 6: BUILD RESULT
+  // Stage 6: BUILD RESULT (restore image buffers from temp in chunks)
   // -----------------------------------------------------------------------
+
+  // Restore image buffers from temp directory in chunks for the report
+  const diffIndices = Array.from(tempPaths.keys());
+  for (let c = 0; c < diffIndices.length; c += RENDER_CHUNK_SIZE) {
+    const chunk = diffIndices.slice(c, c + RENDER_CHUNK_SIZE);
+    for (const idx of chunk) {
+      const paths = tempPaths.get(idx)!;
+      const diff = diffs[idx];
+      diff.baselineImage = readBufferFromTemp(paths.baseline);
+      diff.currentImage = readBufferFromTemp(paths.current);
+      diff.diffImage = readBufferFromTemp(paths.diff);
+    }
+  }
+
   timing.total = Math.round(performance.now() - totalStart);
   const result = buildResult(diffs, timing, totalStart, config);
 
@@ -422,6 +562,18 @@ export async function runPipeline(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`Reporter failed: ${msg}`);
+  }
+
+  // -----------------------------------------------------------------------
+  // Cleanup: free buffers and remove temp directory
+  // -----------------------------------------------------------------------
+  for (const diff of diffs) {
+    disposeBuffers(diff);
+  }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    logger.debug(`Could not clean up temp directory: ${tempDir}`);
   }
 
   return result;

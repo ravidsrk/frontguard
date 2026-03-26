@@ -31,7 +31,7 @@ const STATUS_ICONS: Record<string, string> = {
   changed: chalk.yellow('⚠'),
   regression: chalk.red('✘'),
   new: chalk.blue('★'),
-  error: chalk.red('⚠'),
+  error: chalk.red('✘'),
   flaky: chalk.yellow('~'),
 };
 
@@ -101,9 +101,27 @@ export class ConsoleReporter implements Reporter {
     }
 
     console.log('');
+
+    if (result.diffs.length === 0) {
+      console.log(chalk.dim('  No routes were tested. Add routes to your config or use --url with --routes.'));
+      console.log('');
+      return;
+    }
+
     this.printRouteTable(result);
-    this.printRegressions(result);
-    this.printWarnings(result);
+
+    const hasRegressions = result.summary.regressions > 0;
+    const hasWarnings = result.summary.warnings > 0;
+    const hasErrors = result.summary.errors > 0;
+
+    if (!hasRegressions && !hasWarnings && !hasErrors) {
+      console.log(chalk.green.bold('  ✅ All pages match baselines'));
+      console.log('');
+    } else {
+      this.printRegressions(result);
+      this.printWarnings(result);
+    }
+
     this.printSummary(result);
   }
 

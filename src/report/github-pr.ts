@@ -84,6 +84,14 @@ export class GitHubPRReporter implements Reporter {
     // Marker for finding existing comments
     sections.push(COMMENT_MARKER);
 
+    // If all pages pass (no regressions, warnings, errors, or new), show clean badge
+    const allPassing = summary.regressions === 0 && summary.warnings === 0 && summary.errors === 0 && summary.newPages === 0;
+    if (allPassing && summary.total > 0) {
+      sections.push(`# ✅ Frontguard — All ${summary.total} pages match baselines`);
+      sections.push(this.generateFooter(result));
+      return sections.join('\n\n');
+    }
+
     // Header with badge
     sections.push(this.generateHeader(summary));
 
@@ -151,10 +159,8 @@ export class GitHubPRReporter implements Reporter {
       lines.push(`<summary>${label} — ${diff.diffPercentage.toFixed(2)}% changed</summary>`);
       lines.push('');
 
-      // Image placeholders (would be replaced with actual uploaded image URLs in a real CI)
-      lines.push('| Baseline | Current | Diff |');
-      lines.push('|:---:|:---:|:---:|');
-      lines.push(`| ![baseline](baseline) | ![current](current) | ![diff](diff) |`);
+      // Visual change summary (images can't be embedded in PR comments — too large for base64)
+      lines.push(`> 📸 **Baseline → Current** (${diff.diffPercentage.toFixed(2)}% diff)`);
       lines.push('');
 
       // AI analysis
@@ -190,9 +196,8 @@ export class GitHubPRReporter implements Reporter {
       lines.push(`<summary>${label} — ${diff.diffPercentage.toFixed(2)}% changed</summary>`);
       lines.push('');
 
-      lines.push('| Baseline | Current | Diff |');
-      lines.push('|:---:|:---:|:---:|');
-      lines.push(`| ![baseline](baseline) | ![current](current) | ![diff](diff) |`);
+      // Visual change summary (images can't be embedded in PR comments — too large for base64)
+      lines.push(`> 📸 **Baseline → Current** (${diff.diffPercentage.toFixed(2)}% diff)`);
       lines.push('');
 
       if (diff.aiAnalysis) {
@@ -237,12 +242,12 @@ export class GitHubPRReporter implements Reporter {
         const diff = result.diffs.find((d) => d.route.path === route && d.viewport === vp);
         if (!diff) return '–';
         switch (diff.status) {
-          case 'pass': return '✅';
-          case 'changed': return '⚠️';
-          case 'regression': return '❌';
-          case 'new': return '🆕';
-          case 'error': return '💥';
-          case 'flaky': return '🔄';
+          case 'pass': return '✓';
+          case 'changed': return '⚠';
+          case 'regression': return '✘';
+          case 'new': return '★';
+          case 'error': return '✘';
+          case 'flaky': return '⚠';
           default: return '–';
         }
       });
@@ -257,7 +262,7 @@ export class GitHubPRReporter implements Reporter {
     return `---\n` +
       `<sub>🛡️ Frontguard visual regression test · ` +
       `${result.summary.total} comparisons in ${totalSec}s · ` +
-      `[View full report](${result.config.outputDir}/report.html)</sub>`;
+      `📎 See the full HTML report with screenshots in the CI artifacts</sub>`;
   }
 
   private truncateComment(markdown: string, result: RunResult): string {
