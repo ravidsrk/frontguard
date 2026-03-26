@@ -1,4 +1,9 @@
 import { defineConfig } from 'vitest/config';
 export default defineConfig({
-  test: { globals: true, include: ['test/**/*.test.ts'], timeout: 30000 },
+  test: {
+    globals: true,
+    include: ['test/**/*.test.ts'],
+    exclude: ['test/e2e/**'],
+    timeout: 30000,
+  },
 });
