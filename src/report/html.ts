@@ -39,8 +39,11 @@ export class HTMLReporter implements Reporter {
 
   /**
    * Generate a complete, self-contained HTML report string.
+   *
+   * @param result - The pipeline run result
+   * @param resolveImage - Optional image resolver; defaults to inline base64 data URIs
    */
-  generateReport(result: RunResult): string {
+  generateReport(result: RunResult, resolveImage: ImageResolver = defaultImageResolver): string {
     const routes = [...new Set(result.diffs.map((d) => d.route.path))];
     const routeData = routes.map((path) => {
       const diffs = result.diffs.filter((d) => d.route.path === path);
@@ -82,7 +85,7 @@ ${renderHeader(result)}
     <div class="placeholder" id="placeholder">
       <p>← Select a route from the sidebar to view details</p>
     </div>
-    ${routeData.map((r, i) => renderRouteDetail(r.path, r.diffs, i)).join('\n    ')}
+    ${routeData.map((r, i) => renderRouteDetail(r.path, r.diffs, i, resolveImage)).join('\n    ')}
   </main>
 </div>
 ${renderTimingFooter(result)}
@@ -93,10 +96,42 @@ ${renderTimingFooter(result)}
 
   /**
    * Write the HTML report file to disk.
+   *
+   * Attempts to write PNG images as files under `{outputDir}/images/`
+   * and reference them via relative `src="images/..."` paths in the HTML.
+   * Falls back to inline base64 data URIs if the images directory cannot
+   * be created (e.g. permission issues).
    */
   writeReport(result: RunResult, outputDir: string): void {
     mkdirSync(outputDir, { recursive: true });
-    const html = this.generateReport(result);
+
+    // Try to set up file-based image resolver
+    let resolveImage: ImageResolver = defaultImageResolver;
+    const imagesDir = join(outputDir, 'images');
+
+    try {
+      mkdirSync(imagesDir, { recursive: true });
+
+      // File-based resolver: write PNGs to disk, return relative paths
+      resolveImage = (buf: Buffer | undefined, name: string): string => {
+        if (!buf || buf.length === 0) return '';
+        const filename = `${name}.png`;
+        try {
+          writeFileSync(join(imagesDir, filename), buf);
+          return `images/${filename}`;
+        } catch {
+          // Single-image fallback: if writing this file fails, use data URI
+          return bufferToDataUri(buf);
+        }
+      };
+
+      logger.debug(`Writing report images to ${imagesDir}`);
+    } catch {
+      // Could not create images directory — fall back to base64
+      logger.debug('Could not create images directory, falling back to base64 data URIs');
+    }
+
+    const html = this.generateReport(result, resolveImage);
     const reportPath = join(outputDir, 'report.html');
     writeFileSync(reportPath, html, 'utf-8');
     logger.info(`HTML report written to ${reportPath}`);
@@ -159,6 +194,22 @@ function bufferToDataUri(buf: Buffer | undefined): string {
   return `data:image/png;base64,${buf.toString('base64')}`;
 }
 
+/**
+ * Resolves an image buffer to a src string (file path or data URI).
+ * The `name` parameter provides a unique filename stem for file-based output.
+ */
+type ImageResolver = (buf: Buffer | undefined, name: string) => string;
+
+/** Default resolver: inline base64 data URIs (self-contained HTML). */
+const defaultImageResolver: ImageResolver = (buf, _name) => bufferToDataUri(buf);
+
+/**
+ * Sanitise a route path into a safe filename fragment.
+ */
+function safeFilenameFragment(route: string): string {
+  return route.replace(/[^a-zA-Z0-9]/g, '_').replace(/^_+/, '').slice(0, 60) || '_root';
+}
+
 // ---------------------------------------------------------------------------
 // Render Functions
 // ---------------------------------------------------------------------------
@@ -205,11 +256,14 @@ function renderSidebarItem(path: string, status: string, index: number): string 
       </li>`;
 }
 
-function renderRouteDetail(path: string, diffs: DiffResult[], index: number): string {
-  const diffCards = diffs.map((diff) => {
-    const baselineUri = bufferToDataUri(diff.baselineImage);
-    const currentUri = bufferToDataUri(diff.currentImage);
-    const diffUri = bufferToDataUri(diff.diffImage);
+function renderRouteDetail(path: string, diffs: DiffResult[], index: number, resolveImage: ImageResolver = defaultImageResolver): string {
+  const routeFragment = safeFilenameFragment(path);
+
+  const diffCards = diffs.map((diff, diffIdx) => {
+    const prefix = `${routeFragment}_${diff.viewport}_${diff.browser}_${diffIdx}`;
+    const baselineSrc = resolveImage(diff.baselineImage, `${prefix}_baseline`);
+    const currentSrc = resolveImage(diff.currentImage, `${prefix}_current`);
+    const diffSrc = resolveImage(diff.diffImage, `${prefix}_diff`);
 
     let aiSection = '';
     if (diff.aiAnalysis) {
@@ -231,9 +285,9 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number): st
         </div>
         ${diff.error ? `<div class="diff-error">${escapeHtml(diff.error)}</div>` : ''}
         <div class="image-row">
-          ${baselineUri ? `<div class="image-col"><h5>Baseline</h5><img src="${baselineUri}" alt="baseline" loading="lazy"></div>` : ''}
-          ${currentUri ? `<div class="image-col"><h5>Current</h5><img src="${currentUri}" alt="current" loading="lazy"></div>` : ''}
-          ${diffUri ? `<div class="image-col"><h5>Diff</h5><img src="${diffUri}" alt="diff" loading="lazy"></div>` : ''}
+          ${baselineSrc ? `<div class="image-col"><h5>Baseline</h5><img src="${baselineSrc}" alt="baseline" loading="lazy"></div>` : ''}
+          ${currentSrc ? `<div class="image-col"><h5>Current</h5><img src="${currentSrc}" alt="current" loading="lazy"></div>` : ''}
+          ${diffSrc ? `<div class="image-col"><h5>Diff</h5><img src="${diffSrc}" alt="diff" loading="lazy"></div>` : ''}
         </div>
         ${aiSection}
       </div>`;

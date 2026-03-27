@@ -39,6 +39,9 @@ import { logger } from '../utils/logger.js';
 /** Default number of AI calls to run in parallel. */
 const AI_BATCH_SIZE = 5;
 
+/** Number of comparisons to run in parallel. */
+const COMPARE_BATCH_SIZE = 5;
+
 /** Number of screenshots to render in each memory-management chunk. */
 const RENDER_CHUNK_SIZE = 10;
 
@@ -140,6 +143,49 @@ function toRouteObjects(paths: string[]): Route[] {
   }));
 }
 
+/**
+ * Discovers routes using the shared strategy:
+ *   1. Explicit routes from config
+ *   2. Crawl if discover options are set
+ *   3. Filesystem discovery, falling back to crawl from '/'
+ *
+ * Used by both `runPipeline` and `updateBaselines` to avoid duplication.
+ */
+async function discoverAllRoutes(config: FrontguardConfig): Promise<Route[]> {
+  // 1. Explicit routes from config
+  if (config.routes && config.routes.length > 0) {
+    logger.info(`Using ${config.routes.length} configured route(s)`);
+    return toRouteObjects(config.routes);
+  }
+
+  // 2. Crawl if discover options are set
+  if (config.discover) {
+    logger.info(`Crawling from ${config.discover.startUrl ?? '/'}…`);
+    return discoverRoutes(config);
+  }
+
+  // 3. Try filesystem, fall back to crawl from '/'
+  logger.info('No routes configured — attempting filesystem discovery…');
+  const fsRoutes = discoverRoutesFromFilesystem(process.cwd());
+  if (fsRoutes && fsRoutes.length > 0) {
+    logger.info(`Discovered ${fsRoutes.length} route(s) from filesystem`);
+    return fsRoutes;
+  }
+
+  // 4. Fall back: crawl from baseUrl root
+  logger.info('Filesystem discovery found nothing — crawling from /');
+  const crawlConfig: FrontguardConfig = {
+    ...config,
+    discover: {
+      startUrl: '/',
+      maxDepth: 3,
+      maxRoutes: 50,
+      exclude: [],
+    },
+  };
+  return discoverRoutes(crawlConfig);
+}
+
 // ---------------------------------------------------------------------------
 // Pipeline
 // ---------------------------------------------------------------------------
@@ -209,40 +255,7 @@ export async function runPipeline(
 
   reporter.onStageStart('discover', 'Determining routes to test…');
   try {
-    const [discovered, duration] = await timed(async () => {
-      // 1a. Explicit routes from config
-      if (config.routes && config.routes.length > 0) {
-        logger.info(`Using ${config.routes.length} configured route(s)`);
-        return toRouteObjects(config.routes);
-      }
-
-      // 1b. Crawl if discover options are set
-      if (config.discover) {
-        logger.info(`Crawling from ${config.discover.startUrl ?? '/'}…`);
-        return discoverRoutes(config);
-      }
-
-      // 1c. Try filesystem, fall back to crawl from '/'
-      logger.info('No routes configured — attempting filesystem discovery…');
-      const fsRoutes = discoverRoutesFromFilesystem(process.cwd());
-      if (fsRoutes && fsRoutes.length > 0) {
-        logger.info(`Discovered ${fsRoutes.length} route(s) from filesystem`);
-        return fsRoutes;
-      }
-
-      // 1d. Fall back: crawl from baseUrl root
-      logger.info('Filesystem discovery found nothing — crawling from /');
-      const crawlConfig: FrontguardConfig = {
-        ...config,
-        discover: {
-          startUrl: '/',
-          maxDepth: 3,
-          maxRoutes: 50,
-          exclude: [],
-        },
-      };
-      return discoverRoutes(crawlConfig);
-    });
+    const [discovered, duration] = await timed(() => discoverAllRoutes(config));
 
     routes = discovered;
     timing.discovery = duration;
@@ -371,9 +384,11 @@ export async function runPipeline(
         );
       }
 
-      for (let i = 0; i < screenshots.length; i++) {
-        const shot = screenshots[i];
-        try {
+      let completed = 0;
+      const batchResults = await processBatched(
+        screenshots,
+        COMPARE_BATCH_SIZE,
+        async (shot, i) => {
           const baseline = await storage.readBaseline(
             shot.route.path,
             shot.viewport,
@@ -396,15 +411,35 @@ export async function runPipeline(
             }
           }
 
+          // Null out the screenshot buffer — it's been compared and is no longer needed
+          (shot as { buffer: Buffer | null }).buffer = null!;
+
+          completed++;
+          reporter.onStageProgress(
+            'compare',
+            completed,
+            screenshots.length,
+            `${shot.route.path} @ ${shot.viewport}px → ${diff.status} (${diff.diffPercentage.toFixed(2)}%)`,
+          );
+
+          return { diff, index: i };
+        },
+      );
+
+      // Collect results and manage memory
+      for (const outcome of batchResults) {
+        if (outcome.status === 'fulfilled') {
+          const { diff, index: diffIndex } = outcome.value;
           diffs.push(diff);
-          const diffIndex = diffs.length - 1;
+          const storedIndex = diffs.length - 1;
 
           // Memory optimization: persist changed/regression images to temp dir
           // and free the buffers. Passing diffs don't need images at all.
           const isChanged = diff.status === 'changed' || diff.status === 'regression' || diff.status === 'new';
           if (isChanged) {
-            const key = `${diffIndex}_${shot.route.path}_${shot.viewport}_${shot.browser}`;
-            tempPaths.set(diffIndex, {
+            const shot = screenshots[diffIndex] ?? diff;
+            const key = `${storedIndex}_${diff.route.path}_${diff.viewport}_${diff.browser}`;
+            tempPaths.set(storedIndex, {
               baseline: persistBufferToTemp(tempDir, `${key}_baseline`, diff.baselineImage),
               current: persistBufferToTemp(tempDir, `${key}_current`, diff.currentImage),
               diff: persistBufferToTemp(tempDir, `${key}_diff`, diff.diffImage),
@@ -415,23 +450,13 @@ export async function runPipeline(
             // Not changed — no need to keep buffers at all
             disposeBuffers(diff);
           }
-
-          // Null out the screenshot buffer — it's been compared and is no longer needed
-          (shot as { buffer: Buffer | null }).buffer = null!;
-
-          reporter.onStageProgress(
-            'compare',
-            i + 1,
-            screenshots.length,
-            `${shot.route.path} @ ${shot.viewport}px → ${diff.status} (${diff.diffPercentage.toFixed(2)}%)`,
-          );
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          logger.error(`Comparison failed for ${shot.route.path}: ${msg}`);
+        } else {
+          const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+          logger.error(`Comparison failed: ${msg}`);
           diffs.push({
-            route: shot.route,
-            viewport: shot.viewport,
-            browser: shot.browser,
+            route: { path: 'unknown', label: 'unknown' },
+            viewport: 0,
+            browser: 'chromium',
             status: 'error',
             diffPercentage: 0,
             error: msg,
@@ -596,22 +621,12 @@ export async function updateBaselines(
 ): Promise<void> {
   reporter.onStageStart('init', 'Updating baselines…');
 
-  // Discover routes (same logic as runPipeline stage 1)
+  // Discover routes (shared logic with runPipeline)
   let routes: Route[];
-
-  if (config.routes && config.routes.length > 0) {
-    routes = toRouteObjects(config.routes);
-    logger.info(`Using ${routes.length} configured route(s)`);
-  } else if (config.discover) {
-    logger.info(`Crawling from ${config.discover.startUrl ?? '/'}…`);
-    routes = await discoverRoutes(config);
-  } else {
-    const fsRoutes = discoverRoutesFromFilesystem(process.cwd());
-    if (fsRoutes && fsRoutes.length > 0) {
-      routes = fsRoutes;
-    } else {
-      routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
-    }
+  try {
+    routes = await discoverAllRoutes(config);
+  } catch {
+    routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
   }
 
   logger.info(`Rendering ${routes.length} route(s) for baseline update…`);

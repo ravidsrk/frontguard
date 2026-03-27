@@ -130,6 +130,8 @@ export interface FrontguardConfig {
   maxHeight: number;
   /** Output directory for the HTML report and diff artefacts. */
   outputDir: string;
+  /** Viewport height in pixels (default `720`). */
+  viewportHeight?: number;
 }
 
 // ---------------------------------------------------------------------------

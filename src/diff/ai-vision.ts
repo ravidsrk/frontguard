@@ -10,6 +10,7 @@
 import type { DiffResult, AIAnalysis, AIConfig, ChangeClassification, Severity } from '../core/types.js';
 import { retry } from '../utils/retry.js';
 import { logger } from '../utils/logger.js';
+import { PNG } from 'pngjs';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -23,9 +24,43 @@ Classify this change as one of:
 - 'content_update': Content changed but layout is intact (different text, updated numbers, new blog posts)
 
 Respond with JSON only, no markdown wrapping:
-{ "classification": "regression"|"intentional"|"content_update", "explanation": "<concise description of what changed>", "severity": "critical"|"warning"|"info", "confidence": <0-100>, "suggestedFix": "<optional: how to fix if regression>" }`;
+{ "classification": "regression"|"intentional"|"content_update", "explanation": "<concise description of what changed>", "severity": "critical"|"warning"|"info", "confidence": <0.0 to 1.0>, "suggestedFix": "<optional: how to fix if regression>" }`;
 
 const REQUEST_TIMEOUT_MS = 60_000;
+
+// ---------------------------------------------------------------------------
+// Image Downscaling
+// ---------------------------------------------------------------------------
+
+/**
+ * Downscale a PNG buffer to a maximum width for AI analysis.
+ * Uses nearest-neighbor interpolation (fast, sufficient for AI classification).
+ * Returns the original buffer unchanged if already within maxWidth.
+ */
+function downscaleForAI(buffer: Buffer, maxWidth = 800): Buffer {
+  const png = PNG.sync.read(buffer);
+  if (png.width <= maxWidth) return buffer;
+
+  const scale = maxWidth / png.width;
+  const newHeight = Math.round(png.height * scale);
+  const newPng = new PNG({ width: maxWidth, height: newHeight });
+
+  // Nearest-neighbor downscale (fast, good enough for AI classification)
+  for (let y = 0; y < newHeight; y++) {
+    for (let x = 0; x < maxWidth; x++) {
+      const srcX = Math.floor(x / scale);
+      const srcY = Math.floor(y / scale);
+      const srcIdx = (png.width * srcY + srcX) << 2;
+      const dstIdx = (maxWidth * y + x) << 2;
+      newPng.data[dstIdx] = png.data[srcIdx];
+      newPng.data[dstIdx + 1] = png.data[srcIdx + 1];
+      newPng.data[dstIdx + 2] = png.data[srcIdx + 2];
+      newPng.data[dstIdx + 3] = png.data[srcIdx + 3];
+    }
+  }
+
+  return PNG.sync.write(newPng);
+}
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -68,9 +103,9 @@ export async function analyzeWithAI(
     );
   }
 
-  const baselineB64 = diff.baselineImage.toString('base64');
-  const currentB64 = diff.currentImage.toString('base64');
-  const diffB64 = diff.diffImage?.toString('base64');
+  const baselineB64 = downscaleForAI(diff.baselineImage).toString('base64');
+  const currentB64 = downscaleForAI(diff.currentImage).toString('base64');
+  const diffB64 = diff.diffImage ? downscaleForAI(diff.diffImage).toString('base64') : undefined;
 
   logger.debug(`Analyzing ${diff.route.path} @ ${diff.viewport}px with ${config.provider}/${config.model}`);
 
@@ -399,11 +434,7 @@ function parseAIResponse(rawText: string, provider: string): AIAnalysis {
 
   let confidence = Number(parsed.confidence);
   if (isNaN(confidence)) {
-    confidence = 50; // Default to mid-confidence on parse failure
-  }
-  // Normalize: the types.ts says confidence is 0–1 but prompt says 0–100
-  if (confidence > 1) {
-    confidence = confidence / 100;
+    confidence = 0.5; // Default to mid-confidence on parse failure
   }
   confidence = Math.max(0, Math.min(1, confidence));
 

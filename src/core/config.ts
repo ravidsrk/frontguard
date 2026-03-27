@@ -21,7 +21,7 @@ import type { FrontguardConfig } from './types.js';
 
 /** Zod schema for route-discovery options. */
 const discoverSchema = z.object({
-  startUrl: z.string().url('discover.startUrl must be a valid URL'),
+  startUrl: z.string().min(1, 'discover.startUrl must not be empty'),
   maxDepth: z.number().int().positive().default(3),
   maxRoutes: z.number().int().positive().default(50),
   exclude: z.array(z.string()).default([]),
@@ -85,6 +85,12 @@ export const configSchema = z.object({
     .array(browserEngineSchema)
     .default(['chromium']),
 
+  /**
+   * Pixel-diff threshold as a fraction `0–1` (e.g. `0.1` = 10%).
+   * Represents the fraction of changed pixels needed to flag a diff.
+   * The pipeline converts to percentage (`threshold * 100`) when comparing
+   * against `DiffResult.diffPercentage` which is `0–100`.
+   */
   threshold: z
     .number({ invalid_type_error: 'Config error at `threshold`: expected number, got string' })
     .min(0, 'Config error at `threshold`: must be >= 0')
@@ -124,6 +130,13 @@ export const configSchema = z.object({
   outputDir: z
     .string()
     .default('./frontguard-report'),
+
+  viewportHeight: z
+    .number({ invalid_type_error: 'Config error at `viewportHeight`: expected number' })
+    .int()
+    .positive()
+    .max(10_000)
+    .optional(),
 });
 
 /** Inferred Zod output type — should match `FrontguardConfig`. */

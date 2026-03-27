@@ -196,7 +196,7 @@ async function executeTask(
   let context: BrowserContext;
   try {
     const contextOptions: Record<string, unknown> = {
-      viewport: { width: task.viewport, height: 720 },
+      viewport: { width: task.viewport, height: config.viewportHeight ?? 720 },
     };
 
     if (config.auth?.storageState) {

@@ -18,7 +18,7 @@ import { HTMLReporter } from '../report/html.js';
 import { logger, setLogLevel } from '../utils/logger.js';
 import type { FrontguardConfig, Reporter, BrowserEngine } from '../core/types.js';
 import { writeFileSync, readFileSync, existsSync, appendFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { join } from 'node:path';
 
 // ---------------------------------------------------------------------------
 // Version (read from package.json at build time, fallback to hardcoded)
@@ -26,226 +26,10 @@ import { resolve, join } from 'node:path';
 const VERSION = '0.1.0';
 
 // ---------------------------------------------------------------------------
-// CLI Setup
-// ---------------------------------------------------------------------------
-
-const program = new Command();
-
-program
-  .name('frontguard')
-  .description('AI-powered frontend visual regression testing')
-  .version(VERSION);
-
-// ---------------------------------------------------------------------------
-// Command: run (default)
-// ---------------------------------------------------------------------------
-
-program
-  .command('run', { isDefault: true })
-  .description('Run visual regression tests')
-  .option('-u, --url <url>', 'Base URL to test')
-  .option('-r, --routes <routes>', 'Comma-separated routes')
-  .option('-v, --viewports <vp>', 'Comma-separated viewport widths')
-  .option('-b, --browsers <br>', 'Comma-separated browsers')
-  .option('-c, --config <path>', 'Config file path')
-  .option('-o, --output <format>', 'Output format: console, json', 'console')
-  .option('-t, --threshold <n>', 'Pixel diff threshold percentage (0-100)')
-  .option('--verbose', 'Verbose output')
-  .option('--debug', 'Debug output (includes Playwright traces)')
-  .option('--update-baselines', 'Accept current screenshots as new baselines')
-  .action(async (opts) => {
-    try {
-      // Set log level
-      if (opts.debug) {
-        setLogLevel('debug');
-      } else if (opts.verbose) {
-        setLogLevel('info');
-      }
-
-      // Load and merge config
-      const config = await buildConfig(opts);
-
-      // Create reporter
-      const reporter = createReporter(opts.output);
-
-      // Update baselines mode
-      if (opts.updateBaselines) {
-        logger.info('Updating baselines…');
-        await updateBaselines(config, reporter);
-        logger.info('✅ Baselines updated successfully');
-        process.exit(0);
-      }
-
-      // Run the pipeline
-      logger.info(`Running Frontguard against ${config.baseUrl}`);
-      const result = await runPipeline(config, reporter);
-
-      // Generate HTML report
-      try {
-        const htmlReporter = new HTMLReporter();
-        htmlReporter.onComplete(result);
-      } catch (err) {
-        logger.warn(
-          `HTML report generation failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-
-      // Print summary
-      const { summary } = result;
-      logger.info('');
-      logger.info('─'.repeat(60));
-      logger.info(
-        `Results: ${summary.total} tested, ` +
-          `${summary.passed} passed, ` +
-          `${summary.regressions} regressions, ` +
-          `${summary.warnings} warnings, ` +
-          `${summary.newPages} new, ` +
-          `${summary.errors} errors`,
-      );
-      logger.info(`Timing: ${result.timing.total}ms total`);
-      logger.info('─'.repeat(60));
-
-      // Exit code
-      if (summary.errors > 0 && summary.regressions === 0) {
-        // Errors in the tool itself, but no regressions found
-        process.exit(2);
-      } else if (summary.regressions > 0) {
-        logger.error(`❌ ${summary.regressions} regression(s) detected`);
-        process.exit(1);
-      } else {
-        logger.info('✅ No regressions detected');
-        process.exit(0);
-      }
-    } catch (err) {
-      handleFatalError(err);
-    }
-  });
-
-// ---------------------------------------------------------------------------
-// Command: init
-// ---------------------------------------------------------------------------
-
-program
-  .command('init')
-  .description('Generate a starter Frontguard config file')
-  .option('--format <format>', 'Config format: ts, js, json', 'ts')
-  .action(async (opts) => {
-    try {
-      const cwd = process.cwd();
-      const format = opts.format as 'ts' | 'js' | 'json';
-
-      // Detect framework
-      logger.info('Detecting framework…');
-      const framework = await detectFramework(cwd);
-      if (framework) {
-        logger.info(`Detected: ${framework}`);
-      } else {
-        logger.info('No specific framework detected — using defaults');
-      }
-
-      // Determine file name
-      const extensions: Record<string, string> = {
-        ts: 'frontguard.config.ts',
-        js: 'frontguard.config.js',
-        json: 'frontguard.config.json',
-      };
-      const fileName = extensions[format] ?? 'frontguard.config.ts';
-      const filePath = join(cwd, fileName);
-
-      // Check if config already exists
-      if (existsSync(filePath)) {
-        logger.warn(`Config file already exists: ${fileName}`);
-        logger.info('Delete it first if you want to regenerate.');
-        process.exit(1);
-      }
-
-      // Generate config content
-      const content = generateDefaultConfig({
-        baseUrl: 'http://localhost:3000',
-        framework,
-        format,
-      });
-
-      writeFileSync(filePath, content, 'utf-8');
-      logger.info(`✅ Created ${fileName}`);
-
-      // Update .gitignore
-      const gitignorePath = join(cwd, '.gitignore');
-      const entriesToAdd = ['auth.json', '.frontguard-debug/'];
-      let gitignoreContent = '';
-
-      if (existsSync(gitignorePath)) {
-        gitignoreContent = readFileSync(gitignorePath, 'utf-8');
-      }
-
-      const newEntries: string[] = [];
-      for (const entry of entriesToAdd) {
-        if (!gitignoreContent.includes(entry)) {
-          newEntries.push(entry);
-        }
-      }
-
-      if (newEntries.length > 0) {
-        const addition =
-          (gitignoreContent.endsWith('\n') || gitignoreContent === '' ? '' : '\n') +
-          '\n# Frontguard\n' +
-          newEntries.join('\n') +
-          '\n';
-        appendFileSync(gitignorePath, addition, 'utf-8');
-        logger.info(`Updated .gitignore with: ${newEntries.join(', ')}`);
-      }
-
-      // Print next steps
-      logger.info('');
-      logger.info('Next steps:');
-      logger.info(`  1. Edit ${fileName} to set your baseUrl and routes`);
-      logger.info('  2. Start your dev server (e.g. npm run dev)');
-      logger.info('  3. Run: npx frontguard run');
-      logger.info('');
-      logger.info('On first run, Frontguard will capture baseline screenshots.');
-      logger.info('On subsequent runs, it will compare against them and report changes.');
-    } catch (err) {
-      handleFatalError(err);
-    }
-  });
-
-// ---------------------------------------------------------------------------
-// Command: update-baselines
-// ---------------------------------------------------------------------------
-
-program
-  .command('update-baselines')
-  .description('Accept current screenshots as new baselines')
-  .option('-u, --url <url>', 'Base URL to test')
-  .option('-r, --routes <routes>', 'Comma-separated routes')
-  .option('-c, --config <path>', 'Config file path')
-  .option('--verbose', 'Verbose output')
-  .option('--debug', 'Debug output')
-  .action(async (opts) => {
-    try {
-      if (opts.debug) {
-        setLogLevel('debug');
-      } else if (opts.verbose) {
-        setLogLevel('info');
-      }
-
-      const config = await buildConfig(opts);
-      const reporter = new ConsoleReporter();
-
-      logger.info('Updating baselines…');
-      await updateBaselines(config, reporter);
-      logger.info('✅ Baselines updated successfully');
-      process.exit(0);
-    } catch (err) {
-      handleFatalError(err);
-    }
-  });
-
-// ---------------------------------------------------------------------------
 // Config Builder (merges CLI opts with config file)
 // ---------------------------------------------------------------------------
 
-async function buildConfig(
+export async function buildConfig(
   opts: Record<string, unknown>,
 ): Promise<FrontguardConfig> {
   // Load base config from file (or defaults)
@@ -325,7 +109,7 @@ async function buildConfig(
 // Reporter Factory
 // ---------------------------------------------------------------------------
 
-function createReporter(format: string): Reporter {
+export function createReporter(format: string): Reporter {
   switch (format) {
     case 'json':
       return new JSONReporter();
@@ -339,45 +123,279 @@ function createReporter(format: string): Reporter {
 // Error Handling
 // ---------------------------------------------------------------------------
 
-function handleFatalError(err: unknown): never {
+function formatFatalError(err: unknown): string {
   const error = err instanceof Error ? err : new Error(String(err));
 
-  logger.error('');
-  logger.error('╔══════════════════════════════════════════════════════════╗');
-  logger.error('║                   FRONTGUARD ERROR                      ║');
-  logger.error('╚══════════════════════════════════════════════════════════╝');
-  logger.error('');
-  logger.error(`  ${error.message}`);
+  const lines: string[] = [];
+  lines.push('');
+  lines.push('╔══════════════════════════════════════════════════════════╗');
+  lines.push('║                   FRONTGUARD ERROR                      ║');
+  lines.push('╚══════════════════════════════════════════════════════════╝');
+  lines.push('');
+  lines.push(`  ${error.message}`);
 
   // Provide actionable hints for common errors
   if (error.message.includes('ECONNREFUSED') || error.message.includes('Cannot reach')) {
-    logger.error('');
-    logger.error('  Hint: Is your dev server running?');
-    logger.error('  Try: npm run dev (in another terminal)');
+    lines.push('');
+    lines.push('  Hint: Is your dev server running?');
+    lines.push('  Try: npm run dev (in another terminal)');
   } else if (error.message.includes('Config file not found') || error.message.includes('No base URL')) {
-    logger.error('');
-    logger.error('  Hint: Run `frontguard init` to create a config file,');
-    logger.error('  or pass --url to specify the base URL directly.');
+    lines.push('');
+    lines.push('  Hint: Run `frontguard init` to create a config file,');
+    lines.push('  or pass --url to specify the base URL directly.');
   } else if (error.message.includes('browserType.launch')) {
-    logger.error('');
-    logger.error('  Hint: Playwright browsers may not be installed.');
-    logger.error('  Try: npx playwright install');
+    lines.push('');
+    lines.push('  Hint: Playwright browsers may not be installed.');
+    lines.push('  Try: npx playwright install');
   }
 
-  logger.error('');
+  lines.push('');
 
   if (process.env.FRONTGUARD_DEBUG === '1' || process.env.DEBUG) {
-    logger.error('Stack trace:');
-    logger.error(error.stack ?? '(no stack)');
+    lines.push('Stack trace:');
+    lines.push(error.stack ?? '(no stack)');
   } else {
-    logger.error('  Set FRONTGUARD_DEBUG=1 for full stack trace.');
+    lines.push('  Set FRONTGUARD_DEBUG=1 for full stack trace.');
   }
 
-  process.exit(2);
+  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------
-// Parse & Execute
+// Main entry point
 // ---------------------------------------------------------------------------
 
-program.parseAsync(process.argv).catch(handleFatalError);
+export async function main(argv?: string[]): Promise<number> {
+  const program = new Command();
+
+  program
+    .name('frontguard')
+    .description('AI-powered frontend visual regression testing')
+    .version(VERSION);
+
+  // Track the exit code from command actions
+  let exitCode = 0;
+
+  // ---------------------------------------------------------------------------
+  // Command: run (default)
+  // ---------------------------------------------------------------------------
+
+  program
+    .command('run', { isDefault: true })
+    .description('Run visual regression tests')
+    .option('-u, --url <url>', 'Base URL to test')
+    .option('-r, --routes <routes>', 'Comma-separated routes')
+    .option('-v, --viewports <vp>', 'Comma-separated viewport widths')
+    .option('-b, --browsers <br>', 'Comma-separated browsers')
+    .option('-c, --config <path>', 'Config file path')
+    .option('-o, --output <format>', 'Output format: console, json', 'console')
+    .option('-t, --threshold <n>', 'Pixel diff threshold percentage (0-100)')
+    .option('--verbose', 'Verbose output')
+    .option('--debug', 'Debug output (includes Playwright traces)')
+    .option('--update-baselines', 'Accept current screenshots as new baselines')
+    .action(async (opts) => {
+      try {
+        // Set log level
+        if (opts.debug) {
+          setLogLevel('debug');
+        } else if (opts.verbose) {
+          setLogLevel('info');
+        }
+
+        // Load and merge config
+        const config = await buildConfig(opts);
+
+        // Create reporter
+        const reporter = createReporter(opts.output);
+
+        // Update baselines mode
+        if (opts.updateBaselines) {
+          logger.info('Updating baselines…');
+          await updateBaselines(config, reporter);
+          logger.info('✅ Baselines updated successfully');
+          exitCode = 0;
+          return;
+        }
+
+        // Run the pipeline
+        logger.info(`Running Frontguard against ${config.baseUrl}`);
+        const result = await runPipeline(config, reporter);
+
+        // Generate HTML report
+        try {
+          const htmlReporter = new HTMLReporter();
+          htmlReporter.onComplete(result);
+        } catch (err) {
+          logger.warn(
+            `HTML report generation failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+
+        // Print summary
+        const { summary } = result;
+        logger.info('');
+        logger.info('─'.repeat(60));
+        logger.info(
+          `Results: ${summary.total} tested, ` +
+            `${summary.passed} passed, ` +
+            `${summary.regressions} regressions, ` +
+            `${summary.warnings} warnings, ` +
+            `${summary.newPages} new, ` +
+            `${summary.errors} errors`,
+        );
+        logger.info(`Timing: ${result.timing.total}ms total`);
+        logger.info('─'.repeat(60));
+
+        // Exit code
+        if (summary.errors > 0 && summary.regressions === 0) {
+          // Errors in the tool itself, but no regressions found
+          exitCode = 2;
+        } else if (summary.regressions > 0) {
+          logger.error(`❌ ${summary.regressions} regression(s) detected`);
+          exitCode = 1;
+        } else {
+          logger.info('✅ No regressions detected');
+          exitCode = 0;
+        }
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
+    });
+
+  // ---------------------------------------------------------------------------
+  // Command: init
+  // ---------------------------------------------------------------------------
+
+  program
+    .command('init')
+    .description('Generate a starter Frontguard config file')
+    .option('--format <format>', 'Config format: ts, js, json', 'ts')
+    .action(async (opts) => {
+      try {
+        const cwd = process.cwd();
+        const format = opts.format as 'ts' | 'js' | 'json';
+
+        // Detect framework
+        logger.info('Detecting framework…');
+        const framework = await detectFramework(cwd);
+        if (framework) {
+          logger.info(`Detected: ${framework}`);
+        } else {
+          logger.info('No specific framework detected — using defaults');
+        }
+
+        // Determine file name
+        const extensions: Record<string, string> = {
+          ts: 'frontguard.config.ts',
+          js: 'frontguard.config.js',
+          json: 'frontguard.config.json',
+        };
+        const fileName = extensions[format] ?? 'frontguard.config.ts';
+        const filePath = join(cwd, fileName);
+
+        // Check if config already exists
+        if (existsSync(filePath)) {
+          logger.warn(`Config file already exists: ${fileName}`);
+          logger.info('Delete it first if you want to regenerate.');
+          exitCode = 1;
+          return;
+        }
+
+        // Generate config content
+        const content = generateDefaultConfig({
+          baseUrl: 'http://localhost:3000',
+          framework,
+          format,
+        });
+
+        writeFileSync(filePath, content, 'utf-8');
+        logger.info(`✅ Created ${fileName}`);
+
+        // Update .gitignore
+        const gitignorePath = join(cwd, '.gitignore');
+        const entriesToAdd = ['auth.json', '.frontguard-debug/'];
+        let gitignoreContent = '';
+
+        if (existsSync(gitignorePath)) {
+          gitignoreContent = readFileSync(gitignorePath, 'utf-8');
+        }
+
+        const newEntries: string[] = [];
+        for (const entry of entriesToAdd) {
+          if (!gitignoreContent.includes(entry)) {
+            newEntries.push(entry);
+          }
+        }
+
+        if (newEntries.length > 0) {
+          const addition =
+            (gitignoreContent.endsWith('\n') || gitignoreContent === '' ? '' : '\n') +
+            '\n# Frontguard\n' +
+            newEntries.join('\n') +
+            '\n';
+          appendFileSync(gitignorePath, addition, 'utf-8');
+          logger.info(`Updated .gitignore with: ${newEntries.join(', ')}`);
+        }
+
+        // Print next steps
+        logger.info('');
+        logger.info('Next steps:');
+        logger.info(`  1. Edit ${fileName} to set your baseUrl and routes`);
+        logger.info('  2. Start your dev server (e.g. npm run dev)');
+        logger.info('  3. Run: npx frontguard run');
+        logger.info('');
+        logger.info('On first run, Frontguard will capture baseline screenshots.');
+        logger.info('On subsequent runs, it will compare against them and report changes.');
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
+    });
+
+  // ---------------------------------------------------------------------------
+  // Command: update-baselines
+  // ---------------------------------------------------------------------------
+
+  program
+    .command('update-baselines')
+    .description('Accept current screenshots as new baselines')
+    .option('-u, --url <url>', 'Base URL to test')
+    .option('-r, --routes <routes>', 'Comma-separated routes')
+    .option('-c, --config <path>', 'Config file path')
+    .option('--verbose', 'Verbose output')
+    .option('--debug', 'Debug output')
+    .action(async (opts) => {
+      try {
+        if (opts.debug) {
+          setLogLevel('debug');
+        } else if (opts.verbose) {
+          setLogLevel('info');
+        }
+
+        const config = await buildConfig(opts);
+        const reporter = new ConsoleReporter();
+
+        logger.info('Updating baselines…');
+        await updateBaselines(config, reporter);
+        logger.info('✅ Baselines updated successfully');
+        exitCode = 0;
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
+    });
+
+  // ---------------------------------------------------------------------------
+  // Parse & Execute
+  // ---------------------------------------------------------------------------
+
+  await program.parseAsync(argv ?? process.argv);
+  return exitCode;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-run when executed directly (not imported)
+// ---------------------------------------------------------------------------
+
+main(process.argv).then((code) => process.exit(code)).catch(() => process.exit(2));

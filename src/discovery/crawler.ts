@@ -12,6 +12,9 @@
 import type { FrontguardConfig, Route } from '../core/types.js';
 import { logger } from '../utils/logger.js';
 
+// Cached Playwright module to avoid repeated dynamic imports
+let _playwrightModule: typeof import('playwright') | undefined;
+
 /** Patterns that indicate an API / non-page endpoint */
 const API_PATTERNS = [
   /\/api\//i,
@@ -171,8 +174,11 @@ export async function discoverRoutes(config: FrontguardConfig): Promise<Route[]>
     ? startUrl
     : new URL(startUrl, config.baseUrl).href;
 
-  // Lazy import to avoid loading Playwright when unused
-  const { chromium } = await import('playwright');
+  // Lazy import to avoid loading Playwright when unused; cached after first load
+  if (!_playwrightModule) {
+    _playwrightModule = await import('playwright');
+  }
+  const { chromium } = _playwrightModule;
 
   logger.debug('Launching headless Chromium for route discovery');
 

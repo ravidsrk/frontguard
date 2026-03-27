@@ -9,7 +9,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { BaselineStorage, BaselineManifest, BrowserEngine } from '../core/types.js';
@@ -298,6 +298,14 @@ export class GitOrphanStorage implements BaselineStorage {
    * is not available (very old git).
    */
   private async createOrphanBranch(): Promise<void> {
+    // Guard: refuse to create orphan branch if working tree is dirty
+    const status = this.git('status', '--porcelain');
+    if (status.length > 0) {
+      throw new Error(
+        'Working tree has uncommitted changes. Commit or stash before updating baselines.'
+      );
+    }
+
     // Try worktree approach first (safer — never touches main working tree)
     if (this.supportsWorktree()) {
       await this.createOrphanViaWorktree();
@@ -487,38 +495,6 @@ export class GitOrphanStorage implements BaselineStorage {
    */
   private supportsWorktree(): boolean {
     return this.gitCheck('worktree', 'list');
-  }
-
-  /**
-   * Finds the default branch (main, master, or whatever HEAD points to).
-   */
-  private findDefaultBranch(): string {
-    // Try symbolic ref first
-    try {
-      return this.git('symbolic-ref', '--short', 'HEAD');
-    } catch {
-      // Detached HEAD or orphan — check for common defaults
-    }
-
-    for (const branch of ['main', 'master', 'develop']) {
-      if (this.gitCheck('rev-parse', '--verify', branch)) {
-        return branch;
-      }
-    }
-
-    // Last resort: try to get from remote
-    try {
-      const remote = this.git('remote', 'show', 'origin');
-      const match = remote.match(/HEAD branch:\s*(\S+)/);
-      if (match) return match[1];
-    } catch {
-      // No remote configured
-    }
-
-    throw new Error(
-      'Could not determine default branch. ' +
-        'Ensure you have at least one commit on main or master.'
-    );
   }
 
   /**

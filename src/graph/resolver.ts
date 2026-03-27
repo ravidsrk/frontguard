@@ -366,8 +366,20 @@ export function getChangedFiles(projectDir: string): string[] {
   const allFiles = new Set<string>();
 
   // Strategy 1: PR diff against main (most common CI context)
-  const prFilesMain = gitDiff(resolvedDir, 'diff --name-only origin/main...HEAD');
-  for (const f of prFilesMain) allFiles.add(f);
+  // Fast-check if remote exists before attempting remote diff
+  let hasRemote = false;
+  try {
+    execSync('git remote get-url origin', { cwd: resolvedDir, encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] });
+    hasRemote = true;
+  } catch {
+    // No remote configured — skip remote diff strategies
+    logger.debug('No git remote "origin" found — skipping remote diff');
+  }
+
+  if (hasRemote) {
+    const prFilesMain = gitDiff(resolvedDir, 'diff --name-only origin/main...HEAD');
+    for (const f of prFilesMain) allFiles.add(f);
+  }
 
   // Strategy 2: Last commit diff
   if (allFiles.size === 0) {
