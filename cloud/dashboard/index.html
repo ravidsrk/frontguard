@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frontguard Cloud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--card:#1a1a1a;--card-hover:#222;--border:#2a2a2a;
+  --text:#e5e5e5;--text-dim:#888;--text-muted:#555;
+  --accent:#3b82f6;--accent-hover:#2563eb;
+  --green:#22c55e;--green-bg:rgba(34,197,94,.12);
+  --red:#ef4444;--red-bg:rgba(239,68,68,.12);
+  --yellow:#eab308;--yellow-bg:rgba(234,179,8,.12);
+  --gray:#6b7280;--gray-bg:rgba(107,114,128,.12);
+  --radius:8px;--radius-lg:12px;
+}
+html{font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+body{min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;font-size:inherit}
+input,textarea,select{font-family:inherit;font-size:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;outline:none;transition:border-color .15s}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:vertical}
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+
+/* Layout */
+.shell{max-width:1200px;margin:0 auto;padding:0 20px}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:32px}
+.topbar-brand{font-weight:700;font-size:16px;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
+.topbar-brand svg{width:20px;height:20px}
+.topbar-nav{display:flex;align-items:center;gap:6px}
+.topbar-nav a,.topbar-nav button{padding:6px 14px;border-radius:var(--radius);font-size:13px;font-weight:500;color:var(--text-dim);transition:all .15s}
+.topbar-nav a:hover,.topbar-nav button:hover{color:var(--text);background:var(--card);text-decoration:none}
+.topbar-nav a.active{color:var(--text);background:var(--card)}
+.topbar-nav .btn-logout{color:var(--red);font-size:12px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius);font-weight:500;font-size:13px;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-secondary{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--card-hover);border-color:#444}
+.btn-danger{background:var(--red-bg);color:var(--red)}
+.btn-danger:hover{background:rgba(239,68,68,.2)}
+.btn-success{background:var(--green-bg);color:var(--green)}
+.btn-success:hover{background:rgba(34,197,94,.2)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.card-title{font-weight:600;font-size:15px}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.badge-passed{background:var(--green-bg);color:var(--green)}
+.badge-failed{background:var(--red-bg);color:var(--red)}
+.badge-running{background:var(--yellow-bg);color:var(--yellow)}
+.badge-queued{background:var(--gray-bg);color:var(--gray)}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:32px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.stat-label{font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.stat-value{font-size:28px;font-weight:700;letter-spacing:-.5px}
+.stat-sub{font-size:12px;color:var(--text-muted);margin-top:4px}
+
+/* Table */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);padding:12px 16px;border-bottom:1px solid var(--border)}
+td{padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.mono{font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;font-size:12px;color:var(--text-dim)}
+.actions-cell{display:flex;gap:6px;align-items:center}
+
+/* Forms */
+.form-group{margin-bottom:20px}
+.form-label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text-dim)}
+.form-hint{font-size:12px;color:var(--text-muted);margin-top:4px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.checkbox-group{display:flex;flex-wrap:wrap;gap:12px}
+.checkbox-label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius);transition:all .15s}
+.checkbox-label:hover{border-color:#444}
+.checkbox-label input{accent-color:var(--accent)}
+.checkbox-label.checked{border-color:var(--accent);background:rgba(59,130,246,.08)}
+.slider-wrap{display:flex;align-items:center;gap:16px}
+.slider-wrap input[type=range]{flex:1;accent-color:var(--accent);height:4px;-webkit-appearance:none;background:var(--border);border-radius:2px;outline:none}
+.slider-wrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer}
+.slider-val{font-weight:600;min-width:50px;text-align:right;font-size:15px}
+.toggle-row{display:flex;align-items:center;gap:12px}
+.toggle{position:relative;width:44px;height:24px;background:var(--border);border-radius:12px;cursor:pointer;transition:background .2s}
+.toggle.on{background:var(--accent)}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s}
+.toggle.on::after{transform:translateX(20px)}
+
+/* Login */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-card{width:100%;max-width:400px}
+.login-card h1{font-size:22px;font-weight:700;margin-bottom:4px;letter-spacing:-.3px}
+.login-card p{color:var(--text-dim);margin-bottom:28px;font-size:13px}
+.login-card .form-group{margin-bottom:16px}
+.login-card .btn{width:100%;justify-content:center;padding:11px}
+.login-error{color:var(--red);font-size:13px;margin-top:12px;display:none}
+
+/* Empty */
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-dim)}
+.empty-state svg{width:48px;height:48px;margin-bottom:16px;opacity:.4}
+.empty-state p{margin-bottom:16px;font-size:14px}
+
+/* Detail */
+.detail-header{margin-bottom:28px}
+.detail-header h1{font-size:20px;font-weight:700;letter-spacing:-.3px;margin-bottom:4px}
+.detail-meta{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--text-dim)}
+.detail-meta span{display:flex;align-items:center;gap:4px}
+.detail-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:28px}
+.meta-item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.meta-item dt{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.meta-item dd{font-size:14px;font-weight:500}
+
+/* Spinner */
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-center{display:flex;align-items:center;justify-content:center;padding:60px;gap:10px;color:var(--text-dim)}
+
+/* Toast */
+.toast-container{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 20px;border-radius:var(--radius);font-size:13px;font-weight:500;animation:slideIn .25s ease;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+.toast-success{background:#166534;color:#bbf7d0}
+.toast-error{background:#7f1d1d;color:#fecaca}
+.toast-info{background:#1e3a5f;color:#bfdbfe}
+@keyframes slideIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+
+/* Responsive */
+@media(max-width:640px){
+  .topbar{flex-direction:column;gap:12px}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .form-row{grid-template-columns:1fr}
+  .detail-meta{flex-direction:column;gap:8px}
+  .stat-value{font-size:22px}
+  td,th{padding:10px 12px;font-size:12px}
+  .actions-cell{flex-direction:column;gap:4px}
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+
+/* View transitions */
+.view{display:none;animation:fadeIn .2s ease}
+.view.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* Pulse dot for running */
+.pulse-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--yellow);animation:pulse 1.5s ease infinite;margin-right:4px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Usage bar */
+.usage-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:8px}
+.usage-bar-fill{height:100%;border-radius:3px;transition:width .3s ease}
+</style>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toasts"></div>
+
+<!-- Login View -->
+<div class="view" id="view-login">
+  <div class="login-wrap">
+    <div class="login-card card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div>
+          <h1>Frontguard Cloud</h1>
+          <p style="margin:0">Visual regression testing dashboard</p>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">API Key</label>
+        <input type="password" id="login-key" placeholder="fg_live_..." style="width:100%" autocomplete="off">
+        <div class="form-hint">Enter your Frontguard API key to continue</div>
+      </div>
+      <div class="form-group" style="margin-bottom:8px">
+        <label class="form-label">API Base URL <span style="color:var(--text-muted)">(optional)</span></label>
+        <input type="text" id="login-base-url" placeholder="https://api.frontguard.dev" style="width:100%">
+        <div class="form-hint">Leave empty for same-origin requests</div>
+      </div>
+      <button class="btn btn-primary" id="login-btn" style="width:100%;justify-content:center;padding:11px;margin-top:16px">Sign In</button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Dashboard View -->
+<div class="view" id="view-dashboard">
+  <div class="shell">
+    <nav class="topbar">
+      <div class="topbar-brand">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Frontguard
+      </div>
+      <div class="topbar-nav">
+        <a href="#dashboard" class="active" data-nav="dashboard">Dashboard</a>
+        <a href="#new-run" data-nav="new-run">New Run</a>
+        <button class="btn-logout" onclick="logout()">Sign Out</button>
+      </div>
+    </nav>
+
+    <div id="stats-area">
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Runs</div>
+          <div class="stat-value" id="stat-runs">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Screenshots This Month</div>
+          <div class="stat-value" id="stat-screenshots">—</div>
+          <div class="usage-bar"><div class="usage-bar-fill" id="usage-bar" style="width:0;background:var(--accent)"></div></div>
+          <div class="stat-sub" id="stat-usage-text"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pass Rate</div>
+          <div class="stat-value" id="stat-pass-rate">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Plan</div>
+          <div class="stat-value" id="stat-plan">—</div>
+          <div class="stat-sub" id="stat-plan-sub"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Recent Runs</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="refresh-indicator" style="font-size:11px;color:var(--text-muted)"></span>
+          <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">↻ Refresh</button>
+        </div>
+      </div>
+      <div id="runs-table-area">
+        <div class="loading-center"><div class="spinner"></div> Loading runs…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Run Detail View -->
+<div class="view" id="view-run-detail">
+  <div class="shell">
+    <nav class="topbar">
+      <div class="topbar-brand">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Frontguard
+      </div>
+      <div class="topbar-nav">
+        <a href="#dashboard" data-nav="dashboard">Dashboard</a>
+        <a href="#new-run" data-nav="new-run">New Run</a>
+        <button class="btn-logout" onclick="logout()">Sign Out</button>
+      </div>
+    </nav>
+    <div id="run-detail-content">
+      <div class="loading-center"><div class="spinner"></div> Loading run…</div>
+    </div>
+  </div>
+</div>
+
+<!-- New Run View -->
+<div class="view" id="view-new-run">
+  <div class="shell">
+    <nav class="topbar">
+      <div class="topbar-brand">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Frontguard
+      </div>
+      <div class="topbar-nav">
+        <a href="#dashboard" data-nav="dashboard">Dashboard</a>
+        <a href="#new-run" class="active" data-nav="new-run">New Run</a>
+        <button class="btn-logout" onclick="logout()">Sign Out</button>
+      </div>
+    </nav>
+
+    <div class="card" style="max-width:680px">
+      <div class="card-header">
+        <span class="card-title">Start New Run</span>
+      </div>
+
+      <form id="new-run-form" onsubmit="submitRun(event)">
+        <div class="form-group">
+          <label class="form-label">Target URL</label>
+          <input type="url" id="run-url" placeholder="https://example.com" required style="width:100%">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Routes</label>
+          <textarea id="run-routes" rows="4" placeholder="/" style="width:100%">/</textarea>
+          <div class="form-hint">One path per line. Example: /about, /pricing</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Viewports</label>
+          <div class="checkbox-group" id="viewport-group">
+            <label class="checkbox-label checked"><input type="checkbox" value="375" checked> 375px</label>
+            <label class="checkbox-label checked"><input type="checkbox" value="768" checked> 768px</label>
+            <label class="checkbox-label checked"><input type="checkbox" value="1024" checked> 1024px</label>
+            <label class="checkbox-label checked"><input type="checkbox" value="1440" checked> 1440px</label>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Diff Threshold</label>
+            <div class="slider-wrap">
+              <input type="range" id="run-threshold" min="0.01" max="0.1" step="0.005" value="0.05">
+              <span class="slider-val" id="threshold-val">5.0%</span>
+            </div>
+            <div class="form-hint">Pixel diff % to flag as failure</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">AI Analysis</label>
+            <div class="toggle-row">
+              <div class="toggle" id="ai-toggle" onclick="toggleAI()"></div>
+              <span id="ai-label" style="font-size:13px;color:var(--text-dim)">Off</span>
+            </div>
+            <div id="ai-provider-wrap" style="display:none;margin-top:12px">
+              <select id="ai-provider" style="width:100%">
+                <option value="openai">OpenAI GPT-4o</option>
+                <option value="anthropic">Anthropic Claude</option>
+                <option value="google">Google Gemini</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;padding-top:8px">
+          <button type="submit" class="btn btn-primary" id="submit-run-btn">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Start Run
+          </button>
+          <a href="#dashboard" class="btn btn-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Config ───
+let API_BASE = localStorage.getItem('fg_api_base') || '';
+let apiKey = localStorage.getItem('fg_api_key') || '';
+let refreshTimer = null;
+
+// ─── API ───
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${API_BASE}${path}`, opts);
+  if (res.status === 401) { logout(); throw new Error('Unauthorized'); }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || `HTTP ${res.status}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+// ─── Toast ───
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 4000);
+}
+
+// ─── Auth ───
+function logout() {
+  localStorage.removeItem('fg_api_key');
+  localStorage.removeItem('fg_api_base');
+  apiKey = '';
+  API_BASE = '';
+  clearInterval(refreshTimer);
+  navigate('login');
+}
+
+function doLogin() {
+  const key = document.getElementById('login-key').value.trim();
+  const base = document.getElementById('login-base-url').value.trim().replace(/\/+$/, '');
+  const errEl = document.getElementById('login-error');
+
+  if (!key) {
+    errEl.textContent = 'API key is required';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  errEl.style.display = 'none';
+  apiKey = key;
+  API_BASE = base;
+  localStorage.setItem('fg_api_key', key);
+  if (base) localStorage.setItem('fg_api_base', base);
+
+  // Verify key by calling usage
+  api('GET', '/v1/usage')
+    .then(() => {
+      window.location.hash = '#dashboard';
+    })
+    .catch(err => {
+      errEl.textContent = `Authentication failed: ${err.message}`;
+      errEl.style.display = 'block';
+      localStorage.removeItem('fg_api_key');
+      apiKey = '';
+    });
+}
+
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('login-key').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+// ─── Router ───
+function navigate(view) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById(`view-${view}`);
+  if (el) el.classList.add('active');
+}
+
+function route() {
+  clearInterval(refreshTimer);
+  const hash = window.location.hash || '#dashboard';
+
+  if (!apiKey && hash !== '#login') {
+    navigate('login');
+    return;
+  }
+
+  if (hash === '#login') {
+    navigate('login');
+  } else if (hash === '#dashboard') {
+    navigate('dashboard');
+    loadDashboard();
+    refreshTimer = setInterval(loadDashboard, 10000);
+    updateNav('dashboard');
+  } else if (hash.startsWith('#run/')) {
+    const id = hash.slice(5);
+    navigate('run-detail');
+    loadRunDetail(id);
+    updateNav('');
+  } else if (hash === '#new-run') {
+    navigate('new-run');
+    updateNav('new-run');
+  } else {
+    navigate('dashboard');
+    loadDashboard();
+    refreshTimer = setInterval(loadDashboard, 10000);
+    updateNav('dashboard');
+  }
+}
+
+function updateNav(active) {
+  document.querySelectorAll('[data-nav]').forEach(a => {
+    a.classList.toggle('active', a.dataset.nav === active);
+  });
+}
+
+window.addEventListener('hashchange', route);
+
+// ─── Dashboard ───
+async function loadDashboard() {
+  try {
+    const [runsData, usageData] = await Promise.all([
+      api('GET', '/v1/runs'),
+      api('GET', '/v1/usage').catch(() => null)
+    ]);
+
+    const runs = Array.isArray(runsData) ? runsData : (runsData?.runs || runsData?.data || []);
+
+    // Stats
+    document.getElementById('stat-runs').textContent = runs.length;
+
+    const totalScreenshots = runs.reduce((sum, r) => sum + (r.screenshots || r.screenshot_count || 0), 0);
+    document.getElementById('stat-screenshots').textContent = totalScreenshots.toLocaleString();
+
+    const completed = runs.filter(r => r.status === 'passed' || r.status === 'failed');
+    const passed = runs.filter(r => r.status === 'passed').length;
+    const rate = completed.length ? Math.round((passed / completed.length) * 100) : 0;
+    document.getElementById('stat-pass-rate').textContent = completed.length ? `${rate}%` : '—';
+
+    if (usageData) {
+      const plan = usageData.plan || usageData.tier || 'Free';
+      const limit = usageData.limit || usageData.screenshot_limit || 1000;
+      const used = usageData.used || usageData.screenshots_used || totalScreenshots;
+      const pct = Math.min(100, Math.round((used / limit) * 100));
+
+      document.getElementById('stat-plan').textContent = plan;
+      document.getElementById('stat-plan-sub').textContent = `${used.toLocaleString()} / ${limit.toLocaleString()} screenshots`;
+      document.getElementById('usage-bar').style.width = `${pct}%`;
+      document.getElementById('usage-bar').style.background = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--yellow)' : 'var(--accent)';
+      document.getElementById('stat-usage-text').textContent = `${pct}% of monthly limit`;
+    }
+
+    // Runs table
+    renderRunsTable(runs);
+    document.getElementById('refresh-indicator').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+
+  } catch (err) {
+    document.getElementById('runs-table-area').innerHTML = `<div class="empty-state"><p style="color:var(--red)">Failed to load: ${escapeHtml(err.message)}</p><button class="btn btn-secondary btn-sm" onclick="loadDashboard()">Retry</button></div>`;
+  }
+}
+
+function renderRunsTable(runs) {
+  const area = document.getElementById('runs-table-area');
+
+  if (!runs.length) {
+    area.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <p>No runs yet. Start your first visual regression test.</p>
+        <a href="#new-run" class="btn btn-primary">New Run</a>
+      </div>`;
+    return;
+  }
+
+  const rows = runs.sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt)).map(run => {
+    const id = run.id || run.run_id;
+    const shortId = id.length > 12 ? id.slice(0, 8) + '…' : id;
+    const url = run.url || run.target_url || '—';
+    const displayUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const status = run.status || 'queued';
+    const routes = run.routes_count || run.routes?.length || run.route_count || 0;
+    const screenshots = run.screenshots || run.screenshot_count || 0;
+    const diff = run.max_diff != null ? run.max_diff : (run.diff_percent != null ? run.diff_percent : null);
+    const diffStr = diff != null ? `${(diff * (diff < 1 ? 100 : 1)).toFixed(2)}%` : '—';
+    const time = run.created_at || run.createdAt;
+    const timeStr = time ? formatTime(time) : '—';
+
+    return `<tr>
+      <td><a href="#run/${id}" class="mono" title="${escapeHtml(id)}">${escapeHtml(shortId)}</a></td>
+      <td title="${escapeHtml(url)}">${escapeHtml(displayUrl.length > 35 ? displayUrl.slice(0, 35) + '…' : displayUrl)}</td>
+      <td>${statusBadge(status)}</td>
+      <td>${routes}</td>
+      <td>${screenshots}</td>
+      <td class="mono">${diffStr}</td>
+      <td style="color:var(--text-dim)">${timeStr}</td>
+      <td><div class="actions-cell">
+        <a href="#run/${id}" class="btn btn-secondary btn-sm">View</a>
+        <button class="btn btn-danger btn-sm" onclick="deleteRun('${id}')">Delete</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+
+  area.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Run ID</th><th>URL</th><th>Status</th><th>Routes</th><th>Shots</th><th>Max Diff</th><th>Created</th><th>Actions</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+async function deleteRun(id) {
+  if (!confirm(`Delete run ${id.slice(0, 8)}…? This cannot be undone.`)) return;
+  try {
+    await api('DELETE', `/v1/runs/${id}`);
+    toast('Run deleted', 'success');
+    loadDashboard();
+  } catch (err) {
+    toast(`Delete failed: ${err.message}`, 'error');
+  }
+}
+
+// ─── Run Detail ───
+async function loadRunDetail(id) {
+  const area = document.getElementById('run-detail-content');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div> Loading run…</div>';
+
+  try {
+    const run = await api('GET', `/v1/runs/${id}`);
+    const r = run;
+    const runId = r.id || r.run_id;
+    const status = r.status || 'queued';
+    const url = r.url || r.target_url || '—';
+    const time = r.created_at || r.createdAt || '—';
+    const completedAt = r.completed_at || r.completedAt || null;
+    const threshold = r.threshold != null ? `${(r.threshold * 100).toFixed(1)}%` : '—';
+    const viewports = r.viewports ? r.viewports.join(', ') : '—';
+    const reportUrl = r.report_url || r.reportUrl || null;
+    const results = r.results || r.routes || [];
+
+    area.innerHTML = `
+      <div style="margin-bottom:20px"><a href="#dashboard" style="font-size:13px;color:var(--text-dim)">← Back to Dashboard</a></div>
+
+      <div class="detail-header">
+        <h1>${statusBadge(status)} Run <span class="mono">${escapeHtml(runId)}</span></h1>
+        <div class="detail-meta">
+          <span>🌐 ${escapeHtml(url)}</span>
+          <span>📅 ${typeof time === 'string' ? formatTime(time) : time}</span>
+          ${completedAt ? `<span>✅ Completed ${formatTime(completedAt)}</span>` : ''}
+        </div>
+        <div class="detail-actions">
+          ${reportUrl ? `<a href="${escapeHtml(reportUrl)}" target="_blank" class="btn btn-secondary btn-sm">📊 View Full Report</a>` : ''}
+          <button class="btn btn-success btn-sm" onclick="approveBaselines('${runId}')">✓ Approve Baselines</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteRunAndBack('${runId}')">Delete Run</button>
+        </div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-item"><dt>Threshold</dt><dd>${threshold}</dd></div>
+        <div class="meta-item"><dt>Viewports</dt><dd>${viewports}</dd></div>
+        <div class="meta-item"><dt>Routes</dt><dd>${results.length || r.routes_count || '—'}</dd></div>
+        <div class="meta-item"><dt>Screenshots</dt><dd>${r.screenshots || r.screenshot_count || '—'}</dd></div>
+        ${r.duration ? `<div class="meta-item"><dt>Duration</dt><dd>${r.duration}s</dd></div>` : ''}
+        ${r.ai ? `<div class="meta-item"><dt>AI</dt><dd>${r.ai.provider || 'Enabled'}</dd></div>` : ''}
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Results</span></div>
+        ${results.length ? renderResultsTable(results) : '<div class="empty-state"><p>No results available yet.</p></div>'}
+      </div>
+    `;
+  } catch (err) {
+    area.innerHTML = `<div class="empty-state"><p style="color:var(--red)">Failed to load run: ${escapeHtml(err.message)}</p><a href="#dashboard" class="btn btn-secondary btn-sm">Back to Dashboard</a></div>`;
+  }
+}
+
+function renderResultsTable(results) {
+  const rows = results.map(r => {
+    const route = r.route || r.path || '/';
+    const viewport = r.viewport || r.width || '—';
+    const status = r.status || 'passed';
+    const diff = r.diff != null ? r.diff : (r.diff_percent != null ? r.diff_percent : null);
+    const diffStr = diff != null ? `${(diff * (diff < 1 ? 100 : 1)).toFixed(2)}%` : '—';
+    const classification = r.classification || r.label || '—';
+    const severity = r.severity || '—';
+    const severityClass = severity === 'critical' ? 'color:var(--red)' : severity === 'warning' ? 'color:var(--yellow)' : severity === 'info' ? 'color:var(--accent)' : '';
+
+    return `<tr>
+      <td class="mono">${escapeHtml(route)}</td>
+      <td>${viewport}${typeof viewport === 'number' ? 'px' : ''}</td>
+      <td>${statusBadge(status)}</td>
+      <td class="mono">${diffStr}</td>
+      <td>${escapeHtml(classification)}</td>
+      <td style="${severityClass};font-weight:500">${escapeHtml(severity)}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Route</th><th>Viewport</th><th>Status</th><th>Diff %</th><th>Classification</th><th>Severity</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+async function approveBaselines(runId) {
+  if (!confirm('Approve all screenshots from this run as new baselines?')) return;
+  try {
+    await api('POST', `/v1/baselines/${runId}/approve`);
+    toast('Baselines approved!', 'success');
+  } catch (err) {
+    toast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+async function deleteRunAndBack(id) {
+  if (!confirm(`Delete run ${id.slice(0, 8)}…? This cannot be undone.`)) return;
+  try {
+    await api('DELETE', `/v1/runs/${id}`);
+    toast('Run deleted', 'success');
+    window.location.hash = '#dashboard';
+  } catch (err) {
+    toast(`Delete failed: ${err.message}`, 'error');
+  }
+}
+
+// ─── New Run ───
+const thresholdInput = document.getElementById('run-threshold');
+const thresholdVal = document.getElementById('threshold-val');
+thresholdInput.addEventListener('input', () => {
+  thresholdVal.textContent = `${(parseFloat(thresholdInput.value) * 100).toFixed(1)}%`;
+});
+
+// Checkbox styling
+document.querySelectorAll('.checkbox-label input').forEach(cb => {
+  cb.addEventListener('change', () => {
+    cb.parentElement.classList.toggle('checked', cb.checked);
+  });
+});
+
+let aiEnabled = false;
+function toggleAI() {
+  aiEnabled = !aiEnabled;
+  document.getElementById('ai-toggle').classList.toggle('on', aiEnabled);
+  document.getElementById('ai-label').textContent = aiEnabled ? 'On' : 'Off';
+  document.getElementById('ai-provider-wrap').style.display = aiEnabled ? 'block' : 'none';
+}
+
+async function submitRun(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submit-run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div> Starting…';
+
+  const url = document.getElementById('run-url').value.trim();
+  const routes = document.getElementById('run-routes').value.trim().split('\n').map(s => s.trim()).filter(Boolean);
+  const viewports = Array.from(document.querySelectorAll('#viewport-group input:checked')).map(cb => parseInt(cb.value));
+  const threshold = parseFloat(document.getElementById('run-threshold').value);
+
+  const body = { url, routes, viewports, threshold };
+  if (aiEnabled) {
+    body.ai = { enabled: true, provider: document.getElementById('ai-provider').value };
+  }
+
+  try {
+    const result = await api('POST', '/v1/run', body);
+    const runId = result.id || result.run_id;
+    toast('Run started!', 'success');
+    window.location.hash = runId ? `#run/${runId}` : '#dashboard';
+  } catch (err) {
+    toast(`Failed to start run: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Start Run';
+  }
+}
+
+// ─── Helpers ───
+function statusBadge(status) {
+  const s = status.toLowerCase();
+  if (s === 'passed' || s === 'pass' || s === 'success') return `<span class="badge badge-passed">Passed</span>`;
+  if (s === 'failed' || s === 'fail' || s === 'error') return `<span class="badge badge-failed">Failed</span>`;
+  if (s === 'running' || s === 'in_progress' || s === 'processing') return `<span class="badge badge-running"><span class="pulse-dot"></span>Running</span>`;
+  return `<span class="badge badge-queued">${escapeHtml(status)}</span>`;
+}
+
+function formatTime(str) {
+  try {
+    const d = new Date(str);
+    const now = new Date();
+    const diff = now - d;
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+  } catch { return str; }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Init ───
+route();
+</script>
+</body>
+</html>

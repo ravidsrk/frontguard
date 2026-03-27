@@ -1,0 +1,19 @@
+{
+  "name": "@frontguard/cloud-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --dts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.12.9"
+  },
+  "devDependencies": {
+    "tsup": "^8",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}

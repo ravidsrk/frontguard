@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing — Frontguard Cloud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0a0a0a;
+    color: #e5e5e5;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  /* Nav */
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 24px;
+  }
+  .nav-logo {
+    font-weight: 700;
+    font-size: 18px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .nav-logo span { color: #a3a3a3; font-weight: 400; font-size: 14px; }
+  .nav-links { display: flex; gap: 32px; align-items: center; }
+  .nav-links a { font-size: 14px; color: #a3a3a3; transition: color 0.15s; }
+  .nav-links a:hover { color: #fff; }
+  .nav-links .nav-cta {
+    background: #fff;
+    color: #0a0a0a;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 13px;
+  }
+  .nav-links .nav-cta:hover { background: #e5e5e5; }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    padding: 80px 24px 20px;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .hero h1 {
+    font-size: 44px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+  .hero p {
+    margin-top: 16px;
+    font-size: 17px;
+    color: #a3a3a3;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Toggle */
+  .billing-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 48px auto 0;
+    font-size: 14px;
+    color: #a3a3a3;
+  }
+  .billing-toggle .active { color: #fff; font-weight: 500; }
+  .toggle-switch {
+    width: 44px;
+    height: 24px;
+    background: #262626;
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    border: 1px solid #333;
+  }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s;
+  }
+  .toggle-switch.annual::after { transform: translateX(20px); }
+  .save-badge {
+    font-size: 12px;
+    background: #16a34a15;
+    color: #22c55e;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+
+  /* Pricing Grid */
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    max-width: 1200px;
+    margin: 48px auto 0;
+    padding: 0 24px;
+  }
+
+  .pricing-card {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 12px;
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .pricing-card.popular {
+    border-color: #3b82f6;
+    background: #0c1529;
+  }
+  .popular-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #3b82f6;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 14px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+
+  .card-tier {
+    font-size: 14px;
+    font-weight: 600;
+    color: #a3a3a3;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .card-price {
+    margin-top: 12px;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .card-price .amount {
+    font-size: 40px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.03em;
+  }
+  .card-price .period {
+    font-size: 15px;
+    color: #737373;
+  }
+  .card-desc {
+    font-size: 14px;
+    color: #737373;
+    margin-top: 8px;
+    min-height: 40px;
+  }
+
+  .card-divider {
+    height: 1px;
+    background: #1e1e1e;
+    margin: 24px 0;
+  }
+  .popular .card-divider { background: #1e3a5f; }
+
+  .card-features {
+    list-style: none;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .card-features li {
+    font-size: 14px;
+    color: #d4d4d4;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.4;
+  }
+  .card-features li .check {
+    color: #22c55e;
+    font-weight: 700;
+    font-size: 15px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .card-cta {
+    margin-top: 28px;
+    display: block;
+    text-align: center;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    width: 100%;
+  }
+  .cta-primary {
+    background: #fff;
+    color: #0a0a0a;
+  }
+  .cta-primary:hover { background: #e5e5e5; }
+  .cta-outline {
+    background: transparent;
+    color: #fff;
+    border: 1px solid #333;
+  }
+  .cta-outline:hover { border-color: #555; background: #1a1a1a; }
+  .cta-blue {
+    background: #3b82f6;
+    color: #fff;
+  }
+  .cta-blue:hover { background: #2563eb; }
+
+  /* FAQ */
+  .faq-section {
+    max-width: 720px;
+    margin: 100px auto 0;
+    padding: 0 24px 100px;
+  }
+  .faq-section h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    margin-bottom: 40px;
+    letter-spacing: -0.02em;
+  }
+
+  .faq-item {
+    border-bottom: 1px solid #1e1e1e;
+  }
+  .faq-item:first-child { border-top: 1px solid #1e1e1e; }
+
+  .faq-question {
+    width: 100%;
+    background: none;
+    border: none;
+    color: #e5e5e5;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    text-align: left;
+    padding: 20px 0;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  .faq-question:hover { color: #fff; }
+  .faq-icon {
+    font-size: 20px;
+    color: #525252;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .faq-item.open .faq-icon { transform: rotate(45deg); }
+
+  .faq-answer {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+  }
+  .faq-answer-inner {
+    padding: 0 0 20px;
+    font-size: 14px;
+    color: #a3a3a3;
+    line-height: 1.7;
+  }
+  .faq-item.open .faq-answer { max-height: 200px; }
+
+  /* Footer */
+  .footer {
+    border-top: 1px solid #1a1a1a;
+    text-align: center;
+    padding: 32px 24px;
+    font-size: 13px;
+    color: #525252;
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .pricing-grid { grid-template-columns: repeat(2, 1fr); }
+    .hero h1 { font-size: 36px; }
+  }
+  @media (max-width: 640px) {
+    .pricing-grid { grid-template-columns: 1fr; max-width: 400px; }
+    .hero h1 { font-size: 30px; }
+    .hero { padding-top: 48px; }
+    .nav-links a:not(.nav-cta) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <a href="../landing/" class="nav-logo">frontguard <span>cloud</span></a>
+  <div class="nav-links">
+    <a href="../landing/">Features</a>
+    <a href="#">Docs</a>
+    <a href="#" class="nav-cta">Get Started</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <h1>Simple, transparent pricing</h1>
+  <p>Start free with the open-source CLI. Upgrade when you need cloud rendering, hosted reports, and team features.</p>
+</section>
+
+<!-- Billing Toggle -->
+<div class="billing-toggle">
+  <span class="active" id="monthly-label">Monthly</span>
+  <div class="toggle-switch" id="billing-toggle" onclick="toggleBilling()"></div>
+  <span id="annual-label">Annual</span>
+  <span class="save-badge">Save 20%</span>
+</div>
+
+<!-- Pricing Cards -->
+<div class="pricing-grid">
+
+  <!-- OSS -->
+  <div class="pricing-card">
+    <div class="card-tier">OSS</div>
+    <div class="card-price">
+      <span class="amount">Free</span>
+    </div>
+    <p class="card-desc">Open source, forever free. Run locally with your own AI keys.</p>
+    <div class="card-divider"></div>
+    <ul class="card-features">
+      <li><span class="check">✓</span> CLI + GitHub Action</li>
+      <li><span class="check">✓</span> BYOK AI (bring your own keys)</li>
+      <li><span class="check">✓</span> Unlimited local runs</li>
+      <li><span class="check">✓</span> Community support</li>
+    </ul>
+    <a href="#" class="card-cta cta-outline">Get Started</a>
+  </div>
+
+  <!-- Pro -->
+  <div class="pricing-card popular">
+    <div class="popular-badge">Most Popular</div>
+    <div class="card-tier">Pro</div>
+    <div class="card-price">
+      <span class="amount" data-monthly="29" data-annual="23">$29</span>
+      <span class="period">/mo</span>
+    </div>
+    <p class="card-desc">Managed cloud rendering and hosted reports for solo devs and small projects.</p>
+    <div class="card-divider"></div>
+    <ul class="card-features">
+      <li><span class="check">✓</span> Everything in OSS</li>
+      <li><span class="check">✓</span> Managed cloud rendering</li>
+      <li><span class="check">✓</span> Hosted reports</li>
+      <li><span class="check">✓</span> 5,000 screenshots / mo</li>
+      <li><span class="check">✓</span> Email support</li>
+      <li><span class="check">✓</span> Baseline management UI</li>
+    </ul>
+    <a href="#" class="card-cta cta-blue">Start Trial</a>
+  </div>
+
+  <!-- Team -->
+  <div class="pricing-card">
+    <div class="card-tier">Team</div>
+    <div class="card-price">
+      <span class="amount" data-monthly="99" data-annual="79">$99</span>
+      <span class="period">/mo</span>
+    </div>
+    <p class="card-desc">For teams that need collaboration, SSO, and higher volume.</p>
+    <div class="card-divider"></div>
+    <ul class="card-features">
+      <li><span class="check">✓</span> Everything in Pro</li>
+      <li><span class="check">✓</span> Team management</li>
+      <li><span class="check">✓</span> SSO</li>
+      <li><span class="check">✓</span> 20,000 screenshots / mo</li>
+      <li><span class="check">✓</span> Priority support</li>
+      <li><span class="check">✓</span> Custom webhooks</li>
+      <li><span class="check">✓</span> Slack integration</li>
+    </ul>
+    <a href="#" class="card-cta cta-primary">Start Trial</a>
+  </div>
+
+  <!-- Enterprise -->
+  <div class="pricing-card">
+    <div class="card-tier">Enterprise</div>
+    <div class="card-price">
+      <span class="amount">Custom</span>
+    </div>
+    <p class="card-desc">Unlimited scale, on-prem deployment, and dedicated support.</p>
+    <div class="card-divider"></div>
+    <ul class="card-features">
+      <li><span class="check">✓</span> Everything in Team</li>
+      <li><span class="check">✓</span> Unlimited screenshots</li>
+      <li><span class="check">✓</span> On-prem deployment</li>
+      <li><span class="check">✓</span> SLA</li>
+      <li><span class="check">✓</span> Dedicated support</li>
+      <li><span class="check">✓</span> Custom integrations</li>
+    </ul>
+    <a href="#" class="card-cta cta-outline">Contact Sales</a>
+  </div>
+</div>
+
+<!-- FAQ -->
+<section class="faq-section">
+  <h2>Frequently asked questions</h2>
+
+  <div class="faq-item">
+    <button class="faq-question" onclick="toggleFaq(this)">
+      What counts as a screenshot?
+      <span class="faq-icon">+</span>
+    </button>
+    <div class="faq-answer">
+      <div class="faq-answer-inner">Each route × viewport × browser = 1 screenshot. For example, if you test 10 routes across 2 viewports in 2 browsers, that's 40 screenshots.</div>
+    </div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-question" onclick="toggleFaq(this)">
+      Can I use my own AI keys?
+      <span class="faq-icon">+</span>
+    </button>
+    <div class="faq-answer">
+      <div class="faq-answer-inner">Yes. BYOK (Bring Your Own Keys) is free on all tiers, including the open-source plan. Use your OpenAI, Anthropic, or Google keys — we never store them.</div>
+    </div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-question" onclick="toggleFaq(this)">
+      Do I need Playwright installed?
+      <span class="faq-icon">+</span>
+    </button>
+    <div class="faq-answer">
+      <div class="faq-answer-inner">Not on Pro or higher — cloud rendering handles everything. The OSS tier requires a local Playwright installation to capture screenshots.</div>
+    </div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-question" onclick="toggleFaq(this)">
+      What happens if I exceed my limit?
+      <span class="faq-icon">+</span>
+    </button>
+    <div class="faq-answer">
+      <div class="faq-answer-inner">Runs are throttled, not blocked. You'll never lose data or miss a PR check. Upgrade anytime to increase your limit — changes take effect immediately.</div>
+    </div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-question" onclick="toggleFaq(this)">
+      Can I cancel anytime?
+      <span class="faq-icon">+</span>
+    </button>
+    <div class="faq-answer">
+      <div class="faq-answer-inner">Yes. No contracts, no lock-in. Cancel from your dashboard and you'll keep access through the end of your billing period.</div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  © 2025 Frontguard. Open source visual regression testing.
+</footer>
+
+<script>
+  let isAnnual = false;
+
+  function toggleBilling() {
+    isAnnual = !isAnnual;
+    const toggle = document.getElementById('billing-toggle');
+    const monthlyLabel = document.getElementById('monthly-label');
+    const annualLabel = document.getElementById('annual-label');
+
+    toggle.classList.toggle('annual', isAnnual);
+    monthlyLabel.classList.toggle('active', !isAnnual);
+    annualLabel.classList.toggle('active', isAnnual);
+
+    document.querySelectorAll('.card-price .amount[data-monthly]').forEach(el => {
+      const price = isAnnual ? el.dataset.annual : el.dataset.monthly;
+      el.textContent = '$' + price;
+    });
+  }
+
+  function toggleFaq(btn) {
+    const item = btn.closest('.faq-item');
+    const wasOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+    if (!wasOpen) item.classList.add('open');
+  }
+</script>
+</body>
+</html>
