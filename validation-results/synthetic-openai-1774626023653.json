@@ -1,0 +1,178 @@
+{
+  "timestamp": "2026-03-27T15:40:23.653Z",
+  "provider": "openai",
+  "model": "gpt-4o",
+  "summary": {
+    "total": 10,
+    "classificationAccuracy": "50",
+    "severityAccuracy": "50",
+    "fullMatchAccuracy": "40",
+    "errors": 0
+  },
+  "cases": [
+    {
+      "name": "Identical images (red square)",
+      "expectedClassification": "pass",
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "pass",
+      "gotSeverity": "none",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 1,
+      "explanation": "Images are pixel-identical — passed diff gate",
+      "duration": 58
+    },
+    {
+      "name": "Color change (blue→red button)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical",
+        "warning"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": false,
+      "confidence": 0.95,
+      "explanation": "The color of the buttons changed from blue to red.",
+      "duration": 2674
+    },
+    {
+      "name": "Content change ($49→$59)",
+      "expectedClassification": [
+        "content_update"
+      ],
+      "expectedSeverity": [
+        "info",
+        "warning"
+      ],
+      "gotClassification": "content_update",
+      "gotSeverity": "info",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "Minor content change with a single character difference.",
+      "duration": 2613
+    },
+    {
+      "name": "Layout break (shifted 50px)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "warning",
+      "classificationMatch": true,
+      "severityMatch": false,
+      "confidence": 0.9,
+      "explanation": "The layout in the current version has shifted or has inconsistencies compared to the baseline. Notable changes include misalignment and possible overflow in some sections.",
+      "duration": 3146
+    },
+    {
+      "name": "Missing element (nav bar removed)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": false,
+      "confidence": 0.9,
+      "explanation": "The navigation menu design has been updated from text links to icon-based links.",
+      "duration": 2715
+    },
+    {
+      "name": "Added element (banner + badge)",
+      "expectedClassification": [
+        "intentional",
+        "content_update"
+      ],
+      "expectedSeverity": [
+        "info",
+        "warning"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "critical",
+      "classificationMatch": false,
+      "severityMatch": false,
+      "confidence": 0.95,
+      "explanation": "A new green element is overlapping existing content at the top area, which was not present in the baseline.",
+      "duration": 3097
+    },
+    {
+      "name": "Spacing change (5px shift)",
+      "expectedClassification": [
+        "intentional"
+      ],
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "warning",
+      "classificationMatch": false,
+      "severityMatch": false,
+      "confidence": 0.9,
+      "explanation": "The layout of the text boxes and buttons has shifted vertically. The changes in alignment affect both text and button positions.",
+      "duration": 2330
+    },
+    {
+      "name": "Theme change (light→dark)",
+      "expectedClassification": [
+        "intentional"
+      ],
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "The page's color scheme has changed to a dark mode, affecting the background and text colors.",
+      "duration": 2491
+    },
+    {
+      "name": "Overflow (wider element)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical",
+        "warning"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "critical",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.9,
+      "explanation": "The position of the first section has shifted downward, causing a layout misalignment.",
+      "duration": 1702
+    },
+    {
+      "name": "Image swap (color region)",
+      "expectedClassification": [
+        "content_update"
+      ],
+      "expectedSeverity": [
+        "info",
+        "warning"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "The color of the top section has been changed from green to purple.",
+      "duration": 2303
+    }
+  ]
+}

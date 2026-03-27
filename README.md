@@ -1,8 +1,15 @@
 # 🛡️ Frontguard
 
+[![CI](https://github.com/aspect-build/frontguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aspect-build/frontguard/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/frontguard)](https://www.npmjs.com/package/frontguard)
+[![Tests](https://img.shields.io/badge/tests-319-brightgreen)]()
+[![Bundle](https://img.shields.io/badge/bundle-142KB-blue)]()
+
 **AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.**
 
 Backend has Datadog, Sentry, PagerDuty — a $20B+ monitoring ecosystem. Frontend gets... manual QA and hoping for the best. Frontguard changes that.
+
+> **319 tests** · **25/26 source files covered** · **142KB bundle** · **3 built-in plugins**
 
 ## What It Does
 
@@ -37,6 +44,8 @@ npx frontguard update-baselines
 - **Preview deployments** — Auto-detects Vercel/Netlify preview URLs
 - **Git-native baselines** — Stored in orphan branch, zero main branch bloat
 - **Framework detection** — Next.js, Remix, SvelteKit, Nuxt, Astro out of the box
+- **Security hardened** — Shell injection prevention, path traversal guards, API key redaction
+- **Memory managed** — Streaming buffers, temp file cleanup, bounded concurrency
 
 ## Configuration
 
@@ -119,17 +128,42 @@ export default {
   1 regression · 1 warning · 9 passed · 1 new
 ```
 
+## Plugins
+
+Frontguard ships with a plugin architecture (9 lifecycle hooks) and 3 built-in plugins:
+
+| Plugin | Description | Key Features |
+|--------|-------------|--------------|
+| **Figma** (`src/plugins/figma.ts`) | Design-to-code comparison | Figma API integration, design token extraction, component mapping |
+| **Performance Budgets** (`src/plugins/perf-budgets.ts`) | Bundle size & Web Vitals | LCP/FID/CLS thresholds, budget violation reporting |
+| **Monitor** (`src/plugins/monitor.ts`) | Production visual monitoring | Uptime checks, latency tracking, alerting thresholds |
+
+**Plugin lifecycle hooks:** `onInit`, `onDiscover`, `onFilter`, `onRender`, `onDiff`, `onAnalyze`, `onReport`, `onError`, `onCleanup`
+
+```typescript
+// frontguard.config.ts
+import { figmaPlugin } from 'frontguard/plugins';
+
+export default {
+  // ...base config
+  plugins: [
+    figmaPlugin({ fileKey: 'your-figma-file-key' }),
+  ],
+};
+```
+
 ## Architecture
 
 ```
 src/
 ├── cli/              # CLI entry point (Commander.js)
-├── core/             # Pipeline orchestrator, types, config
+├── core/             # Pipeline orchestrator, types, config, plugin system
 ├── discovery/        # Route discovery (crawler + filesystem)
 ├── render/           # Playwright rendering engine
 ├── diff/             # Pixel diff + AI vision analysis
 ├── storage/          # Git orphan branch baselines
 ├── report/           # Console, JSON, HTML, GitHub PR reporters
+├── plugins/          # Figma, perf budgets, monitoring
 └── utils/            # Redaction, logging, retry
 ```
 
@@ -144,64 +178,34 @@ See [`docs/`](./docs/) for:
 - [Research](./docs/research/) — Market data, technical feasibility, competitive landscape
 - [CEO Review](./docs/ceo-review/) — Founder-mode review with 50+ failure modes mapped
 
-## Roadmap
-
-- **M1** ✅ Core rendering + pixel diff + CLI
-- **M2** 🔲 Dependency graph for smart rendering
-- **M3** 🔲 GitHub Action + preview deployment integration
-- **M4** 🔲 AI analysis against real PRs
-- **M5** 🔲 Documentation site + launch
-
 ## Validating AI Accuracy
 
-Frontguard's value depends on AI vision models correctly classifying visual changes. The validation framework tests this empirically with 10 synthetic test cases and a scaffold for real-world PR validation.
+Frontguard's value depends on AI vision models correctly classifying visual changes. Two validation scripts are included:
 
-**Synthetic validation** (`scripts/validate-ai.ts`) — generates 10 programmatic before/after screenshot pairs using `pngjs` with known ground truth:
-
-| # | Scenario | Expected |
-|---|----------|----------|
-| 1 | Identical images (red square) | pass — no regression |
-| 2 | Color change (blue→red button) | regression / critical |
-| 3 | Content change (price $49→$59) | content_update |
-| 4 | Layout break (50px shift + overflow) | regression / critical |
-| 5 | Missing element (nav bar removed) | regression / critical |
-| 6 | Added element (new banner + badge) | intentional |
-| 7 | Spacing change (subtle 5px shift) | intentional / info |
-| 8 | Full theme change (light→dark) | intentional |
-| 9 | Overflow (wider element on mobile) | regression / warning |
-| 10 | Image swap (green→purple region) | content_update |
-
-For each pair the script generates a pixel diff via `pixelmatch`, calls `analyzeWithAI()`, compares the classification and severity against expected values, and prints a results table. Missing API keys are handled gracefully with a clear error message.
+**Synthetic validation** (`scripts/validate-ai.ts`) — 10 programmatic before/after screenshot pairs with known ground truth:
 
 ```bash
-# Set your AI provider key
 export FRONTGUARD_OPENAI_KEY=sk-...
-# Or: export FRONTGUARD_ANTHROPIC_KEY=sk-ant-...
-
-# Run the 10-case synthetic validation suite
 npx tsx scripts/validate-ai.ts
-
-# Optional: configure provider and model
-VALIDATION_PROVIDER=anthropic VALIDATION_MODEL=claude-sonnet-4-20250514 npx tsx scripts/validate-ai.ts
 ```
 
-**Real-world validation** (`scripts/validate-ai-real.ts`) — scaffold for validating against actual GitHub PRs:
+**Real-world validation** (`scripts/validate-ai-real.ts`) — validates against actual GitHub PRs with full rendering pipeline (clone → framework detect → install deps → dev server → Playwright capture → pixel diff → AI analysis):
 
 ```bash
-# Single PR
 npx tsx scripts/validate-ai-real.ts --repo shadcn-ui/ui --pr 1234
-
-# With ground truth expectations
-npx tsx scripts/validate-ai-real.ts --repo shadcn-ui/ui --pr 1234 \
-  --ground-truth ground-truth/shadcn-1234.json
-
-# Batch mode
 npx tsx scripts/validate-ai-real.ts --batch ground-truth/cases.json
 ```
 
-Accepts `--repo` and `--pr` flags, clones the repo, checks out base/head refs, and scaffolds the before/after rendering pipeline. Key stages (framework detection, dev server startup, Playwright capture) are marked as TODOs for Phase 2 implementation.
-
 Results are saved to `validation-results/` as JSON for tracking accuracy over time.
+
+## Roadmap
+
+- **M1** ✅ Core rendering + pixel diff + CLI
+- **M2** ✅ Dependency graph for smart rendering
+- **M3** ✅ GitHub Action + preview deployment integration
+- **M4** ✅ AI analysis + validation framework
+- **M5** ✅ Plugin system + documentation site + npm prep
+- **Next** 🔲 Real-world AI validation, npm publish, beta testers
 
 ## Environment Variables
 

@@ -7,3 +7,4 @@ auth.json
 .env.*
 *.log
 core
+.frontguard/

@@ -25,6 +25,10 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import pixelmatch from 'pixelmatch';
+import { PNG } from 'pngjs';
+import { analyzeWithAI } from '../src/diff/ai-vision.js';
+import type { DiffResult, Route } from '../src/core/types.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -277,32 +281,183 @@ function checkoutRef(repoDir: string, ref: string): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Render screenshots for a set of routes.
+ * Detect the framework used in a repository by checking for known config files.
+ */
+function detectFramework(repoDir: string): 'next' | 'vite' | 'remix' | 'nuxt' | 'unknown' {
+  const checks: Array<{ file: string; framework: 'next' | 'vite' | 'remix' | 'nuxt' }> = [
+    { file: 'next.config.js', framework: 'next' },
+    { file: 'next.config.mjs', framework: 'next' },
+    { file: 'next.config.ts', framework: 'next' },
+    { file: 'remix.config.js', framework: 'remix' },
+    { file: 'remix.config.ts', framework: 'remix' },
+    { file: 'vite.config.js', framework: 'vite' },
+    { file: 'vite.config.ts', framework: 'vite' },
+    { file: 'nuxt.config.ts', framework: 'nuxt' },
+    { file: 'nuxt.config.js', framework: 'nuxt' },
+  ];
+  for (const { file, framework } of checks) {
+    if (fs.existsSync(path.join(repoDir, file))) return framework;
+  }
+  return 'unknown';
+}
+
+/**
+ * Install dependencies in a repository directory.
+ */
+function installDeps(repoDir: string): void {
+  const hasYarnLock = fs.existsSync(path.join(repoDir, 'yarn.lock'));
+  const hasPnpmLock = fs.existsSync(path.join(repoDir, 'pnpm-lock.yaml'));
+
+  const cmd = hasPnpmLock ? 'pnpm install --frozen-lockfile' :
+    hasYarnLock ? 'yarn install --frozen-lockfile' :
+    'npm ci --ignore-scripts';
+
+  console.log(`    Installing dependencies (${cmd.split(' ')[0]})...`);
+  try {
+    execSync(cmd, { cwd: repoDir, stdio: 'pipe', timeout: 180_000 });
+  } catch {
+    // Fallback to non-strict install
+    const fallback = hasPnpmLock ? 'pnpm install' :
+      hasYarnLock ? 'yarn install' : 'npm install';
+    execSync(fallback, { cwd: repoDir, stdio: 'pipe', timeout: 180_000 });
+  }
+}
+
+/**
+ * Start a dev server and return the base URL and a cleanup function.
+ */
+function startDevServer(
+  repoDir: string,
+  framework: string,
+  baseUrl?: string,
+): { url: string; cleanup: () => void } {
+  if (baseUrl) {
+    return { url: baseUrl, cleanup: () => {} };
+  }
+
+  const port = 3099 + Math.floor(Math.random() * 900);
+  const cmdMap: Record<string, string> = {
+    next: `npx next dev -p ${port}`,
+    vite: `npx vite --port ${port}`,
+    remix: `npx remix dev --port ${port}`,
+    nuxt: `npx nuxi dev --port ${port}`,
+    unknown: `npx serve -l ${port} -s`,
+  };
+  const cmd = cmdMap[framework] ?? cmdMap.unknown;
+  console.log(`    Starting dev server on port ${port}...`);
+
+  const child = require('node:child_process').spawn(cmd, {
+    cwd: repoDir,
+    shell: true,
+    stdio: 'pipe',
+    detached: true,
+  });
+
+  const cleanup = () => {
+    try {
+      if (child.pid) process.kill(-child.pid, 'SIGTERM');
+    } catch {
+      // Process already exited
+    }
+  };
+
+  return { url: `http://localhost:${port}`, cleanup };
+}
+
+/**
+ * Wait for a URL to become reachable.
+ */
+async function waitForServer(url: string, maxAttempts = 30, intervalMs = 2000): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (resp.ok || resp.status === 404) return true; // Server is up
+    } catch {
+      // Not ready yet
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return false;
+}
+
+/**
+ * Render screenshots for a set of routes using Playwright.
  *
- * TODO: This is a scaffold. Full implementation will:
- * 1. Detect the framework (Next.js, Vite, etc.)
- * 2. Install dependencies
- * 3. Start the dev server
- * 4. Use Playwright to capture screenshots at multiple viewports
- * 5. Return PNG buffers keyed by route
- *
- * For now, returns empty buffers to establish the interface.
+ * 1. Detects the framework (Next.js, Vite, etc.)
+ * 2. Installs dependencies
+ * 3. Starts the dev server
+ * 4. Uses Playwright to capture screenshots at 1440px viewport
+ * 5. Returns PNG buffers keyed by route
  */
 async function renderScreenshots(
-  _repoDir: string,
-  _routes: string[],
-  _baseUrl?: string,
+  repoDir: string,
+  routes: string[],
+  baseUrl?: string,
 ): Promise<Map<string, Buffer>> {
-  console.log('  ⚠ Screenshot rendering is scaffolded — returning placeholder images');
-  console.log('    Full implementation requires:');
-  console.log('    - Framework detection (Next.js, Vite, etc.)');
-  console.log('    - Dependency installation');
-  console.log('    - Dev server startup');
-  console.log('    - Playwright screenshot capture');
-  console.log('');
+  const screenshots = new Map<string, Buffer>();
+  const framework = detectFramework(repoDir);
+  console.log(`    Framework detected: ${framework}`);
 
-  // Return empty map — the pipeline will detect this and skip AI analysis
-  return new Map();
+  // Install dependencies
+  try {
+    installDeps(repoDir);
+  } catch (err) {
+    console.error(`    ⚠ Dependency install failed: ${err instanceof Error ? err.message : String(err)}`);
+    return screenshots;
+  }
+
+  // Start dev server
+  const server = startDevServer(repoDir, framework, baseUrl);
+
+  try {
+    if (!baseUrl) {
+      console.log(`    Waiting for server at ${server.url}...`);
+      const ready = await waitForServer(server.url);
+      if (!ready) {
+        console.error('    ⚠ Dev server did not start within timeout');
+        return screenshots;
+      }
+    }
+
+    // Capture screenshots with Playwright
+    let playwright;
+    try {
+      playwright = await import('playwright');
+    } catch {
+      console.error('    ⚠ Playwright not available — install with: npx playwright install chromium');
+      return screenshots;
+    }
+
+    const browser = await playwright.chromium.launch({ headless: true });
+    try {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const page = await context.newPage();
+
+      for (const route of routes) {
+        const url = `${server.url}${route}`;
+        try {
+          console.log(`    Capturing ${route}...`);
+          await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+          // Disable animations for stable screenshots
+          await page.addStyleTag({
+            content: '*, *::before, *::after { animation: none !important; transition: none !important; }',
+          });
+          await page.waitForTimeout(500);
+          const buffer = await page.screenshot({ fullPage: true, type: 'png' });
+          screenshots.set(route, Buffer.from(buffer));
+        } catch (err) {
+          console.error(`    ⚠ Failed to capture ${route}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      await context.close();
+    } finally {
+      await browser.close();
+    }
+  } finally {
+    server.cleanup();
+  }
+
+  return screenshots;
 }
 
 // ---------------------------------------------------------------------------
@@ -374,32 +529,102 @@ async function validatePR(
           aiExplanation: null,
           confidence: null,
           diffPercentage: null,
-          error: 'Screenshot rendering not yet implemented — scaffold only',
+          error: `Missing screenshot: base=${!!baseBuf}, head=${!!headBuf} — rendering may have failed`,
         });
         continue;
       }
 
-      // TODO: Run pixel diff and AI analysis
-      // This will use:
-      //   import { compareScreenshot } from '../src/diff/pixel.js';
-      //   import { analyzeWithAI } from '../src/diff/ai-vision.js';
-      //
-      // const diffResult = compareScreenshot(headScreenshot, baseBuf, 0.1);
-      // const aiResult = await analyzeWithAI(diffResult, { provider: PROVIDER, model: MODEL });
+      try {
+        // Decode PNGs for pixel comparison
+        const basePng = PNG.sync.read(baseBuf);
+        const headPng = PNG.sync.read(headBuf);
 
-      routeResults.push({
-        path: routePath,
-        expectedClassification: gt?.expectedClassification ?? 'unknown',
-        expectedSeverity: gt?.expectedSeverity ?? 'unknown',
-        gotClassification: null,
-        gotSeverity: null,
-        classificationMatch: false,
-        severityMatch: false,
-        aiExplanation: null,
-        confidence: null,
-        diffPercentage: null,
-        error: 'AI analysis not yet connected — scaffold only',
-      });
+        // Handle dimension mismatches by using the larger canvas
+        const width = Math.max(basePng.width, headPng.width);
+        const height = Math.max(basePng.height, headPng.height);
+
+        // Create normalized buffers (pad smaller image with transparent pixels)
+        const normalizeToSize = (png: PNG, w: number, h: number): Buffer => {
+          if (png.width === w && png.height === h) return png.data as unknown as Buffer;
+          const out = Buffer.alloc(w * h * 4, 0);
+          for (let y = 0; y < png.height && y < h; y++) {
+            for (let x = 0; x < png.width && x < w; x++) {
+              const srcIdx = (png.width * y + x) << 2;
+              const dstIdx = (w * y + x) << 2;
+              out[dstIdx] = png.data[srcIdx];
+              out[dstIdx + 1] = png.data[srcIdx + 1];
+              out[dstIdx + 2] = png.data[srcIdx + 2];
+              out[dstIdx + 3] = png.data[srcIdx + 3];
+            }
+          }
+          return out;
+        };
+
+        const baseData = normalizeToSize(basePng, width, height);
+        const headData = normalizeToSize(headPng, width, height);
+        const diffData = Buffer.alloc(width * height * 4);
+
+        const numDiffPixels = pixelmatch(
+          new Uint8Array(baseData),
+          new Uint8Array(headData),
+          new Uint8Array(diffData),
+          width,
+          height,
+          { threshold: 0.1 },
+        );
+
+        const totalPixels = width * height;
+        const diffPercentage = totalPixels > 0 ? (numDiffPixels / totalPixels) * 100 : 0;
+
+        // Encode diff image as PNG
+        const diffPng = new PNG({ width, height });
+        diffPng.data = diffData as unknown as Buffer;
+        const diffImageBuf = PNG.sync.write(diffPng);
+
+        // Build a DiffResult for the AI analysis
+        const route: Route = { path: routePath };
+        const diffResult: DiffResult = {
+          route,
+          viewport: 1440,
+          browser: 'chromium',
+          status: diffPercentage > 10 ? 'changed' : diffPercentage > 0 ? 'warning' : 'pass',
+          diffPercentage,
+          diffImage: diffImageBuf,
+          baselineImage: baseBuf,
+          currentImage: headBuf,
+        };
+
+        // Run AI analysis
+        const aiResult = await analyzeWithAI(diffResult, { provider: PROVIDER, model: MODEL });
+
+        routeResults.push({
+          path: routePath,
+          expectedClassification: gt?.expectedClassification ?? 'unknown',
+          expectedSeverity: gt?.expectedSeverity ?? 'unknown',
+          gotClassification: aiResult.classification,
+          gotSeverity: aiResult.severity,
+          classificationMatch: gt ? aiResult.classification === gt.expectedClassification : false,
+          severityMatch: gt ? aiResult.severity === gt.expectedSeverity : false,
+          aiExplanation: aiResult.explanation,
+          confidence: aiResult.confidence,
+          diffPercentage,
+          error: null,
+        });
+      } catch (err) {
+        routeResults.push({
+          path: routePath,
+          expectedClassification: gt?.expectedClassification ?? 'unknown',
+          expectedSeverity: gt?.expectedSeverity ?? 'unknown',
+          gotClassification: null,
+          gotSeverity: null,
+          classificationMatch: false,
+          severityMatch: false,
+          aiExplanation: null,
+          confidence: null,
+          diffPercentage: null,
+          error: `Analysis failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
     }
 
     // 7. Build result

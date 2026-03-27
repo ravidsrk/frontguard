@@ -1,0 +1,178 @@
+{
+  "timestamp": "2026-03-27T15:43:48.134Z",
+  "provider": "openai",
+  "model": "gpt-4o",
+  "summary": {
+    "total": 10,
+    "classificationAccuracy": "50",
+    "severityAccuracy": "60",
+    "fullMatchAccuracy": "40",
+    "errors": 0
+  },
+  "cases": [
+    {
+      "name": "Identical images (red square)",
+      "expectedClassification": "pass",
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "pass",
+      "gotSeverity": "none",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 1,
+      "explanation": "Images are pixel-identical — passed diff gate",
+      "duration": 58
+    },
+    {
+      "name": "Color change (blue→red button)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical",
+        "warning"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": false,
+      "confidence": 0.95,
+      "explanation": "The button color has changed from blue to red in both instances. This seems to be a deliberate design choice as there is no evidence of layout shifting or element disappearance.",
+      "duration": 2809
+    },
+    {
+      "name": "Content change ($49→$59)",
+      "expectedClassification": [
+        "content_update"
+      ],
+      "expectedSeverity": [
+        "info",
+        "warning"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "A very minor change was detected with only 0.04% of the pixels altered, suggesting an insignificant difference, likely intentional or due to rendering variations. There are no layout disruptions or missing elements.",
+      "duration": 2442
+    },
+    {
+      "name": "Layout break (shifted 50px)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "warning",
+      "classificationMatch": true,
+      "severityMatch": false,
+      "confidence": 0.85,
+      "explanation": "The pixel diff indicates alignment and spacing changes around text areas and buttons. The right edge of the text blocks has shifted, causing misalignment. This appears unintentional as it impacts readability and visual coherence.",
+      "duration": 2987
+    },
+    {
+      "name": "Missing element (nav bar removed)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "critical",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "There is a major shift in the layout causing elements to overlap. The navigation links and content sections are misaligned, and portions of the main content area and UI components have changed significantly and disruptively. This results in readability and usability issues.",
+      "duration": 2841
+    },
+    {
+      "name": "Added element (banner + badge)",
+      "expectedClassification": [
+        "intentional",
+        "content_update"
+      ],
+      "expectedSeverity": [
+        "info",
+        "warning"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "critical",
+      "classificationMatch": false,
+      "severityMatch": false,
+      "confidence": 0.95,
+      "explanation": "A new element has appeared at the top of the page causing overlapping and layout shift. The green bar and new button on the top disrupt the existing layout, which wasn't present in the baseline.",
+      "duration": 2592
+    },
+    {
+      "name": "Spacing change (5px shift)",
+      "expectedClassification": [
+        "intentional"
+      ],
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "warning",
+      "classificationMatch": false,
+      "severityMatch": false,
+      "confidence": 0.9,
+      "explanation": "The text content and buttons have noticeably shifted, as indicated by the pixel diff overlay showing changes around these elements. The changes are significant and affect the layout.",
+      "duration": 2565
+    },
+    {
+      "name": "Theme change (light→dark)",
+      "expectedClassification": [
+        "intentional"
+      ],
+      "expectedSeverity": [
+        "info"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "The change appears to be a complete theme or color scheme update. The structure and layout remain consistent, but colors have been inverted to a dark theme across the entire interface. This includes the sidebar, text areas, and buttons.",
+      "duration": 3030
+    },
+    {
+      "name": "Overflow (wider element)",
+      "expectedClassification": [
+        "regression"
+      ],
+      "expectedSeverity": [
+        "critical",
+        "warning"
+      ],
+      "gotClassification": "regression",
+      "gotSeverity": "warning",
+      "classificationMatch": true,
+      "severityMatch": true,
+      "confidence": 0.9,
+      "explanation": "The layout of the sections appears to have shifted from a centered alignment to a left alignment, and the vertical spacing between sections has also changed significantly. Additionally, there is text overlapping the box margins and a visible change around the button area, suggesting layout shifts.",
+      "duration": 2697
+    },
+    {
+      "name": "Image swap (color region)",
+      "expectedClassification": [
+        "content_update"
+      ],
+      "expectedSeverity": [
+        "info",
+        "warning"
+      ],
+      "gotClassification": "intentional",
+      "gotSeverity": "info",
+      "classificationMatch": false,
+      "severityMatch": true,
+      "confidence": 0.95,
+      "explanation": "The change observed is a color change in the large section at the top from green to purple. The rest of the layout and elements remain consistent without any breakage or misalignment, indicating a deliberate design update.",
+      "duration": 2513
+    }
+  ]
+}

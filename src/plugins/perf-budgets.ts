@@ -180,7 +180,7 @@ export function checkBudgets(
 /**
  * Format a metric value for display.
  */
-function formatMetric(value: number | undefined, unit: string): string {
+function _formatMetric(value: number | undefined, unit: string): string {
   if (value === undefined) return '-';
   if (unit === 'KB') return `${value.toFixed(0)}KB`;
   if (unit === 'ms' || unit === 's') return `${(value / 1000).toFixed(1)}s`;

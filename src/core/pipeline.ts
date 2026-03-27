@@ -20,7 +20,6 @@ import type {
   RunResult,
   RunTiming,
   Reporter,
-  PipelineStage,
 } from './types.js';
 import { discoverRoutes } from '../discovery/crawler.js';
 import { discoverRoutesFromFilesystem } from '../discovery/filesystem.js';
@@ -474,7 +473,7 @@ export async function runPipeline(
           // and free the buffers. Passing diffs don't need images at all.
           const isChanged = diff.status === 'changed' || diff.status === 'regression' || diff.status === 'new';
           if (isChanged) {
-            const shot = screenshots[diffIndex] ?? diff;
+            const _shot = screenshots[diffIndex] ?? diff;
             const key = `${storedIndex}_${diff.route.path}_${diff.viewport}_${diff.browser}`;
             tempPaths.set(storedIndex, {
               baseline: persistBufferToTemp(tempDir, `${key}_baseline`, diff.baselineImage),

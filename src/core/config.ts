@@ -220,9 +220,7 @@ export function detectSecrets(obj: unknown, path = 'config'): void {
  */
 async function loadConfigFile(filePath: string): Promise<unknown> {
   const fileUrl = pathToFileURL(resolve(filePath)).href;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const mod = await import(fileUrl);
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   return mod.default ?? mod;
 }
 

@@ -55,10 +55,8 @@ describe('CLI', () => {
     expect(stdout).toContain('--threshold');
   });
 
-  it('invalid command exits with error', () => {
-    // Running without a URL or config should fail with a helpful error
-    const { exitCode, stderr } = runCli(['run', '--url', '']);
-    // Should exit non-zero (the actual code depends on which error fires first)
+  it('invalid option exits with error', () => {
+    const { exitCode } = runCli(['--invalid-option']);
     expect(exitCode).not.toBe(0);
   });
 });

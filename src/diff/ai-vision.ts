@@ -16,15 +16,36 @@ import { PNG } from 'pngjs';
 // Constants
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are analyzing a visual regression test. Compare these two screenshots of a web page. The first is the baseline (expected), the second is the current version. A pixel diff overlay is also provided highlighting the differences.
+const SYSTEM_PROMPT = `You are a frontend visual regression testing expert. You will receive:
+1. A BASELINE screenshot (the expected/approved version)
+2. A CURRENT screenshot (the new version being tested)
+3. A PIXEL DIFF overlay (red areas = changed pixels)
+4. Context metadata (route path, diff percentage, DOM changes if available)
 
-Classify this change as one of:
-- 'regression': An unintended visual bug (broken layout, missing elements, overlapping text, wrong colors, etc.)
-- 'intentional': A deliberate design change (new component, redesign, updated branding)
-- 'content_update': Content changed but layout is intact (different text, updated numbers, new blog posts)
+Your job: determine if the visual difference is a BUG or INTENTIONAL.
+
+CLASSIFICATION RULES:
+- 'regression': Elements DISAPPEARED, OVERLAPPED, BROKE LAYOUT, or SHIFTED UNINTENTIONALLY. Signs: broken alignment, text clipping/overflow, missing navigation/buttons, z-index issues, content overlapping, responsive breakage. If in doubt between regression and intentional, choose regression (fail-safe).
+- 'intentional': Clear DESIGN CHANGES like new components, color scheme updates, typography changes, added sections. The layout is COHERENT — nothing looks broken.
+- 'content_update': Same layout/design, but TEXT/NUMBERS/DATA changed. Headings, prices, dates, user-generated content.
+
+SEVERITY RULES:
+- 'critical': Navigation/CTA missing, layout completely broken, content unreadable, page blank
+- 'warning': Element shifted, minor overlap, color change that could be intentional, spacing inconsistency
+- 'info': Subtle change, anti-aliasing difference, sub-pixel rendering, minor content update
+
+KEY HEURISTICS:
+- Missing elements → regression (critical) — elements don't disappear on purpose in a PR
+- Color changes on specific elements (buttons, links) → regression (warning) unless entire theme changed
+- Full theme/color scheme change → intentional (info)
+- Text content changed → content_update (info)
+- Layout shifted >10px → regression (warning)
+- Spacing change <5px → intentional (info)
+- Added new elements with broken overlap → regression (critical)
+- Added new elements with clean layout → intentional (info)
 
 Respond with JSON only, no markdown wrapping:
-{ "classification": "regression"|"intentional"|"content_update", "explanation": "<concise description of what changed>", "severity": "critical"|"warning"|"info", "confidence": <0.0 to 1.0>, "suggestedFix": "<optional: how to fix if regression>" }`;
+{ "classification": "regression"|"intentional"|"content_update", "explanation": "<concise description of what changed and WHY you classified it this way>", "severity": "critical"|"warning"|"info", "confidence": <0.0 to 1.0>, "suggestedFix": "<optional: how to fix if regression>" }`;
 
 const REQUEST_TIMEOUT_MS = 60_000;
 
@@ -107,12 +128,20 @@ export async function analyzeWithAI(
   const currentB64 = downscaleForAI(diff.currentImage).toString('base64');
   const diffB64 = diff.diffImage ? downscaleForAI(diff.diffImage).toString('base64') : undefined;
 
+  // Build structural context for the AI
+  const contextLines: string[] = [
+    `Route: ${diff.route.path} (viewport: ${diff.viewport}px, browser: ${diff.browser})`,
+    `Pixel diff: ${diff.diffPercentage.toFixed(2)}% of pixels changed`,
+  ];
+  if (diff.status) contextLines.push(`Status: ${diff.status}`);
+  const contextText = contextLines.join('\n');
+
   logger.debug(`Analyzing ${diff.route.path} @ ${diff.viewport}px with ${config.provider}/${config.model}`);
 
   const rawResponse = await retry(
     () => config.provider === 'openai'
-      ? callOpenAI(apiKey, config.model, baselineB64, currentB64, diffB64)
-      : callAnthropic(apiKey, config.model, baselineB64, currentB64, diffB64),
+      ? callOpenAI(apiKey, config.model, baselineB64, currentB64, diffB64, contextText)
+      : callAnthropic(apiKey, config.model, baselineB64, currentB64, diffB64, contextText),
     {
       retries: 3,
       backoff: 2000,
@@ -161,6 +190,7 @@ async function callOpenAI(
   baselineB64: string,
   currentB64: string,
   diffB64?: string,
+  contextText?: string,
 ): Promise<string> {
   const imageMessages: Array<{type: 'image_url'; image_url: {url: string; detail: string}}> = [
     {
@@ -180,6 +210,10 @@ async function callOpenAI(
     });
   }
 
+  const userText = contextText
+    ? `Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.\n\nContext:\n${contextText}`
+    : 'Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.';
+
   const body = {
     model,
     max_tokens: 1024,
@@ -188,7 +222,7 @@ async function callOpenAI(
       {
         role: 'user',
         content: [
-          { type: 'text', text: 'Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.' },
+          { type: 'text', text: userText },
           ...imageMessages,
         ],
       },
@@ -266,6 +300,7 @@ async function callAnthropic(
   baselineB64: string,
   currentB64: string,
   diffB64?: string,
+  contextText?: string,
 ): Promise<string> {
   const imageBlocks: Array<{type: 'image'; source: {type: 'base64'; media_type: string; data: string}}> = [
     {
@@ -285,6 +320,10 @@ async function callAnthropic(
     });
   }
 
+  const userText = contextText
+    ? `Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.\n\nContext:\n${contextText}`
+    : 'Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.';
+
   const body = {
     model,
     max_tokens: 1024,
@@ -294,7 +333,7 @@ async function callAnthropic(
         role: 'user',
         content: [
           ...imageBlocks,
-          { type: 'text', text: 'Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.' },
+          { type: 'text', text: userText },
         ],
       },
     ],

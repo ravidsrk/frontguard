@@ -10,7 +10,7 @@
 
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
-import type { Reporter, PipelineStage, RunResult, DiffResult } from '../core/types.js';
+import type { Reporter, PipelineStage, RunResult } from '../core/types.js';
 
 // ---------------------------------------------------------------------------
 // Constants
