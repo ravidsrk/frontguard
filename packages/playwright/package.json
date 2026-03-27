@@ -1,0 +1,54 @@
+{
+  "name": "@frontguard/playwright",
+  "version": "0.1.0",
+  "description": "AI-powered visual regression testing for Playwright. 3 lines to visual test any page.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "playwright",
+    "visual-regression",
+    "visual-testing",
+    "screenshot",
+    "diff",
+    "ai",
+    "frontguard"
+  ],
+  "author": "Ravid <ravidsrk@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ravidsrk/frontguard"
+  },
+  "homepage": "https://github.com/ravidsrk/frontguard",
+  "peerDependencies": {
+    "@playwright/test": ">=1.40.0"
+  },
+  "dependencies": {
+    "pngjs": "^7.0.0",
+    "pixelmatch": "^6.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  }
+}
