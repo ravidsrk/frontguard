@@ -36,11 +36,11 @@
     "@playwright/test": ">=1.40.0"
   },
   "dependencies": {
-    "pngjs": "^7.0.0",
-    "pixelmatch": "^6.0.0"
+    "pixelmatch": "^6.0.0",
+    "pngjs": "^7.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.48.0",
+    "@playwright/test": "^1.58.2",
     "@types/node": "^20.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.5.0",

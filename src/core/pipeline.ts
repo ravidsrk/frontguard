@@ -517,7 +517,8 @@ export async function runPipeline(
   // Plugins operating on diffs should work with status/diffPercentage/metadata.
   {
     const modifiedDiffs = await pluginManager.runHook('afterCompare', diffs, pluginCtx);
-    if (modifiedDiffs !== undefined) {
+    // Only replace diffs if the hook returned a DIFFERENT array
+    if (modifiedDiffs !== undefined && modifiedDiffs !== diffs) {
       diffs.length = 0;
       diffs.push(...modifiedDiffs);
     }
@@ -615,6 +616,7 @@ export async function runPipeline(
     for (const idx of chunk) {
       const paths = tempPaths.get(idx)!;
       const diff = diffs[idx];
+      if (!diff) continue;
       diff.baselineImage = readBufferFromTemp(paths.baseline);
       diff.currentImage = readBufferFromTemp(paths.current);
       diff.diffImage = readBufferFromTemp(paths.diff);

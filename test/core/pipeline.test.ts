@@ -786,3 +786,28 @@ describe('AntiFlakeRenders validation', () => {
     }
   });
 });
+
+// Regression test: afterCompare hook returning same array reference should not empty diffs
+describe('Plugin hook same-reference bug (regression)', () => {
+  it('runHook returning the same array should not clear it', async () => {
+    const { PluginManager } = await import('../../src/core/plugins.js');
+    const pm = new PluginManager();
+    
+    // A plugin that receives an array and returns it unchanged
+    pm.register({
+      name: 'identity-plugin',
+      version: '1.0.0',
+      afterCompare: (diffs: unknown[]) => diffs, // returns same reference
+    });
+    
+    const original = [{ status: 'new', route: '/' }, { status: 'pass', route: '/about' }];
+    const result = await pm.runHook('afterCompare', original);
+    
+    // The returned value is the same reference — if the consumer does
+    // `diffs.length = 0; diffs.push(...result)` where result === diffs,
+    // it would empty the array. This test verifies the fix.
+    expect(result).toBe(original); // same reference
+    expect(original.length).toBe(2); // array NOT emptied
+    expect(original[0]).toEqual({ status: 'new', route: '/' });
+  });
+});

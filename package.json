@@ -76,5 +76,6 @@
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.57.2",
     "vitest": "^2.1.0"
-  }
+  },
+  "author": "Ravid <ravidsrk@gmail.com>"
 }
