@@ -9,9 +9,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@daytonaio/sdk": "^0.158.0",
     "hono": "^4.12.9"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "tsup": "^8",
     "tsx": "^4",
     "typescript": "^5"

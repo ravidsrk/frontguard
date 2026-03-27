@@ -9,6 +9,7 @@ export interface Run {
   ai: { provider: string; model: string } | null;
   createdAt: string;
   completedAt?: string;
+  duration?: number;
   results: RunResult[] | null;
   reportUrl: string | null;
   reportHtml?: string;
