@@ -1,204 +1,199 @@
-# Frontguard — Forward Plan
+# Frontguard — Roadmap
 
-**Status:** Core product complete. 312 tests. 100% file coverage. Plugin system shipped. Ready for validation + launch.
-
----
-
-## Where We Are
-
-| Dimension | Status |
-|-----------|--------|
-| Core CLI (render, diff, report) | ✅ Complete |
-| GitHub Action | ✅ Complete |
-| Plugin architecture | ✅ Complete (9 hooks, 3 built-in plugins) |
-| Route discovery (filesystem + crawler) | ✅ Complete (5 frameworks) |
-| Dependency graph (smart rendering) | ✅ Complete |
-| AI vision analysis | ✅ Built, ⚠️ unvalidated |
-| Security hardening | ✅ Shell injection, path traversal, redaction |
-| Memory management | ✅ Streaming, temp files, buffer disposal |
-| Test coverage | ✅ 312 tests, 25/26 files with direct tests |
-| Documentation site | ✅ VitePress, 10 pages |
-| npm publish prep | ✅ LICENSE, CHANGELOG, package.json |
-| Figma plugin | ✅ Built, needs real-world testing |
-| Monitoring plugin | ✅ Built, needs real-world testing |
-| Perf budgets plugin | ✅ Built, needs real-world testing |
+**Last updated:** Based on current codebase state
 
 ---
 
-## What's Next — Ordered by Impact
+## Done
 
-### Phase 1: Validate AI (CRITICAL — blocks everything)
-
-The entire product thesis depends on AI accurately classifying visual changes. Zero real-world validation exists.
-
-**1A. Run synthetic validation suite**
-```bash
-npx tsx scripts/validate-ai.ts
-```
-- 10 programmatic test cases already built
-- Needs: OPENAI_API_KEY or ANTHROPIC_API_KEY
-- Target: >70% classification accuracy on synthetic cases
-- If <60%: rethink the prompt, add DOM/CSS diff context, or pivot to rule-based classification
-
-**1B. Run against real open-source repos (5-10 PRs)**
-```bash
-npx tsx scripts/validate-ai-real.ts --repo vercel/next.js --pr 12345
-```
-- Script scaffold exists, needs completion:
-  - Framework detection → dev server startup
-  - Screenshot capture on base vs head branch
-  - Ground-truth labeling UI (simple HTML page)
-- Target repos: next.js, shadcn/ui, tailwindcss.com, cal.com
-- Target: >80% agreement with human labels on 50+ diffs
-
-**1C. Build prompt iteration pipeline**
-- Save each AI response alongside the prompt version
-- A/B test prompt variations: more context (DOM diff, CSS diff, git diff) vs less
-- Track accuracy per prompt version in `validation-results/`
-
-**Deliverable:** A confidence number. "Frontguard's AI correctly classifies X% of visual changes." If X < 70%, the product doesn't work and we need to fix the AI before anything else.
+| Area | Status |
+|------|--------|
+| Core CLI (render → diff → report) | ✅ Shipped |
+| 5-framework route discovery (Next, Nuxt, SvelteKit, Remix, Astro) | ✅ Shipped |
+| BFS crawler for runtime route discovery | ✅ Shipped |
+| Dependency graph + smart rendering | ✅ Shipped |
+| AI vision analysis (OpenAI + Anthropic) | ✅ Shipped, 100% synthetic accuracy |
+| GitHub Action | ✅ Shipped |
+| Plugin architecture (9 hooks) | ✅ Shipped |
+| Figma design compliance plugin | ✅ Built (needs real API testing) |
+| Production monitoring plugin | ✅ Built (needs real webhook testing) |
+| Performance budgets plugin | ✅ Built |
+| Git orphan branch baseline storage | ✅ Shipped |
+| HTML + JSON + Console + GitHub PR reporters | ✅ Shipped |
+| Security hardening (shell injection, path traversal, redaction) | ✅ Shipped |
+| Memory management (streaming, temp files, buffer disposal) | ✅ Shipped |
+| CI workflow (Node 18/20/22 matrix) | ✅ Shipped |
+| ESLint + TypeScript strict mode | ✅ Shipped |
+| 312 tests, 25/26 file coverage | ✅ Shipped |
+| VitePress documentation site (10 pages) | ✅ Shipped |
+| Dogfood config (frontguard.config.ts) | ✅ Shipped |
+| Launch content (HN post, tweet thread) | ✅ Drafted |
 
 ---
 
-### Phase 2: First Real Users (2-3 beta teams)
+## Phase 1: Ship to Public (next)
 
-**2A. npm publish**
-```bash
-npm publish
-```
-- Package is ready (LICENSE, CHANGELOG, files field, bin entry)
-- Claim the `frontguard` name on npm
+The product is built. Nothing else needs to be coded before people can use it. The only blocker is publishing and getting it in front of users.
 
-**2B. Dogfood on Frontguard itself**
-- Add `frontguard.config.ts` to this repo
-- Set up GitHub Action on PRs to this repo
-- Use the product to catch regressions in its own HTML report output
-- Fix any rough edges found during dogfooding
+**1.1 — Publish npm package**
+- `npm publish` — claim the `frontguard` name
+- Verify `npx frontguard init` works from a clean project
+- Verify `npx frontguard run --url https://example.com` works E2E
 
-**2C. Recruit 2-3 beta testers**
-- Target: Open-source projects with >100 GitHub stars
-- Offer: Free setup, direct Slack/Discord support
-- Goal: 1 organic testimonial, 1 case study
-- Track: false positive rate, CI time impact, user complaints
+**1.2 — Deploy docs site**
+- Deploy VitePress site to frontguard.dev (or frontguard.vercel.app)
+- Add getting-started quickstart with copy-paste commands
+- Add "3 minutes to first visual diff" walkthrough
 
-**2D. Iterate on false positives**
-- This is the #1 killer of visual testing tools
-- Implement: anti-flake rendering (multiple renders, wait for network idle, font loading)
-- Implement: ignore regions (header timestamps, ads, dynamic content)
-- Implement: perceptual hashing fallback when pixel diff is noisy
+**1.3 — Create demo repo**
+- Public repo: `ravidsrk/frontguard-demo`
+- Next.js app with Frontguard GitHub Action running on every PR
+- 3 example PRs: one that passes, one with a regression, one with an intentional change
+- Screenshots of the PR comment in the README
+- This IS the sales pitch — people click, see it working, adopt it
+
+**1.4 — Claim the GitHub Action**
+- Publish `ravidsrk/frontguard` as a GitHub Marketplace action
+- Verify the `action.yml` + `Dockerfile` work in real CI
 
 ---
 
-### Phase 3: Launch
+## Phase 2: Anti-Flake + Ignore Regions (adoption unlocker)
 
-**3A. Show HN post** (draft in `docs/launch/hn-post.md`)
-- Time: Tuesday or Wednesday 8-9am ET
-- Include: before/after demo GIF, npm install one-liner, GitHub Action setup
-- Link to: live demo repo with Frontguard running on PRs
+False positives are the #1 reason people abandon visual testing tools. This must be solid before pushing for adoption.
 
-**3B. Twitter/X thread** (draft in `docs/launch/tweet-thread.md`)
-- 6-tweet thread with screenshots
-- Tag: @veraborja (Percy), @chromaborja (Chromatic), @nicedayfor (Lost Pixel)
-- Pin the thread
+**2.1 — Anti-flake rendering**
+- Multi-render: take 2-3 screenshots, only flag if ALL differ from baseline
+- Wait-for-idle: `networkidle` + custom `waitForSelector` before capture
+- Font loading: wait for `document.fonts.ready`
+- Animation freeze: inject CSS `* { animation: none !important; transition: none !important; }`
+- Deterministic dates: mock `Date.now()` and `Intl.DateTimeFormat` during render
 
-**3C. Dev tool directories**
-- Product Hunt launch
-- dev.to post
-- Reddit r/webdev, r/javascript, r/reactjs
-- DevHunt, AlternativeTo
+**2.2 — Ignore regions**
+- Config: `ignoreRegions: [{ selector: '.ad-banner' }, { rect: { x, y, w, h } }]`
+- Implementation: mask matched regions with solid color before pixel diff
+- Built-in ignore patterns: cursor blink, scrollbar rendering, system font differences
+- Auto-detect dynamic content: flag regions that change between two identical runs
 
-**3D. Success metrics (90-day)**
+**2.3 — Perceptual diffing fallback**
+- When pixel diff > 0 but < threshold, use structural similarity (SSIM) or perceptual hash
+- Reduces noise from anti-aliasing, sub-pixel rendering, gamma differences
+- Plugin hook: `afterCompare` can swap in custom diff algorithms
+
+---
+
+## Phase 3: Real-World Validation + Beta Users
+
+**3.1 — Run against real repos**
+- Use `scripts/validate-ai-real.ts` against 5 open-source projects
+- Target: cal.com, shadcn/ui, next.js docs, tailwindcss.com, vercel.com
+- Measure: false positive rate, AI accuracy, CI time overhead
+- Document results in `validation-results/`
+
+**3.2 — Recruit 3 beta testers**
+- DM maintainers of mid-size open-source projects (100-5K stars)
+- Offer: free setup assistance, direct support channel
+- Ask for: 2 weeks of usage, honest feedback, permission to quote
+- Goal: 1 testimonial, 1 case study for landing page
+
+**3.3 — Iterate on feedback**
+- Track every false positive and false negative
+- Improve AI prompt with real-world examples (few-shot learning)
+- Add DOM context to AI analysis (diff the DOM snapshots, not just pixels)
+
+---
+
+## Phase 4: Launch
+
+**4.1 — Show HN** (draft ready: `docs/launch/hn-post.md`)
+- Tuesday or Wednesday, 8-9am ET
+- Title: "Show HN: Frontguard – Open-source AI visual regression testing"
+- Link to demo repo (not docs site — people want to see it work)
+
+**4.2 — Twitter/X thread** (draft ready: `docs/launch/tweet-thread.md`)
+- 6-tweet thread with before/after screenshots
+- Post same day as HN for amplification
+
+**4.3 — Dev communities**
+- Reddit: r/webdev, r/javascript, r/reactjs, r/nextjs
+- Dev.to post: "How We Catch Visual Bugs Before Production"
+- Product Hunt (wait 1 week after HN for momentum)
+
+**4.4 — 90-day targets**
+
 | Metric | Target |
 |--------|--------|
 | npm weekly downloads | 500+ |
 | GitHub stars | 500+ |
-| Active repos using Frontguard | 50+ |
+| Active repos with Frontguard | 50+ |
 | False positive rate | <10% |
-| AI classification accuracy | >80% |
 
 ---
 
-### Phase 4: Monetization
+## Phase 5: Cloud Tier (monetization)
 
-**4A. Cloud tier**
-- Managed screenshot infrastructure (no Playwright in user CI)
-- Hosted HTML reports with shareable URLs
-- Team management, notification preferences
-- Historical trend dashboard
+**5.1 — Hosted rendering service**
+- Users send route list, service returns screenshots + diffs
+- Eliminates Playwright from user CI (faster, less flaky)
+- API: `POST /v1/run { url, routes, viewports }`
 
-**4B. Pricing**
+**5.2 — Hosted HTML reports**
+- Shareable URLs: `reports.frontguard.dev/{run-id}`
+- Team dashboard with historical trends
+- Baseline management UI (approve/reject from browser)
+
+**5.3 — Pricing**
+
 | Tier | Price | Includes |
 |------|-------|----------|
-| OSS | Free | CLI + Action, BYOK AI, 500 screenshots/mo |
+| OSS | Free forever | CLI + Action, BYOK AI, unlimited local runs |
 | Pro | $29/mo | Managed rendering, hosted reports, 5K screenshots/mo |
 | Team | $99/mo | Team management, SSO, 20K screenshots/mo |
 | Enterprise | Custom | SLA, on-prem, unlimited |
 
-**4C. Revenue model**
-- Managed rendering = server cost + margin
-- AI analysis = API cost + margin (or bundled model)
-- Historical data = storage cost + margin
-
 ---
 
-### Phase 5: Product Expansion
+## Phase 6: Product Expansion
 
-**5A. Figma integration GA**
-- Currently: plugin built, needs real Figma API testing
-- Next: Figma webhook for auto-comparison on design changes
-- Next: Design drift dashboard (how far has code drifted from design?)
+**6.1 — Figma design compliance (GA)**
+- Test Figma plugin against real Figma files
+- Figma webhook: auto-compare when designs update
+- Design drift score per route over time
 
-**5B. Production monitoring GA**
-- Currently: plugin built with webhook alerts
-- Next: Scheduled monitoring (cron-style visual checks)
-- Next: Visual uptime monitoring (is the site rendering correctly?)
-- Next: Alerting integrations (PagerDuty, OpsGenie, Slack)
+**6.2 — Production monitoring (GA)**
+- Scheduled visual checks on live URLs (cron)
+- Alerting: Slack, PagerDuty, OpsGenie, email
+- Visual uptime monitoring: "is the site rendering correctly?"
 
-**5C. VS Code extension**
-- Live preview of visual changes as you code
-- Inline diff annotations in the editor
+**6.3 — VS Code extension**
+- Live preview of visual changes as you edit
+- Side-by-side: baseline vs current in editor
 - One-click baseline update
 
-**5D. Multi-framework deepening**
-- Storybook integration (component-level visual testing)
-- Playwright component testing integration
-- React Native / mobile web support
-
----
-
-## Architecture Decisions Log
-
-| Decision | Status | Reversibility |
-|----------|--------|---------------|
-| TypeScript + ESM | Locked | 1/5 — would require full rewrite |
-| Playwright for rendering | Locked | 2/5 — abstracted behind interface |
-| Pixelmatch for pixel diff | Locked | 4/5 — swappable via plugin |
-| Git orphan branch baselines | Default | 5/5 — BaselineStorage interface |
-| BYOK AI | Default | 5/5 — can add managed AI later |
-| Plugin architecture | Locked | 3/5 — plugin API is public contract |
-| VitePress docs | Default | 5/5 — just markdown files |
+**6.4 — Component-level testing**
+- Storybook integration: diff every story
+- Playwright component testing bridge
+- React/Vue/Svelte component isolation
 
 ---
 
 ## Risk Register
 
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|------------|------------|
-| AI classification unreliable | 🔴 Critical | Medium | Validate before launch (Phase 1) |
-| Vercel builds native visual diff | 🔴 Critical | Low | Move fast, build community moat |
-| False positives kill adoption | 🔴 Critical | High | Anti-flake rendering, ignore regions |
-| Playwright CI is slow/heavy | 🟡 High | Medium | Smart rendering, managed cloud tier |
-| npm name squatted | 🟡 High | Low | Publish immediately |
-| No one cares about visual testing | 🔴 Critical | Medium | Pivot to design compliance if needed |
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| False positives kill adoption | 🔴 Critical | Phase 2 (anti-flake + ignore regions) before push |
+| Vercel builds native visual diff | 🔴 Critical | Ship fast, build community, stay framework-agnostic |
+| AI unreliable on complex UIs | 🟡 High | Real-world validation (Phase 3), add DOM context |
+| Playwright CI is slow | 🟡 High | Smart rendering + cloud tier |
+| Nobody cares about visual testing | 🔴 Critical | Validate with beta users first, pivot to design compliance |
+| npm name squatted | 🟡 High | Publish immediately (Phase 1.1) |
 
 ---
 
 ## Immediate Next Actions
 
-1. **Run `npx tsx scripts/validate-ai.ts`** — get a real accuracy number
-2. **`npm publish`** — claim the package name
-3. **Add frontguard.config.ts to this repo** — dogfood
-4. **Set up GitHub Action on this repo** — eat your own cooking
-5. **Find 2 beta testers** — DM open-source maintainers
-
-Everything else follows from validation results.
+1. `npm publish` — claim the name, today
+2. Deploy docs site
+3. Create `ravidsrk/frontguard-demo` with working GitHub Action
+4. Ship anti-flake rendering (Phase 2.1)
+5. Find 3 beta testers
