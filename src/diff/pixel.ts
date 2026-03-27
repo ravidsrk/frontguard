@@ -10,23 +10,35 @@
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import type { ScreenshotResult, DiffResult } from '../core/types.js';
+import { computeSSIM } from './ssim.js';
+import { logger } from '../utils/logger.js';
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
+/** Options controlling SSIM fallback behaviour. */
+export interface SSIMOptions {
+  /** Whether SSIM fallback is enabled (default: true). */
+  enabled?: boolean;
+  /** SSIM threshold — scores above this are considered perceptually identical (default: 0.98). */
+  ssimThreshold?: number;
+}
+
 /**
  * Compare a current screenshot against its baseline image.
  *
- * @param current    - The freshly captured screenshot
- * @param baseline   - Raw PNG buffer of the baseline image
- * @param threshold  - Diff threshold (0–1); fraction of pixels that may differ before flagging
+ * @param current      - The freshly captured screenshot
+ * @param baseline     - Raw PNG buffer of the baseline image
+ * @param threshold    - Diff threshold (0–1); fraction of pixels that may differ before flagging
+ * @param ssimOptions  - Optional SSIM fallback configuration
  * @returns A fully populated DiffResult
  */
 export function compareScreenshot(
   current: ScreenshotResult,
   baseline: Buffer,
   threshold: number,
+  ssimOptions?: SSIMOptions,
 ): DiffResult {
   // --- Guard: empty buffers --------------------------------------------------
   if (!baseline || baseline.length === 0) {
@@ -146,6 +158,26 @@ export function compareScreenshot(
 
   if (noteMsg) {
     result.error = noteMsg;
+  }
+
+  // --- SSIM fallback for borderline diffs -----------------------------------
+  const ssimEnabled = ssimOptions?.enabled ?? true;
+  const ssimThreshold = ssimOptions?.ssimThreshold ?? 0.98;
+
+  if (
+    ssimEnabled &&
+    diffPercentage > 0 &&
+    diffPercentage < threshold * 100 * 2 // borderline zone (< 2× the threshold in %)
+  ) {
+    const ssim = computeSSIM(baseline, current.buffer);
+    if (ssim > ssimThreshold) {
+      logger.debug(
+        `SSIM override: ${current.route.path} @ ${current.viewport}px — ` +
+          `pixel diff ${diffPercentage.toFixed(2)}% but SSIM ${ssim.toFixed(4)} (perceptually identical)`,
+      );
+      return { ...result, status: 'pass', ssim, ssimOverride: true };
+    }
+    result.ssim = ssim;
   }
 
   return result;

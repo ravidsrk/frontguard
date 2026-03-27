@@ -35,9 +35,15 @@ const aiConfigSchema = z.object({
 
 /** Zod schema for an ignore rule. */
 const ignoreRuleSchema = z.object({
-  selector: z.string().min(1, 'ignore rule selector must not be empty'),
+  selector: z.string().min(1, 'ignore rule selector must not be empty').optional(),
+  rect: z.object({
+    x: z.number(),
+    y: z.number(),
+    width: z.number(),
+    height: z.number(),
+  }).optional(),
   description: z.string().optional(),
-});
+}).refine(r => r.selector || r.rect, { message: 'IgnoreRule must have selector or rect' });
 
 /** Zod schema for auth configuration. */
 const authConfigSchema = z.object({
@@ -140,6 +146,21 @@ export const configSchema = z.object({
 
   /** Plugins are runtime objects — validated structurally, not by Zod. */
   plugins: z.array(z.any()).optional(),
+
+  /** Enable SSIM perceptual diff fallback for borderline results. */
+  ssimFallback: z.boolean().optional().default(true),
+
+  /** SSIM threshold — images above this are considered perceptually identical. */
+  ssimThreshold: z.number().min(0).max(1).optional().default(0.98),
+
+  /** Number of renders per page for anti-flake (default: 1, recommended: 2-3). */
+  antiFlakeRenders: z.number().int().min(1).max(5).optional(),
+
+  /** Freeze Date.now() and new Date() to a fixed timestamp during render. */
+  freezeTime: z.union([z.boolean(), z.number()]).optional(),
+
+  /** Per-page render retry count on failure (default: 0). */
+  renderRetries: z.number().int().min(0).max(3).optional(),
 });
 
 /** Inferred Zod output type — should match `FrontguardConfig`. */

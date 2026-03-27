@@ -124,7 +124,7 @@ export async function renderPages(
   for (let i = 0; i < tasks.length; i += workers) {
     const batch = tasks.slice(i, i + workers);
     const batchResults = await Promise.allSettled(
-      batch.map((task) => executeTask(task, config, browserMap)),
+      batch.map((task) => executeTaskWithRetry(task, config, browserMap)),
     );
 
     for (let j = 0; j < batchResults.length; j++) {
@@ -222,6 +222,20 @@ async function executeTask(
       }
     });
 
+    // --- Freeze Date/time if configured (must be before navigation) -----------
+    if (config.freezeTime !== undefined && config.freezeTime !== false) {
+      const timestamp = config.freezeTime === true ? 0 : config.freezeTime;
+      await page.addInitScript(`{
+        const __fg_frozen = ${timestamp};
+        const __fg_OrigDate = Date;
+        Date = class extends __fg_OrigDate {
+          constructor(...args) { if (args.length === 0) return new __fg_OrigDate(__fg_frozen); return new __fg_OrigDate(...args); }
+          static now() { return __fg_frozen; }
+        };
+        Date.prototype = __fg_OrigDate.prototype;
+      }`);
+    }
+
     // --- Navigate --------------------------------------------------------------
     const url = `${config.baseUrl}${task.route.path}`;
     logger.debug(`Navigating to ${url} [${task.browser} ${task.viewport}px]`);
@@ -241,7 +255,8 @@ async function executeTask(
     }
 
     // --- Apply ignore rules (hide matching elements) ---------------------------
-    if (config.ignore && config.ignore.length > 0) {
+    const selectorRules = config.ignore?.filter(r => r.selector) ?? [];
+    if (selectorRules.length > 0) {
       await page.evaluate((rules: { selector: string }[]) => {
         for (const rule of rules) {
           const elements = document.querySelectorAll(rule.selector);
@@ -249,13 +264,38 @@ async function executeTask(
             (el as HTMLElement).style.visibility = 'hidden';
           }
         }
-      }, config.ignore);
+      }, selectorRules.map(r => ({ selector: r.selector! })));
     }
 
-    // --- Take screenshot -------------------------------------------------------
-    let screenshotBuffer: Buffer = Buffer.from(
-      await page.screenshot({ fullPage: true, type: 'png' }),
-    );
+    // --- Apply rect-based ignore rules (overlay fixed-position masks) --------
+    if (config.ignore?.some(r => r.rect)) {
+      const rects = config.ignore.filter(r => r.rect).map(r => r.rect!);
+      await page.evaluate((rects) => {
+        for (const rect of rects) {
+          const overlay = document.createElement('div');
+          overlay.style.cssText = `position:fixed;left:${rect.x}px;top:${rect.y}px;width:${rect.width}px;height:${rect.height}px;background:#808080;z-index:999999;pointer-events:none;`;
+          document.body.appendChild(overlay);
+        }
+      }, rects);
+    }
+
+    // --- Take screenshot (with optional anti-flake multi-render) ---------------
+    let screenshotBuffer: Buffer;
+    const antiFlakeRenders = config.antiFlakeRenders ?? 1;
+
+    if (antiFlakeRenders > 1) {
+      const buffers: Buffer[] = [];
+      for (let i = 0; i < antiFlakeRenders; i++) {
+        if (i > 0) await page.waitForTimeout(100);
+        buffers.push(Buffer.from(await page.screenshot({ fullPage: true, type: 'png' })));
+      }
+      screenshotBuffer = findConsensusScreenshot(buffers);
+      logger.debug(`Anti-flake: took ${antiFlakeRenders} renders for ${task.route.path}`);
+    } else {
+      screenshotBuffer = Buffer.from(
+        await page.screenshot({ fullPage: true, type: 'png' }),
+      );
+    }
 
     // --- Crop to maxHeight if configured ---------------------------------------
     if (config.maxHeight && config.maxHeight > 0) {
@@ -298,6 +338,60 @@ async function executeTask(
       // Best-effort cleanup
     }
   }
+}
+
+/**
+ * Execute a render task with optional retries on failure.
+ */
+async function executeTaskWithRetry(
+  task: RenderTask,
+  config: FrontguardConfig,
+  browserMap: Map<BrowserEngine, Browser>,
+): Promise<ScreenshotResult> {
+  const renderRetries = config.renderRetries ?? 0;
+  for (let attempt = 0; attempt <= renderRetries; attempt++) {
+    try {
+      return await executeTask(task, config, browserMap);
+    } catch (err) {
+      if (attempt === renderRetries) throw err;
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn(`Render retry ${attempt + 1}/${renderRetries} for ${task.route.path}: ${message}`);
+    }
+  }
+  // Unreachable, but TypeScript needs it
+  throw new Error('Unreachable');
+}
+
+/**
+ * Find the consensus screenshot from multiple renders.
+ *
+ * Fast path: if all buffers are byte-identical, return the first.
+ * Slow path: pairwise comparison to find the frame matching the most others.
+ */
+function findConsensusScreenshot(buffers: Buffer[]): Buffer {
+  if (buffers.length <= 1) return buffers[0];
+
+  // Fast path: check if all buffers are identical
+  const allIdentical = buffers.every((b) => b.equals(buffers[0]));
+  if (allIdentical) {
+    logger.debug(`Anti-flake: all ${buffers.length} renders identical (consensus reached, 0px variance)`);
+    return buffers[0];
+  }
+
+  // Slow path: group identical buffers and return the most common one
+  const groups: { buffer: Buffer; count: number }[] = [];
+  for (const buf of buffers) {
+    const existing = groups.find((g) => g.buffer.equals(buf));
+    if (existing) {
+      existing.count++;
+    } else {
+      groups.push({ buffer: buf, count: 1 });
+    }
+  }
+
+  groups.sort((a, b) => b.count - a.count);
+  logger.debug(`Anti-flake: ${buffers.length} renders, ${groups.length} unique frames, consensus group has ${groups[0].count} matches`);
+  return groups[0].buffer;
 }
 
 /**

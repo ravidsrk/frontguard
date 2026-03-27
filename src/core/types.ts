@@ -78,7 +78,9 @@ export interface AIConfig {
  */
 export interface IgnoreRule {
   /** CSS selector matching elements to mask/ignore. */
-  selector: string;
+  selector?: string;
+  /** Pixel rectangle to mask (x, y, width, height). */
+  rect?: { x: number; y: number; width: number; height: number };
   /** Optional human-readable description of why this rule exists. */
   description?: string;
 }
@@ -136,6 +138,16 @@ export interface FrontguardConfig {
   viewportHeight?: number;
   /** Plugins to register for the pipeline run. */
   plugins?: FrontguardPlugin[];
+  /** Enable SSIM perceptual diff fallback for borderline results (default: true). */
+  ssimFallback?: boolean;
+  /** SSIM threshold — images above this are considered identical (default: 0.98). */
+  ssimThreshold?: number;
+  /** Number of renders per page for anti-flake (default: 1, recommended: 2-3) */
+  antiFlakeRenders?: number;
+  /** Freeze Date.now() and new Date() to a fixed timestamp during render */
+  freezeTime?: boolean | number;
+  /** Per-page render retry count on failure (default: 0) */
+  renderRetries?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -210,6 +222,10 @@ export interface DiffResult {
   aiAnalysis?: AIAnalysis;
   /** Error message when `status` is `'error'`. */
   error?: string;
+  /** SSIM score when SSIM fallback was computed (0–1). */
+  ssim?: number;
+  /** Whether SSIM analysis overrode a pixel-diff failure to pass. */
+  ssimOverride?: boolean;
 }
 
 /**
