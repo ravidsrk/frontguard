@@ -116,7 +116,12 @@ export interface FrontguardConfig {
   viewports: number[];
   /** Browser engines to test with (default `['chromium']`). */
   browsers: BrowserEngine[];
-  /** Pixel-diff threshold `0–1` — fraction of changed pixels to flag (default `0.1`). */
+  /**
+   * Maximum allowed pixel diff as a FRACTION (0.0 to 1.0).
+   * Example: 0.01 = 1% of pixels can differ before flagging.
+   * Note: `diffPercentage` in DiffResult is 0-100 (percent).
+   * Conversion: `diffPercentage / 100 > threshold` means failure.
+   */
   threshold: number;
   /** Optional AI analysis configuration. */
   ai?: AIConfig;
@@ -210,7 +215,7 @@ export interface DiffResult {
   browser: BrowserEngine;
   /** Overall comparison status. */
   status: DiffStatus;
-  /** Percentage of pixels that differ (`0–100`). */
+  /** Percentage of pixels that differ (0-100 scale, NOT 0-1). */
   diffPercentage: number;
   /** PNG image highlighting pixel-level differences. */
   diffImage?: Buffer;

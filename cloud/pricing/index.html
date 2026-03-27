@@ -42,14 +42,14 @@
   .nav-links a { font-size: 14px; color: #a3a3a3; transition: color 0.15s; }
   .nav-links a:hover { color: #fff; }
   .nav-links .nav-cta {
-    background: #fff;
-    color: #0a0a0a;
+    background: #3b82f6;
+    color: #fff;
     padding: 8px 16px;
     border-radius: 6px;
     font-weight: 500;
     font-size: 13px;
   }
-  .nav-links .nav-cta:hover { background: #e5e5e5; }
+  .nav-links .nav-cta:hover { background: #2563eb; }
 
   /* Hero */
   .hero {
@@ -93,9 +93,10 @@
     position: relative;
     cursor: pointer;
     border: 1px solid #333;
+    padding: 0;
+    font-size: 0;
   }
-  .toggle-switch::after {
-    content: '';
+  .toggle-switch .toggle-dot {
     position: absolute;
     width: 18px;
     height: 18px;
@@ -104,8 +105,10 @@
     top: 2px;
     left: 2px;
     transition: transform 0.2s;
+    display: block;
+    pointer-events: none;
   }
-  .toggle-switch.annual::after { transform: translateX(20px); }
+  .toggle-switch.annual .toggle-dot { transform: translateX(20px); }
   .save-badge {
     font-size: 12px;
     background: #16a34a15;
@@ -126,8 +129,8 @@
   }
 
   .pricing-card {
-    background: #111;
-    border: 1px solid #1e1e1e;
+    background: #141414;
+    border: 1px solid #222;
     border-radius: 12px;
     padding: 32px 28px;
     display: flex;
@@ -173,18 +176,18 @@
   }
   .card-price .period {
     font-size: 15px;
-    color: #737373;
+    color: #8a8a8a;
   }
   .card-desc {
     font-size: 14px;
-    color: #737373;
+    color: #8a8a8a;
     margin-top: 8px;
     min-height: 40px;
   }
 
   .card-divider {
     height: 1px;
-    background: #1e1e1e;
+    background: #222;
     margin: 24px 0;
   }
   .popular .card-divider { background: #1e3a5f; }
@@ -226,16 +229,16 @@
     width: 100%;
   }
   .cta-primary {
-    background: #fff;
-    color: #0a0a0a;
+    background: #3b82f6;
+    color: #fff;
   }
-  .cta-primary:hover { background: #e5e5e5; }
+  .cta-primary:hover { background: #2563eb; }
   .cta-outline {
     background: transparent;
     color: #fff;
     border: 1px solid #333;
   }
-  .cta-outline:hover { border-color: #555; background: #1a1a1a; }
+  .cta-outline:hover { border-color: #888; background: #141414; }
   .cta-blue {
     background: #3b82f6;
     color: #fff;
@@ -258,9 +261,9 @@
   }
 
   .faq-item {
-    border-bottom: 1px solid #1e1e1e;
+    border-bottom: 1px solid #222;
   }
-  .faq-item:first-child { border-top: 1px solid #1e1e1e; }
+  .faq-item:first-child { border-top: 1px solid #222; }
 
   .faq-question {
     width: 100%;
@@ -281,7 +284,7 @@
   .faq-question:hover { color: #fff; }
   .faq-icon {
     font-size: 20px;
-    color: #525252;
+    color: #888;
     transition: transform 0.2s;
     flex-shrink: 0;
   }
@@ -302,11 +305,11 @@
 
   /* Footer */
   .footer {
-    border-top: 1px solid #1a1a1a;
+    border-top: 1px solid #222;
     text-align: center;
     padding: 32px 24px;
     font-size: 13px;
-    color: #525252;
+    color: #888;
   }
 
   /* Responsive */
@@ -320,6 +323,10 @@
     .hero { padding-top: 48px; }
     .nav-links a:not(.nav-cta) { display: none; }
   }
+
+  /* Focus visible */
+  :focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -343,7 +350,7 @@
 <!-- Billing Toggle -->
 <div class="billing-toggle">
   <span class="active" id="monthly-label">Monthly</span>
-  <div class="toggle-switch" id="billing-toggle" onclick="toggleBilling()"></div>
+  <button role="switch" aria-checked="false" aria-label="Toggle annual billing" class="toggle-switch" id="billing-toggle" onclick="toggleBilling()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBilling()}"><span class="toggle-dot"></span></button>
   <span id="annual-label">Annual</span>
   <span class="save-badge">Save 20%</span>
 </div>
@@ -435,7 +442,7 @@
   <h2>Frequently asked questions</h2>
 
   <div class="faq-item">
-    <button class="faq-question" onclick="toggleFaq(this)">
+    <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
       What counts as a screenshot?
       <span class="faq-icon">+</span>
     </button>
@@ -445,7 +452,7 @@
   </div>
 
   <div class="faq-item">
-    <button class="faq-question" onclick="toggleFaq(this)">
+    <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
       Can I use my own AI keys?
       <span class="faq-icon">+</span>
     </button>
@@ -455,7 +462,7 @@
   </div>
 
   <div class="faq-item">
-    <button class="faq-question" onclick="toggleFaq(this)">
+    <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
       Do I need Playwright installed?
       <span class="faq-icon">+</span>
     </button>
@@ -465,7 +472,7 @@
   </div>
 
   <div class="faq-item">
-    <button class="faq-question" onclick="toggleFaq(this)">
+    <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
       What happens if I exceed my limit?
       <span class="faq-icon">+</span>
     </button>
@@ -475,7 +482,7 @@
   </div>
 
   <div class="faq-item">
-    <button class="faq-question" onclick="toggleFaq(this)">
+    <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
       Can I cancel anytime?
       <span class="faq-icon">+</span>
     </button>
@@ -500,6 +507,7 @@
     const annualLabel = document.getElementById('annual-label');
 
     toggle.classList.toggle('annual', isAnnual);
+    toggle.setAttribute('aria-checked', String(isAnnual));
     monthlyLabel.classList.toggle('active', !isAnnual);
     annualLabel.classList.toggle('active', isAnnual);
 
@@ -512,8 +520,14 @@
   function toggleFaq(btn) {
     const item = btn.closest('.faq-item');
     const wasOpen = item.classList.contains('open');
-    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
-    if (!wasOpen) item.classList.add('open');
+    document.querySelectorAll('.faq-item').forEach(i => {
+      i.classList.remove('open');
+      i.querySelector('.faq-question').setAttribute('aria-expanded', 'false');
+    });
+    if (!wasOpen) {
+      item.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+    }
   }
 </script>
 </body>

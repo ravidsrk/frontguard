@@ -66,7 +66,7 @@ export function computeSSIM(img1: Buffer, img2: Buffer): number {
     }
   }
 
-  return count > 0 ? ssimSum / count : 1;
+  return count > 0 ? ssimSum / count : 0;
 }
 
 // ---------------------------------------------------------------------------

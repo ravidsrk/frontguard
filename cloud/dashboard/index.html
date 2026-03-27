@@ -10,8 +10,8 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0a0a;--card:#1a1a1a;--card-hover:#222;--border:#2a2a2a;
-  --text:#e5e5e5;--text-dim:#888;--text-muted:#555;
+  --bg:#0a0a0a;--card:#141414;--card-hover:#222;--border:#222;
+  --text:#e5e5e5;--text-dim:#888;--text-muted:#888;
   --accent:#3b82f6;--accent-hover:#2563eb;
   --green:#22c55e;--green-bg:rgba(34,197,94,.12);
   --red:#ef4444;--red-bg:rgba(239,68,68,.12);
@@ -97,10 +97,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .slider-wrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer}
 .slider-val{font-weight:600;min-width:50px;text-align:right;font-size:15px}
 .toggle-row{display:flex;align-items:center;gap:12px}
-.toggle{position:relative;width:44px;height:24px;background:var(--border);border-radius:12px;cursor:pointer;transition:background .2s}
+.toggle{position:relative;width:44px;height:24px;background:var(--border);border-radius:12px;cursor:pointer;transition:background .2s;padding:0;border:none}
 .toggle.on{background:var(--accent)}
-.toggle::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s}
-.toggle.on::after{transform:translateX(20px)}
+.toggle-dot{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s;display:block;pointer-events:none}
+.toggle.on .toggle-dot{transform:translateX(20px)}
 
 /* Login */
 .login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
@@ -141,15 +141,25 @@ tr:hover td{background:rgba(255,255,255,.02)}
 @keyframes slideIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
 
 /* Responsive */
+@media(max-width:1024px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:768px){
+  .stats-grid{grid-template-columns:1fr}
+  .nav{flex-wrap:wrap;gap:8px}
+}
 @media(max-width:640px){
   .topbar{flex-direction:column;gap:12px}
-  .stats-grid{grid-template-columns:1fr 1fr}
   .form-row{grid-template-columns:1fr}
   .detail-meta{flex-direction:column;gap:8px}
   .stat-value{font-size:22px}
   td,th{padding:10px 12px;font-size:12px}
   .actions-cell{flex-direction:column;gap:4px}
 }
+
+/* Focus visible */
+:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
 
 /* Scrollbar */
 ::-webkit-scrollbar{width:6px;height:6px}
@@ -173,7 +183,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <body>
 
 <!-- Toast Container -->
-<div class="toast-container" id="toasts"></div>
+<div class="toast-container" id="toasts" role="status" aria-live="polite"></div>
 
 <!-- Login View -->
 <div class="view" id="view-login">
@@ -331,7 +341,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <div class="form-group">
             <label class="form-label">AI Analysis</label>
             <div class="toggle-row">
-              <div class="toggle" id="ai-toggle" onclick="toggleAI()"></div>
+              <button role="switch" aria-checked="false" aria-label="Enable AI analysis" class="toggle" id="aiToggle" onclick="toggleAI()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleAI()}"><span class="toggle-dot"></span></button>
               <span id="ai-label" style="font-size:13px;color:var(--text-dim)">Off</span>
             </div>
             <div id="ai-provider-wrap" style="display:none;margin-top:12px">
@@ -701,7 +711,9 @@ document.querySelectorAll('.checkbox-label input').forEach(cb => {
 let aiEnabled = false;
 function toggleAI() {
   aiEnabled = !aiEnabled;
-  document.getElementById('ai-toggle').classList.toggle('on', aiEnabled);
+  const toggle = document.getElementById('aiToggle');
+  toggle.classList.toggle('on', aiEnabled);
+  toggle.setAttribute('aria-checked', String(aiEnabled));
   document.getElementById('ai-label').textContent = aiEnabled ? 'On' : 'Off';
   document.getElementById('ai-provider-wrap').style.display = aiEnabled ? 'block' : 'none';
 }

@@ -49,14 +49,14 @@
   .nav-links a { font-size: 14px; color: #a3a3a3; transition: color 0.15s; }
   .nav-links a:hover { color: #fff; }
   .nav-links .nav-cta {
-    background: #fff;
-    color: #0a0a0a;
+    background: #3b82f6;
+    color: #fff;
     padding: 8px 16px;
     border-radius: 6px;
     font-weight: 500;
     font-size: 13px;
   }
-  .nav-links .nav-cta:hover { background: #e5e5e5; }
+  .nav-links .nav-cta:hover { background: #2563eb; }
 
   /* Hero */
   .hero {
@@ -100,17 +100,17 @@
     border: none;
     transition: all 0.15s;
   }
-  .btn-primary { background: #fff; color: #0a0a0a; }
-  .btn-primary:hover { background: #e5e5e5; }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
   .btn-secondary { background: transparent; color: #e5e5e5; border: 1px solid #333; }
-  .btn-secondary:hover { border-color: #555; background: #141414; }
+  .btn-secondary:hover { border-color: #888; background: #141414; }
 
   /* Section shared */
   .section {
     padding: 80px 0;
   }
   .section-border {
-    border-top: 1px solid #1a1a1a;
+    border-top: 1px solid #222;
   }
   .section-label {
     font-size: 12px;
@@ -129,7 +129,7 @@
   }
   .section-subtitle {
     font-size: 16px;
-    color: #737373;
+    color: #8a8a8a;
     margin-top: 12px;
     max-width: 520px;
   }
@@ -151,8 +151,8 @@
     gap: 32px;
   }
   .step {
-    background: #111;
-    border: 1px solid #1e1e1e;
+    background: #141414;
+    border: 1px solid #222;
     border-radius: 12px;
     padding: 32px 28px;
   }
@@ -162,8 +162,8 @@
     justify-content: center;
     width: 32px;
     height: 32px;
-    background: #1a1a1a;
-    border: 1px solid #2a2a2a;
+    background: #141414;
+    border: 1px solid #222;
     border-radius: 8px;
     font-size: 14px;
     font-weight: 600;
@@ -178,13 +178,13 @@
   }
   .step p {
     font-size: 14px;
-    color: #737373;
+    color: #8a8a8a;
     line-height: 1.6;
   }
   .step-code {
     margin-top: 16px;
     background: #0a0a0a;
-    border: 1px solid #1e1e1e;
+    border: 1px solid #222;
     border-radius: 8px;
     padding: 14px 16px;
     font-size: 12px;
@@ -194,7 +194,7 @@
   }
   .step-code .kw { color: #c084fc; }
   .step-code .str { color: #34d399; }
-  .step-code .cmt { color: #525252; }
+  .step-code .cmt { color: #888; }
 
   /* Features Grid */
   .features-grid {
@@ -203,8 +203,8 @@
     gap: 20px;
   }
   .feature-card {
-    background: #111;
-    border: 1px solid #1e1e1e;
+    background: #141414;
+    border: 1px solid #222;
     border-radius: 12px;
     padding: 28px 24px;
   }
@@ -228,7 +228,7 @@
   }
   .feature-card p {
     font-size: 13px;
-    color: #737373;
+    color: #8a8a8a;
     line-height: 1.6;
   }
 
@@ -250,7 +250,7 @@
     font-size: 13px;
     border-bottom: 1px solid #1e1e1e;
   }
-  .comparison-table thead th:first-child { color: #737373; }
+  .comparison-table thead th:first-child { color: #8a8a8a; }
   .comparison-table thead th.hl { color: #fff; }
   .comparison-table tbody td {
     padding: 14px 16px;
@@ -269,7 +269,7 @@
     background: #0c1529;
   }
   .comparison-table .yes { color: #22c55e; font-weight: 600; }
-  .comparison-table .no { color: #525252; }
+  .comparison-table .no { color: #888; }
   .comparison-table .na { color: #404040; font-style: italic; }
 
   /* Bottom CTA */
@@ -297,9 +297,9 @@
     transition: border-color 0.15s;
   }
   .install-cmd:hover { border-color: #333; }
-  .install-cmd .prompt { color: #525252; }
+  .install-cmd .prompt { color: #888; }
   .install-cmd .cmd { color: #e5e5e5; }
-  .install-cmd .copy-icon { color: #525252; font-size: 14px; margin-left: 8px; }
+  .install-cmd .copy-icon { color: #888; font-size: 14px; margin-left: 8px; }
   .bottom-links {
     margin-top: 24px;
     display: flex;
@@ -315,11 +315,11 @@
 
   /* Footer */
   .footer {
-    border-top: 1px solid #1a1a1a;
+    border-top: 1px solid #222;
     text-align: center;
     padding: 32px 24px;
     font-size: 13px;
-    color: #525252;
+    color: #888;
   }
 
   /* Responsive */
@@ -337,6 +337,10 @@
     .comparison-table { font-size: 13px; }
     .comparison-table thead th, .comparison-table tbody td { padding: 10px 12px; }
   }
+
+  /* Focus visible */
+  :focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
 </style>
 </head>
 <body>

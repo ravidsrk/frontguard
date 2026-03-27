@@ -70,8 +70,8 @@ describe('computeSSIM', () => {
     // 4×4 is smaller than the 8×8 window — no blocks can be extracted
     const img = createTestPng(4, 4, 255, 0, 0);
     const ssim = computeSSIM(img, Buffer.from(img));
-    // Should return 1 (fallback for count === 0)
-    expect(ssim).toBe(1);
+    // Should return 0 (fallback for count === 0 — tiny images should NOT auto-pass)
+    expect(ssim).toBe(0);
   });
 
   it('returns SSIM > 0.95 for a 1px shifted image (anti-aliasing scenario)', () => {

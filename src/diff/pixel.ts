@@ -169,15 +169,25 @@ export function compareScreenshot(
     diffPercentage > 0 &&
     diffPercentage < threshold * 100 * 2 // borderline zone (< 2× the threshold in %)
   ) {
-    const ssim = computeSSIM(baseline, current.buffer);
-    if (ssim > ssimThreshold) {
+    let ssim: number | undefined;
+    try {
+      ssim = computeSSIM(baseline, current.buffer);
+    } catch (err) {
+      logger.debug(
+        `SSIM computation failed for ${current.route.path} @ ${current.viewport}px — ` +
+          `falling back to pixel-only result: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    if (ssim !== undefined && ssim > ssimThreshold) {
       logger.debug(
         `SSIM override: ${current.route.path} @ ${current.viewport}px — ` +
           `pixel diff ${diffPercentage.toFixed(2)}% but SSIM ${ssim.toFixed(4)} (perceptually identical)`,
       );
       return { ...result, status: 'pass', ssim, ssimOverride: true };
     }
-    result.ssim = ssim;
+    if (ssim !== undefined) {
+      result.ssim = ssim;
+    }
   }
 
   return result;

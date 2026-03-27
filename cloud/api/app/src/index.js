@@ -4,6 +4,7 @@
 // ─── In-memory stores ───────────────────────────────────────
 const runs = new Map();
 const baselines = new Map();
+const MAX_RUNS = 1000;
 
 // ─── Helpers ────────────────────────────────────────────────
 const corsHeaders = {
@@ -94,6 +95,8 @@ async function createRun(request) {
 
   const { url, routes, viewports, threshold, webhookUrl, metadata } = body;
   if (!url) return json({ error: 'Missing required field: url' }, 400);
+  const urlErr = validateUrl(url);
+  if (urlErr) return json({ error: urlErr }, 400);
 
   const id = crypto.randomUUID();
   const run = {
@@ -116,6 +119,10 @@ async function createRun(request) {
     summary: null,
   };
 
+  if (runs.size >= MAX_RUNS) {
+    const oldest = runs.keys().next().value;
+    runs.delete(oldest);
+  }
   runs.set(id, run);
 
   // Process synchronously for the in-memory demo (in prod this would be async)
@@ -299,7 +306,7 @@ function generateReport(run) {
   <div id="action-result"></div>
 </div>
 <script>
-  const runId = '${run.id}';
+  const runId = ${JSON.stringify(run.id)};
   function showResult(msg, ok) {
     const el = document.getElementById('action-result');
     el.style.display = 'block';
@@ -336,6 +343,30 @@ function escHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// ─── Security helpers ────────────────────────────────────────
+function requireAuth(request) {
+  const auth = request.headers.get('Authorization');
+  if (!auth || !auth.startsWith('Bearer ') || auth.length < 10) {
+    return json({ error: 'Missing or invalid API key. Set Authorization: Bearer <your-key>' }, 401);
+  }
+  return null; // auth passed
+}
+
+function validateUrl(url) {
+  if (!url || typeof url !== 'string') return 'url is required';
+  if (url.length > 2048) return 'url too long (max 2048 chars)';
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return 'url must use http or https';
+    const host = parsed.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('10.') ||
+        host.startsWith('192.168.') || /^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
+      return 'private/internal URLs are not allowed';
+    }
+  } catch { return 'invalid URL format'; }
+  return null;
+}
+
 // ─── Main fetch handler ─────────────────────────────────────
 export default {
   async fetch(request, env) {
@@ -353,7 +384,13 @@ export default {
       if (path === '/health' && method === 'GET') return health();
 
       // Create run
-      if (path === '/v1/run' && method === 'POST') return await createRun(request);
+      if (path === '/v1/run' && method === 'POST') {
+        const authErr = requireAuth(request);
+        if (authErr) return authErr;
+        const contentLength = parseInt(request.headers.get('Content-Length') || '0');
+        if (contentLength > 102400) return json({ error: 'Request body too large (max 100KB)' }, 413);
+        return await createRun(request);
+      }
 
       // Get single run
       if (/^\/v1\/runs\/[\w-]+$/.test(path) && method === 'GET') return getRun(path);
@@ -365,10 +402,20 @@ export default {
       if (/^\/v1\/reports\/[\w-]+$/.test(path) && method === 'GET') return getReport(path);
 
       // Approve baselines
-      if (/^\/v1\/baselines\/[\w-]+\/approve$/.test(path) && method === 'POST') return await approveBaselines(path, request);
+      if (/^\/v1\/baselines\/[\w-]+\/approve$/.test(path) && method === 'POST') {
+        const authErr = requireAuth(request);
+        if (authErr) return authErr;
+        const contentLength = parseInt(request.headers.get('Content-Length') || '0');
+        if (contentLength > 102400) return json({ error: 'Request body too large (max 100KB)' }, 413);
+        return await approveBaselines(path, request);
+      }
 
       // Delete run
-      if (/^\/v1\/runs\/[\w-]+$/.test(path) && method === 'DELETE') return deleteRun(path);
+      if (/^\/v1\/runs\/[\w-]+$/.test(path) && method === 'DELETE') {
+        const authErr = requireAuth(request);
+        if (authErr) return authErr;
+        return deleteRun(path);
+      }
 
       // Usage
       if (path === '/v1/usage' && method === 'GET') return getUsage();
