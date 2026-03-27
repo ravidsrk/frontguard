@@ -137,6 +137,9 @@ export const configSchema = z.object({
     .positive()
     .max(10_000)
     .optional(),
+
+  /** Plugins are runtime objects — validated structurally, not by Zod. */
+  plugins: z.array(z.any()).optional(),
 });
 
 /** Inferred Zod output type — should match `FrontguardConfig`. */

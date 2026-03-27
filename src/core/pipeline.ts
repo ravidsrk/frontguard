@@ -31,6 +31,7 @@ import { analyzeWithAI } from '../diff/ai-vision.js';
 import { GitOrphanStorage } from '../storage/git-orphan.js';
 import { detectPreviewUrl, waitForUrl } from '../utils/preview-url.js';
 import { logger } from '../utils/logger.js';
+import { PluginManager } from './plugins.js';
 
 // ---------------------------------------------------------------------------
 // Memory Management Helpers
@@ -220,6 +221,20 @@ export async function runPipeline(
   };
 
   // -----------------------------------------------------------------------
+  // Plugin setup
+  // -----------------------------------------------------------------------
+  const pluginManager = new PluginManager();
+  const pluginCtx = { config, logger, metadata: new Map<string, unknown>() };
+  if (config.plugins) {
+    for (const plugin of config.plugins) {
+      pluginManager.register(plugin);
+    }
+    await pluginManager.setup(pluginCtx);
+  }
+
+  try {
+
+  // -----------------------------------------------------------------------
   // Stage 0: PREVIEW URL DETECTION
   // -----------------------------------------------------------------------
   const isDefaultUrl =
@@ -253,6 +268,9 @@ export async function runPipeline(
   // -----------------------------------------------------------------------
   let routes: Route[] = [];
 
+  // Plugin hook: beforeDiscover — can modify config before discovery
+  config = await pluginManager.runHook('beforeDiscover', config);
+
   reporter.onStageStart('discover', 'Determining routes to test…');
   try {
     const [discovered, duration] = await timed(() => discoverAllRoutes(config));
@@ -273,6 +291,9 @@ export async function runPipeline(
     routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
     logger.warn('No routes discovered — testing base URL only');
   }
+
+  // Plugin hook: afterDiscover — can add, remove, or modify routes
+  routes = await pluginManager.runHook('afterDiscover', routes, config);
 
   // -----------------------------------------------------------------------
   // Stage 2: FILTER (dependency graph analysis)
@@ -323,6 +344,16 @@ export async function runPipeline(
   // -----------------------------------------------------------------------
   let screenshots: ScreenshotResult[] = [];
 
+  // Plugin hook: beforeRender — can modify routes or config per-render
+  {
+    const renderInput = await pluginManager.runHook(
+      'beforeRender',
+      { routes: filteredRoutes, config },
+    );
+    if (renderInput && renderInput.routes) filteredRoutes = renderInput.routes;
+    if (renderInput && renderInput.config) config = renderInput.config;
+  }
+
   reporter.onStageStart('render', `Capturing ${totalCombinations} screenshot(s)…`);
   try {
     const [captured, duration] = await timed(async () => {
@@ -350,10 +381,16 @@ export async function runPipeline(
     reporter.onStageComplete('render', `Failed: ${msg}`);
   }
 
+  // Plugin hook: afterRender — can modify screenshots before comparison
+  if (screenshots.length > 0) {
+    screenshots = await pluginManager.runHook('afterRender', screenshots, pluginCtx);
+  }
+
   if (screenshots.length === 0) {
     logger.error('No screenshots were captured — cannot proceed with comparison');
     const emptyResult = buildResult([], timing, totalStart, config);
     reporter.onComplete(emptyResult);
+    await pluginManager.teardown();
     return emptyResult;
   }
 
@@ -476,6 +513,17 @@ export async function runPipeline(
   // Free the screenshots array — all data has been extracted
   screenshots = [];
 
+  // Plugin hook: afterCompare — can modify diff results or add custom analysis
+  // Note: image buffers may have been persisted to temp and disposed.
+  // Plugins operating on diffs should work with status/diffPercentage/metadata.
+  {
+    const modifiedDiffs = await pluginManager.runHook('afterCompare', diffs, pluginCtx);
+    if (modifiedDiffs !== undefined) {
+      diffs.length = 0;
+      diffs.push(...modifiedDiffs);
+    }
+  }
+
   // -----------------------------------------------------------------------
   // Stage 5: ANALYZE (optional — AI, parallelised in batches)
   // -----------------------------------------------------------------------
@@ -577,6 +625,9 @@ export async function runPipeline(
   timing.total = Math.round(performance.now() - totalStart);
   const result = buildResult(diffs, timing, totalStart, config);
 
+  // Plugin hook: afterRun — notifications, uploads, custom reporting
+  await pluginManager.runHook('afterRun', result, pluginCtx);
+
   // -----------------------------------------------------------------------
   // Stage 7: REPORT
   // -----------------------------------------------------------------------
@@ -602,6 +653,25 @@ export async function runPipeline(
   }
 
   return result;
+
+  } catch (pipelineError) {
+    // Plugin hook: onError — plugins can inspect or suppress errors
+    let suppressed = false;
+    if (pipelineError instanceof Error) {
+      const suppressResult = await pluginManager.runHook('onError', pipelineError, 'pipeline');
+      // runHook returns the last non-undefined value. If any plugin returned true, suppress.
+      if (suppressResult === true) suppressed = true;
+    }
+
+    if (!suppressed) throw pipelineError;
+
+    // Error suppressed by a plugin — return an empty result
+    timing.total = Math.round(performance.now() - totalStart);
+    return buildResult([], timing, totalStart, config);
+  } finally {
+    // Plugin hook: teardown — always called, even on error
+    await pluginManager.teardown();
+  }
 }
 
 // ---------------------------------------------------------------------------

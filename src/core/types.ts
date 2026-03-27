@@ -7,6 +7,8 @@
  * @module core/types
  */
 
+import type { FrontguardPlugin } from './plugins.js';
+
 // ---------------------------------------------------------------------------
 // Scalar Types
 // ---------------------------------------------------------------------------
@@ -132,6 +134,8 @@ export interface FrontguardConfig {
   outputDir: string;
   /** Viewport height in pixels (default `720`). */
   viewportHeight?: number;
+  /** Plugins to register for the pipeline run. */
+  plugins?: FrontguardPlugin[];
 }
 
 // ---------------------------------------------------------------------------
