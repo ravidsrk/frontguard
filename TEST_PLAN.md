@@ -1,6 +1,6 @@
 # Frontguard Test Plan
 
-**Current Status:** 319 tests across 24 test files covering 25/26 source files.
+**Current Status:** 395 tests across 24 test files covering 25/26 source files.
 
 ---
 
@@ -33,7 +33,7 @@
 | `test/e2e/pipeline.test.ts` | 5 | `src/core/pipeline.ts` | Full pipeline integration: discover → render → diff → report |
 | `test/cli/index.test.ts` | 4 | `src/cli/index.ts` | Config building, reporter creation, fatal error hints |
 
-**Total: 319 tests across 24 test files**
+**Total: 395 tests across 24 test files**
 
 ---
 

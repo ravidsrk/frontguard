@@ -24,8 +24,8 @@ The visual regression testing market (~$1B, 9.5% CAGR) has a **retention crisis,
 
 **What to build:**
 
-🔴 **Anti-flake rendering (critical)**
-The `antiFlakeRenders` config field exists but isn't wired into the pipeline. Activate multi-render consensus: take 3 screenshots, use majority vote to filter animations, loading spinners, and timing jitter. This single feature is the difference between "useful tool" and "another flaky screenshot differ." Competitors struggle here — Percy adds 5+ minutes to CI trying to solve this. Frontguard should solve it in <10 seconds with consensus + SSIM perceptual matching.
+🟢 **Anti-flake rendering (already built)**
+Multi-render consensus is fully wired: `findConsensusScreenshot()` in `src/render/playwright.ts` takes N screenshots, groups identical frames, returns the majority vote. Config: `antiFlakeRenders: 3`. This gives Frontguard a structural advantage — Percy adds 5+ minutes to CI trying to solve flakiness. Frontguard solves it in <10 seconds with consensus + SSIM perceptual matching. **Phase 1 task: validate it works on a real-world flaky page, not build it.**
 
 🔴 **Real-world AI validation**
 Synthetic test accuracy (100%) means nothing. Run against 5 real open-source repos: a Next.js app, a Tailwind dashboard, a component library, an e-commerce storefront, a docs site. Measure: true positives, false positives, false negatives, classification accuracy. If accuracy is below 70% on real diffs, retune prompts before promoting AI as a feature. The AI must at minimum reliably distinguish these 4 cases:
