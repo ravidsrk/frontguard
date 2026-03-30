@@ -104,23 +104,17 @@ ai: {
 
 Requires `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` environment variable.
 
-## Smart render options
+### smartRender
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `smartRender.enabled` | `boolean` | `true` | Enable dependency-graph-based selective rendering |
-| `smartRender.fallbackToFull` | `boolean` | `true` | Full render if graph analysis fails |
-| `smartRender.include` | `string[]` | `['src/**']` | File patterns to include in graph |
-| `smartRender.exclude` | `string[]` | `['**/*.test.*']` | File patterns to exclude from graph |
+- **Type:** `boolean`
+- **Default:** `true`
 
-**Example:**
+Enable smart rendering — only re-render routes affected by your changes based on dependency graph analysis.
 
-```typescript
-smartRender: {
-  enabled: true,
-  include: ['src/**', 'components/**'],
-  exclude: ['**/*.test.*', '**/*.stories.*'],
-},
+```ts
+export default {
+  smartRender: true, // or false to render all routes
+};
 ```
 
 ## Wait for URL options

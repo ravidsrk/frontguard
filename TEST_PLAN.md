@@ -1,6 +1,6 @@
 # Frontguard Test Plan
 
-**Current Status:** 395 tests across 24 test files covering 25/26 source files.
+**Current Status:** 395 tests across 26 test files covering 27 source files.
 
 ---
 
@@ -28,12 +28,14 @@
 | `test/graph/parser.test.ts` | 10 | `src/graph/parser.ts` | Import parsing, dependency graph construction, circular dependency handling |
 | `test/report/json.test.ts` | 9 | `src/report/json.ts` | JSON output format, schema compliance, stdout writing |
 | `test/diff/pixel.test.ts` | 9 | `src/diff/pixel.ts` | Pixel comparison, threshold handling, dimension mismatch, empty buffers, fast path |
+| `test/diff/ssim.test.ts` | 13 | `src/diff/ssim.ts` | Structural similarity comparison, perceptual diff, luminance/contrast/structure, noise tolerance |
 | `test/utils/retry.test.ts` | 7 | `src/utils/retry.ts` | Exponential backoff, max attempts, retryable error detection, abort |
 | `test/discovery/filesystem.test.ts` | 7 | `src/discovery/filesystem.ts` | Next.js/Remix/SvelteKit/Nuxt route extraction, nested groups |
+| `test/core/pipeline.test.ts` | 50 | `src/core/pipeline.ts` | Plugin hooks, pipeline stages, discoverOrFallback, buffer release, concurrency, error boundaries |
 | `test/e2e/pipeline.test.ts` | 5 | `src/core/pipeline.ts` | Full pipeline integration: discover → render → diff → report |
 | `test/cli/index.test.ts` | 4 | `src/cli/index.ts` | Config building, reporter creation, fatal error hints |
 
-**Total: 395 tests across 24 test files**
+**Total: 395 tests across 26 test files**
 
 ---
 
@@ -42,8 +44,8 @@
 | Module | Source Files | Test Files | Direct Coverage |
 |--------|-------------|------------|-----------------|
 | `cli/` | 1 | 1 | ✅ |
-| `core/` | 4 | 3 | ✅ config, plugins, types (pipeline via E2E) |
-| `diff/` | 2 | 2 | ✅ |
+| `core/` | 4 | 3 | ✅ config, plugins, pipeline (+ E2E) |
+| `diff/` | 3 | 3 | ✅ |
 | `discovery/` | 2 | 2 | ✅ |
 | `graph/` | 3 | 3 | ✅ |
 | `plugins/` | 3 (+1 barrel) | 3 | ✅ |
@@ -52,11 +54,7 @@
 | `storage/` | 1 | 1 | ✅ |
 | `utils/` | 4 | 4 | ✅ |
 
-**25/26 source files** have direct test coverage. The one gap:
-
-| File | Status | Notes |
-|------|--------|-------|
-| `src/core/pipeline.ts` | Indirect only | Covered by `test/e2e/pipeline.test.ts` (5 integration tests). No direct unit tests for internal functions like `discoverOrFallback()`, stage orchestration, or buffer release logic. |
+**27/27 source files** have direct test coverage.
 
 Files without tests that don't need them:
 - `src/core/types.ts` — Type definitions only, no runtime logic
@@ -71,27 +69,27 @@ Files without tests that don't need them:
 |---|------------|-----------|-----------|
 | 1 | `src/cli/index.ts` | ✅ | `test/cli/index.test.ts` |
 | 2 | `src/core/config.ts` | ✅ | `test/core/config.test.ts` |
-| 3 | `src/core/pipeline.ts` | ⚠️ E2E only | `test/e2e/pipeline.test.ts` |
+| 3 | `src/core/pipeline.ts` | ✅ | `test/core/pipeline.test.ts` |
 | 4 | `src/core/plugins.ts` | ✅ | `test/core/plugins.test.ts` |
 | 5 | `src/core/types.ts` | — | Types only |
 | 6 | `src/diff/ai-vision.ts` | ✅ | `test/diff/ai-vision.test.ts` |
 | 7 | `src/diff/pixel.ts` | ✅ | `test/diff/pixel.test.ts` |
-| 8 | `src/discovery/crawler.ts` | ✅ | `test/discovery/crawler.test.ts` |
-| 9 | `src/discovery/filesystem.ts` | ✅ | `test/discovery/filesystem.test.ts` |
-| 10 | `src/graph/filter.ts` | ✅ | `test/graph/filter.test.ts` |
-| 11 | `src/graph/parser.ts` | ✅ | `test/graph/parser.test.ts` |
-| 12 | `src/graph/resolver.ts` | ✅ | `test/graph/resolver.test.ts` |
-| 13 | `src/plugins/figma.ts` | ✅ | `test/plugins/figma.test.ts` |
-| 14 | `src/plugins/index.ts` | — | Barrel export |
-| 15 | `src/plugins/monitor.ts` | ✅ | `test/plugins/monitor.test.ts` |
-| 16 | `src/plugins/perf-budgets.ts` | ✅ | `test/plugins/perf-budgets.test.ts` |
-| 17 | `src/render/playwright.ts` | ✅ | `test/render/playwright.test.ts` |
-| 18 | `src/report/console.ts` | ✅ | `test/report/console.test.ts` |
-| 19 | `src/report/github-pr.ts` | ✅ | `test/report/github-pr.test.ts` |
-| 20 | `src/report/html.ts` | ✅ | `test/report/html.test.ts` |
-| 21 | `src/report/json.ts` | ✅ | `test/report/json.test.ts` |
-| 22 | `src/storage/git-orphan.ts` | ✅ | `test/storage/git-orphan.test.ts` |
-| 23 | `src/types/pixelmatch.d.ts` | — | Type declaration |
+| 8 | `src/diff/ssim.ts` | ✅ | `test/diff/ssim.test.ts` |
+| 9 | `src/discovery/crawler.ts` | ✅ | `test/discovery/crawler.test.ts` |
+| 10 | `src/discovery/filesystem.ts` | ✅ | `test/discovery/filesystem.test.ts` |
+| 11 | `src/graph/filter.ts` | ✅ | `test/graph/filter.test.ts` |
+| 12 | `src/graph/parser.ts` | ✅ | `test/graph/parser.test.ts` |
+| 13 | `src/graph/resolver.ts` | ✅ | `test/graph/resolver.test.ts` |
+| 14 | `src/plugins/figma.ts` | ✅ | `test/plugins/figma.test.ts` |
+| 15 | `src/plugins/index.ts` | — | Barrel export |
+| 16 | `src/plugins/monitor.ts` | ✅ | `test/plugins/monitor.test.ts` |
+| 17 | `src/plugins/perf-budgets.ts` | ✅ | `test/plugins/perf-budgets.test.ts` |
+| 18 | `src/render/playwright.ts` | ✅ | `test/render/playwright.test.ts` |
+| 19 | `src/report/console.ts` | ✅ | `test/report/console.test.ts` |
+| 20 | `src/report/github-pr.ts` | ✅ | `test/report/github-pr.test.ts` |
+| 21 | `src/report/html.ts` | ✅ | `test/report/html.test.ts` |
+| 22 | `src/report/json.ts` | ✅ | `test/report/json.test.ts` |
+| 23 | `src/storage/git-orphan.ts` | ✅ | `test/storage/git-orphan.test.ts` |
 | 24 | `src/utils/logger.ts` | ✅ | `test/utils/logger.test.ts` |
 | 25 | `src/utils/preview-url.ts` | ✅ | `test/utils/preview-url.test.ts` |
 | 26 | `src/utils/redact.ts` | ✅ | `test/utils/redact.test.ts` |
@@ -103,7 +101,6 @@ Files without tests that don't need them:
 
 | Priority | Area | Description |
 |----------|------|-------------|
-| 🟡 Medium | `core/pipeline.ts` | Unit tests for `discoverOrFallback()`, buffer release after comparison, concurrency batching, error boundary per stage |
 | 🟢 Low | `cli/index.ts` | Only 4 tests — could expand to cover more CLI flag combinations and edge cases |
 | 🟢 Low | E2E | Only 5 integration tests — could add multi-browser, multi-viewport, error recovery scenarios |
 

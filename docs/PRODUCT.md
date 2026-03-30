@@ -677,39 +677,40 @@ Shared fix patterns across the customer base. If 50 teams using Tailwind CSS all
 
 ```
 src/
-├── cli/              # CLI entry point, arg parsing, config loading
-│   ├── index.ts
-│   └── commands/
-├── core/             # Pipeline orchestrator, types, interfaces
-│   ├── pipeline.ts
-│   ├── types.ts
-│   └── config.ts
-├── discovery/        # Route discovery strategies
-│   ├── crawler.ts
-│   ├── filesystem.ts    # Next.js pages/, Remix routes/
-│   └── sitemap.ts
-├── graph/            # Dependency graph builder
-│   ├── parser.ts
-│   ├── resolver.ts
-│   └── filter.ts
-├── render/           # Page rendering
-│   ├── playwright.ts
-│   └── types.ts
-├── diff/             # Comparison engines
-│   ├── pixel.ts
-│   ├── dom.ts
-│   └── ai-vision.ts
-├── storage/          # Baseline storage
-│   ├── git-orphan.ts
-│   └── types.ts
-├── report/           # Output reporters
-│   ├── github-pr.ts
-│   ├── console.ts
-│   └── json.ts
-└── utils/            # Shared utilities
-    ├── redact.ts     # Secret redaction — used EVERYWHERE
-    ├── logger.ts
-    └── retry.ts
+├── cli/index.ts              # CLI (init, run, update-baselines)
+├── core/
+│   ├── config.ts             # Zod schema, config loading
+│   ├── pipeline.ts           # Orchestrator (discover→filter→render→compare→analyze→report)
+│   ├── plugins.ts            # Plugin manager + hook system
+│   └── types.ts              # Shared types
+├── diff/
+│   ├── ai-vision.ts          # OpenAI/Anthropic vision API integration
+│   ├── pixel.ts              # pixelmatch comparison
+│   └── ssim.ts               # Structural similarity index
+├── discovery/
+│   ├── crawler.ts            # BFS web crawler for route discovery
+│   └── filesystem.ts         # Framework-aware filesystem scanner
+├── graph/
+│   ├── filter.ts             # Smart rendering filter
+│   ├── parser.ts             # Import/dependency parser
+│   └── resolver.ts           # Dependency graph resolver
+├── plugins/
+│   ├── index.ts              # Plugin exports
+│   ├── figma.ts              # Figma design comparison
+│   ├── monitor.ts            # Production monitoring
+│   └── perf-budgets.ts       # Performance budget enforcement
+├── render/playwright.ts      # Multi-browser Playwright renderer
+├── report/
+│   ├── console.ts            # Terminal output
+│   ├── github-pr.ts          # GitHub PR comments
+│   ├── html.ts               # HTML report generator
+│   └── json.ts               # JSON output
+├── storage/git-orphan.ts     # Git orphan branch baseline storage
+└── utils/
+    ├── logger.ts             # Structured logger with redaction
+    ├── preview-url.ts        # Vercel/Netlify preview URL detection
+    ├── redact.ts             # API key redaction
+    └── retry.ts              # Retry with backoff
 ```
 
 **Key principles:**
@@ -724,12 +725,12 @@ src/
 ```typescript
 interface FrontguardPlugin {
   name: string;
-  onRouteDiscovered?(route: Route): Route | null;
-  onBeforeRender?(page: Page, route: Route): void;
-  onAfterScreenshot?(screenshot: Buffer, route: Route): Buffer;
-  onDiffDetected?(diff: DiffResult): DiffResult;
-  onBeforeReport?(report: Report): Report;
-  reporter?(results: RunResults): void;
+  beforeDiscover?(config: ResolvedConfig): void | Promise<void>;
+  afterDiscover?(routes: Route[]): Route[] | Promise<Route[]>;
+  afterRender?(screenshots: Screenshot[]): void | Promise<void>;
+  afterCompare?(results: DiffResult[]): DiffResult[] | Promise<DiffResult[]>;
+  afterRun?(report: Report): void | Promise<void>;
+  onError?(error: Error, context: string): void | Promise<void>;
 }
 ```
 

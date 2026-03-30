@@ -35,7 +35,7 @@ src/
 ├── core/                   # Pipeline orchestration
 │   ├── pipeline.ts         #   Main pipeline: discover → render → diff → report
 │   ├── config.ts           #   Zod-validated config loading
-│   ├── plugins.ts          #   Plugin lifecycle manager (9 hooks)
+│   ├── plugins.ts          #   Plugin lifecycle manager (6 hooks)
 │   └── types.ts            #   Core interfaces
 ├── discovery/              # Route discovery
 │   ├── crawler.ts          #   BFS link crawler from start URL
@@ -82,7 +82,7 @@ src/
 | **diff** | Pixel comparison (pixelmatch), SSIM, AI vision analysis | `Differ`, `VisionAnalyzer` |
 | **storage** | Git orphan branch baseline read/write | `BaselineStorage` |
 | **report** | Format and output results (console, JSON, HTML, GitHub PR) | `Reporter` |
-| **plugins** | Extensibility: Figma compliance, perf budgets, monitoring | `FrontguardPlugin` (9 hooks) |
+| **plugins** | Extensibility: Figma compliance, perf budgets, monitoring | `FrontguardPlugin` (6 hooks) |
 
 ## Key Design Decisions
 
@@ -95,8 +95,8 @@ Pixel diff (pixelmatch) runs first as a fast, free gate. ~90% of pages pass unch
 **Playwright-Native**
 Playwright is the rendering engine (not Puppeteer, not Selenium). It provides multi-browser support (Chromium, Firefox, WebKit) from a single API, built-in screenshot comparison, DOM snapshots, and HAR replay — all needed for deterministic rendering.
 
-**Plugin System (9 Hooks)**
-Lifecycle hooks: `onInit`, `onDiscover`, `onFilter`, `onRender`, `onDiff`, `onAnalyze`, `onReport`, `onError`, `onCleanup`. Plugins can modify routes, inject page scripts, transform screenshots, customize reports. Three built-in plugins ship: Figma compliance, performance budgets, production monitoring.
+**Plugin System (6 Hooks)**
+Lifecycle hooks: `beforeDiscover`, `afterDiscover`, `afterRender`, `afterCompare`, `afterRun`, `onError`. Plugins can modify routes, inject page scripts, transform screenshots, customize reports. Three built-in plugins ship: Figma compliance, performance budgets, production monitoring.
 
 **Error Boundaries Per Stage**
 Each pipeline stage catches errors independently. A single page failing to render doesn't abort the entire run — it's reported as a failure while other pages proceed normally.
@@ -111,7 +111,7 @@ Users provide their own OpenAI/Anthropic API keys. No managed AI service depende
 
 ```
 1. Config loaded + validated (Zod schema)
-2. Plugins initialized (onInit)
+2. Plugins initialized
 3. Routes discovered:
    - Filesystem scan (framework-specific) OR
    - BFS crawler from startUrl OR

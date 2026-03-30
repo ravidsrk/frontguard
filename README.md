@@ -1,15 +1,15 @@
 # 🛡️ Frontguard
 
-[![CI](https://github.com/aspect-build/frontguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aspect-build/frontguard/actions/workflows/ci.yml)
+[![CI](https://github.com/ravidsrk/frontguard/actions/workflows/ci.yml/badge.svg)](https://github.com/ravidsrk/frontguard/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/frontguard)](https://www.npmjs.com/package/frontguard)
-[![Tests](https://img.shields.io/badge/tests-319-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-395-brightgreen)]()
 [![Bundle](https://img.shields.io/badge/bundle-142KB-blue)]()
 
 **AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.**
 
 Backend has Datadog, Sentry, PagerDuty — a $20B+ monitoring ecosystem. Frontend gets... manual QA and hoping for the best. Frontguard changes that.
 
-> **319 tests** · **25/26 source files covered** · **142KB bundle** · **3 built-in plugins**
+> **395 tests** · **26 test files** · **27 source files** · **142KB bundle** · **3 built-in plugins**
 
 ## What It Does
 
@@ -130,7 +130,7 @@ export default {
 
 ## Plugins
 
-Frontguard ships with a plugin architecture (9 lifecycle hooks) and 3 built-in plugins:
+Frontguard ships with a plugin architecture (6 lifecycle hooks) and 3 built-in plugins:
 
 | Plugin | Description | Key Features |
 |--------|-------------|--------------|
@@ -138,7 +138,7 @@ Frontguard ships with a plugin architecture (9 lifecycle hooks) and 3 built-in p
 | **Performance Budgets** (`src/plugins/perf-budgets.ts`) | Bundle size & Web Vitals | LCP/FID/CLS thresholds, budget violation reporting |
 | **Monitor** (`src/plugins/monitor.ts`) | Production visual monitoring | Uptime checks, latency tracking, alerting thresholds |
 
-**Plugin lifecycle hooks:** `onInit`, `onDiscover`, `onFilter`, `onRender`, `onDiff`, `onAnalyze`, `onReport`, `onError`, `onCleanup`
+**Plugin lifecycle hooks:** `beforeDiscover`, `afterDiscover`, `afterRender`, `afterCompare`, `afterRun`, `onError`
 
 ```typescript
 // frontguard.config.ts
@@ -176,7 +176,7 @@ Each stage is independent with error boundaries — one page failing doesn't kil
 See [`docs/`](./docs/) for:
 - [Product deep-dive](./docs/PRODUCT.md) — Architecture, business model, competitive analysis
 - [Research](./docs/research/) — Market data, technical feasibility, competitive landscape
-- [CEO Review](./docs/ceo-review/) — Founder-mode review with 50+ failure modes mapped
+- [CEO Review](./docs/archive/reviews/) — Founder-mode review with 50+ failure modes mapped
 
 ## Validating AI Accuracy
 

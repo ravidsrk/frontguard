@@ -25,7 +25,7 @@ Or fork the demo repo — it's pre-configured with a GitHub Action that runs Fro
 - **Preview URL detection** — auto-detects Vercel/Netlify/Cloudflare preview URLs.
 - **GitHub Action** — three lines in your workflow YAML.
 
-Stack: TypeScript, Playwright, pixelmatch, Zod. ~2k lines. MIT licensed.
+Stack: TypeScript, Playwright, pixelmatch, Zod. ~4K lines of TypeScript. MIT licensed.
 
 Would love feedback on the AI classification approach (regression vs intentional change). It's surprisingly accurate but curious how it holds up on complex UIs.
 

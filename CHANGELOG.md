@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Animation handling** — automatic CSS injection to disable transitions
 - **Auth support** — cookie-based and header-based authentication for protected pages
 - **Ignore regions** — mask dynamic content via CSS selectors or pixel coordinates
-- **Plugin architecture** — 9 lifecycle hooks (`onInit` through `onCleanup`) with error isolation and ordering
+- **Plugin architecture** — 6 lifecycle hooks (`beforeDiscover`, `afterDiscover`, `afterRender`, `afterCompare`, `afterRun`, `onError`) with error isolation and ordering
 - **Figma plugin** — design-to-code comparison with Figma API integration, design token extraction
 - **Performance budgets plugin** — bundle size checks, LCP/FID/CLS thresholds, budget violation reporting
 - **Monitoring plugin** — production visual monitoring with uptime checks, latency tracking, alerting
@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Testing
 
-- **319 tests** across 24 test files covering 25/26 source files
+- **395 tests** across 26 test files covering 27 source files
 - **AI vision tests** — 31 tests with mocked fetch for API calls, retries, JSON parsing, error handling
 - **Crawler tests** — 27 tests for BFS crawl, canonicalization, depth/route limits, filtering
 - **Playwright tests** — 20 tests for screenshot capture, viewport handling, ignore rules

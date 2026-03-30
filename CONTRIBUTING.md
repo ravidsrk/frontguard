@@ -26,14 +26,17 @@ npm test
 
 ```
 src/
-├── cli/          # CLI entry point and commands
-├── core/         # Pipeline orchestration
-├── discovery/    # Route discovery (crawl, filesystem, manual)
-├── capture/      # Screenshot capture via Playwright
-├── comparison/   # Pixel diff via pixelmatch
-├── ai/           # AI analysis (OpenAI, Anthropic)
-├── reporting/    # Report generation and PR comments
-└── utils/        # Shared utilities
+├── cli/           # CLI entry point + commands (init, run, update-baselines)
+├── core/          # Pipeline orchestrator, config, types, plugin system
+├── diff/          # Pixel comparison (pixelmatch), SSIM, AI vision analysis
+├── discovery/     # Route discovery (crawler, filesystem)
+├── graph/         # Dependency graph analysis + smart filtering
+├── plugins/       # Built-in plugins (figma, monitor, perf-budgets)
+├── render/        # Playwright screenshot renderer
+├── report/        # Report generators (HTML, JSON, console, GitHub PR)
+├── storage/       # Baseline storage (git orphan branch)
+├── types/         # Type declarations
+└── utils/         # Logger, retry, redact, preview URL detection
 ```
 
 ## Running in development
@@ -56,7 +59,7 @@ npm run lint
 npm test
 
 # Run specific test file
-npx vitest src/comparison/pixelmatch.test.ts
+npx vitest test/diff/pixel.test.ts
 
 # Watch mode
 npx vitest --watch

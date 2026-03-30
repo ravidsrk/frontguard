@@ -50,12 +50,7 @@ Smart rendering requires understanding your framework's module system:
 
 ```typescript
 export default defineConfig({
-  smartRender: {
-    enabled: true,           // Default: true
-    fallbackToFull: true,    // Full render if graph analysis fails
-    include: ['src/**'],     // Files to include in dependency graph
-    exclude: ['**/*.test.*'], // Files to exclude
-  },
+  smartRender: true, // or false to render all routes
 });
 ```
 
@@ -64,7 +59,7 @@ export default defineConfig({
 To always re-render all pages:
 
 ```typescript
-smartRender: { enabled: false },
+smartRender: false,
 ```
 
 Or use the CLI flag:
