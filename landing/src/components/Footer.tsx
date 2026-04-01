@@ -32,9 +32,12 @@ export default function Footer() {
         <div className="grid gap-12 md:grid-cols-4">
           {/* Logo + tagline */}
           <div className="md:col-span-1">
-            <span className="font-[family-name:var(--font-mono)] text-lg font-medium text-[var(--color-accent)]">
-              frontguard
-            </span>
+            <div className="flex items-center gap-2.5">
+              <img src="/logo-48.png" alt="" width={24} height={24} className="rounded-sm" aria-hidden="true" />
+              <span className="font-[family-name:var(--font-mono)] text-lg font-medium text-[var(--color-accent)]">
+                frontguard
+              </span>
+            </div>
             <p className="mt-3 text-sm leading-relaxed text-[var(--color-text-muted)]">
               AI-powered visual regression testing for modern web teams.
             </p>

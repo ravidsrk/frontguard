@@ -28,8 +28,9 @@ export default function Nav() {
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
         <a
           href="/"
-          className="font-[var(--font-display)] text-xl font-bold tracking-tight text-[var(--color-text)]"
+          className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-[var(--color-text)]"
         >
+          <img src="/logo-48.png" alt="" width={28} height={28} className="rounded-sm" aria-hidden="true" />
           <span className="font-[family-name:var(--font-mono)] text-lg font-medium text-[var(--color-accent)]">
             frontguard
           </span>
