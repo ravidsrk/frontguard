@@ -46,7 +46,7 @@ export default function Footer() {
           {/* Link columns */}
           {footerColumns.map((column) => (
             <div key={column.title}>
-              <h4 className="mb-4 text-sm font-semibold text-[var(--color-text)]">
+              <h4 className="mb-4 text-sm font-semibold text-[var(--color-text)] [text-wrap:balance]">
                 {column.title}
               </h4>
               <ul className="flex flex-col gap-3">
