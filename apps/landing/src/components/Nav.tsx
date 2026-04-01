@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 
 const navLinks = [
   { label: 'Features', href: '#features' },
-  { label: 'Pricing', href: '#pricing' },
   { label: 'Docs', href: '#getting-started' },
   { label: 'GitHub', href: 'https://github.com/ravidsrk/frontguard' },
 ];
@@ -48,7 +47,7 @@ export default function Nav() {
           : 'bg-transparent'
       }`}
     >
-      <nav aria-label="Main navigation" className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
+      <nav aria-label="Main navigation" className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <a
           href="/"
           className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-[var(--color-text)]"
@@ -111,7 +110,7 @@ export default function Nav() {
           id="mobile-menu"
           ref={mobileMenuRef}
           role="menu"
-          className="border-b border-[var(--color-border)] bg-[var(--color-bg)]/95 px-6 pb-6 backdrop-blur-xl md:hidden"
+          className="border-b border-[var(--color-border)] bg-[var(--color-bg)]/95 px-4 pb-6 sm:px-6 backdrop-blur-xl md:hidden"
         >
           <div className="flex flex-col gap-1">
             {navLinks.map((link) => (

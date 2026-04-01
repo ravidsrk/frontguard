@@ -45,10 +45,10 @@ const { ref, inView } = useInView();
 
 return (
 <section ref={ref} id="problem" aria-labelledby="problem-heading" className="py-24 lg:py-32">
-<div className="mx-auto max-w-7xl px-6 lg:px-8">
+<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 <h2
 id="problem-heading"
-className={`mx-auto max-w-3xl text-center font-[family-name:var(--font-display)] text-3xl font-bold leading-tight tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl ${inView ? 'animate-fade-up' : 'opacity-0'}`}
+className={`mx-auto max-w-3xl text-center font-[family-name:var(--font-display)] text-2xl font-bold leading-tight tracking-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
 Your CI catches code bugs.{' '}
 <span className="text-[var(--color-text-muted)]">
@@ -56,7 +56,7 @@ But who catches the visual ones?
 </span>
 </h2>
 
-<div className="mt-16 grid gap-6 md:grid-cols-3">
+<div className="mt-10 grid gap-4 sm:mt-16 sm:gap-6 md:grid-cols-3">
 {painCards.map((card, i) => (
 <div
 key={card.title}

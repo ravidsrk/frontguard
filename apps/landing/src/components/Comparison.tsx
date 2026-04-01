@@ -42,16 +42,24 @@ return (
 );
 }
 
+const tools = ['frontguard', 'percy', 'chromatic', 'playwright'] as const;
+const toolLabels: Record<string, string> = {
+  frontguard: 'Frontguard',
+  percy: 'Percy',
+  chromatic: 'Chromatic',
+  playwright: 'Playwright',
+};
+
 export default function Comparison() {
 const { ref, inView } = useInView();
 
 return (
 <section ref={ref} id="comparison" aria-labelledby="comparison-heading" className="border-t border-[var(--color-border)] py-24 lg:py-32">
-<div className="mx-auto max-w-5xl px-6 lg:px-8">
+<div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
 <div
-className={`mb-16 text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
+className={`mb-12 md:mb-16 text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 id="comparison-heading" className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
+<h2 id="comparison-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-3xl lg:text-4xl">
 Why not Percy? Or Chromatic?{' '}
 <span className="text-[var(--color-text-muted)]">
 Or just Playwright screenshots?
@@ -59,11 +67,12 @@ Or just Playwright screenshots?
 </h2>
 </div>
 
+{/* Desktop table — hidden on mobile */}
 <div
-className={`overflow-x-auto ${inView ? 'animate-fade-up' : 'opacity-0'}`}
+className={`hidden md:block overflow-x-auto ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 style={{ animationDelay: '200ms' }}
 >
-<table className="w-full min-w-[600px]">
+<table className="w-full">
 <caption className="sr-only">Feature comparison between Frontguard, Percy, Chromatic, and Playwright screenshot testing</caption>
 <thead>
 <tr className="border-b border-[var(--color-border)]">
@@ -118,6 +127,29 @@ style={{ animationDelay: `${300 + i * 50}ms` }}
 ))}
 </tbody>
 </table>
+</div>
+
+{/* Mobile cards — shown only on mobile */}
+<div className="md:hidden flex flex-col gap-4">
+{rows.map((row, i) => (
+<div
+key={row.feature}
+className={`rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 ${inView ? 'animate-fade-up' : 'opacity-0'}`}
+style={{ animationDelay: `${200 + i * 60}ms` }}
+>
+<h3 className="mb-3 text-sm font-semibold text-[var(--color-text)]">{row.feature}</h3>
+<div className="grid grid-cols-2 gap-2">
+{tools.map((tool) => (
+<div key={tool} className="flex items-center gap-2">
+<CellValue value={row[tool]} />
+<span className={`text-xs ${tool === 'frontguard' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'}`}>
+{toolLabels[tool]}
+</span>
+</div>
+))}
+</div>
+</div>
+))}
 </div>
 </div>
 </section>

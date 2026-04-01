@@ -34,7 +34,7 @@ background:
 }}
 />
 
-<div className="mx-auto max-w-7xl px-6 lg:px-8">
+<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16">
 {/* Left column — Copy */}
 <div className="lg:col-span-5">
@@ -47,7 +47,7 @@ Open source · MIT Licensed
 </div>
 
 <h1
-className="animate-fade-up font-[family-name:var(--font-display)] text-4xl leading-[1.1] font-extrabold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-5xl lg:text-6xl"
+className="animate-fade-up font-[family-name:var(--font-display)] text-3xl leading-[1.1] font-extrabold tracking-tight text-[var(--color-text)] [text-wrap:balance] sm:text-4xl md:text-5xl lg:text-6xl"
 style={{ animationDelay: '100ms' }}
 >
 Your CSS broke the checkout page.{' '}
@@ -118,8 +118,8 @@ terminal
 </div>
 
 {/* Terminal content */}
-<div className="p-5 lg:p-6">
-<pre className="font-[family-name:var(--font-mono)] text-xs leading-relaxed sm:text-sm">
+<div className="overflow-x-auto p-3 sm:p-5 lg:p-6">
+<pre className="font-[family-name:var(--font-mono)] text-[11px] leading-relaxed sm:text-sm">
 <code>
 {terminalLines.map((line, i) => (
 <div

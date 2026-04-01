@@ -3,7 +3,6 @@ const footerColumns = [
     title: 'Product',
     links: [
       { label: 'Features', href: '#features' },
-      { label: 'Pricing', href: '#pricing' },
       { label: 'Docs', href: '#getting-started' },
       { label: 'Changelog', href: '#' },
     ],
@@ -28,8 +27,8 @@ const footerColumns = [
 export default function Footer() {
   return (
     <footer className="border-t border-[var(--color-border)] py-16" role="contentinfo">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="grid gap-12 md:grid-cols-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4 md:gap-12">
           {/* Logo + tagline */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-2.5">

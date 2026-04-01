@@ -14,14 +14,14 @@ background:
 }}
 />
 
-<div className="mx-auto max-w-3xl px-6 text-center lg:px-8">
+<div className="mx-auto max-w-3xl px-4 sm:px-6 text-center lg:px-8">
 <div
 className={`flex flex-col items-center gap-6 ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 id="final-cta-heading" className="font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-5xl">
+<h2 id="final-cta-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl lg:text-5xl">
 Never find out about CSS bugs from your users again
 </h2>
-<p className="max-w-xl text-lg text-[var(--color-text-muted)]">
+<p className="max-w-xl text-base sm:text-lg text-[var(--color-text-muted)]">
 Install Frontguard in 30 seconds. Catch the bugs that pixel diffs miss.
 </p>
 <a

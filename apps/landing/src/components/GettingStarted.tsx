@@ -95,11 +95,11 @@ tabRefs.current[nextTab]?.focus();
 
 return (
 <section ref={ref} id="getting-started" aria-labelledby="getting-started-heading" className="py-24 lg:py-32">
-<div className="mx-auto max-w-3xl px-6 lg:px-8">
+<div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
 <div
 className={`mb-12 text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 id="getting-started-heading" className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
+<h2 id="getting-started-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl">
 Start catching visual bugs{' '}
 <span className="text-[var(--color-accent)]">in 30 seconds</span>
 </h2>

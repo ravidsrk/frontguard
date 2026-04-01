@@ -8,7 +8,6 @@ const HowItWorks = lazy(() => import('./components/HowItWorks'));
 const Features = lazy(() => import('./components/Features'));
 const Comparison = lazy(() => import('./components/Comparison'));
 const GettingStarted = lazy(() => import('./components/GettingStarted'));
-const Pricing = lazy(() => import('./components/Pricing'));
 const FinalCTA = lazy(() => import('./components/FinalCTA'));
 const Footer = lazy(() => import('./components/Footer'));
 
@@ -31,7 +30,6 @@ Skip to main content
 <Features />
 <Comparison />
 <GettingStarted />
-<Pricing />
 <FinalCTA />
 </Suspense>
 </main>

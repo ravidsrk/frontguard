@@ -74,11 +74,11 @@ const { ref, inView } = useInView();
 
 return (
 <section ref={ref} id="features" aria-labelledby="features-heading" className="py-24 lg:py-32">
-<div className="mx-auto max-w-7xl px-6 lg:px-8">
+<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 <div
 className={`mb-16 text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 id="features-heading" className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
+<h2 id="features-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl">
 Built for the problems{' '}
 <span className="text-[var(--color-text-muted)]">pixel diffs can{'\u2019'}t solve.</span>
 </h2>
