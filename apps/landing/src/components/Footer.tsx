@@ -4,14 +4,13 @@ const footerColumns = [
     links: [
       { label: 'Features', href: '#features' },
       { label: 'Docs', href: '#getting-started' },
-      { label: 'Changelog', href: '#' },
+      { label: 'Changelog', href: 'https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md', external: true },
     ],
   },
   {
     title: 'Resources',
     links: [
       { label: 'GitHub', href: 'https://github.com/ravidsrk/frontguard', external: true },
-      { label: 'Blog', href: '#' },
       { label: 'Contributing', href: 'https://github.com/ravidsrk/frontguard/blob/main/CONTRIBUTING.md', external: true },
     ],
   },
@@ -19,7 +18,6 @@ const footerColumns = [
     title: 'Legal',
     links: [
       { label: 'MIT License', href: 'https://github.com/ravidsrk/frontguard/blob/main/LICENSE', external: true },
-      { label: 'Privacy', href: '#' },
     ],
   },
 ];
@@ -45,9 +43,9 @@ export default function Footer() {
           {/* Link columns */}
           {footerColumns.map((column) => (
             <nav key={column.title} aria-label={`${column.title} links`}>
-              <h4 className="mb-4 text-sm font-semibold text-[var(--color-text)] [text-wrap:balance]">
+              <h3 className="mb-4 text-sm font-semibold text-[var(--color-text)] [text-wrap:balance]">
                 {column.title}
-              </h4>
+              </h3>
               <ul className="flex flex-col gap-1">
                 {column.links.map((link) => (
                   <li key={link.label}>
