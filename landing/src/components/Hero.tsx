@@ -70,9 +70,8 @@ export default function Hero() {
                 variants={fadeUp}
                 className="font-[family-name:var(--font-display)] text-4xl leading-[1.1] font-extrabold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-5xl lg:text-6xl"
               >
-                Catch visual bugs{' '}
-                <span className="text-[var(--color-accent)]">before</span> your
-                users do
+                Your CSS broke the checkout page.{' '}
+                <span className="text-[var(--color-accent)]">Frontguard caught it.</span>
               </motion.h1>
 
               <motion.p
@@ -80,9 +79,9 @@ export default function Hero() {
                 variants={fadeUp}
                 className="max-w-lg text-lg leading-relaxed text-[var(--color-text-muted)]"
               >
-                AI-powered visual regression testing for Playwright. Detect
-                regressions, understand why they happened, and get fix
-                suggestions — in your CI pipeline.
+                Visual regression testing that tells you what broke, why it
+                broke, and how to fix it. Plugs into Playwright. Runs in CI.
+                Free and open source.
               </motion.p>
 
               <motion.div
@@ -94,7 +93,7 @@ export default function Hero() {
                   href="#getting-started"
                   className="touch-manipulation inline-flex items-center gap-2 rounded-lg bg-[var(--color-cta)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-500/20 transition-[background-color,box-shadow] hover:bg-[var(--color-cta-hover)] hover:shadow-orange-500/30"
                 >
-                  Start in 30 Seconds
+                  Install in 30 Seconds
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M3 8h10M9 4l4 4-4 4" />
                   </svg>

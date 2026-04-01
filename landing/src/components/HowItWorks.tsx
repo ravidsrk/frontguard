@@ -45,8 +45,8 @@ export default function HowItWorks() {
           className="mb-16"
         >
           <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
-            Three lines. Zero config.{' '}
-            <span className="text-[var(--color-accent)]">Full coverage.</span>
+            Add visual testing to Playwright{' '}
+            <span className="text-[var(--color-accent)]">in 3 lines.</span>
           </h2>
           <p className="mt-4 max-w-2xl text-lg text-[var(--color-text-muted)]">
             Add visual regression testing to your Playwright suite in under a minute.

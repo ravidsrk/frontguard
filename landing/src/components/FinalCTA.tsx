@@ -24,10 +24,10 @@ export default function FinalCTA() {
           className="flex flex-col items-center gap-6"
         >
           <h2 className="font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-5xl">
-            Ship with confidence
+            Never find out about CSS bugs from your users again
           </h2>
           <p className="max-w-xl text-lg text-[var(--color-text-muted)]">
-            Join teams who never ship visual regressions again.
+            Install Frontguard in 30 seconds. Catch the bugs that pixel diffs miss.
           </p>
           <a
             href="#getting-started"

@@ -5,7 +5,7 @@ const painCards = [
   {
     title: 'CSS changes break layouts silently',
     description:
-      'A padding tweak in one component cascades across 12 pages. Nobody notices until production.',
+      'A padding change in your component breaks the checkout button on mobile. Functional tests pass. You find out from a customer screenshot in Slack.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -19,7 +19,7 @@ const painCards = [
   {
     title: 'Screenshot diffs are 90% noise',
     description:
-      'Font rendering, anti-aliasing, animation timing — traditional pixel diffs cry wolf constantly.',
+      'Your team approved 47 baseline updates last sprint without looking at them. Because when everything is flagged, nothing is.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
@@ -31,7 +31,7 @@ const painCards = [
   {
     title: "Manual QA doesn\u2019t scale",
     description:
-      'Hiring humans to click through every page after every deploy? That worked in 2015.',
+      'Every deploy needs eyes on 30 pages across 3 breakpoints. That\u2019s 90 manual checks. Every. Single. Time.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10" />

@@ -3,12 +3,11 @@ import { useRef } from 'react';
 
 const stats = [
   { value: '395', label: 'tests' },
-  { value: '27', label: 'source files' },
   { value: '< 3s', label: 'per page' },
+  { value: 'Zero', label: 'config needed' },
+  { value: '3', label: 'browsers' },
   { value: 'MIT', label: 'licensed' },
 ];
-
-const logos = ['Acme Corp', 'NovaTech', 'Meridian', 'Axiom', 'Vertex'];
 
 export default function SocialProof() {
   const ref = useRef<HTMLDivElement>(null);
@@ -23,11 +22,11 @@ export default function SocialProof() {
           transition={{ duration: 0.5 }}
           className="mb-10 text-center text-sm font-medium tracking-wide text-[var(--color-text-dim)] uppercase"
         >
-          Built for teams shipping fast
+          Built for developers who ship daily
         </motion.p>
 
         {/* Stats */}
-        <div className="mb-12 grid grid-cols-2 gap-8 md:grid-cols-4">
+        <div className="mb-12 grid grid-cols-2 gap-8 md:grid-cols-5">
           {stats.map((stat, i) => (
             <motion.div
               key={stat.label}
@@ -46,20 +45,7 @@ export default function SocialProof() {
           ))}
         </div>
 
-        {/* Logo strip */}
-        <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
-          {logos.map((logo, i) => (
-            <motion.span
-              key={logo}
-              initial={{ opacity: 0 }}
-              animate={inView ? { opacity: 1 } : {}}
-              transition={{ delay: 0.4 + i * 0.08, duration: 0.4 }}
-              className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight text-[var(--color-text-dim)]/40 select-none"
-            >
-              {logo}
-            </motion.span>
-          ))}
-        </div>
+
       </div>
     </section>
   );

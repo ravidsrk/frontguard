@@ -16,7 +16,7 @@ const tiers: PricingTier[] = [
     name: 'Free',
     price: '$0',
     period: '/mo',
-    description: 'For individual developers and side projects.',
+    description: 'Everything you need to catch regressions locally. No signup required.',
     features: [
       'Unlimited local screenshots',
       '500 cloud screenshots/mo',
@@ -31,7 +31,7 @@ const tiers: PricingTier[] = [
     name: 'Pro',
     price: '$29',
     period: '/mo',
-    description: 'For teams who ship every day.',
+    description: 'Shared baselines across your team. Visual diffs in every PR. $29/mo flat \u2014 not per screenshot.',
     features: [
       'Unlimited projects',
       '10K cloud screenshots/mo',
@@ -47,7 +47,7 @@ const tiers: PricingTier[] = [
     name: 'Enterprise',
     price: 'Custom',
     period: '',
-    description: 'For organizations with compliance needs.',
+    description: 'SSO, SLA, and everything unlimited. For teams where visual quality is non-negotiable.',
     features: [
       'SSO / SAML',
       'Unlimited everything',
@@ -80,6 +80,9 @@ export default function Pricing() {
               No per-screenshot fees. Ever.
             </span>
           </h2>
+          <p className="mt-4 text-sm text-[var(--color-text-muted)]">
+            Percy charges $0.036 per screenshot. Chromatic averages $44K/year. We charge $29/mo flat.
+          </p>
         </motion.div>
 
         <div className="grid gap-6 md:grid-cols-3">

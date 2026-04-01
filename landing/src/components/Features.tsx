@@ -5,7 +5,7 @@ const features = [
   {
     title: 'AI-Powered Analysis',
     description:
-      'Not just pixel diffs. Frontguard understands what changed and whether it matters.',
+      'Tells you "the submit button overflows on mobile because the new padding pushes it outside the flex container." Not "pixels differ at coordinates 340,890."',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
@@ -15,7 +15,7 @@ const features = [
   {
     title: 'Anti-Flake Consensus',
     description:
-      'Multi-render majority vote eliminates animation jitter and timing noise.',
+      'Takes 3 screenshots, keeps the majority. Spinner mid-animation? Loading state flickering? Filtered out automatically.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -25,7 +25,7 @@ const features = [
   {
     title: 'Smart Route Discovery',
     description:
-      'Auto-crawls your app. No manual route lists needed.',
+      'Point it at your URL. It finds every route, tests every page. No config files. No route lists. It just works.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10" />
@@ -36,7 +36,7 @@ const features = [
   {
     title: 'PR-Native Review',
     description:
-      'Visual diffs posted directly in your pull request. No context switching.',
+      'Visual diffs show up right in your PR. Approve or reject without leaving GitHub.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="18" cy="18" r="3" />
@@ -49,7 +49,7 @@ const features = [
   {
     title: 'Multi-Browser',
     description:
-      'Chromium, Firefox, WebKit. One config covers every rendering engine.',
+      'One command tests Chromium, Firefox, and WebKit. That Safari flexbox bug your users found? You\u2019d have caught it.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -61,7 +61,7 @@ const features = [
   {
     title: 'Plugin System',
     description:
-      'Figma comparison, performance budgets, production monitoring. Extend at will.',
+      'Compare production against Figma designs. Set performance budgets. Monitor live pages. Build your own with 6 lifecycle hooks.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
@@ -84,8 +84,8 @@ export default function Features() {
           className="mb-16 text-center"
         >
           <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
-            Everything you need.{' '}
-            <span className="text-[var(--color-text-muted)]">Nothing you don{'\u2019'}t.</span>
+            Built for the problems{' '}
+            <span className="text-[var(--color-text-muted)]">pixel diffs can{'\u2019'}t solve.</span>
           </h2>
         </motion.div>
 
