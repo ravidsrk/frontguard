@@ -35,7 +35,7 @@ background:
 />
 
 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-<div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16">
+<div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16 overflow-hidden">
 {/* Left column — Copy */}
 <div className="lg:col-span-5">
 <div className="flex flex-col gap-6">
@@ -93,7 +93,7 @@ View on GitHub
 
 {/* Right column — Terminal mockup */}
 <div
-className="animate-fade-in-from-right lg:col-span-7"
+className="animate-fade-in-from-right lg:col-span-7 min-w-0"
 style={{ animationDelay: '300ms' }}
 >
 <div className="relative">

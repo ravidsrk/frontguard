@@ -48,10 +48,10 @@ Add visual regression testing to your Playwright suite in under a minute.
 </p>
 </div>
 
-<div className="grid items-start gap-8 lg:grid-cols-12 lg:gap-16">
+<div className="grid items-start gap-8 lg:grid-cols-12 lg:gap-16 overflow-hidden">
 {/* Code block */}
 <div
-className={`lg:col-span-7 ${inView ? 'animate-fade-in-left' : 'opacity-0'}`}
+className={`lg:col-span-7 min-w-0 ${inView ? 'animate-fade-in-left' : 'opacity-0'}`}
 style={{ animationDelay: '200ms' }}
 >
 <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
