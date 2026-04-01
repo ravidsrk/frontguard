@@ -1,0 +1,198 @@
+---
+title: Configuration
+description: Complete reference for frontguard.config.ts — all options explained.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Configuration
+
+Frontguard is configured via `frontguard.config.ts` in your project root. Run `frontguard init` to generate a starter config.
+
+## Full Example
+
+```typescript title="frontguard.config.ts"
+export default {
+  version: 1,
+  baseUrl: 'http://localhost:3000',
+
+  // Auto-discover routes (zero config)
+  discover: {
+    startUrl: '/',
+    maxDepth: 3,
+    maxRoutes: 100,
+    exclude: ['/admin/*', '/api/*'],
+  },
+
+  // Or explicit routes (can be used alongside discover)
+  // routes: ['/', '/pricing', '/checkout'],
+
+  viewports: [375, 768, 1440],
+  browsers: ['chromium'],
+  threshold: 0.1,
+
+  // AI analysis (optional, BYOK)
+  ai: {
+    provider: 'openai',
+    model: 'gpt-4o',
+  },
+
+  // Ignore dynamic content
+  ignore: [
+    { selector: '.dynamic-timestamp', description: 'Timestamps change on every load' },
+    { selector: '.user-avatar', description: 'Avatar may vary' },
+    { rect: { x: 0, y: 0, width: 100, height: 50 }, description: 'Ad banner' },
+  ],
+
+  // Auth for protected pages
+  auth: {
+    storageState: './playwright-auth.json',
+  },
+
+  // Performance
+  smartRender: true,
+  workers: 4,
+  pageTimeout: 30000,
+  maxHeight: 5000,
+  viewportHeight: 720,
+  outputDir: './frontguard-report',
+
+  // Anti-flake
+  antiFlakeRenders: 2,
+  freezeTime: true,
+  renderRetries: 1,
+
+  // SSIM fallback
+  ssimFallback: true,
+  ssimThreshold: 0.98,
+
+  // Plugins
+  plugins: [],
+};
+```
+
+## Reference
+
+### Core Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `version` | `number` | `1` | Config schema version |
+| `baseUrl` | `string` | — | **Required.** Base URL of the application under test |
+| `routes` | `string[]` | — | Explicit list of route paths to test |
+| `discover` | `DiscoverOptions` | — | Auto-discovery configuration |
+| `viewports` | `number[]` | `[375, 768, 1440]` | Viewport widths in pixels |
+| `browsers` | `BrowserEngine[]` | `['chromium']` | Browser engines: `chromium`, `firefox`, `webkit` |
+| `threshold` | `number` | `0.1` | Max allowed pixel diff as a fraction (0.0–1.0) |
+
+### Discovery Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `startUrl` | `string` | `'/'` | Starting URL for the crawler |
+| `maxDepth` | `number` | `3` | Maximum link depth to follow |
+| `maxRoutes` | `number` | `100` | Maximum routes to discover |
+| `exclude` | `string[]` | `[]` | URL patterns (globs) to exclude |
+
+Route discovery supports three modes:
+- **Crawler** — Follows links starting from `startUrl`
+- **Filesystem** — Reads routes from framework file structure (Next.js `app/`, SvelteKit `routes/`, etc.)
+- **Config** — Explicit `routes` array
+
+### AI Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `provider` | `'openai' \| 'anthropic'` | — | AI provider |
+| `model` | `string` | — | Model identifier (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) |
+
+<Callout type="info">
+  AI is BYOK (Bring Your Own Key). Set your API key via environment variables:
+  - `FRONTGUARD_OPENAI_KEY` for OpenAI
+  - `FRONTGUARD_ANTHROPIC_KEY` for Anthropic
+</Callout>
+
+### Ignore Rules
+
+Mask dynamic content that causes false positives:
+
+```typescript
+ignore: [
+  // By CSS selector
+  { selector: '.dynamic-timestamp' },
+
+  // By pixel region
+  { rect: { x: 0, y: 0, width: 300, height: 100 } },
+
+  // With description (for documentation)
+  {
+    selector: '.ad-banner',
+    description: 'Third-party ads change on every load',
+  },
+]
+```
+
+### Authentication
+
+For testing pages behind login:
+
+```typescript
+auth: {
+  storageState: './playwright-auth.json',
+}
+```
+
+The `storageState` file is a Playwright storage state JSON containing cookies, localStorage, and session data. Generate it with:
+
+```bash
+npx playwright codegen --save-storage=playwright-auth.json http://localhost:3000/login
+```
+
+### Performance Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `smartRender` | `boolean` | `true` | Wait for animations, fonts, lazy images |
+| `workers` | `number` | `4` | Parallel browser workers |
+| `pageTimeout` | `number` | `30000` | Navigation timeout in ms |
+| `maxHeight` | `number` | `5000` | Max screenshot height in px |
+| `viewportHeight` | `number` | `720` | Viewport height in px |
+| `outputDir` | `string` | `'./frontguard-report'` | Report output directory |
+
+### Anti-Flake Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `antiFlakeRenders` | `number` | `1` | Renders per page for flake detection (recommended: 2–3) |
+| `freezeTime` | `boolean \| number` | `false` | Freeze `Date.now()` during render |
+| `renderRetries` | `number` | `0` | Per-page retry count on render failure |
+| `ssimFallback` | `boolean` | `true` | Use SSIM perceptual diff for borderline results |
+| `ssimThreshold` | `number` | `0.98` | SSIM score above which images are identical |
+
+<Callout type="info">
+  **Anti-flake rendering**: Set `antiFlakeRenders: 2` to capture each page twice. If both renders produce different results compared to the baseline, the diff is real. If only one does, it's a flake and gets ignored.
+</Callout>
+
+### Baselines
+
+Baselines are stored in a Git orphan branch (`frontguard-baselines`) by default. This keeps baseline images out of your main branch history while still being version-controlled.
+
+The baseline manifest tracks:
+- Which routes have baselines
+- Which viewports and browsers were captured
+- When each baseline was last updated
+
+```json title="Baseline Manifest (auto-generated)"
+{
+  "schemaVersion": 1,
+  "createdBy": "frontguard@0.1.0",
+  "updatedAt": "2025-01-15T10:30:00Z",
+  "routes": {
+    "/": {
+      "viewports": [375, 768, 1440],
+      "browsers": ["chromium"],
+      "lastUpdated": "2025-01-15T10:30:00Z"
+    }
+  }
+}
+```

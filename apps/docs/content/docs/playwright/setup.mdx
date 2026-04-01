@@ -1,0 +1,179 @@
+---
+title: Setup & Installation
+description: Install and configure @frontguard/playwright for visual testing in your Playwright suite.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+# Setup & Installation
+
+## Install
+
+<Tabs items={['npm', 'pnpm', 'yarn']}>
+  <Tab value="npm">
+    ```bash
+    npm install -D @frontguard/playwright
+    ```
+  </Tab>
+  <Tab value="pnpm">
+    ```bash
+    pnpm add -D @frontguard/playwright
+    ```
+  </Tab>
+  <Tab value="yarn">
+    ```bash
+    yarn add -D @frontguard/playwright
+    ```
+  </Tab>
+</Tabs>
+
+## Prerequisites
+
+- `@playwright/test` installed as a dev dependency
+- Playwright browsers installed (`npx playwright install`)
+
+## Basic Usage
+
+Import `visualTest` and call it in any Playwright test:
+
+```typescript title="tests/visual.spec.ts"
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
+test('homepage visual test', async ({ page }) => {
+  await page.goto('/');
+
+  const result = await visualTest(page, 'homepage');
+  expect(result.passed).toBe(true);
+});
+```
+
+The first run creates baselines. Subsequent runs compare against them.
+
+## Configuration Patterns
+
+### Masking Dynamic Content
+
+Hide elements that change between renders (timestamps, ads, avatars):
+
+```typescript
+const result = await visualTest(page, 'dashboard', {
+  mask: ['.timestamp', '.user-avatar', '.ad-slot'],
+});
+```
+
+### Masking Regions by Coordinates
+
+For elements without reliable selectors:
+
+```typescript
+const result = await visualTest(page, 'dashboard', {
+  maskRegions: [
+    { x: 0, y: 0, width: 300, height: 80 }, // Header ad
+    { x: 900, y: 500, width: 200, height: 200 }, // Chat widget
+  ],
+});
+```
+
+### Custom Threshold
+
+Adjust sensitivity per test:
+
+```typescript
+// Strict — 0.1% pixel tolerance
+const result = await visualTest(page, 'pixel-perfect-hero', {
+  threshold: 0.001,
+});
+
+// Relaxed — 5% tolerance for content-heavy pages
+const result = await visualTest(page, 'blog-listing', {
+  threshold: 0.05,
+});
+```
+
+### Freezing Time
+
+Prevent `Date.now()` and `new Date()` from causing flaky screenshots:
+
+```typescript
+const result = await visualTest(page, 'dashboard', {
+  freezeTime: true, // Freezes to epoch 0
+});
+
+// Or freeze to a specific timestamp
+const result = await visualTest(page, 'dashboard', {
+  freezeTime: 1704067200000, // Jan 1, 2024
+});
+```
+
+### AI Analysis
+
+Enable AI-powered explanations for detected regressions:
+
+```typescript
+const result = await visualTest(page, 'checkout', {
+  ai: true, // Uses OpenAI by default
+});
+
+// Or specify provider
+const result = await visualTest(page, 'checkout', {
+  ai: { provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
+});
+
+if (!result.passed && result.ai) {
+  console.log(result.ai.classification); // 'regression' | 'intentional' | 'content_update'
+  console.log(result.ai.explanation);    // Human-readable explanation
+  console.log(result.ai.severity);       // 'critical' | 'warning' | 'info'
+}
+```
+
+<Callout type="info">
+  AI requires an API key set via `FRONTGUARD_OPENAI_KEY` or `FRONTGUARD_ANTHROPIC_KEY` environment variable.
+</Callout>
+
+### Custom Baseline Directory
+
+```typescript
+const result = await visualTest(page, 'homepage', {
+  baselineDir: './test/baselines',
+});
+```
+
+### Updating Baselines
+
+Force-update baselines in your test:
+
+```typescript
+const result = await visualTest(page, 'homepage', {
+  update: true,
+});
+```
+
+Or set the `FRONTGUARD_UPDATE=1` environment variable to update all visual tests:
+
+```bash
+FRONTGUARD_UPDATE=1 npx playwright test
+```
+
+## Organizing Tests
+
+A recommended pattern for visual tests:
+
+```
+tests/
+├── visual/
+│   ├── homepage.spec.ts
+│   ├── checkout.spec.ts
+│   └── dashboard.spec.ts
+├── __visual_baselines__/
+│   ├── homepage-1440x900.png
+│   ├── checkout-filled-1440x900.png
+│   └── dashboard-1440x900.png
+└── e2e/
+    └── ... (functional tests)
+```
+
+<Callout type="warn">
+  Commit baseline images to source control so your entire team shares the same reference. Consider Git LFS for large baseline sets.
+</Callout>

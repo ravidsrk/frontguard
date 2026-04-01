@@ -1,0 +1,215 @@
+---
+title: API Reference
+description: Complete API reference for @frontguard/playwright — types, options, and return values.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# API Reference
+
+## `visualTest()`
+
+The main export from `@frontguard/playwright`. Takes a screenshot, compares against a baseline, and optionally runs AI analysis.
+
+```typescript
+import { visualTest } from '@frontguard/playwright';
+
+async function visualTest(
+  page: Page,
+  name: string,
+  options?: VisualTestOptions
+): Promise<VisualTestResult>
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `page` | `Page` | Playwright page instance |
+| `name` | `string` | Unique name for this visual test (used as baseline filename) |
+| `options` | `VisualTestOptions` | Optional configuration |
+
+### `VisualTestOptions`
+
+```typescript
+interface VisualTestOptions {
+  /** Max pixel diff as fraction 0-1 (default: 0.01 = 1%) */
+  threshold?: number;
+
+  /** Screenshot the full page, not just the viewport (default: true) */
+  fullPage?: boolean;
+
+  /** CSS selectors of elements to hide before screenshot */
+  mask?: string[];
+
+  /** Rectangular regions to mask by coordinates */
+  maskRegions?: Array<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }>;
+
+  /** Enable AI analysis of visual diffs */
+  ai?: boolean | {
+    provider: 'openai' | 'anthropic';
+    model?: string;
+  };
+
+  /** Freeze Date.now() during screenshot (default: false) */
+  freezeTime?: boolean | number;
+
+  /** Custom baseline directory (default: '__visual_baselines__') */
+  baselineDir?: string;
+
+  /** Update baselines instead of comparing (default: false) */
+  update?: boolean;
+}
+```
+
+### `VisualTestResult`
+
+```typescript
+interface VisualTestResult {
+  /** Whether the visual test passed (within threshold) */
+  passed: boolean;
+
+  /** Percentage of pixels that differ (0-100) */
+  diffPercentage: number;
+
+  /** Path to the baseline image */
+  baselinePath: string;
+
+  /** Path to the current screenshot */
+  currentPath: string;
+
+  /** Path to the diff image (only when diff detected) */
+  diffPath?: string;
+
+  /** AI analysis result (only when AI enabled and diff detected) */
+  ai?: {
+    /** 'regression' | 'intentional' | 'content_update' */
+    classification: string;
+    /** 'critical' | 'warning' | 'info' */
+    severity: string;
+    /** Human-readable explanation */
+    explanation: string;
+  };
+
+  /** SSIM perceptual similarity score (0-1) */
+  ssim?: number;
+
+  /** Whether this was the first capture (no previous baseline) */
+  isNewBaseline: boolean;
+}
+```
+
+## Behavior Details
+
+### Screenshot Capture
+
+- Uses Playwright's `page.screenshot()` with `fullPage: true` by default
+- Screenshot format is always PNG
+- Filename includes viewport dimensions: `{name}-{width}x{height}.png`
+
+### Masking
+
+When `mask` selectors are provided, matching elements have `visibility: hidden` applied via `page.evaluate()` before the screenshot is taken.
+
+When `maskRegions` are provided, gray overlay `<div>` elements are injected at the specified coordinates with `position: fixed` and `z-index: 999999`.
+
+### Time Freezing
+
+When `freezeTime` is enabled, a script is injected via `page.addInitScript()` that overrides:
+- `Date.now()` — returns the frozen timestamp
+- `new Date()` — returns a Date at the frozen timestamp
+
+This prevents clock-dependent UI (timestamps, relative dates) from causing flaky diffs.
+
+### Baseline Storage
+
+Baselines are managed by the `BaselineStorage` class:
+- Default directory: `__visual_baselines__/`
+- Files: `{name}-{viewport}.png` (baseline), `{name}-{viewport}.current.png`, `{name}-{viewport}.diff.png`
+- On first run, creates baseline and returns `{ passed: true, isNewBaseline: true }`
+- When `update: true` or `FRONTGUARD_UPDATE=1`, overwrites existing baselines
+
+### Comparison Algorithm
+
+1. **Pixel diff** via `pixelmatch` — counts differing pixels
+2. **SSIM** (Structural Similarity Index) — perceptual similarity score
+3. If `diffPercentage / 100 > threshold`, the test fails
+4. If AI is enabled and the test fails, screenshots are sent for analysis
+
+### AI Analysis
+
+When enabled, both the baseline and current screenshots are sent to the configured AI provider:
+
+```typescript
+interface AIAnalysisResult {
+  classification: string;  // What type of change
+  severity: string;        // How severe
+  explanation: string;     // Human-readable explanation
+}
+```
+
+<Callout type="info">
+  AI analysis only runs when a diff is detected. Passing tests skip the AI call entirely.
+</Callout>
+
+## Usage Patterns
+
+### Assert on Specific Properties
+
+```typescript
+const result = await visualTest(page, 'hero-section');
+
+// Basic pass/fail
+expect(result.passed).toBe(true);
+
+// Check diff percentage directly
+expect(result.diffPercentage).toBeLessThan(0.5);
+
+// Check AI classification
+if (result.ai) {
+  expect(result.ai.classification).not.toBe('regression');
+}
+```
+
+### Conditional AI Analysis
+
+Only run AI when needed to save API costs:
+
+```typescript
+const result = await visualTest(page, 'checkout', {
+  ai: false, // Disable AI
+});
+
+// Only run AI if diff detected
+if (!result.passed) {
+  const detailed = await visualTest(page, 'checkout', {
+    ai: { provider: 'openai', model: 'gpt-4o' },
+  });
+  console.log(detailed.ai?.explanation);
+}
+```
+
+### Multi-Viewport Testing
+
+```typescript
+const viewports = [
+  { width: 375, height: 812, name: 'mobile' },
+  { width: 768, height: 1024, name: 'tablet' },
+  { width: 1440, height: 900, name: 'desktop' },
+];
+
+for (const vp of viewports) {
+  test(`homepage @ ${vp.name}`, async ({ page }) => {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto('/');
+
+    const result = await visualTest(page, `homepage-${vp.name}`);
+    expect(result.passed).toBe(true);
+  });
+}
+```

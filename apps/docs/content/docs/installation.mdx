@@ -1,0 +1,139 @@
+---
+title: Installation
+description: Install Frontguard CLI and Playwright plugin in your project.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+# Installation
+
+Frontguard has two packages — install what you need:
+
+| Package | Use Case |
+|---------|----------|
+| `frontguard` | CLI for standalone visual regression testing |
+| `@frontguard/playwright` | Plugin for visual assertions inside Playwright tests |
+
+## CLI
+
+<Tabs items={['npm', 'pnpm', 'yarn', 'bun']}>
+  <Tab value="npm">
+    ```bash
+    npm install -D frontguard
+    ```
+  </Tab>
+  <Tab value="pnpm">
+    ```bash
+    pnpm add -D frontguard
+    ```
+  </Tab>
+  <Tab value="yarn">
+    ```bash
+    yarn add -D frontguard
+    ```
+  </Tab>
+  <Tab value="bun">
+    ```bash
+    bun add -D frontguard
+    ```
+  </Tab>
+</Tabs>
+
+Or run directly with `npx`:
+
+```bash
+npx frontguard run --url http://localhost:3000
+```
+
+## Playwright Plugin
+
+<Tabs items={['npm', 'pnpm', 'yarn', 'bun']}>
+  <Tab value="npm">
+    ```bash
+    npm install -D @frontguard/playwright
+    ```
+  </Tab>
+  <Tab value="pnpm">
+    ```bash
+    pnpm add -D @frontguard/playwright
+    ```
+  </Tab>
+  <Tab value="yarn">
+    ```bash
+    yarn add -D @frontguard/playwright
+    ```
+  </Tab>
+  <Tab value="bun">
+    ```bash
+    bun add -D @frontguard/playwright
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="info">
+  The Playwright plugin requires `@playwright/test` as a peer dependency. If you don't have it installed yet:
+  ```bash
+  npm install -D @playwright/test
+  npx playwright install
+  ```
+</Callout>
+
+## Prerequisites
+
+- **Node.js** 18 or later
+- **Playwright browsers** — installed via `npx playwright install`
+- **A running dev server** — Frontguard needs a URL to render against
+
+## Playwright Browsers
+
+Frontguard uses Playwright under the hood. Install the browsers you want to test with:
+
+```bash
+# Install all browsers
+npx playwright install
+
+# Install specific browsers
+npx playwright install chromium
+npx playwright install chromium firefox webkit
+```
+
+For CI environments, include system dependencies:
+
+```bash
+npx playwright install --with-deps chromium
+```
+
+## Environment Variables
+
+Set these optional environment variables for AI analysis and GitHub integration:
+
+```bash title=".env"
+# AI Analysis (BYOK — pick one)
+FRONTGUARD_OPENAI_KEY=sk-...
+FRONTGUARD_ANTHROPIC_KEY=...
+
+# GitHub PR comments
+GITHUB_TOKEN=ghp_...
+```
+
+<Callout type="warn">
+  Never commit API keys to source control. Use environment variables or a secrets manager.
+</Callout>
+
+## Verify Installation
+
+```bash
+npx frontguard --version
+```
+
+You should see output like:
+
+```
+frontguard v0.1.0
+```
+
+## Next Steps
+
+- [Quick Start](./quick-start) — Run your first visual regression test
+- [CLI Configuration](./cli/configuration) — Configure `frontguard.config.ts`

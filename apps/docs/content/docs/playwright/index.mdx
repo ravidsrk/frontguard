@@ -1,0 +1,60 @@
+---
+title: Playwright Plugin
+description: Use Frontguard visual assertions directly inside your Playwright tests.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Playwright Plugin
+
+`@frontguard/playwright` lets you add visual regression assertions directly inside your Playwright test files. Instead of running a separate CLI step, call `visualTest()` inline with your existing tests.
+
+## Why Use the Plugin?
+
+| Feature | CLI | Playwright Plugin |
+|---------|-----|-------------------|
+| Runs standalone | ✅ | ❌ |
+| Inside existing tests | ❌ | ✅ |
+| Per-assertion control | ❌ | ✅ |
+| Custom masking per test | Limited | ✅ |
+| AI analysis | ✅ | ✅ |
+| CI integration | ✅ | Via Playwright |
+
+Use the **CLI** for broad, app-wide regression testing. Use the **Playwright plugin** for targeted visual assertions inside specific test scenarios.
+
+## Quick Example
+
+```typescript title="tests/checkout.spec.ts"
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
+test('checkout page renders correctly', async ({ page }) => {
+  await page.goto('/checkout');
+  await page.fill('#email', 'test@example.com');
+
+  const result = await visualTest(page, 'checkout-filled', {
+    threshold: 0.01,
+    mask: ['.dynamic-timestamp'],
+    ai: true,
+  });
+
+  expect(result.passed).toBe(true);
+});
+```
+
+## How It Works
+
+1. `visualTest()` takes a screenshot of the current page state
+2. Compares it against a stored baseline (in `__visual_baselines__/` by default)
+3. If no baseline exists, creates one and returns `{ passed: true, isNewBaseline: true }`
+4. If a diff is detected and AI is enabled, sends both images for analysis
+5. Returns a typed `VisualTestResult` you can assert on
+
+<Callout type="info">
+  Baselines are stored locally in your project directory by default. Commit them to source control for team-wide consistency.
+</Callout>
+
+## Next Steps
+
+- [Setup & Installation](./setup) — Install and configure the plugin
+- [API Reference](./api) — Full API documentation for `visualTest()`

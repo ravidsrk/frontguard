@@ -1,0 +1,163 @@
+---
+title: Quick Start
+description: Run your first visual regression test with Frontguard in under 5 minutes.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+
+# Quick Start
+
+Get visual regression testing running in under 5 minutes.
+
+<Steps>
+
+<Step>
+## Initialize Configuration
+
+Run `frontguard init` in your project root. It auto-detects your framework (Next.js, Remix, SvelteKit, Nuxt, Astro) and generates a config file:
+
+```bash
+npx frontguard init
+```
+
+This creates `frontguard.config.ts`:
+
+```typescript title="frontguard.config.ts"
+export default {
+  version: 1,
+  baseUrl: 'http://localhost:3000',
+
+  discover: {
+    startUrl: '/',
+    maxDepth: 3,
+    exclude: ['/admin/*', '/api/*'],
+  },
+
+  viewports: [375, 768, 1440],
+  browsers: ['chromium'],
+  threshold: 0.1,
+
+  ignore: [
+    { selector: '.dynamic-timestamp' },
+  ],
+};
+```
+</Step>
+
+<Step>
+## Start Your Dev Server
+
+Frontguard needs a running application to screenshot:
+
+```bash
+npm run dev
+```
+
+Make sure your app is accessible at the `baseUrl` defined in your config.
+</Step>
+
+<Step>
+## Capture Baselines
+
+Your first run captures baseline screenshots — the "known good" state of your application:
+
+```bash
+npx frontguard run --url http://localhost:3000
+```
+
+Since there are no existing baselines, all pages are marked as **NEW** and saved automatically.
+
+```
+ frontguard v0.1.0
+
+ 🔍 Discovering routes... found 12 routes
+ 🖥  Rendering 12 routes × 3 viewports
+
+ ───────────────────────────────────────────
+  RESULTS                        12 routes
+ ───────────────────────────────────────────
+  ★ /                375  768  1440   NEW
+  ★ /about           375  768  1440   NEW
+  ★ /pricing         375  768  1440   NEW
+ ───────────────────────────────────────────
+
+  0 regressions · 0 warnings · 0 passed · 12 new
+```
+</Step>
+
+<Step>
+## Make Changes and Re-run
+
+Now make a CSS or layout change in your code, then run Frontguard again:
+
+```bash
+npx frontguard run --url http://localhost:3000
+```
+
+Frontguard compares the new screenshots against your baselines and reports differences:
+
+```
+ ───────────────────────────────────────────
+  RESULTS                        12 routes
+ ───────────────────────────────────────────
+  ✓ /                375  768  1440   PASS
+  ✓ /about           375  768  1440   PASS
+  ✘ /pricing         375  768  1440   REGRESSION
+ ───────────────────────────────────────────
+
+  ✘ /pricing @ 375px
+    AI: "Button width changed from 100% to auto,
+         causing text truncation on mobile."
+    Severity: 🔴 Critical (confidence: 94%)
+
+  1 regression · 0 warnings · 11 passed · 0 new
+```
+</Step>
+
+<Step>
+## Update Baselines
+
+When changes are intentional, accept the new screenshots as baselines:
+
+```bash
+npx frontguard update-baselines
+```
+
+This replaces old baselines with the current screenshots. Future runs compare against this new state.
+</Step>
+
+</Steps>
+
+## What Happens Under the Hood
+
+1. **Route Discovery** — Frontguard crawls your app starting from the start URL, discovering all navigable pages
+2. **Smart Filtering** — If a dependency graph is available, only pages affected by your changes are rendered
+3. **Multi-Viewport Rendering** — Each route is captured at every configured viewport width using Playwright
+4. **Pixel Diff** — Screenshots are compared against baselines using `pixelmatch` with SSIM fallback
+5. **AI Analysis** — If configured, visual diffs are sent to GPT-4V or Claude for classification and explanation
+6. **Reporting** — Results are output to console, JSON, HTML report, and optionally as a GitHub PR comment
+
+<Callout type="info">
+  The pipeline uses error boundaries at every stage. If one page fails to render, the rest still complete.
+</Callout>
+
+## Add to Your Scripts
+
+Add Frontguard to your `package.json` scripts for easy access:
+
+```json title="package.json"
+{
+  "scripts": {
+    "test:visual": "frontguard run --url http://localhost:3000",
+    "test:visual:update": "frontguard update-baselines"
+  }
+}
+```
+
+## Next Steps
+
+- [CLI Commands](./cli/commands) — All available commands and options
+- [Configuration](./cli/configuration) — Full config file reference
+- [CI/CD Integration](./ci-cd) — Run in GitHub Actions
+- [AI Analysis](./guides/ai-analysis) — Enable AI-powered regression explanations

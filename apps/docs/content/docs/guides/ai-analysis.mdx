@@ -1,0 +1,175 @@
+---
+title: AI Analysis
+description: Enable AI-powered regression explanations with OpenAI or Anthropic. Understand why visual changes happened.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+# AI Analysis
+
+Frontguard's AI analysis goes beyond "pixels differ" — it explains **why** a visual change happened, classifies it, and suggests fixes. This is the core differentiator: instead of a red-highlighted diff image, you get a human-readable explanation.
+
+## How It Works
+
+When a visual diff is detected:
+
+1. Both the baseline and current screenshots are sent to an AI vision model
+2. The model analyzes structural changes, layout shifts, color differences, and missing elements
+3. It returns a classification, severity, explanation, and optional suggested fix
+
+```
+  ✘ /dashboard @ 375px
+    AI: "Sidebar overlaps main content on mobile.
+         flex-direction change in Dashboard.module.css:28"
+    Severity: 🔴 Critical (confidence: 94%)
+```
+
+## Supported Providers
+
+<Tabs items={['OpenAI', 'Anthropic']}>
+  <Tab value="OpenAI">
+    Set the `FRONTGUARD_OPENAI_KEY` environment variable:
+    ```bash
+    export FRONTGUARD_OPENAI_KEY=sk-...
+    ```
+
+    Recommended models:
+    - `gpt-4o` — Best accuracy, supports vision
+    - `gpt-4o-mini` — Faster, lower cost
+  </Tab>
+  <Tab value="Anthropic">
+    Set the `FRONTGUARD_ANTHROPIC_KEY` environment variable:
+    ```bash
+    export FRONTGUARD_ANTHROPIC_KEY=sk-ant-...
+    ```
+
+    Recommended models:
+    - `claude-sonnet-4-20250514` — Best accuracy
+    - `claude-3-5-haiku-20241022` — Faster, lower cost
+  </Tab>
+</Tabs>
+
+## Configuration
+
+### CLI
+
+```typescript title="frontguard.config.ts"
+export default {
+  // ...other config
+  ai: {
+    provider: 'openai',
+    model: 'gpt-4o',
+  },
+};
+```
+
+### Playwright Plugin
+
+```typescript title="tests/visual.spec.ts"
+import { visualTest } from '@frontguard/playwright';
+
+const result = await visualTest(page, 'checkout', {
+  ai: { provider: 'openai', model: 'gpt-4o' },
+});
+```
+
+Or simply enable with defaults:
+
+```typescript
+const result = await visualTest(page, 'checkout', {
+  ai: true, // Uses OpenAI by default
+});
+```
+
+## AI Response Types
+
+### Classification
+
+| Classification | Description |
+|---------------|-------------|
+| `regression` | Unintentional visual break — something is wrong |
+| `intentional` | Deliberate design change — looks correct |
+| `content_update` | Dynamic content changed (text, images) — not a code issue |
+
+### Severity
+
+| Severity | Icon | Description |
+|----------|------|-------------|
+| `critical` | 🔴 | Major layout break, content hidden, unusable UI |
+| `warning` | 🟡 | Minor visual shift, spacing change, color tweak |
+| `info` | 🟢 | Cosmetic change, likely intentional |
+
+### Confidence
+
+A 0–1 score indicating how confident the AI is in its classification. Scores above 0.8 are high-confidence.
+
+### Suggested Fix
+
+When a regression is detected, the AI may suggest a CSS fix:
+
+```
+AI: "Button padding changed from 16px to 8px in Header.module.css.
+     Suggested fix: Restore padding to `padding: 16px 24px` in line 42."
+```
+
+<Callout type="info">
+  AI suggestions are advisory. Always review changes in context before applying fixes.
+</Callout>
+
+## Cost Optimization
+
+AI analysis only runs on pages with detected visual diffs. Pages that pass pixel comparison are never sent to the AI.
+
+For large test suites, optimize costs by:
+
+1. **Using a fast gate**: Frontguard's pixel diff catches 90%+ of pages as passing — those never hit the AI
+2. **Choosing the right model**: `gpt-4o-mini` or `claude-3-5-haiku` for initial triage, full models for PR-blocking checks
+3. **Limiting viewports**: Only run AI on the primary viewport if costs are a concern
+
+```typescript title="Cost-optimized config"
+export default {
+  // ...
+  ai: {
+    provider: 'openai',
+    model: 'gpt-4o-mini', // Lower cost, still good accuracy
+  },
+  viewports: [1440], // Only desktop for AI analysis
+};
+```
+
+## Validating AI Accuracy
+
+Frontguard includes validation scripts to measure AI classification accuracy:
+
+### Synthetic Validation
+
+10 programmatic before/after screenshot pairs with known ground truth:
+
+```bash
+export FRONTGUARD_OPENAI_KEY=sk-...
+npx tsx scripts/validate-ai.ts
+```
+
+### Real-World Validation
+
+Validates against actual GitHub PRs with the full rendering pipeline:
+
+```bash
+npx tsx scripts/validate-ai-real.ts --repo shadcn-ui/ui --pr 1234
+npx tsx scripts/validate-ai-real.ts --batch ground-truth/cases.json
+```
+
+Results are saved to `validation-results/` as JSON for tracking accuracy over time.
+
+## BYOK — Bring Your Own Key
+
+Frontguard never stores, proxies, or logs your API keys. Keys are:
+- Read from environment variables at runtime
+- Passed directly to provider SDKs
+- Redacted from all log output and error messages
+- Never written to config files or reports
+
+<Callout type="warn">
+  API keys are redacted in all Frontguard output via the built-in redaction system. If you see a key in output, file a bug.
+</Callout>

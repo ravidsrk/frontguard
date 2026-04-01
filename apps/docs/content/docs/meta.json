@@ -1,0 +1,15 @@
+{
+  "title": "Docs",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "installation",
+    "quick-start",
+    "---Reference---",
+    "cli",
+    "playwright",
+    "---Guides---",
+    "ci-cd",
+    "guides"
+  ]
+}

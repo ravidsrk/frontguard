@@ -1,0 +1,258 @@
+---
+title: Custom Plugins
+description: Build custom Frontguard plugins using the lifecycle hook system.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Custom Plugins
+
+Frontguard ships with a plugin architecture that lets you extend every stage of the pipeline. Plugins hook into lifecycle events to add custom behavior — Slack notifications, Figma design checks, performance monitoring, and more.
+
+## Built-in Plugins
+
+Frontguard includes 3 built-in plugins:
+
+| Plugin | Import | Description |
+|--------|--------|-------------|
+| **Figma** | `frontguard/plugins` | Design-to-code comparison via Figma API |
+| **Performance Budgets** | `frontguard/plugins` | Bundle size & Web Vitals (LCP/FID/CLS) |
+| **Monitor** | `frontguard/plugins` | Production visual monitoring with alerting |
+
+```typescript title="Using a built-in plugin"
+import { figmaPlugin } from 'frontguard/plugins';
+
+export default {
+  // ...base config
+  plugins: [
+    figmaPlugin({ fileKey: 'your-figma-file-key' }),
+  ],
+};
+```
+
+## Plugin Interface
+
+A plugin is an object implementing the `FrontguardPlugin` interface:
+
+```typescript
+interface FrontguardPlugin {
+  /** Unique plugin identifier */
+  name: string;
+
+  /** Called once before the pipeline starts */
+  setup?(ctx: PluginContext): Promise<void> | void;
+
+  /** Called before route discovery — can modify config */
+  beforeDiscover?(config: FrontguardConfig): FrontguardConfig | Promise<FrontguardConfig>;
+
+  /** Called after route discovery — can modify routes */
+  afterDiscover?(routes: Route[], config: FrontguardConfig): Route[] | Promise<Route[]>;
+
+  /** Called before rendering — can modify routes or config */
+  beforeRender?(input: {
+    routes: Route[];
+    config: FrontguardConfig;
+  }): { routes: Route[]; config: FrontguardConfig } | Promise<{ routes: Route[]; config: FrontguardConfig }>;
+
+  /** Called after all screenshots are captured */
+  afterRender?(screenshots: ScreenshotResult[], ctx: PluginContext): ScreenshotResult[] | void;
+
+  /** Called after all pixel comparisons complete */
+  afterCompare?(diffs: DiffResult[], ctx: PluginContext): DiffResult[] | void;
+
+  /** Called after the entire pipeline finishes */
+  afterRun?(result: RunResult, ctx: PluginContext): Promise<void> | void;
+
+  /** Called on pipeline error — return true to suppress */
+  onError?(error: Error, stage: string): boolean | void;
+
+  /** Called once after pipeline finishes for cleanup */
+  teardown?(): Promise<void> | void;
+}
+```
+
+## Plugin Context
+
+Plugins receive a `PluginContext` in their `setup`, `afterRender`, `afterCompare`, and `afterRun` hooks:
+
+```typescript
+interface PluginContext {
+  /** The resolved Frontguard config */
+  config: FrontguardConfig;
+
+  /** Logger instance for structured output */
+  logger: Logger;
+
+  /** Shared key-value store for passing data between hooks */
+  metadata: Map<string, unknown>;
+}
+```
+
+The `metadata` map lets plugins share data across hooks. For example, a Figma plugin might fetch design images in `setup` and compare them in `afterRender`.
+
+## Lifecycle Hooks
+
+Hooks are called in this order:
+
+```
+setup → beforeDiscover → afterDiscover → beforeRender →
+afterRender → afterCompare → afterRun → teardown
+```
+
+All hooks are optional. Implement only what you need.
+
+### Value Transforms
+
+Hooks that return a value replace the input for the next plugin in the chain:
+
+```typescript
+// Plugin A filters routes
+afterDiscover(routes) {
+  return routes.filter(r => !r.path.startsWith('/admin'));
+}
+
+// Plugin B receives the filtered routes
+afterDiscover(routes) {
+  console.log(routes); // No /admin routes
+}
+```
+
+If a hook returns `void` or `undefined`, the original value passes through unchanged.
+
+## Example: Slack Notification Plugin
+
+```typescript title="plugins/slack.ts"
+import type { FrontguardPlugin, RunResult, PluginContext } from 'frontguard';
+
+export function slackPlugin(webhookUrl: string): FrontguardPlugin {
+  return {
+    name: 'slack',
+
+    async afterRun(result: RunResult, ctx: PluginContext) {
+      const { summary } = result;
+
+      if (summary.regressions === 0) return; // Only notify on regressions
+
+      const message = {
+        text: `🔴 Frontguard: ${summary.regressions} visual regression(s) detected`,
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: [
+                `*Visual Regression Report*`,
+                `• ${summary.total} tested`,
+                `• ${summary.passed} passed`,
+                `• ${summary.regressions} regressions`,
+                `• ${summary.warnings} warnings`,
+              ].join('\n'),
+            },
+          },
+        ],
+      };
+
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message),
+      });
+
+      ctx.logger.info('Slack notification sent');
+    },
+  };
+}
+```
+
+Use it in your config:
+
+```typescript title="frontguard.config.ts"
+import { slackPlugin } from './plugins/slack';
+
+export default {
+  // ...base config
+  plugins: [
+    slackPlugin('https://hooks.slack.com/services/...'),
+  ],
+};
+```
+
+## Example: Route Filter Plugin
+
+```typescript title="plugins/route-filter.ts"
+import type { FrontguardPlugin, Route, FrontguardConfig } from 'frontguard';
+
+export function routeFilterPlugin(patterns: string[]): FrontguardPlugin {
+  return {
+    name: 'route-filter',
+
+    afterDiscover(routes: Route[], config: FrontguardConfig) {
+      return routes.filter(route => {
+        return !patterns.some(pattern => {
+          const regex = new RegExp(pattern.replace('*', '.*'));
+          return regex.test(route.path);
+        });
+      });
+    },
+  };
+}
+```
+
+## Example: Error Suppression Plugin
+
+```typescript title="plugins/ignore-errors.ts"
+import type { FrontguardPlugin } from 'frontguard';
+
+export function ignoreTimeoutErrors(): FrontguardPlugin {
+  return {
+    name: 'ignore-timeouts',
+
+    onError(error: Error, stage: string) {
+      if (error.message.includes('timeout') && stage === 'render') {
+        return true; // Suppress timeout errors during render
+      }
+      // Return void/false to let error propagate
+    },
+  };
+}
+```
+
+## Plugin Execution Order
+
+- Plugins are called in **registration order** (array order in config)
+- `teardown` is called in **reverse order** (LIFO)
+- If a plugin's `setup` throws, the pipeline aborts
+- If a plugin's `teardown` throws, the error is logged but other plugins still clean up
+
+<Callout type="info">
+  Plugin names must be unique. Registering two plugins with the same name throws an error.
+</Callout>
+
+## Testing Plugins
+
+Since plugins are plain objects, they're easy to unit test:
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { slackPlugin } from './plugins/slack';
+
+describe('slack plugin', () => {
+  it('has the correct name', () => {
+    const plugin = slackPlugin('https://hooks.slack.com/test');
+    expect(plugin.name).toBe('slack');
+  });
+
+  it('only notifies on regressions', async () => {
+    const plugin = slackPlugin('https://hooks.slack.com/test');
+    const mockResult = {
+      summary: { total: 10, passed: 10, regressions: 0, warnings: 0, newPages: 0, errors: 0 },
+      diffs: [],
+      timing: { discovery: 0, render: 0, compare: 0, ai: 0, total: 0 },
+      config: {} as any,
+    };
+
+    // Should not throw or call fetch
+    await plugin.afterRun?.(mockResult, {} as any);
+  });
+});
+```

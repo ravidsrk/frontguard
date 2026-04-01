@@ -1,0 +1,171 @@
+---
+title: CLI Commands
+description: Complete reference for all Frontguard CLI commands, flags, and options.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# CLI Commands
+
+Frontguard provides three commands: `run`, `init`, and `update-baselines`.
+
+## `frontguard run`
+
+The default command. Runs the visual regression testing pipeline.
+
+```bash
+frontguard run [options]
+```
+
+### Options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-u, --url <url>` | Base URL to test | From config |
+| `-r, --routes <routes>` | Comma-separated routes to test | Auto-discovered |
+| `-v, --viewports <widths>` | Comma-separated viewport widths | `375,768,1440` |
+| `-b, --browsers <engines>` | Comma-separated browsers | `chromium` |
+| `-c, --config <path>` | Path to config file | Auto-detected |
+| `-o, --output <format>` | Output format: `console`, `json` | `console` |
+| `-t, --threshold <n>` | Pixel diff threshold percentage (0-100) | `0.1` |
+| `--verbose` | Verbose output | `false` |
+| `--debug` | Debug output with Playwright traces | `false` |
+| `--update-baselines` | Accept current screenshots as baselines | `false` |
+
+### Examples
+
+```bash title="Basic usage"
+frontguard run --url http://localhost:3000
+```
+
+```bash title="Test specific routes"
+frontguard run --url http://localhost:3000 --routes /,/pricing,/checkout
+```
+
+```bash title="Multi-browser testing"
+frontguard run --url http://localhost:3000 --browsers chromium,firefox,webkit
+```
+
+```bash title="Custom viewports"
+frontguard run --url http://localhost:3000 --viewports 320,768,1920
+```
+
+```bash title="JSON output for CI parsing"
+frontguard run --url http://localhost:3000 --output json
+```
+
+```bash title="Stricter threshold"
+frontguard run --url http://localhost:3000 --threshold 0.01
+```
+
+<Callout type="info">
+  The threshold value works as a percentage. Values over 1 are automatically converted: `--threshold 5` becomes `0.05` (5%).
+</Callout>
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | All tests passed (or only warnings/new pages) |
+| `1` | Regressions detected |
+| `2` | Pipeline errors (but no regressions) |
+
+---
+
+## `frontguard init`
+
+Generates a starter `frontguard.config.ts` file. Auto-detects your framework and creates sensible defaults.
+
+```bash
+frontguard init
+```
+
+This creates a config file in your project root with:
+- Framework-appropriate settings (Next.js, Remix, SvelteKit, Nuxt, Astro)
+- Default viewports (mobile, tablet, desktop)
+- Route discovery configuration
+- Common ignore rules for dynamic content
+
+---
+
+## `frontguard update-baselines`
+
+Accepts the current screenshots as the new baselines. Run this after intentional visual changes.
+
+```bash
+frontguard update-baselines
+```
+
+This command:
+1. Renders all routes at all configured viewports
+2. Saves the screenshots as the new baseline set
+3. Updates the baseline manifest
+
+<Callout type="warn">
+  This overwrites existing baselines. Make sure the current state of your app is correct before running this command.
+</Callout>
+
+---
+
+## Global Options
+
+These options work with all commands:
+
+| Flag | Description |
+|------|-------------|
+| `--version` | Print Frontguard version |
+| `--help` | Show help for a command |
+
+```bash
+frontguard --version
+frontguard run --help
+```
+
+---
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `FRONTGUARD_OPENAI_KEY` | OpenAI API key for AI analysis |
+| `FRONTGUARD_ANTHROPIC_KEY` | Anthropic API key for AI analysis |
+| `GITHUB_TOKEN` | GitHub token for PR comments |
+| `FRONTGUARD_DEBUG` | Set to `1` for full stack traces on errors |
+| `FRONTGUARD_UPDATE` | Set to `1` to force baseline updates (used by Playwright plugin) |
+
+---
+
+## Output Formats
+
+### Console (default)
+
+Human-readable output with color-coded statuses, ASCII tables, and AI analysis summaries.
+
+### JSON
+
+Machine-readable JSON output for CI/CD integration. The JSON structure follows the `RunResult` type:
+
+```json title="JSON output structure"
+{
+  "summary": {
+    "total": 36,
+    "passed": 33,
+    "regressions": 1,
+    "warnings": 1,
+    "newPages": 1,
+    "errors": 0
+  },
+  "diffs": [...],
+  "timing": {
+    "discovery": 1200,
+    "render": 8500,
+    "compare": 300,
+    "ai": 2100,
+    "total": 12100
+  }
+}
+```
+
+### HTML Report
+
+An HTML report is automatically generated in the `outputDir` (default: `./frontguard-report/`) regardless of the output format. It includes side-by-side screenshot comparisons, diff overlays, and AI analysis details.
