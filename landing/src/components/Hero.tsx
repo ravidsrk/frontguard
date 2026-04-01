@@ -42,7 +42,7 @@ background:
 <div
 className="animate-fade-up inline-flex w-fit items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-4 py-1.5 text-xs font-medium text-[var(--color-text-muted)]"
 >
-<span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" />
+<span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" aria-hidden="true" />
 Open source · MIT Licensed
 </div>
 
@@ -69,7 +69,7 @@ style={{ animationDelay: '300ms' }}
 >
 <a
 href="#getting-started"
-className="touch-manipulation inline-flex items-center gap-2 rounded-lg bg-[var(--color-cta)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-500/20 transition-[background-color,box-shadow] hover:bg-[var(--color-cta-hover)] hover:shadow-orange-500/30"
+className="touch-manipulation inline-flex items-center gap-2 rounded-lg bg-[var(--color-cta)] px-6 py-3 text-sm font-semibold text-[var(--color-bg)] shadow-lg shadow-orange-500/20 transition-[background-color,box-shadow] hover:bg-[var(--color-cta-hover)] hover:shadow-orange-500/30"
 >
 Install in 30 Seconds
 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -106,7 +106,7 @@ background:
 }}
 />
 
-<div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
+<div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)]" role="img" aria-label="Terminal demo showing Frontguard detecting a visual regression: the checkout page submit button overflows its container on mobile at 375px width, with an AI-suggested fix to add overflow hidden to the checkout form.">
 {/* Title bar */}
 <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-4 py-3">
 <span className="h-3 w-3 rounded-full bg-[#ef4444]/60" />

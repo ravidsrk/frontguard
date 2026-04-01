@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useInView } from '../hooks/useInView';
 
 type Tab = 'cli' | 'playwright';
@@ -49,8 +49,9 @@ return (
 </span>
 <button
 onClick={handleCopy}
-className="touch-manipulation rounded px-2 py-1 font-[family-name:var(--font-mono)] text-xs text-[var(--color-text-dim)] transition-colors hover:text-[var(--color-text)]"
-aria-label="Copy code to clipboard"
+className="touch-manipulation rounded px-2 py-1 font-[family-name:var(--font-mono)] text-xs text-[var(--color-text-dim)] transition-colors hover:text-[var(--color-text)] min-h-[44px] min-w-[44px] flex items-center justify-center"
+aria-label={`Copy ${filename} code to clipboard`}
+aria-live="polite"
 >
 {copied ? 'Copied!' : 'Copy'}
 </button>
@@ -67,14 +68,38 @@ aria-label="Copy code to clipboard"
 export default function GettingStarted() {
 const { ref, inView } = useInView();
 const [tab, setTab] = useState<Tab>('cli');
+const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ cli: null, playwright: null });
+const tabs: Tab[] = ['cli', 'playwright'];
+
+const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, currentTab: Tab) => {
+const currentIndex = tabs.indexOf(currentTab);
+let nextIndex: number | null = null;
+
+if (e.key === 'ArrowRight') {
+nextIndex = (currentIndex + 1) % tabs.length;
+} else if (e.key === 'ArrowLeft') {
+nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+} else if (e.key === 'Home') {
+nextIndex = 0;
+} else if (e.key === 'End') {
+nextIndex = tabs.length - 1;
+}
+
+if (nextIndex !== null) {
+e.preventDefault();
+const nextTab = tabs[nextIndex];
+setTab(nextTab);
+tabRefs.current[nextTab]?.focus();
+}
+};
 
 return (
-<section ref={ref} id="getting-started" className="py-24 lg:py-32">
+<section ref={ref} id="getting-started" aria-labelledby="getting-started-heading" className="py-24 lg:py-32">
 <div className="mx-auto max-w-3xl px-6 lg:px-8">
 <div
 className={`mb-12 text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
+<h2 id="getting-started-heading" className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
 Start catching visual bugs{' '}
 <span className="text-[var(--color-accent)]">in 30 seconds</span>
 </h2>
@@ -85,11 +110,22 @@ className={inView ? 'animate-fade-up' : 'opacity-0'}
 style={{ animationDelay: '150ms' }}
 >
 {/* Tabs */}
-<div className="mb-6 flex gap-1 rounded-lg bg-[var(--color-bg-elevated)] p-1">
-{(['cli', 'playwright'] as const).map((t) => (
+<div
+className="mb-6 flex gap-1 rounded-lg bg-[var(--color-bg-elevated)] p-1"
+role="tablist"
+aria-label="Installation method"
+>
+{tabs.map((t) => (
 <button
 key={t}
+ref={(el) => { tabRefs.current[t] = el; }}
+role="tab"
+id={`tab-${t}`}
+aria-selected={tab === t}
+aria-controls={`tabpanel-${t}`}
+tabIndex={tab === t ? 0 : -1}
 onClick={() => setTab(t)}
+onKeyDown={(e) => handleTabKeyDown(e, t)}
 className={`touch-manipulation flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
 tab === t
 ? 'bg-[var(--color-bg-card)] text-[var(--color-text)] shadow-sm'
@@ -101,9 +137,18 @@ tab === t
 ))}
 </div>
 
-{/* Tab content */}
-<div className="flex flex-col gap-4">
-{tab === 'cli' ? (
+{/* Tab panels */}
+{tabs.map((t) => (
+<div
+key={t}
+role="tabpanel"
+id={`tabpanel-${t}`}
+aria-labelledby={`tab-${t}`}
+hidden={tab !== t}
+tabIndex={0}
+className="flex flex-col gap-4"
+>
+{t === 'cli' ? (
 <CodeBlock code={cliCode} filename="terminal" />
 ) : (
 <>
@@ -112,6 +157,7 @@ tab === t
 </>
 )}
 </div>
+))}
 </div>
 </div>
 </section>

@@ -64,12 +64,12 @@ export default function Pricing() {
 const { ref, inView } = useInView();
 
 return (
-<section ref={ref} id="pricing" className="border-t border-[var(--color-border)] py-24 lg:py-32">
+<section ref={ref} id="pricing" aria-labelledby="pricing-heading" className="border-t border-[var(--color-border)] py-24 lg:py-32">
 <div className="mx-auto max-w-7xl px-6 lg:px-8">
 <div
 className={`mb-16 text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
+<h2 id="pricing-heading" className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
 Simple pricing.{' '}
 <span className="text-[var(--color-text-muted)]">
 No per-screenshot fees. Ever.
@@ -142,7 +142,7 @@ aria-hidden="true"
 href="#getting-started"
 className={`touch-manipulation block w-full rounded-lg px-4 py-3 text-center text-sm font-semibold transition-colors ${
 tier.highlighted
-? 'bg-[var(--color-cta)] text-white hover:bg-[var(--color-cta-hover)]'
+? 'bg-[var(--color-cta)] text-[var(--color-bg)] hover:bg-[var(--color-cta-hover)]'
 : 'border border-[var(--color-border)] text-[var(--color-text)] hover:border-[var(--color-border-bright)] hover:bg-[var(--color-bg-card-hover)]'
 }`}
 >

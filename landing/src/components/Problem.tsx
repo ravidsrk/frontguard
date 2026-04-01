@@ -44,9 +44,10 @@ export default function Problem() {
 const { ref, inView } = useInView();
 
 return (
-<section ref={ref} className="py-24 lg:py-32">
+<section ref={ref} id="problem" aria-labelledby="problem-heading" className="py-24 lg:py-32">
 <div className="mx-auto max-w-7xl px-6 lg:px-8">
 <h2
+id="problem-heading"
 className={`mx-auto max-w-3xl text-center font-[family-name:var(--font-display)] text-3xl font-bold leading-tight tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
 Your CI catches code bugs.{' '}

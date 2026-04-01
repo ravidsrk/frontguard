@@ -46,12 +46,12 @@ export default function Comparison() {
 const { ref, inView } = useInView();
 
 return (
-<section ref={ref} className="border-t border-[var(--color-border)] py-24 lg:py-32">
+<section ref={ref} id="comparison" aria-labelledby="comparison-heading" className="border-t border-[var(--color-border)] py-24 lg:py-32">
 <div className="mx-auto max-w-5xl px-6 lg:px-8">
 <div
 className={`mb-16 text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
+<h2 id="comparison-heading" className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
 Why not Percy? Or Chromatic?{' '}
 <span className="text-[var(--color-text-muted)]">
 Or just Playwright screenshots?
@@ -64,6 +64,7 @@ className={`overflow-x-auto ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 style={{ animationDelay: '200ms' }}
 >
 <table className="w-full min-w-[600px]">
+<caption className="sr-only">Feature comparison between Frontguard, Percy, Chromatic, and Playwright screenshot testing</caption>
 <thead>
 <tr className="border-b border-[var(--color-border)]">
 <th className="pb-4 pr-4 text-left text-sm font-medium text-[var(--color-text-dim)]">

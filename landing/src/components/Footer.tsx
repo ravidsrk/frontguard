@@ -27,7 +27,7 @@ const footerColumns = [
 
 export default function Footer() {
   return (
-    <footer className="border-t border-[var(--color-border)] py-16">
+    <footer className="border-t border-[var(--color-border)] py-16" role="contentinfo">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="grid gap-12 md:grid-cols-4">
           {/* Logo + tagline */}
@@ -45,16 +45,16 @@ export default function Footer() {
 
           {/* Link columns */}
           {footerColumns.map((column) => (
-            <div key={column.title}>
+            <nav key={column.title} aria-label={`${column.title} links`}>
               <h4 className="mb-4 text-sm font-semibold text-[var(--color-text)] [text-wrap:balance]">
                 {column.title}
               </h4>
-              <ul className="flex flex-col gap-3">
+              <ul className="flex flex-col gap-1">
                 {column.links.map((link) => (
                   <li key={link.label}>
                     <a
                       href={link.href}
-                      className="text-sm text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
+                      className="inline-flex min-h-[44px] items-center text-sm text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
                       {...('external' in link && link.external
                         ? { target: '_blank', rel: 'noopener noreferrer' }
                         : {})}
@@ -64,7 +64,7 @@ export default function Footer() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </nav>
           ))}
         </div>
 

@@ -12,7 +12,7 @@ export default function SocialProof() {
 const { ref, inView } = useInView();
 
 return (
-<section ref={ref} className="border-y border-[var(--color-border)] py-16">
+<section ref={ref} aria-label="Project statistics" className="border-y border-[var(--color-border)] py-16">
 <div className="mx-auto max-w-7xl px-6 lg:px-8">
 <p
 className={`mb-10 text-center text-sm font-medium tracking-wide text-[var(--color-text-dim)] uppercase ${inView ? 'animate-fade-in' : 'opacity-0'}`}

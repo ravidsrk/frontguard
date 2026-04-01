@@ -4,7 +4,7 @@ export default function FinalCTA() {
 const { ref, inView } = useInView();
 
 return (
-<section ref={ref} className="relative overflow-hidden py-24 lg:py-32">
+<section ref={ref} aria-labelledby="final-cta-heading" className="relative overflow-hidden py-24 lg:py-32">
 {/* Background glow */}
 <div
 className="pointer-events-none absolute inset-0 -z-10 opacity-40"
@@ -18,7 +18,7 @@ background:
 <div
 className={`flex flex-col items-center gap-6 ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 className="font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-5xl">
+<h2 id="final-cta-heading" className="font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-5xl">
 Never find out about CSS bugs from your users again
 </h2>
 <p className="max-w-xl text-lg text-[var(--color-text-muted)]">
@@ -26,7 +26,7 @@ Install Frontguard in 30 seconds. Catch the bugs that pixel diffs miss.
 </p>
 <a
 href="#getting-started"
-className="touch-manipulation mt-2 inline-flex items-center gap-2 rounded-xl bg-[var(--color-cta)] px-8 py-4 text-base font-semibold text-white shadow-lg shadow-orange-500/20 transition-[background-color,box-shadow] hover:bg-[var(--color-cta-hover)] hover:shadow-orange-500/30"
+className="touch-manipulation mt-2 inline-flex items-center gap-2 rounded-xl bg-[var(--color-cta)] px-8 py-4 text-base font-semibold text-[var(--color-bg)] shadow-lg shadow-orange-500/20 transition-[background-color,box-shadow] hover:bg-[var(--color-cta-hover)] hover:shadow-orange-500/30"
 >
 Get Started — It{'\u2019'}s Free
 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

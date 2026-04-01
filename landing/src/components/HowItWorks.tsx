@@ -34,12 +34,12 @@ export default function HowItWorks() {
 const { ref, inView } = useInView();
 
 return (
-<section ref={ref} className="border-t border-[var(--color-border)] py-24 lg:py-32">
+<section ref={ref} id="how-it-works" aria-labelledby="how-it-works-heading" className="border-t border-[var(--color-border)] py-24 lg:py-32">
 <div className="mx-auto max-w-7xl px-6 lg:px-8">
 <div
 className={`mb-16 ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
+<h2 id="how-it-works-heading" className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-4xl">
 Add visual testing to Playwright{' '}
 <span className="text-[var(--color-accent)]">in 3 lines.</span>
 </h2>
