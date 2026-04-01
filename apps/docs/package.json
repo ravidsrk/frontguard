@@ -1,5 +1,5 @@
 {
-  "name": "frontguard-docs",
+  "name": "@frontguard/docs",
   "private": true,
   "scripts": {
     "dev": "vitepress dev",

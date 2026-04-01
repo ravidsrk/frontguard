@@ -6,6 +6,6 @@ auth.json
 .env
 .env.*
 *.log
-/core
+core
 .frontguard/
 frontguard-report/
