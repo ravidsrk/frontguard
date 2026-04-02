@@ -21,9 +21,9 @@ declare module 'pixelmatch' {
    * @returns Number of mismatched pixels.
    */
   function pixelmatch(
-    img1: Buffer | Uint8Array | Uint8ClampedArray,
-    img2: Buffer | Uint8Array | Uint8ClampedArray,
-    output: Buffer | Uint8Array | Uint8ClampedArray | null,
+    img1: Uint8Array | Uint8ClampedArray,
+    img2: Uint8Array | Uint8ClampedArray,
+    output: Uint8Array | Uint8ClampedArray | null,
     width: number,
     height: number,
     options?: PixelmatchOptions,
