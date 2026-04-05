@@ -15,9 +15,22 @@
     "build:landing": "npm run build --workspace=apps/landing",
     "build:docs": "npm run build --workspace=apps/docs",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0"
+  },
+  "lint-staged": {
+    "packages/cli/src/**/*.ts": [
+      "eslint --fix --config packages/cli/eslint.config.js"
+    ],
+    "apps/landing/src/**/*.{ts,tsx}": [
+      "eslint --fix --config apps/landing/eslint.config.js"
+    ]
   }
 }

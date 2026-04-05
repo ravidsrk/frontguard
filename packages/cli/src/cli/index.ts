@@ -20,6 +20,17 @@ import type { FrontguardConfig, Reporter, BrowserEngine } from '../core/types.js
 import { writeFileSync, readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// Global error handlers
+process.on('unhandledRejection', (reason) => {
+  console.error('[frontguard] Unhandled promise rejection:', reason instanceof Error ? reason.message : reason);
+  process.exitCode = 1;
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[frontguard] Uncaught exception:', error.message);
+  process.exit(1);
+});
+
 // ---------------------------------------------------------------------------
 // Version (read from package.json at build time, fallback to hardcoded)
 // ---------------------------------------------------------------------------
@@ -398,4 +409,7 @@ export async function main(argv?: string[]): Promise<number> {
 // Auto-run when executed directly (not imported)
 // ---------------------------------------------------------------------------
 
-main(process.argv).then((code) => process.exit(code)).catch(() => process.exit(2));
+main(process.argv).then((code) => process.exit(code)).catch((err) => {
+  console.error('[frontguard] Fatal:', err instanceof Error ? err.message : err);
+  process.exit(2);
+});

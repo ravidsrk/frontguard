@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@daytonaio/sdk": "^0.158.0",
-    "hono": "^4.12.9"
+    "hono": "^4.12.9",
+    "zod": "^3.25.67"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

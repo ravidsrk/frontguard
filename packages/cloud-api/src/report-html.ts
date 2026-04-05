@@ -218,7 +218,8 @@ export function generateReportHtml(run: Run): string {
           status.innerHTML = '<span style="color:#f87171;">Failed to approve baselines.</span>';
         }
       } catch (err) {
-        status.innerHTML = '<span style="color:#f87171;">Error: ' + err.message + '</span>';
+        const msg = (err.message || 'Unknown error').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        status.innerHTML = '<span style="color:#f87171;">Error: ' + msg + '</span>';
       } finally {
         btn.disabled = false;
       }
