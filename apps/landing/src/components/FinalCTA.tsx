@@ -25,7 +25,7 @@ Never find out about CSS bugs from your users again
 Install Frontguard in 30 seconds. Catch the bugs that pixel diffs miss.
 </p>
 <a
-href="#getting-started"
+href="https://docs.frontguard.dev/docs/quick-start"
 className="touch-manipulation mt-2 inline-flex items-center gap-2 rounded-xl bg-[var(--color-cta)] px-8 py-4 text-base font-semibold text-[var(--color-bg)] shadow-lg shadow-orange-500/20 transition-[background-color,box-shadow] hover:bg-[var(--color-cta-hover)] hover:shadow-orange-500/30"
 >
 Get Started — It{'\u2019'}s Free

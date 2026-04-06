@@ -1,2 +1,49 @@
 @import "tailwindcss";
 @import "fumadocs-ui/style.css";
+
+/* ─── Frontguard Brand Theme ─── */
+/* Override fumadocs color tokens for both light and dark modes
+   to match the Frontguard landing page (always dark). */
+
+:root,
+.dark {
+  --color-fd-background: #06080c;
+  --color-fd-foreground: #f1f5f9;
+
+  --color-fd-muted: #111827;
+  --color-fd-muted-foreground: #94a3b8;
+
+  --color-fd-popover: #0c1018;
+  --color-fd-popover-foreground: #f1f5f9;
+
+  --color-fd-card: #0c1018;
+  --color-fd-card-foreground: #f1f5f9;
+
+  --color-fd-border: #1e293b;
+
+  --color-fd-primary: #22d3ee;           /* Electric cyan */
+  --color-fd-primary-foreground: #06080c;
+
+  --color-fd-secondary: #111827;
+  --color-fd-secondary-foreground: #f1f5f9;
+
+  --color-fd-accent: #1a2332;
+  --color-fd-accent-foreground: #f1f5f9;
+
+  --color-fd-ring: #22d3ee;
+  --color-fd-overlay: rgba(0, 0, 0, 0.5);
+}
+
+/* Sidebar overrides (fumadocs scopes some vars to #nd-sidebar) */
+.dark #nd-sidebar,
+:root #nd-sidebar {
+  --color-fd-muted: #111827;
+  --color-fd-secondary: #1a2332;
+  --color-fd-muted-foreground: #94a3b8;
+}
+
+/* Code blocks — match landing page terminal style */
+pre,
+code {
+  font-family: "JetBrains Mono", "Fira Code", monospace !important;
+}

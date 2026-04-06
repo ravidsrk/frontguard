@@ -106,7 +106,7 @@ background:
 }}
 />
 
-<div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)]" role="img" aria-label="Terminal demo showing Frontguard detecting a visual regression: the checkout page submit button overflows its container on mobile at 375px width, with an AI-suggested fix to add overflow hidden to the checkout form.">
+<div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)]" role="img" aria-label="Terminal showing Frontguard detecting a visual regression">
 {/* Title bar */}
 <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-4 py-3">
 <span className="h-3 w-3 rounded-full bg-[#ef4444]/60" />

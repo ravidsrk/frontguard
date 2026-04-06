@@ -3,13 +3,16 @@ const footerColumns = [
     title: 'Product',
     links: [
       { label: 'Features', href: '#features' },
-      { label: 'Docs', href: '#getting-started' },
+      { label: 'Docs', href: 'https://docs.frontguard.dev', external: true },
       { label: 'Changelog', href: 'https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md', external: true },
     ],
   },
   {
     title: 'Resources',
     links: [
+      { label: 'CLI Reference', href: 'https://docs.frontguard.dev/docs/cli', external: true },
+      { label: 'Playwright Plugin', href: 'https://docs.frontguard.dev/docs/playwright', external: true },
+      { label: 'GitHub Actions', href: 'https://docs.frontguard.dev/docs/ci-cd/github-actions', external: true },
       { label: 'GitHub', href: 'https://github.com/ravidsrk/frontguard', external: true },
       { label: 'Contributing', href: 'https://github.com/ravidsrk/frontguard/blob/main/CONTRIBUTING.md', external: true },
     ],

@@ -12,7 +12,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             frontguard
           </span>
         ),
-        url: '/',
+        url: 'https://frontguard.dev',
       }}
       links={[
         {

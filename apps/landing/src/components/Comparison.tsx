@@ -76,19 +76,19 @@ style={{ animationDelay: '200ms' }}
 <caption className="sr-only">Feature comparison between Frontguard, Percy, Chromatic, and Playwright screenshot testing</caption>
 <thead>
 <tr className="border-b border-[var(--color-border)]">
-<th className="pb-4 pr-4 text-left text-sm font-medium text-[var(--color-text-dim)]">
+<th scope="col" className="pb-4 pr-4 text-left text-sm font-medium text-[var(--color-text-dim)]">
 Feature
 </th>
-<th className="pb-4 text-center text-sm font-bold text-[var(--color-accent)]">
+<th scope="col" className="pb-4 text-center text-sm font-bold text-[var(--color-accent)]">
 Frontguard
 </th>
-<th className="pb-4 text-center text-sm font-medium text-[var(--color-text-dim)]">
+<th scope="col" className="pb-4 text-center text-sm font-medium text-[var(--color-text-dim)]">
 Percy
 </th>
-<th className="pb-4 text-center text-sm font-medium text-[var(--color-text-dim)]">
+<th scope="col" className="pb-4 text-center text-sm font-medium text-[var(--color-text-dim)]">
 Chromatic
 </th>
-<th className="pb-4 text-center text-sm font-medium text-[var(--color-text-dim)]">
+<th scope="col" className="pb-4 text-center text-sm font-medium text-[var(--color-text-dim)]">
 Playwright
 </th>
 </tr>

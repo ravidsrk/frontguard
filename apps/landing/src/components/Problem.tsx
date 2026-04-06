@@ -60,7 +60,7 @@ But who catches the visual ones?
 {painCards.map((card, i) => (
 <div
 key={card.title}
-className={`group rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-6 transition-colors hover:border-[var(--color-border-bright)] hover:bg-[var(--color-bg-card-hover)] ${inView ? 'animate-fade-up' : 'opacity-0'}`}
+className={`group rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-6 transition-colors hover:border-[var(--color-border-bright)] ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 style={{ animationDelay: `${200 + i * 120}ms` }}
 >
 <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-danger-dim)] text-[var(--color-danger)]">

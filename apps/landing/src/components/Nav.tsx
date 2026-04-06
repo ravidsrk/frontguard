@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 const navLinks = [
   { label: 'Features', href: '#features' },
-  { label: 'Docs', href: '#getting-started' },
+  { label: 'Docs', href: 'https://docs.frontguard.dev' },
   { label: 'GitHub', href: 'https://github.com/ravidsrk/frontguard' },
 ];
 
@@ -105,19 +105,19 @@ export default function Nav() {
       </nav>
 
       {/* Mobile menu */}
-      {mobileOpen && (
-        <div
-          id="mobile-menu"
-          ref={mobileMenuRef}
-          role="menu"
-          className="border-b border-[var(--color-border)] bg-[var(--color-bg)]/95 px-4 pb-6 sm:px-6 backdrop-blur-xl md:hidden"
-        >
+      <div
+        id="mobile-menu"
+        ref={mobileMenuRef}
+        className={`md:hidden overflow-hidden transition-all duration-200 ease-out ${
+          mobileOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <div className="border-b border-[var(--color-border)] bg-[var(--color-bg)]/95 px-4 pb-6 sm:px-6 backdrop-blur-xl">
           <div className="flex flex-col gap-1">
             {navLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
-                role="menuitem"
                 onClick={() => setMobileOpen(false)}
                 className="touch-manipulation rounded-lg px-3 py-3 text-sm font-medium text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text)]"
                 {...(link.href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
@@ -127,7 +127,6 @@ export default function Nav() {
             ))}
             <a
               href="#getting-started"
-              role="menuitem"
               onClick={() => setMobileOpen(false)}
               className="touch-manipulation mt-2 inline-block rounded-lg bg-[var(--color-cta)] px-4 py-3 text-center text-sm font-semibold text-[var(--color-bg)] transition-colors hover:bg-[var(--color-cta-hover)]"
             >
@@ -135,7 +134,7 @@ export default function Nav() {
             </a>
           </div>
         </div>
-      )}
+      </div>
     </header>
   );
 }

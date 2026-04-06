@@ -11,6 +11,12 @@ const GettingStarted = lazy(() => import('./components/GettingStarted'));
 const FinalCTA = lazy(() => import('./components/FinalCTA'));
 const Footer = lazy(() => import('./components/Footer'));
 
+const SectionSkeleton = () => (
+  <div className="min-h-[50vh] flex items-center justify-center">
+    <div className="w-8 h-8 rounded-full border-2 border-accent/30 border-t-accent animate-spin" />
+  </div>
+);
+
 export default function App() {
 return (
 <>
@@ -23,7 +29,7 @@ Skip to main content
 <Nav />
 <main id="main-content">
 <Hero />
-<Suspense fallback={null}>
+<Suspense fallback={<SectionSkeleton />}>
 <SocialProof />
 <Problem />
 <HowItWorks />
@@ -33,7 +39,7 @@ Skip to main content
 <FinalCTA />
 </Suspense>
 </main>
-<Suspense fallback={null}>
+<Suspense fallback={<SectionSkeleton />}>
 <Footer />
 </Suspense>
 </>
