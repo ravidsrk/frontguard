@@ -2,14 +2,14 @@
 
 [![CI](https://github.com/ravidsrk/frontguard/actions/workflows/ci.yml/badge.svg)](https://github.com/ravidsrk/frontguard/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/frontguard)](https://www.npmjs.com/package/frontguard)
-[![Tests](https://img.shields.io/badge/tests-395-brightgreen)]()
-[![Bundle](https://img.shields.io/badge/bundle-142KB-blue)]()
+[![Tests](https://img.shields.io/badge/tests-400-brightgreen)]()
+[![Bundle](https://img.shields.io/badge/bundle-102KB-blue)]()
 
 **AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.**
 
 Backend has Datadog, Sentry, PagerDuty — a $20B+ monitoring ecosystem. Frontend gets... manual QA and hoping for the best. Frontguard changes that.
 
-> **395 tests** · **26 test files** · **27 source files** · **142KB bundle** · **3 built-in plugins**
+> **400 tests** · **27 test files** · **27 source files** · **102KB bundle** · **3 built-in plugins**
 
 ## What It Does
 
@@ -184,45 +184,22 @@ See [`docs/`](./docs/) for:
 - [Product deep-dive](./docs/PRODUCT.md) — Architecture decisions and design rationale
 - [Research](./docs/research/) — Market data, technical feasibility, competitive landscape
 
-## Validating AI Accuracy
-
-Frontguard's value depends on AI vision models correctly classifying visual changes. Two validation scripts are included:
-
-**Synthetic validation** (`scripts/validate-ai.ts`) — 10 programmatic before/after screenshot pairs with known ground truth:
-
-```bash
-export FRONTGUARD_OPENAI_KEY=sk-...
-npx tsx scripts/validate-ai.ts
-```
-
-**Real-world validation** (`scripts/validate-ai-real.ts`) — validates against actual GitHub PRs with full rendering pipeline (clone → framework detect → install deps → dev server → Playwright capture → pixel diff → AI analysis):
-
-```bash
-npx tsx scripts/validate-ai-real.ts --repo shadcn-ui/ui --pr 1234
-npx tsx scripts/validate-ai-real.ts --batch ground-truth/cases.json
-```
-
-Results are saved to `validation-results/` as JSON for tracking accuracy over time.
-
 ## Roadmap
 
-- **M1** ✅ Core rendering + pixel diff + CLI
-- **M2** ✅ Dependency graph for smart rendering
-- **M3** ✅ GitHub Action + preview deployment integration
-- **M4** ✅ AI analysis + validation framework
-- **M5** ✅ Plugin system + documentation site + npm prep
-- **Next** 🔲 Real-world AI validation, npm publish, beta testers
+See [ROADMAP.md](./ROADMAP.md) for the full milestone history and upcoming plans.
 
 ## Environment Variables
 
 ```bash
-# AI Analysis (BYOK — pick one)
+# AI Analysis (optional, BYOK — bring your own key, pick one)
 FRONTGUARD_OPENAI_KEY=sk-...
 FRONTGUARD_ANTHROPIC_KEY=...
 
 # GitHub PR comments
 GITHUB_TOKEN=ghp_...
 ```
+
+> **Note:** AI keys are optional. Frontguard works without them — pixel diff and DOM diff run locally. AI analysis (classification, explanations, fix suggestions) activates only when a key is provided.
 
 ## Contributing
 
