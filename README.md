@@ -24,7 +24,7 @@ AI explains what changed and why → Suggests fixes → Posts PR comment
 
 ## Quick Start
 
-**Prerequisites:** [Node.js](https://nodejs.org/) 18+ and npm 9+
+**Prerequisites:** [Node.js](https://nodejs.org/) 20+ and npm 9+
 
 ```bash
 # Install
