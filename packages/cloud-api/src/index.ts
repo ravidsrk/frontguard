@@ -252,6 +252,6 @@ app.get('/v1/usage', (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// Export — Cloudflare Workers / mogra.xyz compatible
+// Export — Cloudflare Workers compatible
 // ---------------------------------------------------------------------------
 export default app;

@@ -99,7 +99,7 @@ return (
 <div
 className={`mb-12 text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 id="getting-started-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl">
+<h2 id="getting-started-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl">
 Start catching visual bugs{' '}
 <span className="text-[var(--color-accent)]">in 30 seconds</span>
 </h2>

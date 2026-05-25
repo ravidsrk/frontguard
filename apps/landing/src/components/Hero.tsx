@@ -25,15 +25,6 @@ fix: 'text-[var(--color-text-muted)]',
 export default function Hero() {
 return (
 <section className="relative overflow-hidden pt-32 pb-20 lg:pt-40 lg:pb-32">
-{/* Gradient mesh background */}
-<div
-className="pointer-events-none absolute top-0 left-1/2 -z-10 h-[600px] w-[900px] -translate-x-1/2 opacity-30"
-style={{
-background:
-'radial-gradient(ellipse at 30% 20%, rgba(34, 211, 238, 0.15) 0%, transparent 60%), radial-gradient(ellipse at 70% 60%, rgba(249, 115, 22, 0.08) 0%, transparent 60%)',
-}}
-/>
-
 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16 overflow-hidden">
 {/* Left column — Copy */}
@@ -97,15 +88,6 @@ className="animate-fade-in-from-right lg:col-span-7 min-w-0"
 style={{ animationDelay: '300ms' }}
 >
 <div className="relative">
-{/* Glow behind terminal */}
-<div
-className="pointer-events-none absolute -inset-4 -z-10 rounded-2xl opacity-40"
-style={{
-background:
-'radial-gradient(ellipse at 50% 50%, rgba(34, 211, 238, 0.12) 0%, transparent 70%)',
-}}
-/>
-
 <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)]" role="img" aria-label="Terminal showing Frontguard detecting a visual regression">
 {/* Title bar */}
 <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-4 py-3">

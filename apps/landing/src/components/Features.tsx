@@ -1,109 +1,110 @@
 import { useInView } from '../hooks/useInView';
 
 const features = [
-{
-title: 'AI-Powered Analysis',
-description:
-'Tells you “the submit button overflows on mobile because the new padding pushes it outside the flex container.” Not “pixels differ at coordinates 340,890.”',
-icon: (
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-</svg>
-),
-},
-{
-title: 'Anti-Flake Consensus',
-description:
-'Takes 3 screenshots, keeps the majority. Spinner mid-animation? Loading state flickering? Filtered out automatically.',
-icon: (
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-</svg>
-),
-},
-{
-title: 'Smart Route Discovery',
-description:
-'Point it at your URL. It finds every route, tests every page. No config files. No route lists. It just works.',
-icon: (
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-<circle cx="12" cy="12" r="10" />
-<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-</svg>
-),
-},
-{
-title: 'PR-Native Review',
-description:
-'Visual diffs show up right in your PR. Approve or reject without leaving GitHub.',
-icon: (
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-<circle cx="18" cy="18" r="3" />
-<circle cx="6" cy="6" r="3" />
-<path d="M13 6h3a2 2 0 012 2v7" />
-<line x1="6" y1="9" x2="6" y2="21" />
-</svg>
-),
-},
-{
-title: 'Multi-Browser',
-description:
-'One command tests Chromium, Firefox, and WebKit. That Safari flexbox bug your users found? You\u2019d have caught it.',
-icon: (
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-<rect x="2" y="3" width="20" height="14" rx="2" />
-<line x1="8" y1="21" x2="16" y2="21" />
-<line x1="12" y1="17" x2="12" y2="21" />
-</svg>
-),
-},
-{
-title: 'Plugin System',
-description:
-'Compare production against Figma designs. Set performance budgets. Monitor live pages. Build your own with 6 lifecycle hooks.',
-icon: (
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
-</svg>
-),
-},
+  {
+    eyebrow: 'AI analysis',
+    title: 'It tells you why, not where',
+    description:
+      'Instead of "pixels differ at coordinates 340,890," you get: "the submit button overflows on mobile because the new padding pushes it outside the flex container." GPT-4o vision reads the screenshot the way a senior engineer would.',
+  },
+  {
+    eyebrow: 'Anti-flake consensus',
+    title: '3 screenshots, majority wins',
+    description:
+      'Spinner mid-animation? Loading flicker? A blinking cursor in your hero? Frontguard takes three captures, keeps the consensus, drops the outlier. Flake noise stops drowning real regressions.',
+  },
+  {
+    eyebrow: 'Smart route discovery',
+    title: 'Point at a URL. It tests every page.',
+    description:
+      'No config files. No route lists. No baseline directories to maintain. The crawler walks your sitemap, finds every reachable page, and builds the test matrix for you.',
+  },
+  {
+    eyebrow: 'PR-native review',
+    title: 'Diffs render in the GitHub thread',
+    description:
+      'Every PR gets a comment with side-by-side visual diffs and the AI explanation inline. Approve or reject without leaving the review tab.',
+  },
+  {
+    eyebrow: 'Multi-browser',
+    title: 'Chromium, Firefox, WebKit — one command',
+    description:
+      'That Safari flexbox bug a customer found last quarter? It would have been caught at PR time. WebKit gets the same screenshot pipeline as Chromium.',
+  },
+  {
+    eyebrow: 'Plugin system',
+    title: '6 lifecycle hooks for whatever you need',
+    description:
+      'Compare production against Figma. Set performance budgets. Monitor live pages. Build your own with onBeforeCapture / onAfterDiff / onReport hooks.',
+  },
 ];
 
 export default function Features() {
-const { ref, inView } = useInView();
+  const { ref, inView } = useInView();
 
-return (
-<section ref={ref} id="features" aria-labelledby="features-heading" className="py-24 lg:py-32">
-<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-<div
-className={`mb-16 text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
->
-<h2 id="features-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl">
-Built for the problems{' '}
-<span className="text-[var(--color-text-muted)]">pixel diffs can{'\u2019'}t solve.</span>
-</h2>
-</div>
+  // Asymmetric bento layout: one prominent feature spanning 2 cols on desktop,
+  // five smaller features in alternating rows. No icon-card trios.
+  return (
+    <section ref={ref} id="features" aria-labelledby="features-heading" className="border-t border-[var(--color-border)] py-24 lg:py-32">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className={`mb-16 max-w-3xl ${inView ? 'animate-fade-up' : 'opacity-0'}`}>
+          <h2
+            id="features-heading"
+            className="font-[family-name:var(--font-display)] text-2xl font-bold leading-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl"
+          >
+            Built for the problems{' '}
+            <span className="text-[var(--color-text-muted)]">pixel diffs can{'\u2019'}t solve.</span>
+          </h2>
+        </div>
 
-<div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-{features.map((feature, i) => (
-<div
-key={feature.title}
-className={`group rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-6 transition-[border-color,background-color] hover:border-[var(--color-border-bright)] hover:bg-[var(--color-bg-card-hover)] ${inView ? 'animate-fade-up' : 'opacity-0'}`}
-style={{ animationDelay: `${100 + i * 80}ms` }}
->
-<div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-accent-glow)] text-[var(--color-accent)]">
-{feature.icon}
-</div>
-<h3 className="mb-2 font-[family-name:var(--font-display)] text-base font-semibold text-[var(--color-text)] [text-wrap:balance]">
-{feature.title}
-</h3>
-<p className="text-sm leading-relaxed text-[var(--color-text-muted)]">
-{feature.description}
-</p>
-</div>
-))}
-</div>
-</div>
-</section>
-);
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-3 lg:grid-rows-[auto_auto]">
+          {features.map((feature, i) => {
+            // First feature spans 2 columns (prominent), rest fill remaining slots
+            const isProminent = i === 0;
+            return (
+              <article
+                key={feature.title}
+                className={`flex flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-6 sm:p-8 transition-[border-color,background-color] hover:border-[var(--color-border-bright)] hover:bg-[var(--color-bg-card-hover)] ${
+                  isProminent ? 'lg:col-span-2 lg:row-span-1' : ''
+                } ${inView ? 'animate-fade-up' : 'opacity-0'}`}
+                style={{ animationDelay: `${100 + i * 80}ms` }}
+              >
+                <span className="font-[family-name:var(--font-mono)] text-xs uppercase tracking-wide text-[var(--color-accent)]">
+                  {feature.eyebrow}
+                </span>
+                <h3
+                  className={`mt-3 font-[family-name:var(--font-display)] font-semibold text-[var(--color-text)] [text-wrap:balance] ${
+                    isProminent ? 'text-xl sm:text-2xl' : 'text-lg'
+                  }`}
+                >
+                  {feature.title}
+                </h3>
+                <p
+                  className={`mt-3 leading-relaxed text-[var(--color-text-muted)] ${
+                    isProminent ? 'text-base' : 'text-sm'
+                  }`}
+                >
+                  {feature.description}
+                </p>
+                {isProminent ? (
+                  <div className="mt-6 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
+                    <div className="border-b border-[var(--color-border)] px-4 py-2 font-[family-name:var(--font-mono)] text-xs text-[var(--color-text-dim)]">
+                      regression-report.md
+                    </div>
+                    <pre className="overflow-x-auto p-4 font-[family-name:var(--font-mono)] text-xs sm:text-sm leading-relaxed">
+                      <code>
+                        <span className="text-[var(--color-danger)]">/checkout @ 375px — REGRESSION (4.2% diff)</span>{'\n'}
+                        <span className="text-[var(--color-accent)]">  AI: The submit button is being pushed outside its{'\n'}       parent flex container by the new 24px padding.{'\n'}       Visible from 320px to 414px viewports.</span>{'\n'}
+                        <span className="text-[var(--color-text-muted)]">  Suggested fix: reduce padding to 16px or add{'\n'}                   `flex-shrink: 0` to .submit-btn.</span>
+                      </code>
+                    </pre>
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
 }

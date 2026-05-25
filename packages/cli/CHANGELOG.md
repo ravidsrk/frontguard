@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AI analysis** — BYOK support for OpenAI and Anthropic vision models with unified 0–1 confidence scale
 - **Smart rendering** — dependency graph for selective page re-rendering with batched `Promise.allSettled` concurrency
 - **Git baselines** — orphan branch storage for baseline screenshots with worktree-based implementation
-- **GitHub Action** — `ravidsrk/frontguard@v1` for CI integration
+- **GitHub Action** — `frontguard@v1` for CI integration
 - **Preview URL detection** — auto-detect Vercel, Netlify, Cloudflare Pages, Railway, and Render
 - **PR comments** — automatic diff reports posted to pull requests (broken image placeholders fixed)
 - **Multiple viewports** — responsive regression testing at configurable sizes

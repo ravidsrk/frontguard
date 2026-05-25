@@ -106,7 +106,7 @@ Honest, technical comparison blog post. Developers search for "percy alternative
 
 **Goal:** 500 stars. 200 weekly users. Fix suggestions accepted >20% of the time. First paying customers.
 
-This is the feature no competitor has. The autoplan review called it "The Architectural Gem." Every competitor stops at "here's what changed." Frontguard goes further: "here's what changed, here's why it's a regression, here's the fix, and I've verified the fix works."
+This is the feature no competitor has. Every competitor stops at "here's what changed." Frontguard goes further: "here's what changed, here's why it's a regression, here's the fix, and I've verified the fix works."
 
 **What to build:**
 

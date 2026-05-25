@@ -174,9 +174,8 @@ Each stage is independent with error boundaries — one page failing doesn't kil
 ## Documentation
 
 See [`docs/`](./docs/) for:
-- [Product deep-dive](./docs/PRODUCT.md) — Architecture, business model, competitive analysis
+- [Product deep-dive](./docs/PRODUCT.md) — Architecture decisions and design rationale
 - [Research](./docs/research/) — Market data, technical feasibility, competitive landscape
-- [CEO Review](./docs/archive/reviews/) — Founder-mode review with 50+ failure modes mapped
 
 ## Validating AI Accuracy
 

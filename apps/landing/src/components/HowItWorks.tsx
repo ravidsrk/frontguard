@@ -39,7 +39,7 @@ return (
 <div
 className={`mb-16 ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 id="how-it-works-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl">
+<h2 id="how-it-works-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl">
 Add visual testing to Playwright{' '}
 <span className="text-[var(--color-accent)]">in 3 lines.</span>
 </h2>

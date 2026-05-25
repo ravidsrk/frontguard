@@ -9,3 +9,6 @@ auth.json
 core
 .frontguard/
 frontguard-report/
+
+# Deployment-specific
+fly.toml

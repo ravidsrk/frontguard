@@ -41,16 +41,16 @@ export default function Nav() {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-[background-color,border-color,backdrop-filter] duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-[background-color,border-color] duration-300 ${
         scrolled
-          ? 'border-b border-[var(--color-border)] bg-[var(--color-bg)]/80 backdrop-blur-xl'
+          ? 'border-b border-[var(--color-border)] bg-[var(--color-bg)]/95'
           : 'bg-transparent'
       }`}
     >
       <nav aria-label="Main navigation" className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <a
           href="/"
-          className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-[var(--color-text)]"
+          className="flex items-center gap-2.5 text-xl font-bold text-[var(--color-text)]"
         >
           <img src="/logo-48.png" alt="" width={28} height={28} className="rounded-sm" aria-hidden="true" />
           <span className="font-[family-name:var(--font-mono)] text-lg font-medium text-[var(--color-accent)]">
@@ -74,7 +74,7 @@ export default function Nav() {
             href="#getting-started"
             className="touch-manipulation rounded-lg bg-[var(--color-cta)] px-4 py-2 text-sm font-semibold text-[var(--color-bg)] transition-colors hover:bg-[var(--color-cta-hover)]"
           >
-            Get Started
+            Install
           </a>
         </div>
 
@@ -112,7 +112,7 @@ export default function Nav() {
           mobileOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
-        <div className="border-b border-[var(--color-border)] bg-[var(--color-bg)]/95 px-4 pb-6 sm:px-6 backdrop-blur-xl">
+        <div className="border-b border-[var(--color-border)] bg-[var(--color-bg)] px-4 pb-6 sm:px-6">
           <div className="flex flex-col gap-1">
             {navLinks.map((link) => (
               <a
@@ -130,7 +130,7 @@ export default function Nav() {
               onClick={() => setMobileOpen(false)}
               className="touch-manipulation mt-2 inline-block rounded-lg bg-[var(--color-cta)] px-4 py-3 text-center text-sm font-semibold text-[var(--color-bg)] transition-colors hover:bg-[var(--color-cta-hover)]"
             >
-              Get Started
+              Install
             </a>
           </div>
         </div>

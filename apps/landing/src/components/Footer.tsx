@@ -29,17 +29,17 @@ export default function Footer() {
   return (
     <footer className="border-t border-[var(--color-border)] py-16" role="contentinfo">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4 md:gap-12">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_0.8fr] md:gap-12">
           {/* Logo + tagline */}
-          <div className="md:col-span-1">
+          <div>
             <div className="flex items-center gap-2.5">
               <img src="/logo-48.png" alt="" width={24} height={24} className="rounded-sm" aria-hidden="true" />
               <span className="font-[family-name:var(--font-mono)] text-lg font-medium text-[var(--color-accent)]">
                 frontguard
               </span>
             </div>
-            <p className="mt-3 text-sm leading-relaxed text-[var(--color-text-muted)]">
-              AI-powered visual regression testing for modern web teams.
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-[var(--color-text-muted)]">
+              Visual regression testing for Playwright. Open source under the MIT License.
             </p>
           </div>
 

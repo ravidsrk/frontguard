@@ -12,7 +12,7 @@ const stats = [
 },
 { value: '< 2 min', label: 'Setup Time', icon: null },
 { value: '3 Browsers', label: 'Chromium, Firefox, WebKit', icon: null },
-{ value: 'AI-Powered', label: 'GPT-4o Vision Analysis', icon: null },
+{ value: 'GPT-4o', label: 'Vision-based diff analysis', icon: null },
 ];
 
 export default function SocialProof() {
@@ -36,7 +36,7 @@ className={`text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 style={{ animationDelay: `${i * 100}ms` }}
 >
 {stat.icon && <div className="mb-2 flex justify-center">{stat.icon}</div>}
-<div className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[var(--color-text)] [font-variant-numeric:tabular-nums] sm:text-3xl md:text-4xl">
+<div className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--color-text)] [font-variant-numeric:tabular-nums] sm:text-3xl md:text-4xl">
 {stat.value}
 </div>
 <div className="mt-1 text-xs sm:text-sm text-[var(--color-text-muted)]">

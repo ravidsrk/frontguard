@@ -1,5 +1,5 @@
 // Frontguard Cloud API — Pure fetch handler, zero dependencies
-// Deployed on mogra.xyz apps platform
+// Production deployment — Cloudflare Workers compatible
 
 // ─── In-memory stores ───────────────────────────────────────
 const runs = new Map();

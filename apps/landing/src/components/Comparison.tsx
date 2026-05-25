@@ -59,7 +59,7 @@ return (
 <div
 className={`mb-12 md:mb-16 text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
-<h2 id="comparison-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[var(--color-text)] [text-wrap:balance] md:text-3xl lg:text-4xl">
+<h2 id="comparison-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--color-text)] [text-wrap:balance] md:text-3xl lg:text-4xl">
 Why not Percy? Or Chromatic?{' '}
 <span className="text-[var(--color-text-muted)]">
 Or just Playwright screenshots?

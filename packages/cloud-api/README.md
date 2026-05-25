@@ -2,7 +2,7 @@
 
 ## Two implementations
 
-- `app/src/index.js` — Deployed to mogra.xyz. Pure fetch handler, zero dependencies. This is production.
+- `app/src/index.js` — Production deployment. Pure fetch handler, zero dependencies.
 - `src/` — Hono-based version for local development and testing. NOT deployed.
 
 The Hono version is the source of truth for business logic. The `app/` version is a manually-synced deployment artifact.
