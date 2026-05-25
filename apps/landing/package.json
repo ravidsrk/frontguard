@@ -2,6 +2,16 @@
   "name": "@frontguard/landing",
   "private": true,
   "version": "0.0.0",
+  "description": "Landing page for Frontguard",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ravidsrk/frontguard.git",
+    "directory": "apps/landing"
+  },
+  "bugs": {
+    "url": "https://github.com/ravidsrk/frontguard/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

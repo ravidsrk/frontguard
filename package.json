@@ -1,6 +1,16 @@
 {
   "name": "frontguard-monorepo",
   "private": true,
+  "description": "AI-powered frontend visual regression testing",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ravidsrk/frontguard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ravidsrk/frontguard/issues"
+  },
+  "homepage": "https://frontguard.dev",
   "workspaces": [
     "packages/*",
     "apps/*"

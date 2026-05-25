@@ -1,6 +1,6 @@
 # Frontguard Roadmap
 
-*Last updated: March 2026. Based on competitive research across 10 competitors, developer pain point analysis from Reddit/HN/GitHub, technology trend analysis, and GTM playbook research. Full research at `/workspace/drive/research-synthesis.md`.*
+*Last updated: March 2026. Based on competitive research across 10 competitors, developer pain point analysis from Reddit/HN/GitHub, technology trend analysis, and GTM playbook research. Full research available internally (see project documentation).*
 
 ---
 

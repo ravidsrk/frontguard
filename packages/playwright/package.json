@@ -32,6 +32,9 @@
     "url": "https://github.com/ravidsrk/frontguard"
   },
   "homepage": "https://frontguard.dev",
+  "bugs": {
+    "url": "https://github.com/ravidsrk/frontguard/issues"
+  },
   "peerDependencies": {
     "@playwright/test": ">=1.40.0"
   },

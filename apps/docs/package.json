@@ -2,6 +2,16 @@
   "name": "@frontguard/docs",
   "version": "0.1.0",
   "private": true,
+  "description": "Documentation site for Frontguard",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ravidsrk/frontguard.git",
+    "directory": "apps/docs"
+  },
+  "bugs": {
+    "url": "https://github.com/ravidsrk/frontguard/issues"
+  },
   "scripts": {
     "dev": "next dev --turbopack --port 3001",
     "build": "next build",

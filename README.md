@@ -24,7 +24,12 @@ AI explains what changed and why → Suggests fixes → Posts PR comment
 
 ## Quick Start
 
+**Prerequisites:** [Node.js](https://nodejs.org/) 18+ and npm 9+
+
 ```bash
+# Install
+npm install frontguard
+
 # Initialize config (auto-detects your framework)
 npx frontguard init
 
@@ -34,6 +39,8 @@ npx frontguard run --url http://localhost:3000
 # Accept current screenshots as new baselines
 npx frontguard update-baselines
 ```
+
+> **Full documentation:** [frontguard.dev](https://frontguard.dev) · [`docs/`](./docs/) folder
 
 ## Features
 
@@ -216,6 +223,10 @@ FRONTGUARD_ANTHROPIC_KEY=...
 # GitHub PR comments
 GITHUB_TOKEN=ghp_...
 ```
+
+## Contributing
+
+Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines, development setup, and how to submit PRs.
 
 ## License
 
