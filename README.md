@@ -28,7 +28,7 @@ AI explains what changed and why → Suggests fixes → Posts PR comment
 
 ```bash
 # Install
-npm install frontguard
+npm install @frontguard/cli
 
 # Initialize config (auto-detects your framework)
 npx frontguard init
