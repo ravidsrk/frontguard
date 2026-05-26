@@ -1,9 +1,9 @@
 # 🛡️ Frontguard
 
 [![CI](https://github.com/ravidsrk/frontguard/actions/workflows/ci.yml/badge.svg)](https://github.com/ravidsrk/frontguard/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/frontguard)](https://www.npmjs.com/package/frontguard)
+[![npm](https://img.shields.io/npm/v/@frontguard/cli)](https://www.npmjs.com/package/@frontguard/cli)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Tests](https://img.shields.io/badge/tests-395-brightgreen)]()
-[![Bundle](https://img.shields.io/badge/bundle-142KB-blue)]()
 
 **AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.**
 
