@@ -24,7 +24,7 @@ fix: 'text-[var(--color-text-muted)]',
 
 export default function Hero() {
 return (
-<section className="relative overflow-hidden pt-32 pb-20 lg:pt-40 lg:pb-32">
+<section className="relative overflow-hidden pt-24 sm:pt-28 lg:pt-40 pb-16 sm:pb-20 lg:pb-32">
 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16 overflow-hidden">
 {/* Left column — Copy */}
