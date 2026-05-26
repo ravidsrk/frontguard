@@ -1,0 +1,28 @@
+# Frontguard
+
+> AI-powered visual regression testing for Playwright
+
+Frontguard is a free, open-source CLI tool that detects visual regressions in web applications. It plugs into Playwright, runs in CI pipelines, and uses AI to explain what broke, why it broke, and how to fix it.
+
+## Key Pages
+
+- [Home](https://frontguard.dev) — Product overview, features, getting started
+- [Documentation](https://docs.frontguard.dev) — Full API reference, guides, configuration
+- [GitHub](https://github.com/ravidsrk/frontguard) — Source code, issues, contributing
+- [npm](https://www.npmjs.com/package/frontguard) — Package installation
+
+## What Frontguard Does
+
+- Zero-config route discovery — automatically finds all routes in Next.js, Remix, Astro, Vite, and SvelteKit projects
+- Multi-viewport screenshot capture — renders pages at desktop (1280px), tablet (768px), and mobile (375px)
+- Pixel-level diffing — compares screenshots against baselines to detect visual changes
+- AI-powered analysis — explains regressions in plain English with root cause and suggested fixes
+- CI/CD integration — runs as a Playwright test in any CI pipeline (GitHub Actions, GitLab CI, etc.)
+
+## Author
+
+Ravindra Kumar — https://github.com/ravidsrk
+
+## License
+
+MIT — Free and open source
