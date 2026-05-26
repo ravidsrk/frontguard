@@ -1,6 +1,6 @@
 # Frontguard Roadmap
 
-*Last updated: March 2026. Based on competitive research across 10 competitors, developer pain point analysis from Reddit/HN/GitHub, technology trend analysis, and GTM playbook research. Full research available internally (see project documentation).*
+*Last updated: May 2026. Based on competitive research across 10 competitors, developer pain point analysis from Reddit/HN/GitHub, technology trend analysis, and GTM playbook research. Full research available internally (see project documentation).*
 
 ---
 
@@ -16,66 +16,53 @@ The visual regression testing market (~$1B, 9.5% CAGR) has a **retention crisis,
 
 ---
 
-# Phase 1: Prove It Works (Week 0–6)
+# What's Shipped (v0.1)
 
-**Goal:** 50 stars, 20 weekly CLI users, <15% false positive rate on real repos.
+Phase 1 is complete. The core engine works — deterministic rendering, AI-powered analysis, full CLI workflow, and CI integration. This is a working visual regression testing tool, not a prototype.
 
-**The core problem to solve:** Deterministic screenshots that match locally and in CI. This is the #1 reason teams abandon visual testing. Everything else is noise until this works reliably.
+✅ **Anti-flake rendering**
+Multi-render consensus via `findConsensusScreenshot()` — takes N screenshots (default `antiFlakeRenders: 3`), groups identical frames, returns the majority vote. Combined with SSIM perceptual matching, this solves the #1 reason teams abandon visual testing. Runs in <10 seconds where Percy adds 5+ minutes.
 
-**What to build:**
+✅ **AI analysis & classification**
+Dual-model analysis using GPT-4o and Anthropic vision. Classifies every diff as regression, intentional change, or content update. Outputs severity scoring, confidence levels, and a `suggestedFix` field with AI-generated remediation guidance. This is the feature no competitor has — understanding *what changed and whether it matters.*
 
-🟢 **Anti-flake rendering (already built)**
-Multi-render consensus is fully wired: `findConsensusScreenshot()` in `src/render/playwright.ts` takes N screenshots, groups identical frames, returns the majority vote. Config: `antiFlakeRenders: 3`. This gives Frontguard a structural advantage — Percy adds 5+ minutes to CI trying to solve flakiness. Frontguard solves it in <10 seconds with consensus + SSIM perceptual matching. **Phase 1 task: validate it works on a real-world flaky page, not build it.**
+✅ **Screenshot diffing**
+Dual-engine comparison: pixelmatch for pixel-level precision, plus a full SSIM (Structural Similarity Index) implementation for perceptual matching. Catches real regressions while ignoring rendering noise.
 
-🔴 **Real-world AI validation**
-Synthetic test accuracy (100%) means nothing. Run against 5 real open-source repos: a Next.js app, a Tailwind dashboard, a component library, an e-commerce storefront, a docs site. Measure: true positives, false positives, false negatives, classification accuracy. If accuracy is below 70% on real diffs, retune prompts before promoting AI as a feature. The AI must at minimum reliably distinguish these 4 cases:
-- Intentional redesign (large visual change, code change explains it)
-- Regression (visual break, code change doesn't intend it)
-- Content update (text/image changed, layout intact)
-- Rendering noise (anti-aliasing, font rendering, subpixel differences)
+✅ **CLI tool**
+Full command set: `run` (execute visual tests), `init` (scaffold config), `update-baselines` (approve changes). Comprehensive option flags for routes, viewports, thresholds, AI provider selection, and output formatting.
 
-🔴 **GitHub Action polish**
-The action.yml and Dockerfile exist but haven't been tested in real CI. The GitHub Action is distribution channel #1 (71M jobs/day, 35% YoY growth). The integration must be copy-paste:
+✅ **GitHub Action**
+Composite action via `action.yml` with automatic preview URL detection for Vercel and Netlify deployments. Parses JSON output for structured CI integration. Copy-paste setup:
 ```yaml
 - uses: frontguard/action@v1
   with:
     url: ${{ steps.deploy.outputs.url }}
 ```
-Publish to GitHub Marketplace. Most Playwright users already run in GitHub Actions — meet them where they are.
 
-🟡 **Demo GIF + comparison screenshots for README**
-The launch lives or dies on the first 10 seconds of the README. Show: a real regression detected, the AI explanation, the diff overlay, the PR comment. Without this, nobody clicks install.
+✅ **Route discovery**
+Filesystem-based discovery for Next.js (App Router + Pages Router), Remix, SvelteKit, and Nuxt. Falls back to live breadth-first crawling for unknown frameworks. Zero-config for supported frameworks — point it at a codebase and it finds the routes.
 
-🟡 **30-second demo video**
-For HN, Reddit, Twitter. Show the zero-to-first-regression-caught flow.
+✅ **Multi-viewport rendering**
+Default viewports at 375px (mobile), 768px (tablet), and 1440px (desktop). Fully configurable via CLI flags or config file. Every route is tested at every viewport automatically.
 
-**What NOT to build:** Cloud dashboard, production monitoring, Figma integration, team features. All premature at 0 users.
+✅ **Baseline management**
+Git orphan branch storage with worktree-based reads and writes. Baselines live in version control alongside your code, not in a third-party cloud. Concurrent update detection prevents baseline conflicts in team workflows.
 
-**Distribution:**
-1. Pre-launch: answer questions in r/Playwright and r/QualityAssurance for 2 weeks (build credibility, don't promote)
-2. Submit PR to awesome-playwright list
-3. Launch day (Tue/Wed 9-10am ET): HN Show HN + r/Playwright + r/webdev + X thread simultaneously
-4. Week 1: Dev.to article "How to add visual regression testing to Playwright in 5 minutes"
-5. Respond to EVERY issue and comment personally
-
-**Kill criteria:** If you can't get 10 people to try it in 6 weeks, the positioning is wrong. Pivot to pure Playwright plugin (drop the standalone CLI angle) or pivot to production monitoring (drop the CI testing angle).
+✅ **Figma design compliance**
+Full Figma plugin implementation — connects to the Figma API, exports design frames as PNGs, and reports pixel-level deviations between design intent and rendered production pages. "Your login page drifted 12% from the approved Figma design. Here's where."
 
 ---
 
-# Phase 2: Solve the False Positive Problem (Week 6–14)
+# What's Next: v0.2
 
-**Goal:** <10% false positive rate. 200 stars. 50 weekly active CLI users. First 5 teams running in CI.
+**Goal:** Ship the items that are 80% done, add the high-impact distribution pieces, and validate on real-world repos. This is the "earn trust and get noticed" release.
 
-This phase exists because every data signal says the same thing: **false positives kill visual testing adoption.** Teams don't stop because features are missing. They stop because they can't trust the results. Every feature in this phase exists to earn trust.
+🟡 **PR thumbnail grid** *(partially shipped)*
+PR comments work — Frontguard creates and updates markdown comments with regression/warning sections and AI classifications. What's missing: embedded screenshot thumbnails showing before/after/diff inline in the PR. This is the #1 conversion trigger from "neat tool" to "team standard." Developers want visual diffs *in the PR*, not in terminal output.
 
-**What to build:**
-
-🔴 **Intelligent baseline management**
-Current: orphan branch stores baselines. Problem: when a team intentionally redesigns a page, they have to manually update baselines. This creates a "baseline rot" problem where nobody updates and diffs accumulate.
-Build: `frontguard update --interactive` — shows each diff with AI classification ("this looks intentional based on the code change"), lets developer approve/reject per-screenshot. PR-based baseline update flow: Frontguard opens a PR to update baselines, team reviews visual changes in the PR diff, merge = approved.
-
-🔴 **Smart threshold tuning**
-Different pages need different sensitivity. A marketing page with dynamic testimonials needs a higher threshold than a checkout form. Build per-route threshold overrides:
+🔴 **Per-route threshold overrides** *(not started)*
+Global threshold works, but different pages need different sensitivity. A marketing page with dynamic testimonials needs a higher threshold than a checkout form:
 ```typescript
 routes: [
   { path: '/checkout', threshold: 0.001 }, // strict
@@ -84,41 +71,45 @@ routes: [
 ]
 ```
 
-🔴 **PR-native review (not a dashboard)**
-Research is clear: developers want visual diffs inline in GitHub PRs, not in a separate tool. Build a GitHub App that posts a PR comment with:
-- Thumbnail grid of all changed screenshots
-- AI classification for each (regression / intentional / content change)
-- One-click "approve new baseline" button
-- Collapsible full-size diffs
-This is the #5 developer want ("review in the PR, not a separate dashboard") and the key conversion trigger from free → paid.
+🔴 **`frontguard doctor` command** *(not started)*
+Environment diagnostic that checks for sources of non-determinism: Playwright version, Chromium version, font availability, viewport/device scale factor, animation state, time zone. Outputs actionable warnings. This is table-stakes developer UX — every serious CLI tool has a `doctor` command.
 
-🟡 **Deterministic rendering hardening**
-Document and enforce: specific Playwright version, specific Chromium version, specific font fallbacks, consistent viewport + device scale factor, disabled animations, frozen time. Create a `frontguard doctor` command that checks the environment and warns about sources of non-determinism.
+🔴 **Comparison content: "Frontguard vs Percy vs Chromatic"** *(not started)*
+Honest, technical comparison pages for the docs site. Developers search for "percy alternative" and "chromatic alternative" — own these search terms. Include: setup time, CI impact, pricing at 1K/5K/50K screenshots, false positive rates, AI capabilities. This is an SEO play with compounding returns.
 
-🟡 **Comparison content: "Frontguard vs Percy vs Chromatic"**
-Honest, technical comparison blog post. Developers search for "percy alternative" and "chromatic alternative." Own these search terms. Include: setup time, CI impact, pricing at 1K/5K/50K screenshots, false positive rates, AI capabilities.
+🔴 **Real-world validation on 5 open-source repos** *(not started)*
+Synthetic test accuracy means nothing. Run against real repos: a Next.js app, a Tailwind dashboard, a component library, an e-commerce storefront, a docs site. Measure: true positives, false positives, false negatives, classification accuracy. If accuracy is below 70% on real diffs, retune prompts before promoting AI as a feature.
 
-**What NOT to build:** Cloud rendering, production monitoring, auto-fix, team management. Still premature.
+🔴 **Demo GIF + 30-second video** *(not started)*
+The launch lives or dies on the first 10 seconds of the README. Show: a real regression detected, the AI explanation, the diff overlay, the PR comment. For HN, Reddit, Twitter — show the zero-to-first-regression-caught flow. Without this, nobody clicks install.
+
+🟡 **Vercel/Netlify platform integration** *(partially shipped)*
+Preview URL auto-detection from environment variables works. What's missing: dedicated platform plugins for Vercel Integration Marketplace and Netlify Build Plugins that provide one-click setup and deeper integration.
+
+**Distribution plan for v0.2 launch:**
+1. Pre-launch: answer questions in r/Playwright and r/QualityAssurance for 2 weeks (build credibility, don't promote)
+2. Submit PR to awesome-playwright list
+3. Launch day (Tue/Wed 9-10am ET): HN Show HN + r/Playwright + r/webdev + X thread simultaneously
+4. Week 1: Dev.to article "How to add visual regression testing to Playwright in 5 minutes"
+5. Respond to EVERY issue and comment personally
+
+**Kill criteria:** If you can't get 10 people to try it in 6 weeks of the v0.2 launch, the positioning is wrong. Pivot to pure Playwright plugin (drop the standalone CLI angle) or pivot to production monitoring (drop the CI testing angle).
 
 ---
 
-# Phase 3: The Moat — AI Auto-Fix (Week 14–26)
+# Phase 3: The Moat — AI Auto-Fix (Month 3–6)
 
 **Goal:** 500 stars. 200 weekly users. Fix suggestions accepted >20% of the time. First paying customers.
 
 This is the feature no competitor has. Every competitor stops at "here's what changed." Frontguard goes further: "here's what changed, here's why it's a regression, here's the fix, and I've verified the fix works."
 
-**What to build:**
-
-🔴 **AI fix generation (CSS-first)**
-When Frontguard classifies a diff as a regression, generate a CSS fix:
-1. AI analyzes the baseline screenshot, current screenshot, and the git diff that caused the change
-2. AI generates a CSS patch (not full file rewrite — surgical fix)
-3. Fix is applied in a Daytona sandbox
-4. Sandbox renders the page with the fix applied
-5. New screenshot is compared against baseline
-6. If it matches (within threshold): "Verified fix — apply?"
-7. If it doesn't match: discard, suggest manual review
+🟡 **AI fix generation — sandbox verification loop** *(partially shipped)*
+The `suggestedFix` field is already populated by AI analysis and displayed in reports. What's missing: the automated verify-and-apply loop.
+1. AI generates a CSS patch (already works)
+2. 🔴 Fix is applied in a Daytona sandbox
+3. 🔴 Sandbox renders the page with the fix applied
+4. 🔴 New screenshot is compared against baseline
+5. 🔴 If it matches: "Verified fix — apply?" If not: discard, suggest manual review
 
 Start with CSS-only fixes (highest AI reliability):
 - Overflow/truncation fixes
@@ -127,12 +118,10 @@ Start with CSS-only fixes (highest AI reliability):
 - Z-index/stacking fixes
 - Color/opacity regressions
 
-The Daytona sandbox infrastructure is already built. This is assembling existing pieces into the killer workflow.
-
 🔴 **Fix pattern database**
 Every accepted fix becomes training data. After 1,000 accepted fixes, Frontguard knows: "When a Tailwind `space-y-4` is removed and content overflows, the fix is usually to add `gap-4` to the parent flex container." This is the compounding moat that no competitor can replicate without the same volume of real-world fix data.
 
-🟡 **Accessibility convergence**
+🔴 **Accessibility convergence**
 Same screenshot, dual analysis: visual regression + accessibility audit. The regulatory tailwind is massive — web accessibility lawsuits up 320% since 2018, European Accessibility Act mandating compliance. This is allocated budget you can capture with zero additional rendering cost.
 - Color contrast violations
 - Missing alt text on visible images
@@ -140,11 +129,8 @@ Same screenshot, dual analysis: visual regression + accessibility audit. The reg
 - Focus indicator visibility
 - Heading hierarchy issues
 
-🟡 **Cloud tier launch (minimal)**
-Only if there are 5+ teams actively asking for hosted rendering. Launch with:
-- Daytona-powered cloud rendering (already built)
-- Turso/D1 persistence (replace in-memory Map)
-- GitHub OAuth for auth (real user accounts)
+🟡 **Cloud tier launch** *(partially shipped)*
+The Hono API scaffold and Daytona sandbox runner exist. What's missing: persistent storage (replace in-memory Map with Turso/D1), real auth (GitHub OAuth), and actual deployment. Launch only if 5+ teams actively ask for hosted rendering.
 - Free: 500 cloud screenshots/mo. Pro: $29/mo, 10K screenshots/mo.
 - Never per-screenshot pricing. Feature-gated: team collaboration is the upsell.
 
@@ -154,24 +140,21 @@ Only if there are 5+ teams actively asking for hosted rendering. Launch with:
 
 **Goal:** 1,000 stars. $15K MRR. 30 paying teams. Expand from CI tool to always-on reliability platform.
 
-This is the "Datadog for frontend" move. Research shows production visual monitoring is an emerging category — PageBolt, Visual Sentinel, MonitorSensei are all early movers, but nobody dominant yet. Frontguard already has the rendering, diffing, and AI analysis. Adding a scheduler makes it a monitoring platform.
+This is the "Datadog for frontend" move. Production visual monitoring is an emerging category — PageBolt, Visual Sentinel, MonitorSensei are all early movers, but nobody dominant yet. Frontguard already has the rendering, diffing, and AI analysis. Adding a scheduler makes it a monitoring platform.
 
-**What to build:**
-
-🔴 **Zero-config URL monitoring**
-"Paste your production URL. We'll monitor it."
+🟡 **Zero-config URL monitoring** *(partially shipped)*
+The production monitoring plugin exists with URL monitoring, threshold alerting, and history tracking. What's missing: a scheduler/cron to run checks on cadence (hourly, daily, on-deploy). Once that's in, this becomes:
 - Crawl the site, auto-discover critical pages
 - Establish baselines from current production state
-- Render on schedule (hourly, daily, on-deploy)
-- Alert when visual drift exceeds threshold
+- Render on schedule, alert when visual drift exceeds threshold
 - Catches: broken deploys, CDN failures, third-party script injection, ad layout corruption, A/B test leakage
 
 This is differentiated from uptime monitoring (which checks HTTP 200) and from CI testing (which runs pre-merge). This is "does your live site look right, right now?"
 
-🔴 **Integration layer: Slack, PagerDuty, webhooks, OpenTelemetry**
-Visual regressions become alerts in existing workflows. Position Frontguard as "the visual layer you embed" rather than a standalone destination. This also mitigates the threat of observability platforms adding visual features — if Frontguard IS the visual layer they use, expansion is partnership, not competition.
+🟡 **Integration layer: Slack, PagerDuty, webhooks** *(partially shipped)*
+Generic webhook alerting works (Slack/Discord incoming webhooks). What's missing: platform-specific integrations (native Slack app, PagerDuty integration, OpenTelemetry export). Position Frontguard as "the visual layer you embed" rather than a standalone destination. This also mitigates the threat of observability platforms adding visual features — if Frontguard IS the visual layer they use, expansion is partnership, not competition.
 
-🟡 **Third-party script monitoring**
+🔴 **Third-party script monitoring**
 Detect when an ad network, analytics SDK, or chat widget changes your page layout. This is a pain point nobody owns. An ad partner changes their creative sizes, your page layout breaks, and you don't know until customers complain. Frontguard detects it in the next monitoring cycle.
 
 🟡 **Performance visual correlation**
@@ -187,13 +170,11 @@ When a page gets slower (Core Web Vitals degrade), correlate with visual changes
 
 **Goal:** $50K MRR. 100 paying teams. Enterprise pipeline.
 
-**What to build:**
-
-🔴 **Marketplace integrations**
-- Vercel: Integration that auto-runs Frontguard on every preview deployment (Vercel Marketplace listing)
-- Netlify: Build plugin
-- GitHub App: One-click install, auto-configures for all repos in an org
-These are distribution multipliers. Each integration puts Frontguard in front of the platform's entire user base.
+🟡 **Marketplace integrations** *(partially shipped)*
+Preview URL auto-detection for Vercel and Netlify works. What's missing:
+- 🔴 Vercel Integration Marketplace listing (auto-run on every preview deployment)
+- 🔴 Netlify Build Plugin
+- ✅ GitHub Action (shipped — composite action with JSON output parsing)
 
 🔴 **Team features**
 - Shared baselines across team members (cloud-hosted)
@@ -202,17 +183,17 @@ These are distribution multipliers. Each integration puts Frontguard in front of
 - SSO/SAML for enterprise
 These are the conversion trigger from Free → Pro → Enterprise. Gate team features, never individual developer workflow.
 
-🟡 **Figma-to-production visual comparison**
-Import Figma designs as expected baselines. Compare rendered production pages against designer intent. "Your login page drifted 12% from the approved Figma design. Here's where." This is premium positioning — design teams pay for this.
+✅ **Figma-to-production visual comparison** *(shipped)*
+Full Figma plugin connects to the Figma API, exports design frames as PNGs, and reports deviations between design intent and rendered production pages. This was originally a Phase 5 item — shipped early as part of v0.1.
 
-🟡 **Fine-tuned visual analysis model**
+🔴 **Fine-tuned visual analysis model**
 After 10,000+ comparisons with human feedback, fine-tune a smaller model (Phi-4 class, 15B params) for:
 - Higher accuracy on common regression patterns
 - Faster inference (local execution possible)
 - Lower cost per analysis
 - Privacy-friendly: can run on-prem for enterprise customers who can't send screenshots to OpenAI
 
-🟡 **Fix pattern marketplace**
+🔴 **Fix pattern marketplace**
 Community-contributed fix patterns for common frameworks:
 - Tailwind overflow patterns
 - React hydration mismatch fixes
@@ -273,13 +254,13 @@ This creates a data flywheel: more users → more fix patterns → better auto-f
 
 # Success Metrics
 
-| Phase | When | Key Metric | Kill Signal |
-|-------|------|-----------|-------------|
-| 1: Prove It | Week 6 | 50 stars, 20 weekly users | Can't find 10 users in 6 weeks |
-| 2: Earn Trust | Week 14 | <10% false positive rate, 50 weekly users | >25% FP rate after tuning |
-| 3: The Moat | Month 6 | Fix suggestions accepted >20%, first paying customers | <5% fix acceptance |
-| 4: Monitor | Month 12 | $15K MRR, 30 paying teams | <$5K MRR after 6 months of cloud |
-| 5: Scale | Month 18 | $50K MRR, 100 paying teams | Stalling growth, losing to platform incumbents |
+| Phase | Status | Key Metric | Kill Signal |
+|-------|--------|-----------|-------------|
+| v0.1: Core Engine | ✅ Shipped | Working CLI + GitHub Action + AI analysis + Figma compliance | — |
+| v0.2: Earn Trust | 🟡 Next up | 50 stars, 20 weekly users, <10% FP rate on real repos | Can't find 10 users in 6 weeks of launch |
+| Phase 3: The Moat | 🔴 Future | Fix suggestions accepted >20%, first paying customers | <5% fix acceptance after tuning |
+| Phase 4: Monitor | 🔴 Future | $15K MRR, 30 paying teams | <$5K MRR after 6 months of cloud |
+| Phase 5: Scale | 🔴 Future | $50K MRR, 100 paying teams | Stalling growth, losing to platform incumbents |
 
 ---
 
@@ -291,4 +272,4 @@ Frontguard's window is 12-18 months before GitHub Copilot and observability plat
 
 2. **Workflow integration depth.** Being the visual layer embedded in GitHub PRs, Slack alerts, Vercel deploys, and Datadog dashboards makes Frontguard hard to rip out — even if a bigger player offers a "good enough" alternative.
 
-The product is built. The technology works. The market gap is validated. What's left is execution against a clock.
+The core engine is built and working. The AI classification, anti-flake rendering, CLI workflow, CI integration, and Figma compliance are all shipped. What's next is validation on real-world repos, distribution (demo, comparison content, launch), and building the auto-fix moat before the window closes.
