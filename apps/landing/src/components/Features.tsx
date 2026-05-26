@@ -91,7 +91,7 @@ export default function Features() {
                     <div className="border-b border-[var(--color-border)] px-4 py-2 font-[family-name:var(--font-mono)] text-xs text-[var(--color-text-dim)]">
                       regression-report.md
                     </div>
-                    <pre className="overflow-x-auto p-4 font-[family-name:var(--font-mono)] text-xs sm:text-sm leading-relaxed">
+                    <pre className="overflow-x-auto whitespace-pre-wrap break-words p-4 font-[family-name:var(--font-mono)] text-xs sm:text-sm leading-relaxed">
                       <code>
                         <span className="text-[var(--color-danger)]">/checkout @ 375px — REGRESSION (4.2% diff)</span>{'\n'}
                         <span className="text-[var(--color-accent)]">  AI: The submit button is being pushed outside its{'\n'}       parent flex container by the new 24px padding.{'\n'}       Visible from 320px to 414px viewports.</span>{'\n'}
