@@ -20,11 +20,10 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
-      - run: npx --yes @cloudflare/next-on-pages
-        working-directory: apps/docs
+      - run: npm run build --workspace=apps/docs
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/docs/.vercel/output/static --project-name=frontguard-docs --branch=main
+          command: pages deploy apps/docs/out --project-name=frontguard-docs --branch=main
