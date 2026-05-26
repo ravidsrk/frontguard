@@ -36,7 +36,7 @@ className={`text-center ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 style={{ animationDelay: `${i * 100}ms` }}
 >
 {stat.icon && <div className="mb-2 flex justify-center">{stat.icon}</div>}
-<div className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--color-text)] [font-variant-numeric:tabular-nums] sm:text-3xl md:text-4xl">
+<div className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--color-text)] [font-variant-numeric:tabular-nums] sm:text-2xl md:text-4xl">
 {stat.value}
 </div>
 <div className="mt-1 text-xs sm:text-sm text-[var(--color-text-muted)]">
