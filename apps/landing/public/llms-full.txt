@@ -1,0 +1,358 @@
+# Frontguard
+
+> AI-powered visual regression testing for Playwright
+
+Frontguard is a free, open-source CLI tool that detects visual regressions in web applications. It plugs into Playwright, runs in CI pipelines, and uses AI to explain what broke, why it broke, and how to fix it.
+
+## Key Pages
+
+- [Home](https://frontguard.dev) — Product overview, features, getting started
+- [Documentation](https://docs.frontguard.dev) — Full API reference, guides, configuration
+- [GitHub](https://github.com/ravidsrk/frontguard) — Source code, issues, contributing
+- [npm](https://www.npmjs.com/package/frontguard) — Package installation
+
+## What Frontguard Does
+
+- Zero-config route discovery — automatically finds all routes in Next.js, Remix, Astro, Vite, and SvelteKit projects
+- Multi-viewport screenshot capture — renders pages at desktop (1280px), tablet (768px), and mobile (375px)
+- Pixel-level diffing — compares screenshots against baselines to detect visual changes
+- AI-powered analysis — explains regressions in plain English with root cause and suggested fixes
+- CI/CD integration — runs as a Playwright test in any CI pipeline (GitHub Actions, GitLab CI, etc.)
+
+## Author
+
+Ravindra Kumar — https://github.com/ravidsrk
+
+## License
+
+MIT — Free and open source
+
+---
+
+## Detailed Feature Descriptions
+
+### Zero-Config Route Discovery
+
+Frontguard automatically discovers every route in your web application without requiring any manual configuration. When you run Frontguard, it analyzes your project's file structure and framework conventions to build a complete list of pages to test. For Next.js projects, it reads the `app/` or `pages/` directory. For Remix, it parses the `routes/` folder. Astro, Vite, and SvelteKit projects are handled similarly — Frontguard understands each framework's routing conventions and extracts all static and dynamic routes. This means you get full visual coverage of your application from the very first run, with zero setup. If a developer adds a new page, Frontguard picks it up automatically on the next run.
+
+### Multi-Viewport Screenshot Capture
+
+Every discovered route is rendered at three viewport widths: desktop (1280px), tablet (768px), and mobile (375px). This ensures that responsive design regressions are caught regardless of the breakpoint they occur at. Frontguard uses Playwright's browser automation to load each page, wait for it to stabilize (network idle, animations complete), and then capture a full-page screenshot. The result is a comprehensive visual snapshot of your entire application across all device sizes. Screenshots are stored locally as baseline images and compared against subsequent runs.
+
+### Pixel-Level Diffing
+
+Frontguard compares each new screenshot against its stored baseline using pixel-level image diffing. When pixels differ between the baseline and the current screenshot, Frontguard generates a diff image highlighting the changed regions. A configurable threshold determines how much change is considered significant — minor anti-aliasing differences are ignored, while meaningful layout shifts, color changes, and content differences are flagged. The diff output includes the percentage of pixels that changed, the specific regions affected, and a visual overlay showing exactly what moved or changed.
+
+### AI-Powered Analysis
+
+When a visual regression is detected, Frontguard doesn't just show you a diff image and leave you to figure out what happened. It sends the baseline screenshot, the current screenshot, and the diff image to an AI model that analyzes the visual changes and produces a plain-English explanation. The AI report includes three parts: (1) what changed — a description of the visible differences, such as "the navigation bar shifted 12px to the right and the hero image is missing," (2) why it likely broke — possible root causes like "a CSS margin change on the header component" or "a missing asset import," and (3) how to fix it — suggested code changes or configuration adjustments. This transforms visual regression testing from a manual review process into an automated, actionable workflow.
+
+### CI/CD Integration
+
+Frontguard is designed to run inside continuous integration pipelines. It executes as a standard Playwright test, which means it works anywhere Playwright works: GitHub Actions, GitLab CI, CircleCI, Jenkins, Azure DevOps, and any other CI platform. When a visual regression is detected in CI, the test fails with a detailed report. Developers see exactly which pages changed, on which viewports, and get AI-generated explanations of what went wrong — all without leaving their pull request or CI dashboard.
+
+---
+
+## Installation and Usage
+
+### Prerequisites
+
+- Node.js 18 or later
+- A web application project (Next.js, Remix, Astro, Vite, or SvelteKit)
+
+### Installation
+
+Install Frontguard as a dev dependency:
+
+```bash
+npm install --save-dev frontguard
+```
+
+Or with other package managers:
+
+```bash
+yarn add --dev frontguard
+pnpm add --save-dev frontguard
+```
+
+Frontguard includes Playwright as a peer dependency. If you don't already have Playwright browsers installed:
+
+```bash
+npx playwright install
+```
+
+### Configuration
+
+Frontguard works with zero configuration for supported frameworks. It automatically detects your framework and discovers routes.
+
+For custom configuration, create a `frontguard.config.ts` (or `.js`) file in your project root:
+
+```typescript
+import { defineConfig } from 'frontguard';
+
+export default defineConfig({
+  baseUrl: 'http://localhost:3000',
+  viewports: {
+    desktop: { width: 1280, height: 720 },
+    tablet: { width: 768, height: 1024 },
+    mobile: { width: 375, height: 812 },
+  },
+  threshold: 0.1,       // Pixel diff threshold (0-1)
+  routes: 'auto',       // 'auto' for discovery, or explicit array
+  baselineDir: '.frontguard/baselines',
+  outputDir: '.frontguard/results',
+});
+```
+
+### Running Frontguard
+
+First run — capture baselines:
+
+```bash
+npx frontguard
+```
+
+On the first run, Frontguard captures baseline screenshots for all discovered routes and viewports. These baselines are stored in `.frontguard/baselines/` and should be committed to your repository.
+
+Subsequent runs — detect regressions:
+
+```bash
+npx frontguard
+```
+
+Frontguard compares current screenshots against baselines and reports any visual differences. If regressions are found, it generates diff images and AI analysis reports in `.frontguard/results/`.
+
+Update baselines after intentional changes:
+
+```bash
+npx frontguard --update-baselines
+```
+
+This replaces existing baselines with current screenshots, accepting all visual changes as the new expected state.
+
+---
+
+## How AI Analysis Works
+
+Frontguard's AI analysis pipeline follows three stages:
+
+1. **Screenshot Comparison** — Frontguard captures a fresh screenshot of each route at each viewport and compares it pixel-by-pixel against the stored baseline. If the pixel difference exceeds the configured threshold, the route is flagged as a regression.
+
+2. **Diff Detection** — For flagged routes, Frontguard generates a diff image that highlights exactly which regions of the page changed. It calculates the percentage of changed pixels, identifies bounding boxes around changed regions, and classifies the type of change (layout shift, color change, content addition/removal, etc.).
+
+3. **AI Explanation** — The baseline image, current image, and diff image are sent to an AI vision model. The model analyzes the visual differences and produces a structured report containing: a human-readable description of what changed, a likely root cause analysis, and specific suggestions for fixing the regression. This report is included in the test output and CI logs.
+
+The AI analysis uses vision-capable language models (such as GPT-4o or Claude) to interpret the visual changes. The model receives the images along with context about the route, viewport, and framework, enabling it to make informed suggestions about the likely cause and fix.
+
+---
+
+## Comparison with Alternatives
+
+### Percy (BrowserStack)
+
+Percy is a commercial visual testing platform. It requires uploading screenshots to Percy's cloud for comparison and review. Pricing is per-screenshot, which can become expensive for large applications. Percy provides a web-based review UI but does not include AI-powered analysis of regressions. Frontguard is free, runs entirely locally or in your own CI, stores baselines in your repository, and includes AI-powered explanations.
+
+### Chromatic (Storybook)
+
+Chromatic is tightly coupled with Storybook — it captures screenshots of individual components rather than full pages. It's a cloud service with usage-based pricing. Chromatic excels at component-level visual testing but does not provide full-page, route-level regression testing. Frontguard tests your actual deployed pages across all routes and viewports, catching integration-level visual bugs that component-level tools miss.
+
+### BackstopJS
+
+BackstopJS is an open-source visual regression tool that uses Puppeteer. It requires manual configuration of every URL and viewport to test. There is no route auto-discovery and no AI analysis. BackstopJS generates diff reports but leaves interpretation entirely to the developer. Frontguard automates route discovery, supports modern frameworks out of the box, uses Playwright (faster and more reliable than Puppeteer), and adds AI-powered analysis on top.
+
+### What Makes Frontguard Different
+
+| Feature | Frontguard | Percy | Chromatic | BackstopJS |
+|---|---|---|---|---|
+| Free & open source | ✅ | ❌ (paid) | ❌ (paid) | ✅ |
+| Zero-config route discovery | ✅ | ❌ | ❌ | ❌ |
+| AI-powered analysis | ✅ | ❌ | ❌ | ❌ |
+| Full-page testing | ✅ | ✅ | ❌ (components) | ✅ |
+| Multi-viewport | ✅ | ✅ | ✅ | ✅ (manual) |
+| Runs locally / in your CI | ✅ | ❌ (cloud) | ❌ (cloud) | ✅ |
+| Playwright-based | ✅ | ❌ | ❌ | ❌ (Puppeteer) |
+
+---
+
+## Framework Support
+
+Frontguard supports automatic route discovery for the following frameworks:
+
+### Next.js (App Router & Pages Router)
+Reads `app/` directory for App Router routes and `pages/` directory for Pages Router routes. Handles dynamic segments (`[id]`), catch-all routes (`[...slug]`), route groups, parallel routes, and layouts. Skips API routes and middleware.
+
+### Remix
+Parses the `app/routes/` directory following Remix's flat-file and nested routing conventions. Handles parameterized routes, layout routes, and pathless layout routes.
+
+### Astro
+Reads `src/pages/` and discovers `.astro`, `.md`, and `.mdx` page files. Handles static and dynamic routes according to Astro's file-based routing.
+
+### Vite (with file-based routing plugins)
+Supports Vite projects using `vite-plugin-pages` or similar file-based routing solutions. Falls back to manual route specification if no routing plugin is detected.
+
+### SvelteKit
+Parses `src/routes/` following SvelteKit's file-based routing conventions. Handles `+page.svelte` files, layout groups, and parameterized routes.
+
+For frameworks not listed above, you can manually specify routes in the configuration file.
+
+---
+
+## CI/CD Setup Examples
+
+### GitHub Actions
+
+```yaml
+name: Visual Regression Tests
+on: [pull_request]
+
+jobs:
+  visual-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Build application
+        run: npm run build
+
+      - name: Start application
+        run: npm start &
+
+      - name: Run Frontguard
+        run: npx frontguard
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Upload results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontguard-results
+          path: .frontguard/results/
+```
+
+### GitLab CI
+
+```yaml
+visual-regression:
+  image: mcr.microsoft.com/playwright:v1.40.0-jammy
+  stage: test
+  script:
+    - npm ci
+    - npm run build
+    - npm start &
+    - npx frontguard
+  artifacts:
+    when: on_failure
+    paths:
+      - .frontguard/results/
+  variables:
+    OPENAI_API_KEY: $OPENAI_API_KEY
+```
+
+---
+
+## FAQ
+
+### Is Frontguard free?
+Yes. Frontguard is completely free and open source under the MIT license. There are no usage limits, no per-screenshot pricing, and no cloud accounts required.
+
+### Does Frontguard require an API key?
+Frontguard's core screenshot capture and pixel diffing works without any API key. The AI-powered analysis feature requires an API key for a vision-capable AI model (e.g., OpenAI API key for GPT-4o). Set it as the `OPENAI_API_KEY` environment variable.
+
+### How do I handle dynamic content (dates, ads, user-specific data)?
+Frontguard supports region masking — you can configure specific areas of a page to be excluded from comparison. You can also set a higher diff threshold for pages with known dynamic content. For dates, consider using a fixed date in your test environment.
+
+### Can I test only specific routes?
+Yes. Override automatic discovery by specifying routes in your configuration file:
+```typescript
+export default defineConfig({
+  routes: ['/', '/about', '/pricing', '/blog'],
+});
+```
+
+### Do I need to commit baseline images to my repository?
+Yes, baselines should be committed so that CI runs can compare against them. The `.frontguard/baselines/` directory typically adds 5-50 MB to your repository depending on the number of routes and viewports. Consider using Git LFS for large projects.
+
+### What browsers does Frontguard support?
+Frontguard uses Playwright, which supports Chromium, Firefox, and WebKit. By default, Frontguard uses Chromium for consistency. You can configure additional browsers in the config file.
+
+### Can I use Frontguard with a non-JavaScript project?
+Yes. If your web application runs on a URL, Frontguard can test it. Specify the `baseUrl` and `routes` manually in the configuration file. Auto-discovery only works for supported JavaScript frameworks.
+
+### How does Frontguard handle flaky screenshots?
+Frontguard waits for network idle and configurable stability conditions before capturing. It also supports retry logic — if a diff is detected, it can re-capture and re-compare to filter out transient rendering differences.
+
+---
+
+## Troubleshooting
+
+### Screenshots look blank or incomplete
+- Ensure your application is fully started before running Frontguard
+- Check that the `baseUrl` is correct and accessible
+- Increase the wait time: `npx frontguard --wait 5000` (milliseconds)
+- Verify Playwright browsers are installed: `npx playwright install`
+
+### Too many false positives
+- Increase the diff threshold in configuration (e.g., `threshold: 0.2`)
+- Add region masks for dynamic content areas
+- Ensure your test environment uses deterministic data (fixed dates, seeded random values)
+
+### AI analysis not working
+- Verify your `OPENAI_API_KEY` (or equivalent) is set and valid
+- Check your API quota and rate limits
+- Frontguard falls back to diff-only mode if the AI service is unavailable
+
+### Route discovery missing pages
+- Verify your framework is supported and the project structure follows conventions
+- Check that pages are not marked as draft or hidden
+- Use `npx frontguard --list-routes` to see discovered routes and debug
+
+### CI pipeline times out
+- Reduce the number of viewports if testing time is a concern
+- Use `routes` config to test only critical pages in CI
+- Ensure the application starts quickly in your CI environment
+
+### Baseline mismatch after OS/browser update
+- Different operating systems and browser versions can render fonts and subpixels differently
+- Pin your CI runner's OS and Playwright version for consistent results
+- Re-generate baselines after intentional environment updates: `npx frontguard --update-baselines`
+
+---
+
+## Version History
+
+### v0.1.0 (Initial Release)
+- Zero-config route discovery for Next.js, Remix, Astro, Vite, and SvelteKit
+- Multi-viewport screenshot capture (desktop, tablet, mobile)
+- Pixel-level image diffing with configurable threshold
+- AI-powered regression analysis with root cause and fix suggestions
+- CLI interface with baseline management
+- GitHub Actions and GitLab CI integration support
+- Playwright-based browser automation
+- MIT licensed, free and open source
+
+---
+
+## Technical Details
+
+- **Runtime:** Node.js 18+
+- **Browser automation:** Playwright
+- **Image diffing:** pixelmatch (pixel-level comparison)
+- **AI models:** Compatible with OpenAI GPT-4o, Anthropic Claude, and other vision-capable models
+- **Package size:** Lightweight CLI, Playwright browsers installed separately
+- **Baseline storage:** Local filesystem (committed to repository)
+- **Output format:** HTML report, JSON data, diff images
+
+## Links
+
+- Website: https://frontguard.dev
+- Documentation: https://docs.frontguard.dev
+- GitHub: https://github.com/ravidsrk/frontguard
+- npm: https://www.npmjs.com/package/frontguard
+- Author: Ravindra Kumar (https://github.com/ravidsrk)
