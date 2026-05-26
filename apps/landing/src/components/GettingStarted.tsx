@@ -126,7 +126,7 @@ aria-controls={`tabpanel-${t}`}
 tabIndex={tab === t ? 0 : -1}
 onClick={() => setTab(t)}
 onKeyDown={(e) => handleTabKeyDown(e, t)}
-className={`touch-manipulation flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+className={`touch-manipulation flex-1 rounded-md px-4 py-2.5 min-h-[44px] text-sm font-medium transition-colors ${
 tab === t
 ? 'bg-[var(--color-bg-card)] text-[var(--color-text)] shadow-sm'
 : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
