@@ -71,7 +71,222 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Static HTML fallback for search engine crawlers. React replaces this on mount. -->
+      <style>
+        .seo-fallback { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #e2e8f0; background: #06080c; margin: 0; padding: 0; line-height: 1.7; }
+        .seo-fallback a { color: #f97316; text-decoration: underline; }
+        .seo-fallback h1, .seo-fallback h2, .seo-fallback h3 { font-family: 'Outfit', system-ui, sans-serif; color: #f1f5f9; line-height: 1.2; }
+        .seo-fallback h1 { font-size: 2.25rem; font-weight: 800; margin: 0 0 1rem; }
+        .seo-fallback h2 { font-size: 1.75rem; font-weight: 700; margin: 2.5rem 0 1rem; }
+        .seo-fallback h3 { font-size: 1.125rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }
+        .seo-fallback p, .seo-fallback li { color: #94a3b8; }
+        .seo-fallback .wrap { max-width: 48rem; margin: 0 auto; padding: 2rem 1.5rem; }
+        .seo-fallback nav ul { list-style: none; display: flex; gap: 1.5rem; padding: 0; }
+        .seo-fallback section { padding: 2rem 0; border-top: 1px solid #1e293b; }
+        .seo-fallback pre, .seo-fallback code { font-family: 'JetBrains Mono', monospace; font-size: 0.875rem; background: #0f172a; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; display: block; color: #e2e8f0; }
+        .seo-fallback footer { border-top: 1px solid #1e293b; margin-top: 2rem; padding-top: 2rem; }
+        .seo-fallback footer ul { list-style: none; padding: 0; }
+        .seo-fallback .cta { display: inline-block; background: #f97316; color: #06080c; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; text-decoration: none; margin-right: 1rem; }
+        .seo-fallback .cta-secondary { display: inline-block; border: 1px solid #334155; padding: 0.75rem 1.5rem; border-radius: 0.5rem; color: #e2e8f0; text-decoration: none; }
+      </style>
+      <div class="seo-fallback">
+        <div class="wrap">
+
+          <!-- Header / Nav -->
+          <header>
+            <nav aria-label="Main navigation">
+              <a href="/" aria-label="Frontguard home"><strong>frontguard</strong></a>
+              <ul>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="#getting-started">Getting Started</a></li>
+                <li><a href="https://docs.frontguard.dev" target="_blank" rel="noopener noreferrer">Docs</a></li>
+                <li><a href="https://github.com/ravidsrk/frontguard" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+              </ul>
+            </nav>
+          </header>
+
+          <main>
+            <!-- Hero -->
+            <section aria-labelledby="hero-heading">
+              <p>Open source · MIT Licensed</p>
+              <h1 id="hero-heading">Your CSS broke the checkout page. <span>Frontguard caught it.</span></h1>
+              <p>Visual regression testing that tells you what broke, why it broke, and how to fix it. Plugs into Playwright. Runs in CI. Free and open source.</p>
+              <p>
+                <a href="#getting-started" class="cta">Install in 30 Seconds</a>
+                <a href="https://github.com/ravidsrk/frontguard" target="_blank" rel="noopener noreferrer" class="cta-secondary">View on GitHub</a>
+              </p>
+            </section>
+
+            <!-- Problem -->
+            <section id="problem" aria-labelledby="problem-heading">
+              <h2 id="problem-heading">Your CI catches code bugs. But who catches the visual ones?</h2>
+              <h3>CSS changes break layouts silently</h3>
+              <p>A padding change in your component breaks the checkout button on mobile. Functional tests pass. You find out from a customer screenshot in Slack.</p>
+              <h3>Screenshot diffs are 90% noise</h3>
+              <p>Your team approved 47 baseline updates last sprint without looking at them. Because when everything is flagged, nothing is.</p>
+              <h3>Manual QA doesn't scale</h3>
+              <p>Every deploy needs eyes on 30 pages across 3 breakpoints. That's 90 manual checks. Every. Single. Time.</p>
+            </section>
+
+            <!-- How It Works -->
+            <section id="how-it-works" aria-labelledby="how-it-works-heading">
+              <h2 id="how-it-works-heading">Add visual testing to Playwright in 3 lines.</h2>
+              <p>Add visual regression testing to your Playwright suite in under a minute.</p>
+              <h3>Step 1 — Install</h3>
+              <pre><code>npm install @frontguard/playwright</code></pre>
+              <p>One package. No config files, no dashboard setup.</p>
+              <h3>Step 2 — Add to tests</h3>
+              <pre><code>import { test } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
+test('checkout page', async ({ page }) =&gt; {
+  await page.goto('https://myapp.com/checkout');
+  const result = await visualTest(page, 'checkout');
+  expect(result.passed).toBe(true);
+});</code></pre>
+              <p>Drop it into any existing Playwright test. Just 3 lines of code.</p>
+              <h3>Step 3 — Run in CI</h3>
+              <pre><code>npx playwright test</code></pre>
+              <p>Get PR comments with visual diffs and AI analysis.</p>
+            </section>
+
+            <!-- Features -->
+            <section id="features" aria-labelledby="features-heading">
+              <h2 id="features-heading">Built for the problems pixel diffs can't solve.</h2>
+
+              <article>
+                <h3>AI-Powered Analysis — It tells you why, not where</h3>
+                <p>Instead of "pixels differ at coordinates 340,890," you get: "the submit button overflows on mobile because the new padding pushes it outside the flex container." GPT-4o vision reads the screenshot the way a senior engineer would.</p>
+              </article>
+
+              <article>
+                <h3>Anti-Flake Consensus — 3 screenshots, majority wins</h3>
+                <p>Spinner mid-animation? Loading flicker? A blinking cursor in your hero? Frontguard takes three captures, keeps the consensus, drops the outlier. Flake noise stops drowning real regressions.</p>
+              </article>
+
+              <article>
+                <h3>Smart Route Discovery — Point at a URL. It tests every page.</h3>
+                <p>No config files. No route lists. No baseline directories to maintain. The crawler walks your sitemap, finds every reachable page, and builds the test matrix for you.</p>
+              </article>
+
+              <article>
+                <h3>PR-Native Review — Diffs render in the GitHub thread</h3>
+                <p>Every PR gets a comment with side-by-side visual diffs and the AI explanation inline. Approve or reject without leaving the review tab.</p>
+              </article>
+
+              <article>
+                <h3>Multi-Browser — Chromium, Firefox, WebKit — one command</h3>
+                <p>That Safari flexbox bug a customer found last quarter? It would have been caught at PR time. WebKit gets the same screenshot pipeline as Chromium.</p>
+              </article>
+
+              <article>
+                <h3>Plugin System — 6 lifecycle hooks for whatever you need</h3>
+                <p>Compare production against Figma. Set performance budgets. Monitor live pages. Build your own with onBeforeCapture, onAfterDiff, and onReport hooks.</p>
+              </article>
+            </section>
+
+            <!-- Comparison -->
+            <section id="comparison" aria-labelledby="comparison-heading">
+              <h2 id="comparison-heading">Why not Percy? Or Chromatic? Or just Playwright screenshots?</h2>
+              <p>Frontguard is the only open-source visual testing tool with AI analysis, anti-flake consensus, and auto-fix suggestions. Here is how it compares:</p>
+              <ul>
+                <li><strong>AI analysis:</strong> Frontguard ✔ — Percy, Chromatic, Playwright ✗</li>
+                <li><strong>Open source:</strong> Frontguard ✔ — Playwright ✔ — Chromatic partial — Percy ✗</li>
+                <li><strong>No per-screenshot fees:</strong> Frontguard ✔ — Playwright ✔ — Percy ✗ — Chromatic ✗</li>
+                <li><strong>Anti-flake consensus:</strong> Frontguard ✔ — all others ✗</li>
+                <li><strong>Playwright native:</strong> Frontguard ✔ — Playwright ✔ — Percy ✗ — Chromatic ✗</li>
+                <li><strong>Works without Storybook:</strong> Frontguard ✔ — Percy ✔ — Playwright ✔ — Chromatic ✗</li>
+                <li><strong>Auto-fix suggestions:</strong> Frontguard ✔ — all others ✗</li>
+              </ul>
+            </section>
+
+            <!-- Getting Started -->
+            <section id="getting-started" aria-labelledby="getting-started-heading">
+              <h2 id="getting-started-heading">Start catching visual bugs in 30 seconds</h2>
+              <h3>CLI Quick Start</h3>
+              <pre><code>npm install -g frontguard
+frontguard init
+frontguard run --url http://localhost:3000</code></pre>
+              <h3>Playwright Plugin</h3>
+              <pre><code>npm install @frontguard/playwright</code></pre>
+              <pre><code>import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
+test('homepage visual', async ({ page }) =&gt; {
+  await page.goto('http://localhost:3000');
+  const result = await visualTest(page, 'homepage');
+  expect(result.passed).toBe(true);
+});</code></pre>
+            </section>
+
+            <!-- Final CTA -->
+            <section aria-labelledby="final-cta-heading">
+              <h2 id="final-cta-heading">Never find out about CSS bugs from your users again</h2>
+              <p>Install Frontguard in 30 seconds. Catch the bugs that pixel diffs miss.</p>
+              <p><a href="https://docs.frontguard.dev/docs/quick-start" class="cta">Install Frontguard in 30 Seconds</a></p>
+              <p>No credit card required. Free forever for individual developers.</p>
+            </section>
+          </main>
+
+          <!-- Footer -->
+          <footer role="contentinfo">
+            <p><strong>frontguard</strong> — Visual regression testing for Playwright. Open source under the MIT License.</p>
+            <nav aria-label="Product links">
+              <h3>Product</h3>
+              <ul>
+                <li><a href="#features">Features</a></li>
+                <li><a href="https://docs.frontguard.dev" target="_blank" rel="noopener noreferrer">Docs</a></li>
+                <li><a href="https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a></li>
+              </ul>
+            </nav>
+            <nav aria-label="Resource links">
+              <h3>Resources</h3>
+              <ul>
+                <li><a href="https://docs.frontguard.dev/docs/cli" target="_blank" rel="noopener noreferrer">CLI Reference</a></li>
+                <li><a href="https://docs.frontguard.dev/docs/playwright" target="_blank" rel="noopener noreferrer">Playwright Plugin</a></li>
+                <li><a href="https://docs.frontguard.dev/docs/ci-cd/github-actions" target="_blank" rel="noopener noreferrer">GitHub Actions</a></li>
+                <li><a href="https://github.com/ravidsrk/frontguard" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+                <li><a href="https://www.npmjs.com/package/frontguard" target="_blank" rel="noopener noreferrer">npm</a></li>
+                <li><a href="https://github.com/ravidsrk/frontguard/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">Contributing</a></li>
+              </ul>
+            </nav>
+            <nav aria-label="Legal links">
+              <h3>Legal</h3>
+              <ul>
+                <li><a href="https://github.com/ravidsrk/frontguard/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a></li>
+              </ul>
+            </nav>
+            <p>&copy; 2025 Frontguard. Open source under the MIT License.</p>
+          </footer>
+
+        </div>
+      </div>
+    </div>
+
+    <noscript>
+      <style>
+        body { font-family: system-ui, sans-serif; color: #e2e8f0; background: #06080c; margin: 0; padding: 2rem; line-height: 1.7; }
+        a { color: #f97316; } h1, h2, h3 { color: #f1f5f9; } h1 { font-size: 2rem; }
+        .wrap { max-width: 48rem; margin: 0 auto; }
+      </style>
+      <div class="wrap">
+        <h1>Frontguard — Visual regression testing for Playwright</h1>
+        <p>Your CSS broke the checkout page. Frontguard caught it. Visual regression testing that tells you what broke, why it broke, and how to fix it. Plugs into Playwright. Runs in CI. Free and open source.</p>
+        <p>This page requires JavaScript to run the full interactive experience. Please enable JavaScript or visit the links below:</p>
+        <ul>
+          <li><a href="https://docs.frontguard.dev">Documentation</a></li>
+          <li><a href="https://github.com/ravidsrk/frontguard">GitHub Repository</a></li>
+          <li><a href="https://www.npmjs.com/package/frontguard">npm Package</a></li>
+          <li><a href="https://github.com/ravidsrk/frontguard/blob/main/LICENSE">MIT License</a></li>
+        </ul>
+        <h2>Getting Started</h2>
+        <p>Install via CLI: <code>npm install -g frontguard && frontguard init</code></p>
+        <p>Or as a Playwright plugin: <code>npm install @frontguard/playwright</code></p>
+      </div>
+    </noscript>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
