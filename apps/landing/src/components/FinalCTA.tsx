@@ -17,7 +17,7 @@ Install Frontguard in 30 seconds. Catch the bugs that pixel diffs miss.
 </p>
 <a
 href="https://docs.frontguard.dev/docs/quick-start"
-className="touch-manipulation mt-2 inline-flex items-center gap-2 rounded-xl bg-[var(--color-cta)] px-8 py-4 text-base font-semibold text-[var(--color-bg)] shadow-lg shadow-orange-500/20 transition-[background-color,box-shadow] hover:bg-[var(--color-cta-hover)] hover:shadow-orange-500/30"
+className="touch-manipulation mt-2 inline-flex items-center gap-2 rounded-xl bg-[var(--color-cta)] px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-semibold text-[var(--color-bg)] shadow-lg shadow-orange-500/20 transition-[background-color,box-shadow] hover:bg-[var(--color-cta-hover)] hover:shadow-orange-500/30"
 >
 Install Frontguard in 30 Seconds
 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
