@@ -37,7 +37,7 @@ But who catches the visual ones?
 <div className="mt-10 grid gap-4 sm:mt-16 sm:gap-6 lg:grid-cols-[1.4fr_1fr]">
 {/* Prominent first card */}
 <div
-className={`flex flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-8 sm:p-10 transition-colors hover:border-[var(--color-border-bright)] ${inView ? 'animate-fade-up' : 'opacity-0'}`}
+className={`flex flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5 sm:p-8 md:p-10 transition-colors hover:border-[var(--color-border-bright)] ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 style={{ animationDelay: '200ms' }}
 >
 <span className="font-[family-name:var(--font-mono)] text-xs uppercase tracking-wide text-[var(--color-danger)]/80">
@@ -52,7 +52,7 @@ style={{ animationDelay: '200ms' }}
 {/* Tiny diff visual — concrete proof, not an icon */}
 <div className="mt-auto pt-8">
 <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
-<div className="grid grid-cols-2 divide-x divide-[var(--color-border)] font-[family-name:var(--font-mono)] text-xs">
+<div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--color-border)] font-[family-name:var(--font-mono)] text-xs">
 <div className="flex flex-col gap-1 p-4">
 <span className="text-[var(--color-text-dim)]">before</span>
 <span className="text-[var(--color-success)]">.checkout-form &#123; padding: 16px &#125;</span>
