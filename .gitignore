@@ -11,7 +11,6 @@ core
 frontguard-report/
 
 # Deployment-specific
-fly.toml
 
 # Next.js
 .next/
