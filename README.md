@@ -187,7 +187,7 @@ See [`docs/`](./docs/) for:
 
 ## Roadmap
 
-See [ROADMAP.md](./ROADMAP.md) for the full milestone history and upcoming plans.
+See [ROADMAP.md](./docs/ROADMAP.md) for the full milestone history and upcoming plans.
 
 ## Environment Variables
 
