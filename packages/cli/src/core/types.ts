@@ -222,6 +222,8 @@ export interface FrontguardConfig {
   renderRetries?: number;
   /** Screenshot image-upload configuration (for PR comment thumbnails). */
   imageUpload?: ImageUploadConfig;
+  /** Anonymous usage telemetry (default: true). Disable to opt out. */
+  telemetry?: boolean;
 }
 
 // ---------------------------------------------------------------------------

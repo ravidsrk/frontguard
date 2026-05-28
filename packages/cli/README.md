@@ -25,8 +25,11 @@ AI explains what changed and why → Suggests fixes → Posts PR comment
 ## Quick Start
 
 ```bash
-# Initialize config (auto-detects your framework)
-npx frontguard init
+# Initialize config (auto-detects your framework; --ci adds a GitHub Action)
+npx frontguard init --ci
+
+# Verify your environment (Node, Playwright, browsers, git, config)
+npx frontguard doctor
 
 # Run visual regression tests
 npx frontguard run --url http://localhost:3000
@@ -34,6 +37,15 @@ npx frontguard run --url http://localhost:3000
 # Accept current screenshots as new baselines
 npx frontguard update-baselines
 ```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `frontguard run` | Run visual regression tests (default command) |
+| `frontguard init [--ci] [--yes]` | Generate config, optionally a GitHub Actions workflow |
+| `frontguard doctor` | Diagnose environment readiness |
+| `frontguard update-baselines` | Accept current screenshots as new baselines |
 
 ## Features
 

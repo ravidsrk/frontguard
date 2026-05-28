@@ -10,7 +10,18 @@
 
 Backend has Datadog, Sentry, PagerDuty — a $20B+ monitoring ecosystem. Frontend gets... manual QA and hoping for the best. Frontguard changes that.
 
-> **400 tests** · **27 test files** · **27 source files** · **102KB bundle** · **3 built-in plugins**
+> **460+ tests** · **multi-browser** · **AI vision analysis** · **self-hostable** · **MIT**
+
+<!-- Demo: regenerate with `vhs demo/frontguard-demo.tape` → demo/frontguard-demo.gif -->
+<p align="center">
+  <img src="./demo/frontguard-demo.gif" alt="Frontguard demo — init, doctor, run, AI classification" width="800"/>
+</p>
+
+## Why Frontguard?
+
+- **🧠 AI-powered analysis** — Doesn't just say "pixels differ." It classifies the change (regression vs intentional vs content update), explains *why*, and suggests a fix. This kills the #1 pain of visual testing: false positives.
+- **🎯 Anti-flake rendering** — Multi-render consensus eliminates the flaky-screenshot noise that makes teams disable their visual suites.
+- **🔓 Open-source & self-hostable** — CLI-first, free forever. No per-screenshot pricing cliff, no dashboard lock-in, BYO AI key.
 
 ## What It Does
 
@@ -31,8 +42,11 @@ AI explains what changed and why → Suggests fixes → Posts PR comment
 # Install
 npm install @frontguard/cli
 
-# Initialize config (auto-detects your framework)
-npx frontguard init
+# Initialize config (auto-detects your framework, --ci adds a GitHub Action)
+npx frontguard init --ci
+
+# Verify your environment is ready
+npx frontguard doctor
 
 # Run visual regression tests
 npx frontguard run --url http://localhost:3000
@@ -54,6 +68,36 @@ npx frontguard update-baselines
 - **Framework detection** — Next.js, Remix, SvelteKit, Nuxt, Astro out of the box
 - **Security hardened** — Shell injection prevention, path traversal guards, API key redaction
 - **Memory managed** — Streaming buffers, temp file cleanup, bounded concurrency
+- **PR thumbnails** — Baseline/current/diff images embedded in PR comments (R2/S3/GitHub artifacts)
+- **Per-route thresholds** — Strict on `/checkout`, relaxed on `/blog` — all in one config
+
+## How Frontguard Compares
+
+| | Frontguard | Percy | Chromatic | BackstopJS | Lost Pixel |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Open source | ✅ | ❌ | ◐ | ✅ | ◐ (archived) |
+| CLI-first | ✅ | ❌ | ❌ | ✅ | ✅ |
+| **AI change classification** | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Anti-flake rendering | ✅ | ◐ | ◐ | ❌ | ❌ |
+| Self-hostable | ✅ | ❌ | ❌ | ✅ | ◐ |
+| Free tier | Forever (CLI) | Trial → $399/mo | Storybook hobby | Free | Dead |
+| Actively maintained | ✅ | ✅ | ✅ | ❌ (6yr) | ❌ |
+
+> Migrating? See the [BackstopJS](https://frontguard.dev/docs/guides/migrate-from-backstopjs) and [Lost Pixel](https://frontguard.dev/docs/guides/migrate-from-lost-pixel) guides.
+
+## AI Classification Example
+
+```
+  ✘ /dashboard @ 375px — 2.34% changed
+    🔴 AI Analysis — Regression (94% confidence)
+    "The sidebar overlaps the main content on mobile. A flex-direction
+     change in Dashboard.module.css:28 removed the column stacking."
+    Suggested fix: restore `flex-direction: column` at the < 768px breakpoint.
+
+  ✓ /pricing @ 1440px — 0.8% changed
+    🟢 AI Analysis — Intentional (91% confidence)
+    "New 'Enterprise' pricing tier added. Layout intact, content expanded."
+```
 
 ## Configuration
 

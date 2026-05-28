@@ -16,6 +16,7 @@ import { runPipeline, updateBaselines } from '../core/pipeline.js';
 import { runDoctor } from './doctor.js';
 import { getFrameworkInfo } from '../templates/index.js';
 import { generateGitHubActionsWorkflow } from '../templates/github-actions.js';
+import { sendTelemetry, isTelemetryEnabled, type TelemetryEvent } from '../utils/telemetry.js';
 import { ConsoleReporter } from '../report/console.js';
 import { JSONReporter } from '../report/json.js';
 import { HTMLReporter } from '../report/html.js';
@@ -186,7 +187,19 @@ export async function main(argv?: string[]): Promise<number> {
   program
     .name('frontguard')
     .description('AI-powered frontend visual regression testing')
-    .version(VERSION);
+    .version(VERSION)
+    .option('--no-telemetry', 'Disable anonymous usage telemetry');
+
+  /** Helper: emit a telemetry event, honoring --no-telemetry and config. */
+  const emitTelemetry = async (
+    event: TelemetryEvent,
+    configEnabled?: boolean,
+  ): Promise<void> => {
+    // Commander stores --no-telemetry as opts.telemetry === false.
+    const optOutFlag = program.opts().telemetry === false;
+    if (!isTelemetryEnabled({ optOutFlag, configEnabled })) return;
+    await sendTelemetry(event, { enabled: true });
+  };
 
   // Track the exit code from command actions
   let exitCode = 0;
@@ -272,9 +285,28 @@ export async function main(argv?: string[]): Promise<number> {
           logger.info('✅ No regressions detected');
           exitCode = 0;
         }
+
+        // Anonymous telemetry (opt-out).
+        await emitTelemetry(
+          {
+            command: 'run',
+            version: VERSION,
+            routes: new Set(result.diffs.map((d) => d.route.path)).size,
+            regressions: summary.regressions,
+            aiProvider: config.ai?.provider ?? 'none',
+            antiFlake: (config.antiFlakeRenders ?? 1) > 1,
+            durationMs: result.timing.total,
+          },
+          config.telemetry,
+        );
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;
+        await emitTelemetry({
+          command: 'run',
+          version: VERSION,
+          errorType: err instanceof Error ? err.name : 'UnknownError',
+        });
       }
     });
 
@@ -383,6 +415,8 @@ export async function main(argv?: string[]): Promise<number> {
         logger.info('');
         logger.info('On first run, Frontguard will capture baseline screenshots.');
         logger.info('On subsequent runs, it will compare against them and report changes.');
+
+        await emitTelemetry({ command: 'init', version: VERSION });
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;
@@ -432,6 +466,7 @@ export async function main(argv?: string[]): Promise<number> {
     .action(async () => {
       try {
         exitCode = await runDoctor(process.cwd());
+        await emitTelemetry({ command: 'doctor', version: VERSION });
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;
