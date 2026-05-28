@@ -176,11 +176,16 @@ export class GitHubPRReporter implements Reporter {
         lines.push(`> ${severityEmoji} **AI Analysis** — ${classBadge} (${Math.round(ai.confidence * 100)}% confidence)`);
         lines.push(`>`);
         lines.push(`> ${ai.explanation}`);
-        if (ai.suggestedFix) {
+        if (ai.suggestedFix && !diff.suggestedFix) {
           lines.push(`>`);
           lines.push(`> **Suggested fix:** ${ai.suggestedFix}`);
         }
         lines.push('');
+      }
+
+      // Structured AI fix (Task 4.3)
+      if (diff.suggestedFix) {
+        lines.push(...this.renderFix(diff));
       }
 
       lines.push('</details>');
@@ -188,6 +193,44 @@ export class GitHubPRReporter implements Reporter {
     }
 
     return lines.join('\n');
+  }
+
+  /**
+   * Renders a collapsible structured-fix block with the CSS patch in a
+   * fenced `diff` code block. Verified fixes are visually distinct.
+   */
+  private renderFix(diff: DiffResult): string[] {
+    const fix = diff.suggestedFix;
+    if (!fix) return [];
+    const verified = diff.fixVerification?.verified;
+    const badge =
+      verified === true
+        ? '✅ **Verified** — re-rendered within threshold'
+        : verified === false
+          ? '⚠️ Unverified — could not confirm in sandbox'
+          : '💡 Suggested';
+    const lines: string[] = [];
+    lines.push('<details open>');
+    lines.push(
+      `<summary>🔧 Suggested fix — ${fix.category} (${Math.round(fix.confidence * 100)}% confidence)</summary>`,
+    );
+    lines.push('');
+    lines.push(badge);
+    lines.push('');
+    lines.push(`> ${fix.explanation}`);
+    lines.push('');
+    if (fix.target) lines.push(`Target: \`${fix.target}\``);
+    lines.push('');
+    // Present CSS as a diff block (additions) for "Apply Fix" copy-paste.
+    lines.push('```diff');
+    for (const line of fix.patch.split('\n')) {
+      lines.push(`+ ${line}`);
+    }
+    lines.push('```');
+    lines.push('');
+    lines.push('</details>');
+    lines.push('');
+    return lines;
   }
 
   private generateWarningsSection(warnings: DiffResult[]): string {
