@@ -357,6 +357,49 @@ export interface ScreenshotResult {
   duration: number;
 }
 
+/** Severity/impact level of an accessibility violation (axe-core scale). */
+export type AccessibilityImpact = 'minor' | 'moderate' | 'serious' | 'critical';
+
+/** A single accessibility violation node. */
+export interface AccessibilityViolationNode {
+  /** CSS selector(s) targeting the offending element. */
+  target: string[];
+  /** Short failure summary for this node. */
+  failureSummary?: string;
+  /** Truncated outer HTML of the element. */
+  html?: string;
+}
+
+/** A single accessibility violation (one axe rule). */
+export interface AccessibilityViolation {
+  /** Axe rule id (e.g. `color-contrast`). */
+  id: string;
+  /** Impact level. */
+  impact: AccessibilityImpact;
+  /** Human-readable description. */
+  description: string;
+  /** Help text describing how to fix. */
+  help: string;
+  /** URL to detailed remediation guidance. */
+  helpUrl: string;
+  /** Affected element nodes. */
+  nodes: AccessibilityViolationNode[];
+}
+
+/** Accessibility audit result for a single route × viewport. */
+export interface AccessibilityResult {
+  /** Route path audited. */
+  route: string;
+  /** Viewport width. */
+  viewport: number;
+  /** Violations found. */
+  violations: AccessibilityViolation[];
+  /** Number of passing checks. */
+  passes: number;
+  /** Number of incomplete (needs-review) checks. */
+  incomplete: number;
+}
+
 /**
  * Result of comparing a screenshot against its baseline.
  *
@@ -472,6 +515,8 @@ export interface RunResult {
   timing: RunTiming;
   /** Configuration used for this run. */
   config: FrontguardConfig;
+  /** Accessibility audit results (Task 5.1), if the a11y plugin ran. */
+  accessibility?: AccessibilityResult[];
 }
 
 // ---------------------------------------------------------------------------

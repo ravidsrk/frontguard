@@ -756,6 +756,13 @@ export async function runPipeline(
   timing.total = Math.round(performance.now() - totalStart);
   const result = buildResult(diffs, timing, totalStart, config);
 
+  // Surface accessibility results (Task 5.1) from plugin metadata onto the
+  // result so reporters can render them.
+  const a11yResults = pluginCtx.metadata.get('accessibility:results');
+  if (Array.isArray(a11yResults) && a11yResults.length > 0) {
+    result.accessibility = a11yResults as RunResult['accessibility'];
+  }
+
   // -----------------------------------------------------------------------
   // Stage 6.5: UPLOAD IMAGES (optional — for PR comment thumbnails)
   // -----------------------------------------------------------------------

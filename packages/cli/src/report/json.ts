@@ -85,6 +85,7 @@ interface SerializedRunResult {
   summary: RunResult['summary'];
   timing: RunResult['timing'];
   diffs: SerializedDiff[];
+  accessibility?: RunResult['accessibility'];
   config: {
     baseUrl: string;
     viewports: number[];
@@ -104,6 +105,7 @@ function serializeRunResult(result: RunResult): SerializedRunResult {
     summary: result.summary,
     timing: result.timing,
     diffs: result.diffs.map(serializeDiff),
+    accessibility: result.accessibility,
     config: {
       baseUrl: result.config.baseUrl,
       viewports: result.config.viewports,

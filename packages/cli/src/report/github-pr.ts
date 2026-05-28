@@ -84,10 +84,15 @@ export class GitHubPRReporter implements Reporter {
     // Marker for finding existing comments
     sections.push(COMMENT_MARKER);
 
-    // If all pages pass (no regressions, warnings, errors, or new), show clean badge
+    // If all pages pass (no regressions, warnings, errors, or new), show clean
+    // badge — but still surface accessibility violations if any were found.
     const allPassing = summary.regressions === 0 && summary.warnings === 0 && summary.errors === 0 && summary.newPages === 0;
+    const hasA11yViolations = !!result.accessibility?.some((r) => r.violations.length > 0);
     if (allPassing && summary.total > 0) {
       sections.push(`# ✅ Frontguard — All ${summary.total} pages match baselines`);
+      if (hasA11yViolations) {
+        sections.push(this.generateAccessibilitySection(result));
+      }
       sections.push(this.generateFooter(result));
       return sections.join('\n\n');
     }
@@ -111,6 +116,11 @@ export class GitHubPRReporter implements Reporter {
     const newPages = result.diffs.filter((d) => d.status === 'new');
     if (newPages.length > 0) {
       sections.push(this.generateNewPagesSection(newPages));
+    }
+
+    // Accessibility (Task 5.1)
+    if (result.accessibility && result.accessibility.some((r) => r.violations.length > 0)) {
+      sections.push(this.generateAccessibilitySection(result));
     }
 
     // Summary table
@@ -231,6 +241,36 @@ export class GitHubPRReporter implements Reporter {
     lines.push('</details>');
     lines.push('');
     return lines;
+  }
+
+  /** Renders the accessibility violations section. */
+  private generateAccessibilitySection(result: RunResult): string {
+    const a11y = result.accessibility ?? [];
+    const withViolations = a11y.filter((r) => r.violations.length > 0);
+    const total = withViolations.reduce((n, r) => n + r.violations.length, 0);
+    const lines: string[] = [`## ♿ Accessibility (${total} violation${total !== 1 ? 's' : ''})`, ''];
+
+    for (const r of withViolations) {
+      lines.push(`<details>`);
+      lines.push(`<summary>${r.route} @ ${r.viewport}px — ${r.violations.length} violation(s)</summary>`);
+      lines.push('');
+      lines.push('| Impact | Rule | Description | Element |');
+      lines.push('|--------|------|-------------|---------|');
+      for (const v of r.violations) {
+        const emoji =
+          v.impact === 'critical' ? '🔴' :
+          v.impact === 'serious' ? '🟠' :
+          v.impact === 'moderate' ? '🟡' : '🔵';
+        const target = (v.nodes[0]?.target?.join(', ') ?? '').replace(/\|/g, '\\|');
+        lines.push(
+          `| ${emoji} ${v.impact} | [${v.id}](${v.helpUrl}) | ${v.help.replace(/\|/g, '\\|')} | \`${target}\` |`,
+        );
+      }
+      lines.push('');
+      lines.push('</details>');
+      lines.push('');
+    }
+    return lines.join('\n');
   }
 
   private generateWarningsSection(warnings: DiffResult[]): string {
