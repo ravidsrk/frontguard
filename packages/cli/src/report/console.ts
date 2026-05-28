@@ -123,7 +123,41 @@ export class ConsoleReporter implements Reporter {
       this.printWarnings(result);
     }
 
+    this.printAccessibility(result);
     this.printSummary(result);
+  }
+
+  // -------------------------------------------------------------------------
+  // Accessibility
+  // -------------------------------------------------------------------------
+
+  private printAccessibility(result: RunResult): void {
+    const a11y = result.accessibility;
+    if (!a11y || a11y.length === 0) return;
+    const withViolations = a11y.filter((r) => r.violations.length > 0);
+    if (withViolations.length === 0) {
+      console.log(chalk.green('  ♿ Accessibility: no violations'));
+      console.log('');
+      return;
+    }
+    const total = withViolations.reduce((n, r) => n + r.violations.length, 0);
+    console.log(chalk.yellow.bold(`  ♿ ACCESSIBILITY (${total} violation${total !== 1 ? 's' : ''})`));
+    console.log('');
+    for (const r of withViolations) {
+      console.log(chalk.yellow(`    ${r.route} @ ${r.viewport}px`));
+      for (const v of r.violations) {
+        const impactColor =
+          v.impact === 'critical' ? chalk.red :
+          v.impact === 'serious' ? chalk.redBright :
+          v.impact === 'moderate' ? chalk.yellow : chalk.blue;
+        const target = v.nodes[0]?.target?.join(', ') ?? '';
+        console.log(
+          `      ${impactColor(`[${v.impact}]`)} ${chalk.bold(v.id)}: ${v.help}` +
+            (target ? chalk.dim(` (${target})`) : ''),
+        );
+      }
+      console.log('');
+    }
   }
 
   // -------------------------------------------------------------------------

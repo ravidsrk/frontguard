@@ -38,3 +38,16 @@ export type {
   BudgetCheckResult,
   BudgetViolation,
 } from './perf-budgets.js';
+// Accessibility audit plugin (axe-core)
+export {
+  createAccessibilityPlugin,
+  parseAxeResults,
+  meetsImpactThreshold,
+  normalizeImpact,
+  countFailingViolations,
+  ACCESSIBILITY_RESULTS_KEY,
+} from './accessibility.js';
+export type {
+  AccessibilityConfig,
+  RawAxeResults,
+} from './accessibility.js';

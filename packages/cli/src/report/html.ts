@@ -86,6 +86,7 @@ ${renderHeader(result)}
       <p>← Select a route from the sidebar to view details</p>
     </div>
     ${routeData.map((r, i) => renderRouteDetail(r.path, r.diffs, i, resolveImage)).join('\n    ')}
+    ${renderAccessibilitySection(result)}
   </main>
 </div>
 ${renderTimingFooter(result)}
@@ -319,6 +320,37 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
       <h2>${escapeHtml(path)}</h2>
       ${diffCards}
     </div>`;
+}
+
+function renderAccessibilitySection(result: RunResult): string {
+  const a11y = result.accessibility ?? [];
+  const withViolations = a11y.filter((r) => r.violations.length > 0);
+  if (withViolations.length === 0) return '';
+  const total = withViolations.reduce((n, r) => n + r.violations.length, 0);
+
+  const blocks = withViolations.map((r) => {
+    const rows = r.violations
+      .map((v) => {
+        const target = escapeHtml(v.nodes[0]?.target?.join(', ') ?? '');
+        return `<tr class="a11y-${v.impact}">
+            <td><span class="a11y-impact a11y-impact-${v.impact}">${v.impact}</span></td>
+            <td><a href="${escapeHtml(v.helpUrl)}" target="_blank" rel="noopener">${escapeHtml(v.id)}</a></td>
+            <td>${escapeHtml(v.help)}</td>
+            <td><code>${target}</code></td>
+          </tr>`;
+      })
+      .join('\n');
+    return `<h3>${escapeHtml(r.route)} @ ${r.viewport}px</h3>
+        <table class="a11y-table">
+          <thead><tr><th>Impact</th><th>Rule</th><th>Description</th><th>Element</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+  }).join('\n');
+
+  return `<section class="a11y-section" id="a11y-section">
+      <h2>♿ Accessibility (${total} violation${total !== 1 ? 's' : ''})</h2>
+      ${blocks}
+    </section>`;
 }
 
 function renderTimingFooter(result: RunResult): string {
@@ -586,6 +618,19 @@ body {
 }
 .copy-fix-btn:hover { background: #30363d; }
 .copy-fix-btn.copied { background: #238636; color: #fff; }
+
+/* Accessibility section */
+.a11y-section { margin-top: 32px; padding: 16px; border-top: 1px solid var(--border); }
+.a11y-section h2 { font-size: 18px; margin-bottom: 12px; }
+.a11y-section h3 { font-size: 14px; margin: 16px 0 8px; color: var(--text-muted); }
+.a11y-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.a11y-table th, .a11y-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.a11y-table code { font-family: ui-monospace, monospace; font-size: 12px; color: #7ee787; }
+.a11y-impact { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.a11y-impact-critical { background: rgba(248,81,73,0.2); color: #ff7b72; }
+.a11y-impact-serious { background: rgba(219,109,40,0.2); color: #ffa657; }
+.a11y-impact-moderate { background: rgba(210,153,34,0.2); color: #e3b341; }
+.a11y-impact-minor { background: rgba(88,166,255,0.15); color: #79c0ff; }
 
 .badge {
   display: inline-block;
