@@ -58,7 +58,7 @@ const REQUEST_TIMEOUT_MS = 60_000;
  * Uses nearest-neighbor interpolation (fast, sufficient for AI classification).
  * Returns the original buffer unchanged if already within maxWidth.
  */
-function downscaleForAI(buffer: Buffer, maxWidth = 800): Buffer {
+export function downscaleForAI(buffer: Buffer, maxWidth = 800): Buffer {
   const png = PNG.sync.read(buffer);
   if (png.width <= maxWidth) return buffer;
 
@@ -165,7 +165,7 @@ export async function analyzeWithAI(
 // API Key Resolution
 // ---------------------------------------------------------------------------
 
-function getApiKey(provider: 'openai' | 'anthropic'): string {
+export function getApiKey(provider: 'openai' | 'anthropic'): string {
   const envVar = provider === 'openai' ? 'FRONTGUARD_OPENAI_KEY' : 'FRONTGUARD_ANTHROPIC_KEY';
   const key = process.env[envVar];
 
@@ -184,13 +184,14 @@ function getApiKey(provider: 'openai' | 'anthropic'): string {
 // OpenAI Vision API
 // ---------------------------------------------------------------------------
 
-async function callOpenAI(
+export async function callOpenAI(
   apiKey: string,
   model: string,
   baselineB64: string,
   currentB64: string,
   diffB64?: string,
   contextText?: string,
+  systemPrompt: string = SYSTEM_PROMPT,
 ): Promise<string> {
   const imageMessages: Array<{type: 'image_url'; image_url: {url: string; detail: string}}> = [
     {
@@ -218,7 +219,7 @@ async function callOpenAI(
     model,
     max_tokens: 1024,
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: systemPrompt },
       {
         role: 'user',
         content: [
@@ -294,13 +295,14 @@ async function callOpenAI(
 // Anthropic Messages API
 // ---------------------------------------------------------------------------
 
-async function callAnthropic(
+export async function callAnthropic(
   apiKey: string,
   model: string,
   baselineB64: string,
   currentB64: string,
   diffB64?: string,
   contextText?: string,
+  systemPrompt: string = SYSTEM_PROMPT,
 ): Promise<string> {
   const imageBlocks: Array<{type: 'image'; source: {type: 'base64'; media_type: string; data: string}}> = [
     {
@@ -327,7 +329,7 @@ async function callAnthropic(
   const body = {
     model,
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [
       {
         role: 'user',
