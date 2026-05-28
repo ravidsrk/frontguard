@@ -97,6 +97,38 @@ export interface AuthConfig {
 }
 
 /**
+ * Per-route configuration object.
+ *
+ * Allows overriding the global `threshold`, adding route-specific `ignore`
+ * rules (merged with global rules), and restricting `viewport` widths for a
+ * single route. Used in the `routes` array alongside plain strings.
+ *
+ * @example
+ * routes: [
+ *   '/',                                   // string form — uses global config
+ *   { path: '/checkout', threshold: 0.01 }, // strict threshold for checkout
+ *   { path: '/blog', threshold: 0.5, ignore: [{ selector: '.timestamp' }] },
+ * ]
+ */
+export interface RouteConfig {
+  /** URL path relative to `baseUrl` (e.g. `'/checkout'`). */
+  path: string;
+  /** Per-route pixel-diff threshold (fraction 0–1). Overrides global `threshold`. */
+  threshold?: number;
+  /** Per-route ignore rules. Merged with (not replacing) global ignore rules. */
+  ignore?: IgnoreRule[];
+  /** Restrict this route to specific viewport widths. Defaults to global `viewports`. */
+  viewport?: number[];
+  /** Optional human-readable label for reports. */
+  label?: string;
+}
+
+/**
+ * A route entry in config — either a plain path string or a {@link RouteConfig}.
+ */
+export type RouteEntry = string | RouteConfig;
+
+/**
  * Main Frontguard configuration.
  *
  * Validated at load time via a Zod schema defined in `config.ts`.
@@ -108,8 +140,12 @@ export interface FrontguardConfig {
   version: number;
   /** Base URL of the application under test (e.g. `'http://localhost:3000'`). */
   baseUrl: string;
-  /** Explicit list of route paths to test (e.g. `['/', '/about']`). */
-  routes?: string[];
+  /**
+   * Explicit list of routes to test. Each entry is either a path string
+   * (e.g. `'/about'`) or a {@link RouteConfig} object with per-route
+   * threshold/ignore/viewport overrides. Mixed arrays are allowed.
+   */
+  routes?: RouteEntry[];
   /** Auto-discovery configuration — mutually usable with `routes`. */
   discover?: DiscoverOptions;
   /** Viewport widths (in px) to capture at (default `[375, 768, 1440]`). */
@@ -174,6 +210,12 @@ export interface Route {
   auth?: boolean;
   /** How this route was discovered. */
   discoveredVia?: 'crawl' | 'filesystem' | 'config' | 'sitemap';
+  /** Per-route pixel-diff threshold (fraction 0–1). Overrides global `threshold` when set. */
+  threshold?: number;
+  /** Per-route ignore rules, merged with global rules during comparison. */
+  ignore?: IgnoreRule[];
+  /** Per-route viewport widths. Restricts capture to these widths when set. */
+  viewport?: number[];
 }
 
 /**

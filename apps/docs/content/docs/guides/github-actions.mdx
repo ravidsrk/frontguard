@@ -1,0 +1,98 @@
+---
+title: GitHub Actions
+description: Run Frontguard on every pull request with GitHub Actions. Auto-post visual regression results as PR comments.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# GitHub Actions
+
+Run Frontguard automatically on every pull request. When a visual regression is detected, Frontguard posts a comment on the PR with the details.
+
+## Quick Setup
+
+The fastest way to get a working workflow:
+
+```bash
+npx frontguard init --ci
+```
+
+This generates `.github/workflows/frontguard.yml` tailored to your detected framework (correct dev command and port).
+
+## The Workflow
+
+```yaml
+name: Frontguard
+
+on:
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: write       # push baseline commits
+  pull-requests: write  # post PR comments
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for the baseline orphan branch
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - run: |
+          npm run dev &
+          npx wait-on http://localhost:3000 --timeout 60000
+
+      - run: npx frontguard run --url http://localhost:3000 --output json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+## How It Works
+
+1. **Checkout with full history** (`fetch-depth: 0`) so Frontguard can fetch the `frontguard-baselines` orphan branch.
+2. **Cache Playwright browsers** to keep CI runs fast (saves ~30s per run).
+3. **Start the dev server** in the background and wait for it to be reachable.
+4. **Run Frontguard**, which renders pages, compares them to baselines, and posts a PR comment via the `github-pr` reporter.
+
+<Callout type="info">
+On the **first run**, no baselines exist yet — Frontguard captures them and commits to the `frontguard-baselines` branch. Subsequent runs compare against those baselines.
+</Callout>
+
+## Enabling AI Classification
+
+Add API keys as repository secrets and uncomment the env lines:
+
+```yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # or:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+With AI enabled, intentional changes are automatically distinguished from regressions, cutting false-positive noise.
+
+## Troubleshooting
+
+- **Workflow can't comment on the PR** — ensure `permissions.pull-requests: write` is set.
+- **Baselines not found** — make sure `fetch-depth: 0` is set on `actions/checkout`.
+- **Dev server never ready** — adjust the `wait-on` URL/port to match your framework.

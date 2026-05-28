@@ -76,9 +76,12 @@ export async function renderPages(
   const workers = config.workers ?? 4;
 
   // --- Build the full task list ------------------------------------------------
+  // Per-route viewport overrides restrict capture to a subset of widths.
   const tasks: RenderTask[] = [];
   for (const route of routes) {
-    for (const viewport of config.viewports) {
+    const viewports =
+      route.viewport && route.viewport.length > 0 ? route.viewport : config.viewports;
+    for (const viewport of viewports) {
       for (const browser of config.browsers) {
         tasks.push({ route, viewport, browser });
       }
@@ -255,7 +258,10 @@ async function executeTask(
     }
 
     // --- Apply ignore rules (hide matching elements) ---------------------------
-    const selectorRules = config.ignore?.filter(r => r.selector) ?? [];
+    // Merge global ignore rules with any per-route ignore rules. Per-route
+    // rules ADD to the global set, they do not replace it.
+    const mergedIgnore = [...(config.ignore ?? []), ...(task.route.ignore ?? [])];
+    const selectorRules = mergedIgnore.filter(r => r.selector);
     if (selectorRules.length > 0) {
       await page.evaluate((rules: { selector: string }[]) => {
         for (const rule of rules) {
@@ -268,8 +274,8 @@ async function executeTask(
     }
 
     // --- Apply rect-based ignore rules (overlay fixed-position masks) --------
-    if (config.ignore?.some(r => r.rect)) {
-      const rects = config.ignore.filter(r => r.rect).map(r => r.rect!);
+    if (mergedIgnore.some(r => r.rect)) {
+      const rects = mergedIgnore.filter(r => r.rect).map(r => r.rect!);
       await page.evaluate((rects) => {
         for (const rect of rects) {
           const overlay = document.createElement('div');

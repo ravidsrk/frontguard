@@ -14,6 +14,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { FrontguardConfig } from './types.js';
+import { getFrameworkInfo } from '../templates/index.js';
 
 // ---------------------------------------------------------------------------
 // Zod Sub-Schemas
@@ -53,6 +54,25 @@ const authConfigSchema = z.object({
 /** Browser engine enum. */
 const browserEngineSchema = z.enum(['chromium', 'firefox', 'webkit']);
 
+/**
+ * Zod schema for a per-route configuration object.
+ * Allows overriding threshold / ignore / viewport per route.
+ */
+const routeConfigSchema = z.object({
+  path: z.string().min(1, 'route.path must not be empty'),
+  threshold: z
+    .number()
+    .min(0, 'route.threshold must be >= 0')
+    .max(1, 'route.threshold must be <= 1')
+    .optional(),
+  ignore: z.array(ignoreRuleSchema).optional(),
+  viewport: z.array(z.number().int().positive()).optional(),
+  label: z.string().optional(),
+});
+
+/** A route entry — either a plain string path or a {@link routeConfigSchema}. */
+const routeEntrySchema = z.union([z.string().min(1), routeConfigSchema]);
+
 // ---------------------------------------------------------------------------
 // Main Config Schema
 // ---------------------------------------------------------------------------
@@ -75,7 +95,7 @@ export const configSchema = z.object({
     .string({ required_error: 'Config error at `baseUrl`: this field is required' })
     .url('Config error at `baseUrl`: expected a valid URL'),
 
-  routes: z.array(z.string().min(1)).optional(),
+  routes: z.array(routeEntrySchema).optional(),
 
   discover: discoverSchema.optional(),
 
@@ -363,6 +383,7 @@ const FRAMEWORK_INDICATORS: Record<string, string> = {
   gatsby: 'Gatsby',
   astro: 'Astro',
   '@angular/core': 'Angular',
+  'react-scripts': 'Create React App',
   vite: 'Vite',
 };
 
@@ -427,36 +448,28 @@ export interface GenerateConfigOptions {
  * @returns The config file contents as a string.
  */
 export function generateDefaultConfig(options: GenerateConfigOptions = {}): string {
-  const {
-    baseUrl = 'http://localhost:3000',
-    framework = null,
-    format = 'ts',
-  } = options;
+  const { framework = null, format = 'ts' } = options;
 
-  // Build framework-specific hints
-  let frameworkComment = '';
-  let routeHint = "routes: ['/', '/about', '/contact'],";
+  // Resolve framework metadata (port, typical routes, note).
+  const info = getFrameworkInfo(framework);
 
-  if (framework === 'Next.js') {
-    frameworkComment = '// Detected: Next.js — routes are auto-discovered from the pages/app directory.\n';
-    routeHint = "// routes: ['/', '/about'],  // or use discover for auto-crawl";
-  } else if (framework === 'Remix') {
-    frameworkComment = '// Detected: Remix — routes are auto-discovered from the app/routes directory.\n';
-    routeHint = "// routes: ['/', '/about'],  // or use discover for auto-crawl";
-  } else if (framework === 'Nuxt') {
-    frameworkComment = '// Detected: Nuxt — routes are auto-discovered from the pages directory.\n';
-    routeHint = "// routes: ['/', '/about'],  // or use discover for auto-crawl";
-  } else if (framework === 'SvelteKit') {
-    frameworkComment = '// Detected: SvelteKit — routes are auto-discovered from src/routes.\n';
-    routeHint = "// routes: ['/', '/about'],  // or use discover for auto-crawl";
-  }
+  // baseUrl: prefer explicit option, else framework default port.
+  const baseUrl = options.baseUrl ?? `http://localhost:${info.defaultPort}`;
+
+  // Build framework-specific hints.
+  const frameworkComment = framework ? `// Detected: ${info.note}\n` : '';
+  const routesArrayLiteral = `[${info.typicalRoutes.map((r) => `'${r}'`).join(', ')}]`;
+  // For file-system-routed frameworks, suggest discover instead of explicit routes.
+  const routeHint = info.fileSystemRouting
+    ? `// routes: ${routesArrayLiteral},  // or use discover for auto-crawl`
+    : `routes: ${routesArrayLiteral},`;
 
   // JSON format
   if (format === 'json') {
     const config = {
       version: 1,
       baseUrl,
-      routes: ['/', '/about', '/contact'],
+      routes: info.typicalRoutes,
       viewports: [375, 768, 1440],
       browsers: ['chromium'],
       threshold: 0.1,

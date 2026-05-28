@@ -5,6 +5,7 @@
  *   run               Run visual regression tests (default)
  *   init              Generate a starter config file
  *   update-baselines  Accept current screenshots as new baselines
+ *   doctor            Diagnose environment readiness
  *
  * @module cli/index
  */
@@ -12,12 +13,15 @@
 import { Command } from 'commander';
 import { loadConfig, detectFramework, generateDefaultConfig } from '../core/config.js';
 import { runPipeline, updateBaselines } from '../core/pipeline.js';
+import { runDoctor } from './doctor.js';
+import { getFrameworkInfo } from '../templates/index.js';
+import { generateGitHubActionsWorkflow } from '../templates/github-actions.js';
 import { ConsoleReporter } from '../report/console.js';
 import { JSONReporter } from '../report/json.js';
 import { HTMLReporter } from '../report/html.js';
 import { logger, setLogLevel } from '../utils/logger.js';
 import type { FrontguardConfig, Reporter, BrowserEngine } from '../core/types.js';
-import { writeFileSync, readFileSync, existsSync, appendFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Global error handlers
@@ -282,6 +286,8 @@ export async function main(argv?: string[]): Promise<number> {
     .command('init')
     .description('Generate a starter Frontguard config file')
     .option('--format <format>', 'Config format: ts, js, json', 'ts')
+    .option('-y, --yes', 'Skip prompts and use defaults (CI-friendly)')
+    .option('--ci', 'Also generate a GitHub Actions workflow at .github/workflows/frontguard.yml')
     .action(async (opts) => {
       try {
         const cwd = process.cwd();
@@ -295,6 +301,9 @@ export async function main(argv?: string[]): Promise<number> {
         } else {
           logger.info('No specific framework detected — using defaults');
         }
+
+        // Resolve framework metadata (port, dev command) for config + CI.
+        const fwInfo = getFrameworkInfo(framework);
 
         // Determine file name
         const extensions: Record<string, string> = {
@@ -313,9 +322,8 @@ export async function main(argv?: string[]): Promise<number> {
           return;
         }
 
-        // Generate config content
+        // Generate config content (baseUrl derived from framework default port)
         const content = generateDefaultConfig({
-          baseUrl: 'http://localhost:3000',
           framework,
           format,
         });
@@ -323,9 +331,26 @@ export async function main(argv?: string[]): Promise<number> {
         writeFileSync(filePath, content, 'utf-8');
         logger.info(`✅ Created ${fileName}`);
 
+        // Optionally generate a GitHub Actions workflow (--ci)
+        if (opts.ci) {
+          const workflowDir = join(cwd, '.github', 'workflows');
+          const workflowPath = join(workflowDir, 'frontguard.yml');
+          if (existsSync(workflowPath)) {
+            logger.warn('.github/workflows/frontguard.yml already exists — skipping');
+          } else {
+            mkdirSync(workflowDir, { recursive: true });
+            const workflow = generateGitHubActionsWorkflow({
+              devCommand: `npm run dev`,
+              port: fwInfo.defaultPort,
+            });
+            writeFileSync(workflowPath, workflow, 'utf-8');
+            logger.info('✅ Created .github/workflows/frontguard.yml');
+          }
+        }
+
         // Update .gitignore
         const gitignorePath = join(cwd, '.gitignore');
-        const entriesToAdd = ['auth.json', '.frontguard-debug/'];
+        const entriesToAdd = ['auth.json', '.frontguard/', '.frontguard-debug/', 'frontguard-report/'];
         let gitignoreContent = '';
 
         if (existsSync(gitignorePath)) {
@@ -391,6 +416,22 @@ export async function main(argv?: string[]): Promise<number> {
         await updateBaselines(config, reporter);
         logger.info('✅ Baselines updated successfully');
         exitCode = 0;
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
+    });
+
+  // ---------------------------------------------------------------------------
+  // Command: doctor
+  // ---------------------------------------------------------------------------
+
+  program
+    .command('doctor')
+    .description('Diagnose environment readiness (Node, Playwright, browsers, config, git)')
+    .action(async () => {
+      try {
+        exitCode = await runDoctor(process.cwd());
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;

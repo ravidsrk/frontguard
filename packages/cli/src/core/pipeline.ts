@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import type {
   FrontguardConfig,
   Route,
+  RouteEntry,
   ScreenshotResult,
   DiffResult,
   RunResult,
@@ -133,14 +134,43 @@ async function timed<T>(fn: () => Promise<T>): Promise<[T, number]> {
 }
 
 /**
- * Converts explicit route strings from config into Route objects.
+ * Converts explicit route entries from config into Route objects.
+ *
+ * Each entry is either a plain path string or a {@link RouteConfig} object
+ * carrying per-route `threshold`, `ignore`, and `viewport` overrides. The
+ * overrides are copied onto the runtime Route so the compare stage can apply
+ * them without re-reading the config.
  */
-function toRouteObjects(paths: string[]): Route[] {
-  return paths.map((path) => ({
-    path,
-    label: path === '/' ? 'Home' : path,
-    discoveredVia: 'config' as const,
-  }));
+export function toRouteObjects(entries: RouteEntry[]): Route[] {
+  return entries.map((entry) => {
+    if (typeof entry === 'string') {
+      return {
+        path: entry,
+        label: entry === '/' ? 'Home' : entry,
+        discoveredVia: 'config' as const,
+      };
+    }
+    return {
+      path: entry.path,
+      label: entry.label ?? (entry.path === '/' ? 'Home' : entry.path),
+      discoveredVia: 'config' as const,
+      threshold: entry.threshold,
+      ignore: entry.ignore,
+      viewport: entry.viewport,
+    };
+  });
+}
+
+/**
+ * Resolves the effective pixel-diff threshold for a route, preferring the
+ * per-route override when present and falling back to the global threshold.
+ *
+ * @param route           - The route being compared.
+ * @param globalThreshold - The global config threshold (fraction 0–1).
+ * @returns The threshold to use for this route.
+ */
+export function resolveThreshold(route: Route, globalThreshold: number): number {
+  return typeof route.threshold === 'number' ? route.threshold : globalThreshold;
 }
 
 /**
@@ -433,16 +463,19 @@ export async function runPipeline(
 
           let diff: DiffResult;
 
+          // Resolve the effective threshold: per-route override wins over global.
+          const effectiveThreshold = resolveThreshold(shot.route, config.threshold);
+
           if (!baseline) {
             // No baseline exists — this is a new page
             diff = createNewPageResult(shot);
             logger.debug(`New page: ${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`);
           } else {
-            // Compare against existing baseline
-            diff = compareScreenshot(shot, baseline, config.threshold);
+            // Compare against existing baseline using the effective threshold
+            diff = compareScreenshot(shot, baseline, effectiveThreshold);
 
-            // Mark regressions vs changes based on threshold
-            if (diff.status === 'changed' && diff.diffPercentage > config.threshold * 100) {
+            // Mark regressions vs changes based on the effective threshold
+            if (diff.status === 'changed' && diff.diffPercentage > effectiveThreshold * 100) {
               diff = { ...diff, status: 'regression' };
             }
           }

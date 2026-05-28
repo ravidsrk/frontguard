@@ -29,6 +29,12 @@ import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { analyzeWithAI } from '../src/diff/ai-vision.js';
 import type { DiffResult, Route } from '../src/core/types.js';
+import {
+  computeMetrics,
+  evaluateGate,
+  formatMetricsMarkdown,
+  type Prediction,
+} from '../src/diff/validation-metrics.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -743,6 +749,33 @@ async function main(): Promise<void> {
     console.log('  ═══════════════════════════════════════════════════');
     console.log(`  AGGREGATE: ${totalCorrect}/${totalRoutes} classification correct across ${allResults.length} PRs`);
     console.log('  ═══════════════════════════════════════════════════');
+
+    // Structured metrics + launch gate via the shared metrics module.
+    const predictions: Prediction[] = [];
+    for (const r of allResults) {
+      for (const route of r.routes) {
+        if (!route.gotClassification || route.expectedClassification === 'unknown') continue;
+        predictions.push({
+          id: `${r.repo}#${r.pr}${route.path}`,
+          predicted: route.gotClassification as Prediction['predicted'],
+          actual: route.expectedClassification as Prediction['actual'],
+        });
+      }
+    }
+
+    if (predictions.length > 0) {
+      const metrics = computeMetrics(predictions);
+      const gate = evaluateGate(metrics);
+      const markdown = formatMetricsMarkdown(metrics, gate, 'AI Classification Validation — v0.2 (live run)');
+      const outPath = path.resolve(process.cwd(), 'validation', 'results-v0.2-live.md');
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      fs.writeFileSync(outPath, markdown, 'utf-8');
+      console.log('');
+      console.log(`  Accuracy: ${(metrics.accuracy * 100).toFixed(1)}%  |  FP rate: ${(metrics.falsePositiveRate * 100).toFixed(1)}%`);
+      console.log(`  Launch gate: ${gate.passed ? '✅ PASS' : '❌ FAIL'}`);
+      if (!gate.passed) gate.reasons.forEach((r) => console.log(`    - ${r}`));
+      console.log(`  Metrics report saved: ${outPath}`);
+    }
   } else {
     // Single PR mode
     if (!args.repo || !args.pr) {
