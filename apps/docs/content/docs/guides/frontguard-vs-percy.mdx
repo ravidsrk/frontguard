@@ -1,0 +1,141 @@
+---
+title: Frontguard vs Percy
+description: An honest Frontguard vs Percy comparison — pricing, CI impact, false positives, and AI capabilities. Find out which visual regression tool fits your team.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is the difference between Frontguard and Percy?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Percy (by BrowserStack) is a hosted visual testing platform with a polished review dashboard and cross-browser rendering grid, billed per screenshot. Frontguard is a CLI-first, open-source (MIT) visual regression tool with AI vision analysis that explains why a diff happened. Frontguard's CLI is free forever; Percy starts free then jumps to $399/mo at scale."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Frontguard a free alternative to Percy?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Frontguard's CLI is free forever and MIT-licensed. You bring your own AI key (OpenAI or Anthropic) for analysis. A $29/mo Pro tier and an optional cloud are additive, not required."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does Frontguard have a review dashboard like Percy?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Not yet. Percy has a mature hosted review UI for approving snapshots across a team. Frontguard reviews happen via CLI/report output today; a hosted dashboard is on the roadmap. If a polished multi-reviewer dashboard is essential right now, Percy is the better choice."
+      }
+    }
+  ]
+}) }} />
+
+# Frontguard vs Percy
+
+[Percy](https://percy.io) (acquired by BrowserStack) is one of the most established hosted visual testing platforms — a strong review dashboard, a cross-browser rendering grid, and deep CI integrations. **Frontguard** is a newer, CLI-first, MIT-licensed tool whose differentiator is **AI vision analysis** (it explains *why* a diff happened) and a **free-forever** local workflow.
+
+<Callout type="info">
+  **Honest disclaimer:** Frontguard is a new, open-source project (early stars, no hosted review dashboard yet). Percy is mature and battle-tested. This page is intended to be accurate, not promotional — read the "When to choose Percy" section.
+</Callout>
+
+## Quick Comparison
+
+| | Percy | Frontguard |
+|---|-------|------------|
+| Setup time | ~15–30 min (account + SDK + token) | ~5 min (`npm i` + `init`) |
+| CI impact | Uploads snapshots to Percy cloud for rendering | Renders locally in CI; no upload required |
+| Pricing @ 1K shots/mo | Free tier (~5K included) | Free (CLI) |
+| Pricing @ 5K shots/mo | Free / entry tier | Free (CLI) |
+| Pricing @ 50K shots/mo | ~$399/mo+ | Free (CLI) + your AI usage |
+| False-positive approach | Manual review in dashboard | AI classifies regression vs intentional vs content |
+| AI capabilities | ❌ None | 🟢 Vision analysis + suggested fixes (BYOK) |
+| Review dashboard | 🟢 Mature, multi-reviewer | 🔴 Not yet (CLI/report only) |
+| Cross-browser grid | 🟢 Hosted grid | Local Playwright (chromium/firefox/webkit) |
+| License | Proprietary (SaaS) | MIT, self-hostable |
+
+## When to Choose Percy
+
+Be honest with yourself — Percy is the better choice when:
+
+- **You need a mature hosted review dashboard today.** Multiple reviewers approving snapshots with comments, history, and role-based access. Frontguard doesn't have this yet.
+- **You want a managed cross-browser/-device rendering grid** without running browsers yourself.
+- **You're already in the BrowserStack ecosystem** and want unified billing/SSO.
+- **You don't want to manage AI keys** or care about diff *explanations* — you just want a snapshot diff service that "just works" with enterprise support.
+
+## When to Choose Frontguard
+
+- **You want to understand *why* a diff happened**, not just see red pixels. AI classification cuts false-positive triage.
+- **You want predictable/zero cost at scale.** No $399/mo cliff at 50K screenshots.
+- **You want to keep rendering in your own CI** (no uploading every snapshot to a third-party cloud).
+- **You value open source + self-hosting** (MIT license).
+- **You're Playwright-native** and want anti-flake multi-render consensus built in.
+
+## Feature-by-Feature Deep Dive
+
+### Rendering & CI model
+Percy uploads your DOM/snapshots to its cloud, which renders and diffs server-side. This means snapshots leave your infrastructure and counts meter your bill. Frontguard renders with Playwright **inside your CI** and stores baselines on a git orphan branch — nothing has to leave your pipeline.
+
+### False positives
+This is the core philosophical difference. Percy relies on a human reviewing the dashboard to dismiss noise (anti-aliasing, dynamic content, intentional changes). Frontguard adds an **AI classification layer**: each diff is labeled `regression`, `intentional`, or `content_update` with a confidence score, so you triage far fewer images by hand. Frontguard also has **anti-flake multi-render consensus** to suppress flaky pixel noise before it ever becomes a diff.
+
+### AI analysis
+Percy has no AI explanation feature. Frontguard sends baseline + current images to OpenAI or Anthropic (BYOK) and returns a plain-English explanation plus an optional suggested CSS fix. See [AI Analysis](/docs/guides/ai-analysis).
+
+### Review & approval
+Percy wins here today: a polished, collaborative web dashboard. Frontguard's review is CLI/report-based (`frontguard approve`). A hosted dashboard is on the roadmap but **not shipped yet**.
+
+## Pricing Comparison
+
+<Callout type="warn">
+  Pricing changes — verify current numbers on each vendor's site. Figures below reflect commonly published tiers at time of writing.
+</Callout>
+
+| Screenshots/mo | Percy | Frontguard |
+|----------------|-------|------------|
+| 1,000 | Free (5K included on free tier) | Free (CLI) |
+| 5,000 | Free → entry paid | Free (CLI) |
+| 50,000 | ~$399/mo and up | Free (CLI) + your own AI API spend |
+
+- **Percy:** generous free tier, then a notable **cliff to ~$399/mo** for higher volume / enterprise features.
+- **Frontguard:** **CLI is free forever** (MIT). Optional **$29/mo Pro** and an optional cloud add team features. AI analysis cost = your own OpenAI/Anthropic usage (BYOK), and AI only runs on pages that actually diffed.
+
+## Migration Steps (Percy → Frontguard)
+
+1. **Install Frontguard.**
+   ```bash
+   npm install -D @frontguard/cli
+   npx frontguard init
+   ```
+2. **Translate your Percy snapshots to routes.** Percy `percySnapshot(name)` calls / story URLs become entries in `routes`.
+   ```typescript title="frontguard.config.ts"
+   export default {
+     baseUrl: 'http://localhost:3000',
+     routes: ['/', '/pricing', '/checkout'],
+     viewports: [375, 768, 1440], // Percy `widths` → viewports
+     threshold: 0.1,
+     smartRender: true,
+     ai: { provider: 'openai', model: 'gpt-4o' },
+   };
+   ```
+3. **Map Percy `widths` → `viewports`** (direct).
+4. **Move Percy CSS hides / `percyCSS`** for dynamic content to `ignore: [{ selector }]`.
+5. **For interaction flows**, use the [Playwright plugin](/docs/playwright/setup) instead of Percy SDK calls.
+6. **Capture baselines and run.**
+   ```bash
+   npx frontguard baseline
+   npx frontguard run
+   ```
+7. **Update CI** — replace the `percy exec` wrapper with `frontguard run`. Remove `PERCY_TOKEN`.
+
+## Next Steps
+
+- [AI Analysis](/docs/guides/ai-analysis)
+- [Configuration reference](/docs/cli/configuration)
+- [GitHub Actions](/docs/guides/github-actions)

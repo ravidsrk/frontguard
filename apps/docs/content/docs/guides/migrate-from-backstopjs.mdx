@@ -1,0 +1,312 @@
+---
+title: Migrate from BackstopJS
+description: A complete BackstopJS migration guide. Frontguard is a modern BackstopJS alternative and BackstopJS replacement with AI analysis, Playwright rendering, and zero-config baselines.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+# Migrate from BackstopJS
+
+[BackstopJS](https://github.com/garris/BackstopJS) was the de-facto open-source visual regression tool for years (~73K downloads/week), but it is effectively unmaintained and still rides on PhantomJS-era assumptions, hand-written `backstop.json` scenario files, and a "red pixels differ" reporting model.
+
+**Frontguard** is a modern, CLI-first BackstopJS alternative: Playwright-native rendering, git-orphan-branch baselines (no committed PNGs to wrestle with), anti-flake multi-render consensus, and AI vision analysis that explains *why* a diff happened instead of just highlighting pixels. It's MIT-licensed and self-hostable.
+
+<Callout type="info">
+  This guide maps every common `backstop.json` concept to its Frontguard equivalent so you can migrate scenario-by-scenario without losing coverage.
+</Callout>
+
+## Side-by-Side Config Comparison
+
+BackstopJS uses a JSON file (`backstop.json`). Frontguard uses a typed `frontguard.config.ts` so your config is validated by TypeScript.
+
+<Tabs items={['backstop.json', 'frontguard.config.ts']}>
+  <Tab value="backstop.json">
+    ```json title="backstop.json"
+    {
+      "id": "my_project",
+      "viewports": [
+        { "label": "phone", "width": 375, "height": 667 },
+        { "label": "tablet", "width": 768, "height": 1024 },
+        { "label": "desktop", "width": 1440, "height": 900 }
+      ],
+      "scenarios": [
+        {
+          "label": "Homepage",
+          "url": "https://localhost:3000/",
+          "readySelector": ".hero-loaded",
+          "misMatchThreshold": 0.1,
+          "selectors": ["document"],
+          "hideSelectors": [".cookie-banner"]
+        },
+        {
+          "label": "Pricing",
+          "url": "https://localhost:3000/pricing",
+          "misMatchThreshold": 0.05
+        }
+      ],
+      "paths": {
+        "bitmaps_reference": "backstop_data/bitmaps_reference",
+        "bitmaps_test": "backstop_data/bitmaps_test"
+      },
+      "engine": "playwright",
+      "report": ["browser"]
+    }
+    ```
+  </Tab>
+  <Tab value="frontguard.config.ts">
+    ```typescript title="frontguard.config.ts"
+    export default {
+      baseUrl: 'http://localhost:3000',
+      viewports: [375, 768, 1440],
+      browsers: ['chromium'],
+      threshold: 0.1,
+      smartRender: true,
+      routes: [
+        { path: '/', threshold: 0.1, ignore: [{ selector: '.cookie-banner' }] },
+        { path: '/pricing', threshold: 0.05 },
+      ],
+      ai: {
+        provider: 'openai',
+        model: 'gpt-4o',
+      },
+    };
+    ```
+  </Tab>
+</Tabs>
+
+Notice what disappears: there are **no `paths`, no `bitmaps_reference`/`bitmaps_test` directories, and no `id`**. Frontguard stores baselines on a git orphan branch automatically — you never commit binary PNGs into your working tree.
+
+## Scenario Mapping: Scenarios → Routes
+
+A BackstopJS **scenario** is a URL plus rendering options. In Frontguard, that becomes a **route** — either a simple string or an object when you need per-route overrides.
+
+| BackstopJS scenario | Frontguard route |
+|---------------------|------------------|
+| `{ "label": "Home", "url": ".../" }` | `'/'` (string form) |
+| `{ "url": ".../pricing", "misMatchThreshold": 0.05 }` | `{ path: '/pricing', threshold: 0.05 }` |
+| `{ "url": ".../app", "viewports": [...] }` | `{ path: '/app', viewport: 1440 }` |
+| `hideSelectors` / `removeSelectors` | `ignore: [{ selector }]` (per route or global) |
+
+```typescript title="frontguard.config.ts — route forms"
+export default {
+  baseUrl: 'http://localhost:3000',
+  routes: [
+    '/',                                          // simple string
+    '/pricing',
+    { path: '/checkout', threshold: 0.02 },       // tighter threshold
+    {
+      path: '/dashboard',
+      viewport: 1440,                             // desktop only
+      ignore: [{ selector: '.live-clock', description: 'Updates every second' }],
+    },
+  ],
+};
+```
+
+<Callout type="info">
+  The `url` in a BackstopJS scenario is an absolute URL. In Frontguard, set `baseUrl` once and use relative `path`s — cleaner config and easy to repoint at staging/prod.
+</Callout>
+
+## Feature Comparison
+
+| Concept | BackstopJS | Frontguard | Notes |
+|---------|------------|------------|-------|
+| Config format | `backstop.json` | `frontguard.config.ts` (typed) | ✅ Maps |
+| Scenario / page | `scenarios[]` | `routes[]` | ✅ Maps |
+| `misMatchThreshold` | per-scenario | `threshold` (per-route or global) | ✅ Direct mapping |
+| `viewports` | `[{label,width,height}]` | `viewports: number[]` | ✅ Maps (widths only) |
+| `readySelector` | wait for selector | `smartRender` + `waitForSelector` | ✅ Maps + improved |
+| `hideSelectors` / `removeSelectors` | hide elements | `ignore: [{ selector }]` | ✅ Maps |
+| Reference vs test bitmaps | `bitmaps_reference` / `bitmaps_test` dirs | git-orphan-branch baselines | ✨ Different (no committed PNGs) |
+| Rendering engine | Puppeteer/Playwright | Playwright-native | ✅ Maps |
+| Anti-flake | manual `delay` | multi-render consensus | ✨ New |
+| Why a diff happened | ❌ pixels only | AI vision classification | ✨ New |
+| Suggested fixes | ❌ | AI suggested CSS fix | ✨ New |
+| Approve baselines | `backstop approve` | `frontguard approve` | ✅ Maps |
+| License | MIT | MIT | ✅ Same |
+
+## readySelector → smartRender + waitForSelector
+
+BackstopJS's `readySelector` blocks the screenshot until a selector appears. Frontguard handles most of this automatically with **`smartRender`** (waits for network idle, fonts, images, and layout stabilization), and lets you add an explicit selector wait when you need it.
+
+<Tabs items={['BackstopJS', 'Frontguard']}>
+  <Tab value="BackstopJS">
+    ```json title="backstop.json"
+    {
+      "label": "Dashboard",
+      "url": "https://localhost:3000/dashboard",
+      "readySelector": ".chart-rendered",
+      "delay": 500
+    }
+    ```
+  </Tab>
+  <Tab value="Frontguard">
+    ```typescript title="frontguard.config.ts"
+    export default {
+      baseUrl: 'http://localhost:3000',
+      smartRender: true, // auto-waits for network idle, fonts, images, layout
+      routes: [
+        {
+          path: '/dashboard',
+          // explicit selector wait when smartRender isn't enough
+          waitForSelector: '.chart-rendered',
+        },
+      ],
+    };
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="info">
+  In practice, `smartRender: true` removes the need for most `readySelector` + `delay` combos. Add `waitForSelector` only for app-specific "fully painted" markers (charts, lazy data, animations finishing).
+</Callout>
+
+## misMatchThreshold → threshold (direct mapping)
+
+This is a 1:1 mapping. BackstopJS's `misMatchThreshold` and Frontguard's `threshold` are both a fraction of changed pixels (0.0–1.0). A BackstopJS `misMatchThreshold: 0.1` becomes `threshold: 0.1`.
+
+```typescript title="frontguard.config.ts"
+export default {
+  threshold: 0.1,                                // global default
+  routes: [
+    { path: '/marketing', threshold: 0.2 },      // looser
+    { path: '/checkout', threshold: 0.01 },      // strict
+  ],
+};
+```
+
+## viewports → viewports (direct mapping)
+
+BackstopJS viewports are objects with `label`, `width`, and `height`. Frontguard viewports are just **widths** (height is determined by full-page capture). Drop the labels and heights — keep the widths.
+
+```
+BackstopJS                                   Frontguard
+[                                            viewports: [375, 768, 1440]
+  { label:"phone",   width:375,  height:667 },
+  { label:"tablet",  width:768,  height:1024 },
+  { label:"desktop", width:1440, height:900 }
+]
+```
+
+## reference / test → Frontguard baselines
+
+This is the biggest mental-model shift. BackstopJS keeps two directories of PNGs (`bitmaps_reference` and `bitmaps_test`) and you typically commit references into git. Frontguard stores baselines on a dedicated **git orphan branch** — no binary blobs in your working tree, no merge conflicts on PNGs.
+
+| BackstopJS | Frontguard |
+|------------|------------|
+| `backstop reference` | `frontguard baseline` (capture baselines) |
+| `backstop test` | `frontguard run` (compare against baselines) |
+| `backstop approve` | `frontguard approve` (promote current → baseline) |
+| `bitmaps_reference/` (committed PNGs) | git orphan branch (auto-managed) |
+| `bitmaps_test/` (gitignored output) | `./frontguard-report` (gitignored) |
+
+<Callout type="warn">
+  After migrating, **delete `backstop_data/`** from your repo. Frontguard does not read it, and committed reference PNGs are no longer needed.
+</Callout>
+
+## Step-by-Step Migration Checklist
+
+1. **Install Frontguard** and remove BackstopJS.
+   ```bash
+   npm uninstall backstopjs
+   npm install -D @frontguard/cli
+   ```
+2. **Generate a starter config.**
+   ```bash
+   npx frontguard init
+   ```
+3. **Port `viewports`** — keep widths, drop labels/heights.
+4. **Port each scenario to a route** — `url` → relative `path` under a single `baseUrl`.
+5. **Map thresholds** — `misMatchThreshold` → `threshold` (1:1).
+6. **Map ready states** — enable `smartRender: true`; add `waitForSelector` only where needed.
+7. **Map hidden elements** — `hideSelectors` → `ignore: [{ selector }]`.
+8. **Capture fresh baselines.**
+   ```bash
+   npx frontguard baseline
+   ```
+9. **Run a comparison** to confirm parity.
+   ```bash
+   npx frontguard run
+   ```
+10. **(Optional) Enable AI analysis** — set `FRONTGUARD_OPENAI_KEY` and add an `ai` block.
+11. **Delete `backstop_data/`** and `backstop.json` from the repo.
+12. **Update CI** — replace `backstop test` with `frontguard run`.
+
+## Common Gotchas
+
+<Callout type="warn">
+  **Don't reuse BackstopJS reference PNGs.** Frontguard renders with its own Playwright pipeline and anti-flake consensus; baselines must be captured fresh with `frontguard baseline`. Old BackstopJS bitmaps will not match.
+</Callout>
+
+- **Viewport heights are gone.** Frontguard captures full-page by default. If you relied on a fixed BackstopJS viewport height to crop, use `viewportHeight` / `maxHeight` in config instead.
+- **`selectors` (element-level shots) aren't 1:1.** BackstopJS could screenshot a single selector. Frontguard captures pages/routes; mask noise with `ignore` instead of cropping to a selector.
+- **Absolute URLs → relative paths.** Move the host into `baseUrl`. Hardcoded `https://localhost:3000/...` in every scenario becomes `'/...'`.
+- **`onReadyScript` / `onBeforeScript` (Puppet scripts).** For complex interactions (login, hovers), use the Playwright plugin or `auth.storageState` instead of Backstop engine scripts.
+- **First run after migration will "fail" everything.** That's expected — you have no baselines yet. Run `frontguard baseline` first, then `frontguard run`.
+
+## Config Converter Snippet
+
+Drop this Node script in your repo root to auto-translate an existing `backstop.json` into a starter `frontguard.config.ts`. It handles viewports, scenarios → routes, `misMatchThreshold` → `threshold`, and `hideSelectors` → `ignore`.
+
+```javascript title="convert-backstop.mjs"
+import { readFileSync, writeFileSync } from 'node:fs';
+
+const backstop = JSON.parse(readFileSync('backstop.json', 'utf8'));
+
+// Viewports: keep widths only
+const viewports = [...new Set((backstop.viewports || []).map((v) => v.width))];
+
+// Derive baseUrl from the first scenario URL
+const firstUrl = backstop.scenarios?.[0]?.url || 'http://localhost:3000';
+const baseUrl = new URL(firstUrl).origin;
+
+// Scenarios -> routes
+const routes = (backstop.scenarios || []).map((s) => {
+  const path = new URL(s.url, baseUrl).pathname;
+  const route = { path };
+  if (typeof s.misMatchThreshold === 'number') {
+    route.threshold = s.misMatchThreshold;
+  }
+  const hidden = [...(s.hideSelectors || []), ...(s.removeSelectors || [])];
+  if (hidden.length) {
+    route.ignore = hidden.map((selector) => ({ selector }));
+  }
+  // readySelector -> waitForSelector
+  if (s.readySelector) route.waitForSelector = s.readySelector;
+  // Collapse to a plain string when no overrides are needed
+  return Object.keys(route).length === 1 ? path : route;
+});
+
+const config = `export default {
+  baseUrl: ${JSON.stringify(baseUrl)},
+  viewports: ${JSON.stringify(viewports.length ? viewports : [375, 768, 1440])},
+  browsers: ['chromium'],
+  threshold: 0.1,
+  smartRender: true,
+  routes: ${JSON.stringify(routes, null, 2)},
+  // ai: { provider: 'openai', model: 'gpt-4o' },
+};
+`;
+
+writeFileSync('frontguard.config.ts', config);
+console.log('Wrote frontguard.config.ts with', routes.length, 'routes');
+```
+
+Run it:
+
+```bash
+node convert-backstop.mjs
+# then capture fresh baselines
+npx frontguard baseline
+```
+
+<Callout type="info">
+  The converter produces a **starter** config — review it, enable AI, and tune per-route thresholds before capturing baselines.
+</Callout>
+
+## Next Steps
+
+- [AI Analysis](/docs/guides/ai-analysis) — understand *why* diffs happen
+- [Configuration reference](/docs/cli/configuration) — every `frontguard.config.ts` option
+- [GitHub Actions](/docs/guides/github-actions) — wire `frontguard run` into CI

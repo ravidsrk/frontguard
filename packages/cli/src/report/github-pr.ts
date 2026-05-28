@@ -155,22 +155,25 @@ export class GitHubPRReporter implements Reporter {
 
     for (const diff of regressions) {
       const label = `\`${diff.route.path}\` @ ${diff.viewport}px (${diff.browser})`;
-      lines.push(`<details>`);
+      lines.push(`<details open>`);
       lines.push(`<summary>${label} — ${diff.diffPercentage.toFixed(2)}% changed</summary>`);
       lines.push('');
 
-      // Visual change summary (images can't be embedded in PR comments — too large for base64)
-      lines.push(`> 📸 **Baseline → Current** (${diff.diffPercentage.toFixed(2)}% diff)`);
-      lines.push('');
+      // Embed image thumbnails when upload URLs are available; otherwise fall
+      // back to a text-only summary (legacy behaviour).
+      lines.push(this.renderImageGrid(diff));
 
-      // AI analysis
+      // AI analysis with a classification badge.
       if (diff.aiAnalysis) {
         const ai = diff.aiAnalysis;
         const severityEmoji =
           ai.severity === 'critical' ? '🔴' :
           ai.severity === 'warning' ? '🟡' : 'ℹ️';
+        const classBadge =
+          ai.classification === 'regression' ? '🔴 Regression' :
+          ai.classification === 'intentional' ? '🟢 Intentional' : '🟡 Content update';
 
-        lines.push(`> ${severityEmoji} **AI Analysis** (${Math.round(ai.confidence * 100)}% confidence)`);
+        lines.push(`> ${severityEmoji} **AI Analysis** — ${classBadge} (${Math.round(ai.confidence * 100)}% confidence)`);
         lines.push(`>`);
         lines.push(`> ${ai.explanation}`);
         if (ai.suggestedFix) {
@@ -196,9 +199,7 @@ export class GitHubPRReporter implements Reporter {
       lines.push(`<summary>${label} — ${diff.diffPercentage.toFixed(2)}% changed</summary>`);
       lines.push('');
 
-      // Visual change summary (images can't be embedded in PR comments — too large for base64)
-      lines.push(`> 📸 **Baseline → Current** (${diff.diffPercentage.toFixed(2)}% diff)`);
-      lines.push('');
+      lines.push(this.renderImageGrid(diff));
 
       if (diff.aiAnalysis) {
         lines.push(`> **AI:** ${diff.aiAnalysis.explanation}`);
@@ -210,6 +211,42 @@ export class GitHubPRReporter implements Reporter {
     }
 
     return lines.join('\n');
+  }
+
+  /**
+   * Renders a baseline/current/diff image grid for a diff.
+   *
+   * If image URLs were uploaded (`baselineImageUrl` etc.), produces an HTML
+   * `<table>` of 280px-wide thumbnails linking to full-size images. If no URLs
+   * are present (no image upload configured), falls back to a text summary —
+   * preserving the previous behaviour.
+   */
+  private renderImageGrid(diff: DiffResult): string {
+    const hasImages =
+      Boolean(diff.baselineImageUrl) ||
+      Boolean(diff.currentImageUrl) ||
+      Boolean(diff.diffImageUrl);
+
+    if (!hasImages) {
+      return `> 📸 **Baseline → Current** (${diff.diffPercentage.toFixed(2)}% diff)\n`;
+    }
+
+    const cell = (url: string | undefined, alt: string): string =>
+      url
+        ? `<a href="${url}" target="_blank"><img src="${url}" width="280" alt="${alt}"/></a>`
+        : '<em>n/a</em>';
+
+    return [
+      '<table>',
+      '<tr><th>Baseline</th><th>Current</th><th>Diff</th></tr>',
+      '<tr>',
+      `<td>${cell(diff.baselineImageUrl, 'baseline')}</td>`,
+      `<td>${cell(diff.currentImageUrl, 'current')}</td>`,
+      `<td>${cell(diff.diffImageUrl, 'diff')}</td>`,
+      '</tr>',
+      '</table>',
+      '',
+    ].join('\n');
   }
 
   private generateNewPagesSection(newPages: DiffResult[]): string {

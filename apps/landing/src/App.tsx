@@ -4,6 +4,7 @@ import Hero from './components/Hero';
 
 const SocialProof = lazy(() => import('./components/SocialProof'));
 const Problem = lazy(() => import('./components/Problem'));
+const DemoSection = lazy(() => import('./components/DemoSection'));
 const HowItWorks = lazy(() => import('./components/HowItWorks'));
 const Features = lazy(() => import('./components/Features'));
 const Comparison = lazy(() => import('./components/Comparison'));
@@ -32,6 +33,7 @@ Skip to main content
 <Suspense fallback={<SectionSkeleton />}>
 <SocialProof />
 <Problem />
+<DemoSection />
 <HowItWorks />
 <Features />
 <Comparison />

@@ -1,0 +1,166 @@
+---
+title: Frontguard vs Chromatic
+description: An honest Frontguard vs Chromatic comparison — pricing, Storybook coupling, CI impact, false positives, and AI capabilities. Pick the right visual testing tool.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is the difference between Frontguard and Chromatic?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Chromatic (by the Storybook team) is a hosted visual testing and review platform tightly integrated with Storybook, billed per snapshot. Frontguard is a CLI-first, open-source (MIT) visual regression tool that tests any URL or route — Storybook optional — and adds AI vision analysis that explains why a diff happened. Frontguard's CLI is free forever; Chromatic is free for Storybook hobby use and paid by snapshot volume beyond that."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need Storybook to use Frontguard?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Chromatic is designed around Storybook. Frontguard tests live routes via baseUrl and works with or without Storybook — point it at a running app, a static build, or a served Storybook."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does Frontguard have a review dashboard like Chromatic?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Not yet. Chromatic has a mature hosted review UI with branch/PR workflows. Frontguard reviews happen via CLI/report output today; a hosted dashboard is on the roadmap. If a polished review dashboard is essential right now, Chromatic is the better choice."
+      }
+    }
+  ]
+}) }} />
+
+# Frontguard vs Chromatic
+
+[Chromatic](https://www.chromatic.com) is built by the Storybook maintainers — a hosted visual testing + review platform with first-class Storybook integration, TurboSnap (changed-story detection), and a strong PR review workflow. **Frontguard** is a newer, CLI-first, MIT-licensed tool that tests **any URL or route** (Storybook optional) and adds **AI vision analysis**.
+
+<Callout type="info">
+  **Honest disclaimer:** Frontguard is a new, open-source project (early stars, no hosted review dashboard yet). Chromatic is mature and deeply polished, especially for Storybook teams. Read "When to choose Chromatic" — for some teams it's clearly the right call.
+</Callout>
+
+## Quick Comparison
+
+| | Chromatic | Frontguard |
+|---|-----------|------------|
+| Setup time | ~10–20 min (account + Storybook + token) | ~5 min (`npm i` + `init`) |
+| CI impact | Builds + uploads Storybook to Chromatic cloud | Renders locally in CI; no upload required |
+| Pricing @ 1K shots/mo | Free hobby tier (~5K snapshots) | Free (CLI) |
+| Pricing @ 5K shots/mo | Free → paid as usage grows | Free (CLI) |
+| Pricing @ 50K shots/mo | Paid (per-snapshot, scales with volume) | Free (CLI) + your AI usage |
+| False-positive approach | Manual review + TurboSnap scoping | AI classifies regression vs intentional vs content |
+| AI capabilities | ❌ None | 🟢 Vision analysis + suggested fixes (BYOK) |
+| Storybook required | 🟢 Designed for it | ❌ Optional (tests any route) |
+| Review dashboard | 🟢 Mature, PR-integrated | 🔴 Not yet (CLI/report only) |
+| License | Proprietary (SaaS) | MIT, self-hostable |
+
+## When to Choose Chromatic
+
+Honestly, Chromatic is the better choice when:
+
+- **You live in Storybook.** Component-driven teams with comprehensive Storybook coverage get first-class per-story snapshots, interaction tests, and TurboSnap to skip unchanged stories.
+- **You need a polished, PR-integrated review dashboard today** with multiple reviewers, baselines per branch, and a slick approval UX. Frontguard doesn't have this yet.
+- **You want a fully managed service** with support, and you're fine billing per snapshot.
+- **You rely on TurboSnap** to only re-snapshot stories affected by a code change.
+
+## When to Choose Frontguard
+
+- **You test full pages/routes, not just components** — or you have no Storybook.
+- **You want AI to explain *why* a diff happened** and classify it (regression vs intentional vs content), reducing manual triage.
+- **You want predictable/zero cost** without per-snapshot metering.
+- **You want rendering to stay in your own CI** (no uploading builds to a third party).
+- **You value open source + self-hosting** (MIT).
+
+## Feature-by-Feature Deep Dive
+
+### Scope: components vs pages
+Chromatic is component-first: it renders each Storybook story in isolation. That's fantastic for design-system coverage but assumes you maintain Storybook. Frontguard is route-first: it captures real, fully-assembled pages at `baseUrl` (and *can* point at a served Storybook iframe if you want stories too).
+
+### CI model
+Chromatic builds your Storybook and uploads it to its cloud for rendering/diffing — snapshots meter your bill and leave your infra. Frontguard renders with Playwright **inside your CI** and stores baselines on a git orphan branch.
+
+### Change scoping / cost control
+Chromatic's **TurboSnap** detects which stories a commit affects and skips the rest — a real strength. Frontguard controls cost differently: AI only runs on pages that *actually diffed* (pixel-pass pages never hit the model), plus per-route thresholds and viewport limits.
+
+### False positives
+Chromatic relies on human review (with good tooling) to dismiss noise. Frontguard adds an **AI classification layer** + **anti-flake multi-render consensus** to suppress flaky/intentional changes automatically before they reach a human.
+
+### AI analysis
+Chromatic has no AI explanation feature. Frontguard sends baseline + current images to OpenAI/Anthropic (BYOK) and returns a classification, severity, explanation, and optional suggested fix. See [AI Analysis](/docs/guides/ai-analysis).
+
+### Review & approval
+Chromatic clearly wins today: branch-aware baselines, PR checks, multi-reviewer dashboard. Frontguard's review is CLI/report-based (`frontguard approve`); a hosted dashboard is **on the roadmap, not shipped**.
+
+## Pricing Comparison
+
+<Callout type="warn">
+  Pricing changes — verify current numbers on each vendor's site. Figures below reflect commonly published tiers at time of writing.
+</Callout>
+
+| Screenshots/mo | Chromatic | Frontguard |
+|----------------|-----------|------------|
+| 1,000 | Free hobby tier | Free (CLI) |
+| 5,000 | Free hobby (~5K snapshots) → paid beyond | Free (CLI) |
+| 50,000 | Paid, scales per-snapshot | Free (CLI) + your own AI API spend |
+
+- **Chromatic:** **free for Storybook hobby** use (a generous monthly snapshot allotment), then per-snapshot billing as you scale. TurboSnap helps keep counts down.
+- **Frontguard:** **CLI is free forever** (MIT). Optional **$29/mo Pro** and an optional cloud add team features. AI cost = your own OpenAI/Anthropic usage (BYOK), only on diffed pages.
+
+## Migration Steps (Chromatic → Frontguard)
+
+1. **Install Frontguard.**
+   ```bash
+   npm install -D @frontguard/cli
+   npx frontguard init
+   ```
+2. **Decide your scope.** Keep testing Storybook stories *and/or* add real page routes.
+   <Tabs items={['Test real pages', 'Test Storybook stories']}>
+     <Tab value="Test real pages">
+       ```typescript title="frontguard.config.ts"
+       export default {
+         baseUrl: 'http://localhost:3000',
+         routes: ['/', '/pricing', '/checkout'],
+         viewports: [375, 768, 1440],
+         threshold: 0.1,
+         smartRender: true,
+         ai: { provider: 'openai', model: 'gpt-4o' },
+       };
+       ```
+     </Tab>
+     <Tab value="Test Storybook stories">
+       ```typescript title="frontguard.config.ts"
+       export default {
+         // serve storybook-static, e.g. http-server storybook-static -p 6006
+         baseUrl: 'http://localhost:6006',
+         routes: [
+           '/iframe.html?id=button--primary&viewMode=story',
+           '/iframe.html?id=card--default&viewMode=story',
+         ],
+         viewports: [375, 1440],
+         threshold: 0.1,
+         smartRender: true,
+       };
+       ```
+     </Tab>
+   </Tabs>
+3. **Map Chromatic `modes`/viewports → `viewports`.**
+4. **Move ignored/dynamic regions** to `ignore: [{ selector }]`.
+5. **For interaction/play-function flows**, use the [Playwright plugin](/docs/playwright/setup).
+6. **Capture baselines and run.**
+   ```bash
+   npx frontguard baseline
+   npx frontguard run
+   ```
+7. **Update CI** — replace the `chromatic` command with `frontguard run`. Remove `CHROMATIC_PROJECT_TOKEN`.
+
+## Next Steps
+
+- [AI Analysis](/docs/guides/ai-analysis)
+- [Configuration reference](/docs/cli/configuration)
+- [GitHub Actions](/docs/guides/github-actions)

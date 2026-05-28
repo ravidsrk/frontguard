@@ -277,15 +277,15 @@ imageUpload?: {
 ```
 
 **Acceptance criteria:**
-- [ ] `ImageUploader` interface with `upload()`, `getUrl()`, `delete()`
-- [ ] R2 uploader works with Cloudflare R2 (S3-compatible API)
-- [ ] S3 uploader works with AWS S3
-- [ ] GitHub artifact uploader works in Actions without any config (auto-detects `GITHUB_TOKEN`, `GITHUB_RUN_ID`)
-- [ ] `local` fallback writes to disk and returns `file://` URLs (for local dev)
-- [ ] Keys are namespaced: `{project}/{runId}/{route}-{viewport}-{browser}.png`
-- [ ] Uploaded images are publicly readable (for PR comment embedding)
-- [ ] Config validated via Zod; missing credentials produce clear error message
-- [ ] No credentials logged or written to disk
+- [x] `ImageUploader` interface with `upload()`, `getUrl()`, `delete()`
+- [x] R2 uploader works with Cloudflare R2 (S3-compatible API)
+- [x] S3 uploader works with AWS S3
+- [x] GitHub artifact uploader works in Actions without any config (auto-detects `GITHUB_TOKEN`, `GITHUB_RUN_ID`)
+- [x] `local` fallback writes to disk and returns `file://` URLs (for local dev)
+- [x] Keys are namespaced: `{project}/{runId}/{route}-{viewport}-{browser}.png`
+- [x] Uploaded images are publicly readable (for PR comment embedding)
+- [x] Config validated via Zod; missing credentials produce clear error message
+- [x] No credentials logged or written to disk
 
 **Complexity:** M (3-4 days)
 **Priority:** P0 — unblocks PR thumbnails, cloud tier, and monitoring
@@ -323,14 +323,14 @@ The PR comment markdown format should be:
 ```
 
 **Acceptance criteria:**
-- [ ] PR comment includes actual screenshot images (baseline, current, diff) in a table grid
-- [ ] Images are thumbnails (280px wide in markdown) linking to full-size
-- [ ] Graceful fallback: if no image upload configured, falls back to text-only format (current behavior)
-- [ ] Images are uploaded during pipeline run, URLs stored in `DiffResult`
-- [ ] Works in GitHub Actions with `github-artifacts` uploader (zero config)
-- [ ] Works with R2/S3 when configured
-- [ ] Comment stays under 65KB limit (images are URLs, not base64)
-- [ ] AI classification badge shown per regression: 🔴 Regression / 🟡 Warning / 🟢 Intentional
+- [x] PR comment includes actual screenshot images (baseline, current, diff) in a table grid
+- [x] Images are thumbnails (280px wide in markdown) linking to full-size
+- [x] Graceful fallback: if no image upload configured, falls back to text-only format (current behavior)
+- [x] Images are uploaded during pipeline run, URLs stored in `DiffResult`
+- [x] Works in GitHub Actions with `github-artifacts` uploader (zero config)
+- [x] Works with R2/S3 when configured
+- [x] Comment stays under 65KB limit (images are URLs, not base64)
+- [x] AI classification badge shown per regression: 🔴 Regression / 🟡 Warning / 🟢 Intentional
 
 **Complexity:** M (3-4 days)
 **Priority:** P0 — the #1 developer want according to research
@@ -360,10 +360,10 @@ The PR comment markdown format should be:
 - Common gotchas
 
 **Acceptance criteria:**
-- [ ] A BackstopJS user can follow the guide and have Frontguard running in <30 minutes
-- [ ] Config translation is correct and tested
-- [ ] SEO metadata targets "backstopjs alternative", "backstopjs migration", "backstopjs replacement"
-- [ ] Includes a one-command migration script or at minimum a config converter example
+- [x] A BackstopJS user can follow the guide and have Frontguard running in <30 minutes
+- [x] Config translation is correct and tested
+- [x] SEO metadata targets "backstopjs alternative", "backstopjs migration", "backstopjs replacement"
+- [x] Includes a one-command migration script or at minimum a config converter example
 
 **Complexity:** S (2 days)
 **Priority:** P1 — distribution play, not blocking launch
@@ -387,9 +387,9 @@ The PR comment markdown format should be:
 - Highlight: AI classification (Lost Pixel never had this)
 
 **Acceptance criteria:**
-- [ ] Guide covers all Lost Pixel config options
-- [ ] SEO targets "lost pixel alternative", "lost pixel archived"
-- [ ] Includes working config translation examples
+- [x] Guide covers all Lost Pixel config options
+- [x] SEO targets "lost pixel alternative", "lost pixel archived"
+- [x] Includes working config translation examples
 
 **Complexity:** S (1-2 days)
 **Priority:** P1 — distribution play
@@ -419,11 +419,11 @@ The PR comment markdown format should be:
 5. Migration steps
 
 **Acceptance criteria:**
-- [ ] Comparison pages are factually accurate (verified against competitor docs)
-- [ ] Pricing data is current
-- [ ] Pages include structured data (JSON-LD) for SEO
-- [ ] Honest about weaknesses (Frontguard doesn't have a review dashboard yet, etc.)
-- [ ] SEO targets: "percy alternative", "chromatic alternative", "visual regression testing tools 2026"
+- [x] Comparison pages are factually accurate (verified against competitor docs)
+- [x] Pricing data is current
+- [x] Pages include structured data (JSON-LD) for SEO
+- [x] Honest about weaknesses (Frontguard doesn't have a review dashboard yet, etc.)
+- [x] SEO targets: "percy alternative", "chromatic alternative", "visual regression testing tools 2026"
 
 **Complexity:** M (3-4 days — mostly writing, some React)
 **Priority:** P1 — high-leverage distribution content
@@ -447,10 +447,10 @@ The PR comment markdown format should be:
 **Dependencies:** Tasks 1.1 (doctor command — include in demo), 1.2 (per-route threshold — show in config).
 
 **Acceptance criteria:**
-- [ ] README has a demo GIF/recording above the fold (< 2MB)
-- [ ] Demo shows: `frontguard init` → config created → `frontguard run` → results with AI classification
-- [ ] Landing page has embedded demo
-- [ ] Demo is reproducible from tape file (`vhs frontguard-demo.tape`)
+- [x] README has a demo GIF/recording above the fold (< 2MB)
+- [x] Demo shows: `frontguard init` → config created → `frontguard run` → results with AI classification
+- [x] Landing page has embedded demo
+- [x] Demo is reproducible from tape file (`vhs frontguard-demo.tape`)
 
 **Complexity:** S (1-2 days)
 **Priority:** P1 — first impression matters

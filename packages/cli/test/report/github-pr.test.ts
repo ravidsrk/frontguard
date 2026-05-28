@@ -132,6 +132,75 @@ describe('GitHubPRReporter', () => {
     expect(comment).toContain('Check flex layout changes');
   });
 
+  // --- Task 2.2: PR screenshot thumbnails --------------------------------
+  it('embeds image thumbnails when upload URLs are present', () => {
+    const reporter = new GitHubPRReporter();
+    const result = makeRunResult([
+      makeDiff({
+        status: 'regression',
+        diffPercentage: 8,
+        route: { path: '/pricing' },
+        baselineImageUrl: 'https://cdn.test/baseline.png',
+        currentImageUrl: 'https://cdn.test/current.png',
+        diffImageUrl: 'https://cdn.test/diff.png',
+      }),
+    ]);
+    const comment = reporter.generateComment(result);
+    expect(comment).toContain('<table>');
+    expect(comment).toContain('<img src="https://cdn.test/baseline.png" width="280"');
+    expect(comment).toContain('https://cdn.test/current.png');
+    expect(comment).toContain('https://cdn.test/diff.png');
+    expect(comment).toContain('<th>Baseline</th>');
+  });
+
+  it('falls back to text summary when no image URLs present', () => {
+    const reporter = new GitHubPRReporter();
+    const result = makeRunResult([
+      makeDiff({ status: 'regression', diffPercentage: 8, route: { path: '/pricing' } }),
+    ]);
+    const comment = reporter.generateComment(result);
+    expect(comment).not.toContain('<table>');
+    expect(comment).toContain('📸 **Baseline → Current**');
+  });
+
+  it('shows AI classification badge for regressions', () => {
+    const reporter = new GitHubPRReporter();
+    const result = makeRunResult([
+      makeDiff({
+        status: 'regression',
+        diffPercentage: 8,
+        route: { path: '/x' },
+        aiAnalysis: {
+          classification: 'regression',
+          explanation: 'broken',
+          severity: 'critical',
+          confidence: 0.95,
+        },
+      }),
+    ]);
+    const comment = reporter.generateComment(result);
+    expect(comment).toContain('🔴 Regression');
+  });
+
+  it('keeps comment under 60KB even with image URLs', () => {
+    const reporter = new GitHubPRReporter();
+    const diffs: DiffResult[] = [];
+    for (let i = 0; i < 200; i++) {
+      diffs.push(
+        makeDiff({
+          status: 'regression',
+          diffPercentage: 5,
+          route: { path: `/route-${i}` },
+          baselineImageUrl: `https://cdn.test/b-${i}.png`,
+          currentImageUrl: `https://cdn.test/c-${i}.png`,
+          diffImageUrl: `https://cdn.test/d-${i}.png`,
+        }),
+      );
+    }
+    const comment = reporter.generateComment(makeRunResult(diffs));
+    expect(comment.length).toBeLessThanOrEqual(60_000);
+  });
+
   it('uses consistent status icons in summary table', () => {
     const reporter = new GitHubPRReporter();
     const result = makeRunResult([

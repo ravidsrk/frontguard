@@ -29,6 +29,7 @@ import { renderPages } from '../render/playwright.js';
 import { compareScreenshot, createNewPageResult } from '../diff/pixel.js';
 import { analyzeWithAI } from '../diff/ai-vision.js';
 import { GitOrphanStorage } from '../storage/git-orphan.js';
+import { uploadImages } from '../storage/upload-stage.js';
 import { detectPreviewUrl, waitForUrl } from '../utils/preview-url.js';
 import { logger } from '../utils/logger.js';
 import { PluginManager } from './plugins.js';
@@ -658,6 +659,23 @@ export async function runPipeline(
 
   timing.total = Math.round(performance.now() - totalStart);
   const result = buildResult(diffs, timing, totalStart, config);
+
+  // -----------------------------------------------------------------------
+  // Stage 6.5: UPLOAD IMAGES (optional — for PR comment thumbnails)
+  // -----------------------------------------------------------------------
+  if (config.imageUpload) {
+    try {
+      const runId = process.env.GITHUB_RUN_ID ?? `local-${Date.now()}`;
+      const count = await uploadImages(diffs, config, runId);
+      if (count > 0) {
+        logger.info(`Uploaded ${count} screenshot image(s) via ${config.imageUpload.provider}`);
+      }
+    } catch (err) {
+      logger.warn(
+        `Image upload stage failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 
   // Plugin hook: afterRun — notifications, uploads, custom reporting
   await pluginManager.runHook('afterRun', result, pluginCtx);

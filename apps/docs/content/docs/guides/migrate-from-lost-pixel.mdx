@@ -1,0 +1,271 @@
+---
+title: Migrate from Lost Pixel
+description: A Lost Pixel migration guide and Lost Pixel alternative. Lost Pixel is archived — move to Frontguard for a free-forever CLI, Playwright rendering, and AI visual classification.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+# Migrate from Lost Pixel
+
+[Lost Pixel](https://github.com/lost-pixel/lost-pixel) was a popular open-source visual regression tool (~43K downloads/week) with a hosted "Lost Pixel Platform" for review. The open-source project is now **archived**, and the hosted platform is no longer a safe long-term bet.
+
+**Frontguard** is a Lost Pixel alternative built for the same workflows — page shots, custom shots, and Storybook stories — but with a **free-forever CLI**, Playwright-native rendering, git-orphan-branch baselines, anti-flake multi-render consensus, and **AI vision classification** that Lost Pixel never had. MIT-licensed and self-hostable.
+
+<Callout type="warn">
+  Lost Pixel's GitHub repository is archived. If you're starting fresh or your team is blocked on platform reliability, migrating to an actively maintained tool is the safer path.
+</Callout>
+
+## Config Mapping: lostpixel.config.ts → frontguard.config.ts
+
+Both tools use a TypeScript config. Lost Pixel splits capture into `pageShots`, `customShots`, and `storybookShots` modes; Frontguard unifies everything under `baseUrl` + `routes`.
+
+<Tabs items={['lostpixel.config.ts', 'frontguard.config.ts']}>
+  <Tab value="lostpixel.config.ts">
+    ```typescript title="lostpixel.config.ts"
+    import { CustomProjectConfig } from 'lost-pixel';
+
+    export const config: CustomProjectConfig = {
+      pageShots: {
+        pages: [
+          { path: '/', name: 'home' },
+          { path: '/pricing', name: 'pricing' },
+        ],
+        baseUrl: 'http://localhost:3000',
+      },
+      threshold: 0.1,
+      breakpoints: [375, 768, 1440],
+      lostPixelProjectId: 'abc123',
+      apiKey: process.env.LOST_PIXEL_API_KEY,
+    };
+    ```
+  </Tab>
+  <Tab value="frontguard.config.ts">
+    ```typescript title="frontguard.config.ts"
+    export default {
+      baseUrl: 'http://localhost:3000',
+      routes: ['/', '/pricing'],
+      viewports: [375, 768, 1440],
+      browsers: ['chromium'],
+      threshold: 0.1,
+      smartRender: true,
+      ai: {
+        provider: 'openai',
+        model: 'gpt-4o',
+      },
+    };
+    ```
+  </Tab>
+</Tabs>
+
+Notice the `lostPixelProjectId` and `apiKey` are gone — Frontguard's CLI runs entirely locally/in your CI with git-orphan-branch baselines. No platform account required.
+
+### Field-by-field mapping
+
+| Lost Pixel | Frontguard | Notes |
+|------------|------------|-------|
+| `pageShots.baseUrl` | `baseUrl` | ✅ Direct |
+| `pageShots.pages[].path` | `routes[].path` (or string) | ✅ Direct |
+| `pageShots.pages[].name` | — (derived from path) | Frontguard names by route automatically |
+| `threshold` | `threshold` | ✅ Direct (0.0–1.0 fraction) |
+| `breakpoints` | `viewports` | ✅ Direct (widths) |
+| `waitBeforeScreenshot` | `smartRender` (+ `waitForSelector`) | ✨ Improved |
+| `lostPixelProjectId` / `apiKey` | — | Not needed — CLI is self-contained |
+| `mask` / `elementShots` masking | `ignore: [{ selector }]` | ✅ Maps |
+
+## pageShots → routes
+
+`pageShots` is the closest analog to Frontguard's core model. Each page becomes a route.
+
+<Tabs items={['Lost Pixel', 'Frontguard']}>
+  <Tab value="Lost Pixel">
+    ```typescript title="lostpixel.config.ts"
+    export const config = {
+      pageShots: {
+        baseUrl: 'http://localhost:3000',
+        pages: [
+          { path: '/', name: 'home' },
+          { path: '/blog', name: 'blog', threshold: 0.05 },
+          { path: '/dash', name: 'dash', mask: [{ selector: '.clock' }] },
+        ],
+      },
+    };
+    ```
+  </Tab>
+  <Tab value="Frontguard">
+    ```typescript title="frontguard.config.ts"
+    export default {
+      baseUrl: 'http://localhost:3000',
+      routes: [
+        '/',
+        { path: '/blog', threshold: 0.05 },
+        { path: '/dash', ignore: [{ selector: '.clock', description: 'Live clock' }] },
+      ],
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## customShots → routes (or Playwright plugin)
+
+Lost Pixel's `customShots` pointed at a directory of pre-captured images or custom-rendered shots. In Frontguard you have two options:
+
+- **Simple cases:** add the URL as another route.
+- **Interaction-heavy cases (logged-in views, hovers, multi-step flows):** use the [Playwright plugin](/docs/playwright/setup), which lets you drive the page with full Playwright APIs and call `visualTest(page, name)`.
+
+```typescript title="tests/visual.spec.ts — replaces customShots"
+import { test } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
+test('checkout — logged in, coupon applied', async ({ page }) => {
+  await page.goto('/checkout');
+  await page.getByRole('button', { name: 'Apply coupon' }).click();
+  await visualTest(page, 'checkout-coupon-applied', { ai: true });
+});
+```
+
+## storybookShots → Storybook routes
+
+Lost Pixel's `storybookShots` crawled a built Storybook. With Frontguard, point `baseUrl` at your running/static Storybook and list the iframe story URLs as routes (or auto-discover them).
+
+<Tabs items={['Lost Pixel', 'Frontguard']}>
+  <Tab value="Lost Pixel">
+    ```typescript title="lostpixel.config.ts"
+    export const config = {
+      storybookShots: {
+        storybookUrl: './storybook-static',
+      },
+      threshold: 0.1,
+    };
+    ```
+  </Tab>
+  <Tab value="Frontguard">
+    ```typescript title="frontguard.config.ts"
+    export default {
+      // serve storybook-static (e.g. `npx http-server storybook-static -p 6006`)
+      baseUrl: 'http://localhost:6006',
+      threshold: 0.1,
+      smartRender: true,
+      // Auto-discover stories, or list iframe URLs explicitly:
+      routes: [
+        '/iframe.html?id=button--primary&viewMode=story',
+        '/iframe.html?id=button--secondary&viewMode=story',
+        '/iframe.html?id=card--default&viewMode=story',
+      ],
+    };
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="info">
+  Story IDs come from your Storybook `stories.json` / `index.json`. You can script-generate the `routes` array from that file the same way Lost Pixel enumerated stories internally.
+</Callout>
+
+## Platform Comparison
+
+The biggest reason to migrate: Lost Pixel's hosted platform and OSS repo are no longer dependable. Frontguard's value lives in a CLI that's **free forever** — the optional cloud is additive, not required.
+
+| | Lost Pixel | Frontguard |
+|---|------------|------------|
+| OSS status | 🔴 Archived | 🟢 Active, MIT |
+| Core engine | CLI + hosted platform | CLI-first (free forever) |
+| Hosted review | Lost Pixel Platform (uncertain) | Optional cloud (CLI works fully without it) |
+| Baselines | local / platform | git orphan branch (auto) |
+| Rendering | Playwright | Playwright-native + anti-flake consensus |
+| AI classification | ❌ Never had it | 🟢 OpenAI / Anthropic (BYOK) |
+| Self-hostable | partial | 🟢 Fully |
+| Account required to run | platform features | ❌ None |
+
+<Callout type="warn">
+  **Honest note:** Frontguard is a new project with no hosted review dashboard yet (the optional cloud is in progress). If your team's workflow depends entirely on a polished hosted review UI today, evaluate that gap before committing. The CLI workflow — baseline, run, approve — is fully functional.
+</Callout>
+
+## AI Classification — the thing Lost Pixel never had
+
+Lost Pixel reported pixel diffs. Frontguard sends the baseline + current screenshot to a vision model and returns a **classification** (`regression` / `intentional` / `content_update`), a **severity** (🔴/🟡/🟢), a plain-English explanation, and an optional suggested CSS fix.
+
+```
+  ✘ /dashboard @ 375px
+    AI: "Sidebar overlaps main content on mobile.
+         flex-direction change in Dashboard.module.css:28"
+    Severity: 🔴 Critical (confidence: 94%)
+```
+
+This is the single biggest upgrade over Lost Pixel: it tells you whether a diff is a real bug, an intentional redesign, or just dynamic content — drastically cutting false-positive triage. See [AI Analysis](/docs/guides/ai-analysis).
+
+## Working Migration Example
+
+A realistic Lost Pixel config and its Frontguard translation, end to end.
+
+<Tabs items={['Before (lostpixel.config.ts)', 'After (frontguard.config.ts)']}>
+  <Tab value="Before (lostpixel.config.ts)">
+    ```typescript title="lostpixel.config.ts"
+    import { CustomProjectConfig } from 'lost-pixel';
+
+    export const config: CustomProjectConfig = {
+      pageShots: {
+        baseUrl: 'http://localhost:3000',
+        pages: [
+          { path: '/', name: 'home' },
+          { path: '/pricing', name: 'pricing', threshold: 0.05 },
+          { path: '/dashboard', name: 'dashboard', mask: [{ selector: '.live-clock' }] },
+        ],
+        waitBeforeScreenshot: 1000,
+      },
+      breakpoints: [375, 1440],
+      threshold: 0.1,
+      lostPixelProjectId: 'proj_abc',
+      apiKey: process.env.LOST_PIXEL_API_KEY,
+    };
+    ```
+  </Tab>
+  <Tab value="After (frontguard.config.ts)">
+    ```typescript title="frontguard.config.ts"
+    export default {
+      baseUrl: 'http://localhost:3000',
+      viewports: [375, 1440],
+      browsers: ['chromium'],
+      threshold: 0.1,
+      smartRender: true, // replaces waitBeforeScreenshot
+      routes: [
+        '/',
+        { path: '/pricing', threshold: 0.05 },
+        {
+          path: '/dashboard',
+          ignore: [{ selector: '.live-clock', description: 'Updates every second' }],
+        },
+      ],
+      ai: { provider: 'openai', model: 'gpt-4o' }, // new capability
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Migration Checklist
+
+1. **Install Frontguard, remove Lost Pixel.**
+   ```bash
+   npm uninstall lost-pixel
+   npm install -D @frontguard/cli
+   npx frontguard init
+   ```
+2. **Map `pageShots.pages` → `routes`** (path stays, drop `name`).
+3. **Map `breakpoints` → `viewports`** (1:1).
+4. **Map `threshold` → `threshold`** (1:1).
+5. **Replace `waitBeforeScreenshot`** with `smartRender: true` (+ `waitForSelector` if needed).
+6. **Move `mask` → `ignore: [{ selector }]`.**
+7. **Port `customShots`** to routes or the Playwright plugin for interactive flows.
+8. **Point `baseUrl` at a served Storybook** for `storybookShots` and list story iframe URLs.
+9. **Drop `lostPixelProjectId` / `apiKey`** — not needed.
+10. **Capture baselines, run, approve.**
+    ```bash
+    npx frontguard baseline
+    npx frontguard run
+    ```
+11. **(Optional) Enable AI** — set `FRONTGUARD_OPENAI_KEY`.
+
+## Next Steps
+
+- [AI Analysis](/docs/guides/ai-analysis) — the classification Lost Pixel never had
+- [Playwright setup](/docs/playwright/setup) — for `customShots`-style interactive flows
+- [Configuration reference](/docs/cli/configuration)

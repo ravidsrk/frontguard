@@ -51,6 +51,26 @@ const authConfigSchema = z.object({
   storageState: z.string().optional(),
 });
 
+/** Zod schema for image-upload configuration. */
+const imageUploadSchema = z.object({
+  provider: z.enum(['r2', 's3', 'github-artifacts', 'local']),
+  bucket: z.string().optional(),
+  region: z.string().optional(),
+  endpoint: z.string().optional(),
+  accessKeyId: z.string().optional(),
+  secretAccessKey: z.string().optional(),
+  publicUrlPrefix: z.string().optional(),
+  outputDir: z.string().optional(),
+  project: z.string().optional(),
+}).refine(
+  (c) => {
+    // R2/S3 require a bucket (credentials may come from env, so not enforced here).
+    if (c.provider === 'r2' || c.provider === 's3') return Boolean(c.bucket);
+    return true;
+  },
+  { message: 'imageUpload.bucket is required when provider is "r2" or "s3"' },
+);
+
 /** Browser engine enum. */
 const browserEngineSchema = z.enum(['chromium', 'firefox', 'webkit']);
 
@@ -181,6 +201,9 @@ export const configSchema = z.object({
 
   /** Per-page render retry count on failure (default: 0). */
   renderRetries: z.number().int().min(0).max(3).optional(),
+
+  /** Screenshot image-upload configuration (for PR comment thumbnails). */
+  imageUpload: imageUploadSchema.optional(),
 });
 
 /** Inferred Zod output type — should match `FrontguardConfig`. */
