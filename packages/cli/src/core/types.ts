@@ -96,6 +96,37 @@ export interface AuthConfig {
   storageState?: string;
 }
 
+/** Image-upload provider backends. */
+export type ImageUploadProvider = 'r2' | 's3' | 'github-artifacts' | 'local';
+
+/**
+ * Configuration for the screenshot image-upload layer.
+ *
+ * Used to host baseline/current/diff PNGs at public URLs so they can be
+ * embedded in PR comments. Credentials may be supplied via env vars
+ * (`FRONTGUARD_S3_ACCESS_KEY` / `FRONTGUARD_S3_SECRET_KEY`) instead of inline.
+ */
+export interface ImageUploadConfig {
+  /** Which backend to use. */
+  provider: ImageUploadProvider;
+  /** Bucket name (R2/S3). */
+  bucket?: string;
+  /** Region (S3; R2 uses `auto`). */
+  region?: string;
+  /** Custom endpoint (R2: `https://<account>.r2.cloudflarestorage.com`). */
+  endpoint?: string;
+  /** Access key id (or env `FRONTGUARD_S3_ACCESS_KEY`). */
+  accessKeyId?: string;
+  /** Secret access key (or env `FRONTGUARD_S3_SECRET_KEY`). */
+  secretAccessKey?: string;
+  /** Public URL prefix for custom domains / R2 public buckets. */
+  publicUrlPrefix?: string;
+  /** Output directory for the `local` provider (defaults to config.outputDir). */
+  outputDir?: string;
+  /** Project namespace used in object keys (defaults to `frontguard`). */
+  project?: string;
+}
+
 /**
  * Per-route configuration object.
  *
@@ -189,6 +220,8 @@ export interface FrontguardConfig {
   freezeTime?: boolean | number;
   /** Per-page render retry count on failure (default: 0) */
   renderRetries?: number;
+  /** Screenshot image-upload configuration (for PR comment thumbnails). */
+  imageUpload?: ImageUploadConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -273,6 +306,12 @@ export interface DiffResult {
   ssim?: number;
   /** Whether SSIM analysis overrode a pixel-diff failure to pass. */
   ssimOverride?: boolean;
+  /** Public URL of the uploaded baseline image (set by the upload stage). */
+  baselineImageUrl?: string;
+  /** Public URL of the uploaded current image (set by the upload stage). */
+  currentImageUrl?: string;
+  /** Public URL of the uploaded diff image (set by the upload stage). */
+  diffImageUrl?: string;
 }
 
 /**
