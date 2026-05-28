@@ -186,10 +186,32 @@ export class ConsoleReporter implements Reporter {
           chalk.blue;
 
         console.log(chalk.dim(`    AI: `) + severityColor(`[${ai.severity}]`) + ` ${ai.explanation}`);
-        if (ai.suggestedFix) {
+        if (ai.suggestedFix && !diff.suggestedFix) {
           console.log(chalk.dim(`    Fix: `) + ai.suggestedFix);
         }
         console.log(chalk.dim(`    Confidence: ${Math.round(ai.confidence * 100)}%`));
+      }
+
+      // Structured AI fix (Task 4.3)
+      if (diff.suggestedFix) {
+        const fix = diff.suggestedFix;
+        const verified = diff.fixVerification?.verified;
+        const badge =
+          verified === true
+            ? chalk.green('✓ verified')
+            : verified === false
+              ? chalk.yellow('⚠ unverified')
+              : chalk.dim('suggested');
+        console.log(
+          chalk.cyan(`    🔧 Fix available `) +
+            chalk.dim(`(${Math.round(fix.confidence * 100)}% confidence, ${fix.category}) `) +
+            badge,
+        );
+        console.log(chalk.dim(`    ${fix.explanation}`));
+        // Indent the patch.
+        for (const line of fix.patch.split('\n')) {
+          console.log(chalk.green(`      ${line}`));
+        }
       }
 
       console.log('');

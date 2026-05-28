@@ -272,8 +272,29 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
           <h4>🤖 AI Analysis ${severityBadge(ai.severity)}</h4>
           <p><strong>Classification:</strong> ${escapeHtml(ai.classification)}</p>
           <p>${escapeHtml(ai.explanation)}</p>
-          ${ai.suggestedFix ? `<p><strong>Suggested fix:</strong> ${escapeHtml(ai.suggestedFix)}</p>` : ''}
+          ${ai.suggestedFix && !diff.suggestedFix ? `<p><strong>Suggested fix:</strong> ${escapeHtml(ai.suggestedFix)}</p>` : ''}
           <p class="confidence">Confidence: ${Math.round(ai.confidence * 100)}%</p>
+        </div>`;
+    }
+
+    let fixSection = '';
+    if (diff.suggestedFix) {
+      const fix = diff.suggestedFix;
+      const verified = diff.fixVerification?.verified;
+      const verifyClass = verified === true ? 'fix-verified' : verified === false ? 'fix-unverified' : 'fix-suggested';
+      const verifyLabel =
+        verified === true ? '✓ Verified' : verified === false ? '⚠ Unverified' : '💡 Suggested';
+      const patchId = `patch-${prefix}`;
+      fixSection = `<div class="fix-panel ${verifyClass}">
+          <h4>🔧 Suggested Fix <span class="fix-badge">${verifyLabel}</span>
+            <span class="confidence">${Math.round(fix.confidence * 100)}% · ${escapeHtml(fix.category)}</span>
+          </h4>
+          <p>${escapeHtml(fix.explanation)}</p>
+          ${fix.target ? `<p class="fix-target">Target: <code>${escapeHtml(fix.target)}</code></p>` : ''}
+          <div class="fix-code-wrap">
+            <button class="copy-fix-btn" data-target="${patchId}" type="button">Copy fix</button>
+            <pre class="fix-code"><code id="${patchId}">${escapeHtml(fix.patch)}</code></pre>
+          </div>
         </div>`;
     }
 
@@ -290,6 +311,7 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
           ${diffSrc ? `<div class="image-col"><h5>Diff</h5><img src="${diffSrc}" alt="diff" loading="lazy"></div>` : ''}
         </div>
         ${aiSection}
+        ${fixSection}
       </div>`;
   }).join('\n      ');
 
@@ -538,6 +560,33 @@ body {
 .ai-analysis p { margin-bottom: 6px; font-size: 13px; }
 .confidence { color: var(--text-muted); font-size: 12px; }
 
+/* Suggested Fix panel */
+.fix-panel {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(63, 185, 80, 0.06);
+}
+.fix-panel.fix-verified { background: rgba(63, 185, 80, 0.10); border-left: 3px solid #3fb950; }
+.fix-panel.fix-unverified { background: rgba(210, 153, 34, 0.08); border-left: 3px solid #d29922; }
+.fix-panel.fix-suggested { border-left: 3px solid var(--border); }
+.fix-panel h4 { font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fix-panel p { margin-bottom: 6px; font-size: 13px; }
+.fix-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: rgba(255,255,255,0.08); }
+.fix-target code { font-family: monospace; font-size: 12px; }
+.fix-code-wrap { position: relative; margin-top: 8px; }
+.fix-code {
+  background: #0d1117; border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px; overflow-x: auto; font-size: 12px; line-height: 1.5;
+}
+.fix-code code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #7ee787; white-space: pre; }
+.copy-fix-btn {
+  position: absolute; top: 8px; right: 8px; z-index: 1;
+  background: var(--border); color: var(--text); border: none; border-radius: 4px;
+  padding: 4px 10px; font-size: 11px; cursor: pointer;
+}
+.copy-fix-btn:hover { background: #30363d; }
+.copy-fix-btn.copied { background: #238636; color: #fff; }
+
 .badge {
   display: inline-block;
   padding: 2px 8px;
@@ -634,6 +683,29 @@ function getJS(): string {
         emptyState.style.display = visibleCount === 0 ? '' : 'none';
       }
     });
+  });
+
+  // Copy-fix buttons
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest && e.target.closest('.copy-fix-btn');
+    if (!btn) return;
+    var code = document.getElementById(btn.getAttribute('data-target'));
+    if (!code) return;
+    var text = code.textContent || '';
+    var done = function() {
+      var original = btn.textContent;
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(function() { btn.textContent = original; btn.classList.remove('copied'); }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function(){});
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (err) {}
+      document.body.removeChild(ta);
+    }
   });
 
   // Auto-select first route if only a few

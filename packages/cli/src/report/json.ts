@@ -64,6 +64,20 @@ interface SerializedDiff {
     confidence: number;
     suggestedFix?: string;
   };
+  suggestedFix?: {
+    fixType: string;
+    category: string;
+    patch: string;
+    confidence: number;
+    explanation: string;
+    target?: string;
+  };
+  fixVerification?: {
+    fixApplied: boolean;
+    diffPercentage: number;
+    verified: boolean;
+    error?: string;
+  };
   error?: string;
 }
 
@@ -121,6 +135,26 @@ function serializeDiff(diff: DiffResult): SerializedDiff {
       severity: diff.aiAnalysis.severity,
       confidence: diff.aiAnalysis.confidence,
       suggestedFix: diff.aiAnalysis.suggestedFix,
+    };
+  }
+
+  if (diff.suggestedFix) {
+    serialized.suggestedFix = {
+      fixType: diff.suggestedFix.fixType,
+      category: diff.suggestedFix.category,
+      patch: diff.suggestedFix.patch,
+      confidence: diff.suggestedFix.confidence,
+      explanation: diff.suggestedFix.explanation,
+      target: diff.suggestedFix.target,
+    };
+  }
+
+  if (diff.fixVerification) {
+    serialized.fixVerification = {
+      fixApplied: diff.fixVerification.fixApplied,
+      diffPercentage: diff.fixVerification.diffPercentage,
+      verified: diff.fixVerification.verified,
+      error: diff.fixVerification.error,
     };
   }
 
