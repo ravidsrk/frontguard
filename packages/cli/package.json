@@ -36,6 +36,10 @@
     "ci"
   ],
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "files": [
     "dist",
     "action.yml",

@@ -1,0 +1,42 @@
+[
+  {
+    "name": "taxonomy",
+    "repo": "shadcn-ui/taxonomy",
+    "url": "http://localhost:3000",
+    "routes": ["/", "/pricing", "/blog", "/login", "/dashboard"],
+    "devCommand": "pnpm dev",
+    "category": "Next.js app"
+  },
+  {
+    "name": "tailwind-dashboard",
+    "repo": "shadcn-ui/next-template",
+    "url": "http://localhost:3000",
+    "routes": ["/", "/dashboard", "/dashboard/settings", "/dashboard/analytics"],
+    "devCommand": "npm run dev",
+    "category": "Tailwind dashboard"
+  },
+  {
+    "name": "chakra-ui-docs",
+    "repo": "chakra-ui/chakra-ui-docs",
+    "url": "http://localhost:3000",
+    "routes": ["/", "/docs/components/button", "/docs/components/modal", "/getting-started"],
+    "devCommand": "pnpm dev",
+    "category": "component library docs"
+  },
+  {
+    "name": "medusa-storefront",
+    "repo": "medusajs/nextjs-starter-medusa",
+    "url": "http://localhost:8000",
+    "routes": ["/", "/store", "/cart", "/checkout", "/account"],
+    "devCommand": "npm run dev",
+    "category": "e-commerce storefront"
+  },
+  {
+    "name": "nextra-docs",
+    "repo": "shuding/nextra",
+    "url": "http://localhost:3000",
+    "routes": ["/", "/docs", "/docs/guide", "/about"],
+    "devCommand": "pnpm dev",
+    "category": "docs site"
+  }
+]

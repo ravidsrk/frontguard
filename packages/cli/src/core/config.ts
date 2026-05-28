@@ -204,6 +204,9 @@ export const configSchema = z.object({
 
   /** Screenshot image-upload configuration (for PR comment thumbnails). */
   imageUpload: imageUploadSchema.optional(),
+
+  /** Anonymous usage telemetry (default: true). Set false to opt out. */
+  telemetry: z.boolean().optional(),
 });
 
 /** Inferred Zod output type — should match `FrontguardConfig`. */

@@ -27,6 +27,10 @@
   ],
   "author": "Ravindra Kumar <ravidsrk@gmail.com>",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/ravidsrk/frontguard"

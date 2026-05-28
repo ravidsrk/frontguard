@@ -26,6 +26,8 @@
     "build:docs": "npm run build --workspace=apps/docs",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "release": "npm run build && changeset publish",
+    "version-packages": "changeset version",
     "prepare": "husky"
   },
   "engines": {

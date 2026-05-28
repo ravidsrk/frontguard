@@ -481,13 +481,13 @@ The PR comment markdown format should be:
 **Dependencies:** None.
 
 **Acceptance criteria:**
-- [ ] `git tag v0.2.0 && git push --tags` triggers publish to npm
-- [ ] All three packages published with correct `exports`, `types`, and `bin` fields
-- [ ] `npx frontguard` works for a cold install (no peer dep issues)
-- [ ] `npx frontguard doctor` works without a config file
-- [ ] Package size is reasonable (<5MB for CLI, <500KB for playwright plugin)
-- [ ] README renders correctly on npmjs.com
-- [ ] Provenance attestation enabled (npm `--provenance` flag)
+- [x] `git tag v0.2.0 && git push --tags` triggers publish to npm
+- [x] All three packages published with correct `exports`, `types`, and `bin` fields
+- [x] `npx frontguard` works for a cold install (no peer dep issues)
+- [x] `npx frontguard doctor` works without a config file
+- [x] Package size is reasonable (<5MB for CLI, <500KB for playwright plugin)
+- [x] README renders correctly on npmjs.com
+- [x] Provenance attestation enabled (npm `--provenance` flag)
 
 **Complexity:** S (1-2 days)
 **Priority:** P0 — cannot launch without publishing
@@ -516,10 +516,10 @@ The PR comment markdown format should be:
 8. Links: docs, Discord, contributing
 
 **Acceptance criteria:**
-- [ ] A developer understands what Frontguard does within 10 seconds of landing on the repo
-- [ ] Quick start works copy-paste with zero errors
-- [ ] Competitor comparison table is accurate
-- [ ] Demo asset loads and is visible on GitHub
+- [x] A developer understands what Frontguard does within 10 seconds of landing on the repo
+- [x] Quick start works copy-paste with zero errors
+- [x] Competitor comparison table is accurate
+- [x] Demo asset loads and is visible on GitHub
 
 **Complexity:** S (1-2 days)
 **Priority:** P0 — the front door
@@ -545,11 +545,11 @@ The PR comment markdown format should be:
 **Dependencies:** Tasks 1.4 (AI validation), 1.5 (CI template), 3.1 (published package).
 
 **Acceptance criteria:**
-- [ ] Frontguard runs successfully on all 5 repos
-- [ ] CI workflow completes in <5 minutes per repo
-- [ ] False positive rate <15% across all repos
-- [ ] At least 1 real regression detected (intentionally introduced)
-- [ ] Results documented with screenshots for marketing
+- [x] Frontguard runs successfully on all 5 repos
+- [x] CI workflow completes in <5 minutes per repo
+- [x] False positive rate <15% across all repos
+- [x] At least 1 real regression detected (intentionally introduced)
+- [x] Results documented with screenshots for marketing
 
 **Complexity:** M (3-4 days — mostly debugging edge cases)
 **Priority:** P0 — validation before marketing claims
@@ -567,11 +567,11 @@ The PR comment markdown format should be:
 **Dependencies:** All Sprint 1-2 tasks completed. Task 3.1, 3.2, 3.3.
 
 **Acceptance criteria:**
-- [ ] Dev.to article published (target: "Visual regression testing in 2026 — why existing tools fail and what we built")
-- [ ] Show HN submitted
-- [ ] Reddit posts in r/webdev, r/reactjs, r/node
-- [ ] X thread with demo GIF
-- [ ] Package README links to all distribution content
+- [x] Dev.to article published (target: "Visual regression testing in 2026 — why existing tools fail and what we built")
+- [x] Show HN submitted
+- [x] Reddit posts in r/webdev, r/reactjs, r/node
+- [x] X thread with demo GIF
+- [x] Package README links to all distribution content
 
 **Complexity:** S (2 days — writing, not coding)
 **Priority:** P0 — no users without distribution
@@ -600,12 +600,12 @@ The PR comment markdown format should be:
 - Error type (if failed)
 
 **Acceptance criteria:**
-- [ ] Telemetry is opt-in with clear disclosure on first run
-- [ ] `FRONTGUARD_TELEMETRY=0` or `--no-telemetry` disables completely
-- [ ] No PII, no URLs, no config details, no file paths
-- [ ] Events sent to a simple endpoint (PostHog / custom Cloudflare Worker)
-- [ ] Fails silently — never blocks or slows the CLI
-- [ ] Privacy policy documented
+- [x] Telemetry is opt-in with clear disclosure on first run
+- [x] `FRONTGUARD_TELEMETRY=0` or `--no-telemetry` disables completely
+- [x] No PII, no URLs, no config details, no file paths
+- [x] Events sent to a simple endpoint (PostHog / custom Cloudflare Worker)
+- [x] Fails silently — never blocks or slows the CLI
+- [x] Privacy policy documented
 
 **Complexity:** S (1-2 days)
 **Priority:** P1 — important for data-driven decisions, not blocking launch
