@@ -207,6 +207,15 @@ export const configSchema = z.object({
 
   /** Anonymous usage telemetry (default: true). Set false to opt out. */
   telemetry: z.boolean().optional(),
+
+  /** Generate AI-powered CSS fixes for regressions (requires `ai`). */
+  generateFixes: z.boolean().optional(),
+
+  /** Verify generated fixes in a sandbox before presenting them (opt-in). */
+  verifyFixes: z.boolean().optional(),
+
+  /** Sandbox backend for fix verification (default: 'local'). */
+  fixSandbox: z.enum(['local', 'daytona']).optional(),
 });
 
 /** Inferred Zod output type — should match `FrontguardConfig`. */

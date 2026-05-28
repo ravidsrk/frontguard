@@ -78,6 +78,7 @@ export type PipelineStage =
   | 'render'
   | 'compare'
   | 'analyze'
+  | 'fix'
   | 'report';
 
 // ---------------------------------------------------------------------------
@@ -269,6 +270,12 @@ export interface FrontguardConfig {
   imageUpload?: ImageUploadConfig;
   /** Anonymous usage telemetry (default: true). Disable to opt out. */
   telemetry?: boolean;
+  /** Generate AI-powered CSS fixes for regressions (requires `ai`). */
+  generateFixes?: boolean;
+  /** Verify generated fixes in a sandbox before presenting them (opt-in). */
+  verifyFixes?: boolean;
+  /** Sandbox backend for fix verification (default: 'local'). */
+  fixSandbox?: 'local' | 'daytona';
 }
 
 // ---------------------------------------------------------------------------
@@ -404,6 +411,8 @@ export interface RunTiming {
   compare: number;
   /** Time spent on AI analysis. */
   ai: number;
+  /** Time spent generating (and optionally verifying) fixes. */
+  fix?: number;
   /** Total wall-clock time for the entire run. */
   total: number;
 }

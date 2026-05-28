@@ -108,6 +108,19 @@ export async function buildConfig(
     }
   }
 
+  if (opts.generateFixes) {
+    config.generateFixes = true;
+  }
+
+  if (opts.verifyFixes) {
+    config.generateFixes = true; // verification implies generation
+    config.verifyFixes = true;
+  }
+
+  if (opts.fixSandbox && typeof opts.fixSandbox === 'string') {
+    config.fixSandbox = opts.fixSandbox === 'daytona' ? 'daytona' : 'local';
+  }
+
   // Validate baseUrl is set
   if (!config.baseUrl) {
     throw new Error(
@@ -221,6 +234,9 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--verbose', 'Verbose output')
     .option('--debug', 'Debug output (includes Playwright traces)')
     .option('--update-baselines', 'Accept current screenshots as new baselines')
+    .option('--generate-fixes', 'Generate AI-powered CSS fixes for regressions (requires AI)')
+    .option('--verify-fixes', 'Verify generated fixes in a sandbox (implies --generate-fixes)')
+    .option('--fix-sandbox <kind>', 'Sandbox for fix verification: local or daytona', 'local')
     .action(async (opts) => {
       try {
         // Set log level
