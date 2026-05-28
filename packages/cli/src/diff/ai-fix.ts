@@ -53,7 +53,8 @@ FIX CATEGORIES: overflow-fix, spacing-fix, font-fix, responsive-fix, z-index-fix
 Respond with JSON ONLY, no markdown fences:
 { "fixType": "css"|"html"|"config", "category": "<category>", "patch": "<minimal CSS/code patch>", "confidence": <0.0-1.0>, "explanation": "<what the fix does and why>", "target": "<optional CSS selector or file hint>" }`;
 
-const VALID_CATEGORIES: FixCategory[] = [
+/** All valid fix categories. */
+export const FIX_CATEGORIES: FixCategory[] = [
   'overflow-fix',
   'spacing-fix',
   'font-fix',
@@ -61,6 +62,8 @@ const VALID_CATEGORIES: FixCategory[] = [
   'z-index-fix',
   'other',
 ];
+
+const VALID_CATEGORIES: FixCategory[] = FIX_CATEGORIES;
 
 const VALID_FIX_TYPES: FixType[] = ['css', 'html', 'config'];
 
@@ -131,6 +134,12 @@ export function parseFixResponse(raw: string): SuggestedFix | null {
 export interface GenerateFixOptions {
   /** The git diff (code changes) that likely caused the regression. */
   gitDiff?: string;
+  /**
+   * Optional fix-pattern lookup. If it returns a cached patch for the diff's
+   * context, the AI call is skipped and the cached fix is returned with a
+   * high confidence and a `cached` marker in its explanation.
+   */
+  patternLookup?: (diff: DiffResult) => { cssPatch: string; category: FixCategory } | null;
 }
 
 /**
@@ -148,6 +157,22 @@ export async function generateFix(
 ): Promise<SuggestedFix | null> {
   if (!diff.baselineImage || !diff.currentImage) {
     throw new AIFixError('Cannot generate fix: baseline or current image is missing.');
+  }
+
+  // Data-moat short-circuit: reuse a previously-accepted fix for this context
+  // and skip the AI call entirely.
+  if (options.patternLookup) {
+    const cached = options.patternLookup(diff);
+    if (cached) {
+      logger.debug(`Reusing cached fix pattern for ${diff.route.path} (${cached.category})`);
+      return {
+        fixType: 'css',
+        category: cached.category,
+        patch: cached.cssPatch,
+        confidence: 0.95,
+        explanation: 'Reused a previously-accepted fix for a similar regression (cached).',
+      };
+    }
   }
 
   const apiKey = getApiKey(config.provider);

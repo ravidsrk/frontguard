@@ -1,5 +1,9 @@
 import { defineConfig } from 'tsup';
 
+// Native/optional modules must stay external so their runtime addons resolve
+// from node_modules instead of being inlined by the bundler.
+const EXTERNAL = ['better-sqlite3', 'playwright', '@daytonaio/sdk'];
+
 export default defineConfig([
   // CLI entry — gets shebang for bin
   {
@@ -10,6 +14,7 @@ export default defineConfig([
     clean: true,
     splitting: false,
     sourcemap: true,
+    external: EXTERNAL,
     banner: { js: '#!/usr/bin/env node' },
   },
   // Library entries — no shebang
@@ -24,5 +29,6 @@ export default defineConfig([
     clean: false,
     splitting: false,
     sourcemap: true,
+    external: EXTERNAL,
   },
 ]);
