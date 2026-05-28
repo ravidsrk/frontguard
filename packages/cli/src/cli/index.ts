@@ -21,6 +21,7 @@ import { ConsoleReporter } from '../report/console.js';
 import { JSONReporter } from '../report/json.js';
 import { HTMLReporter } from '../report/html.js';
 import { logger, setLogLevel } from '../utils/logger.js';
+import { FixPatternDB } from '../storage/fix-patterns.js';
 import type { FrontguardConfig, Reporter, BrowserEngine } from '../core/types.js';
 import { writeFileSync, readFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -487,6 +488,75 @@ export async function main(argv?: string[]): Promise<number> {
         logger.error(formatFatalError(err));
         exitCode = 2;
       }
+    });
+
+  // ---------------------------------------------------------------------------
+  // Commands: accept-fix / reject-fix / export-patterns (Task 4.4)
+  // ---------------------------------------------------------------------------
+
+  const withPatternDB = async (fn: (db: FixPatternDB) => number): Promise<void> => {
+    const db = new FixPatternDB();
+    const ok = await db.open();
+    if (!ok) {
+      logger.error(
+        'Fix-pattern database is unavailable. Install the optional dependency: npm install better-sqlite3',
+      );
+      exitCode = 2;
+      return;
+    }
+    try {
+      exitCode = fn(db);
+    } finally {
+      db.close();
+    }
+  };
+
+  program
+    .command('accept-fix <id>')
+    .description('Mark a suggested fix as accepted (improves future suggestions)')
+    .action(async (id: string) => {
+      await withPatternDB((db) => {
+        const found = db.setAccepted(id, true);
+        if (found) {
+          logger.info(`✅ Fix ${id} marked as accepted`);
+          return 0;
+        }
+        logger.error(`No fix pattern found with id ${id}`);
+        return 1;
+      });
+    });
+
+  program
+    .command('reject-fix <id>')
+    .description('Mark a suggested fix as rejected (negative training signal)')
+    .action(async (id: string) => {
+      await withPatternDB((db) => {
+        const found = db.setAccepted(id, false);
+        if (found) {
+          logger.info(`🚫 Fix ${id} marked as rejected`);
+          return 0;
+        }
+        logger.error(`No fix pattern found with id ${id}`);
+        return 1;
+      });
+    });
+
+  program
+    .command('export-patterns')
+    .description('Export the local fix-pattern database as JSON (shareable)')
+    .option('-o, --output <path>', 'Write JSON to a file instead of stdout')
+    .action(async (opts: { output?: string }) => {
+      await withPatternDB((db) => {
+        const patterns = db.exportAll();
+        const json = JSON.stringify({ version: 1, patterns }, null, 2);
+        if (opts.output) {
+          writeFileSync(opts.output, json, 'utf8');
+          logger.info(`Exported ${patterns.length} pattern(s) to ${opts.output}`);
+        } else {
+          process.stdout.write(json + '\n');
+        }
+        return 0;
+      });
     });
 
   // ---------------------------------------------------------------------------

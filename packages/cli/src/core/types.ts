@@ -58,6 +58,33 @@ export interface SuggestedFix {
   target?: string;
 }
 
+/**
+ * A stored fix pattern (Task 4.4) — the local data moat.
+ *
+ * Every generated fix that's accepted or rejected is recorded so future
+ * suggestions can be improved (and cheap repeat-fixes can skip the AI call).
+ */
+export interface FixPattern {
+  /** Stable id (hash-derived). */
+  id: string;
+  /** Fix category. */
+  category: FixCategory;
+  /** The CSS patch. */
+  cssPatch: string;
+  /** Hash of the visual/route context this fix applied to. */
+  contextHash: string;
+  /** Whether this pattern was accepted (true) or rejected (false). */
+  accepted: boolean;
+  /** Confidence of the originating fix. */
+  confidence: number;
+  /** ISO timestamp. */
+  createdAt: string;
+  /** Route path the fix was for. */
+  route?: string;
+  /** Viewport width. */
+  viewport?: number;
+}
+
 /** Result of verifying a fix in a sandbox (Task 4.2). */
 export interface FixVerification {
   /** Whether the patch applied cleanly. */

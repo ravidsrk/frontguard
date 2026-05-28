@@ -28,8 +28,9 @@ import { smartFilter } from '../graph/filter.js';
 import { renderPages } from '../render/playwright.js';
 import { compareScreenshot, createNewPageResult } from '../diff/pixel.js';
 import { analyzeWithAI } from '../diff/ai-vision.js';
-import { generateFix } from '../diff/ai-fix.js';
+import { generateFix, FIX_CATEGORIES } from '../diff/ai-fix.js';
 import { verifyFix } from '../sandbox/verify-fix.js';
+import { FixPatternDB, contextHashFor } from '../storage/fix-patterns.js';
 import { GitOrphanStorage } from '../storage/git-orphan.js';
 import { uploadImages } from '../storage/upload-stage.js';
 import { detectPreviewUrl, waitForUrl } from '../utils/preview-url.js';
@@ -667,12 +668,30 @@ export async function runPipeline(
         `Generating fixes for ${regressionDiffs.length} regression(s)…`,
       );
       let fixCompleted = 0;
+
+      // Open the local fix-pattern DB (data moat). Degrades to no-op if
+      // better-sqlite3 isn't available.
+      const patternDB = new FixPatternDB();
+      const patternsOn = await patternDB.open();
+
       try {
         const [, duration] = await timed(async () => {
           // Sequential to bound AI cost and (optional) sandbox usage.
           for (const { diff } of regressionDiffs) {
             try {
-              const fix = await generateFix(diff, aiConfig);
+              const fix = await generateFix(diff, aiConfig, {
+                patternLookup: patternsOn
+                  ? (d) => {
+                      // We don't know the category before generating, so probe
+                      // each category's context hash for an accepted pattern.
+                      for (const cat of FIX_CATEGORIES) {
+                        const hit = patternDB.findAcceptedPattern(contextHashFor(d, cat));
+                        if (hit) return hit;
+                      }
+                      return null;
+                    }
+                  : undefined,
+              });
               if (fix) {
                 diff.suggestedFix = fix;
                 // Optional sandbox verification (cost-aware, opt-in).
@@ -680,6 +699,13 @@ export async function runPipeline(
                   diff.fixVerification = await verifyFix(diff, fix, config, {
                     baseUrl: config.baseUrl,
                     sandbox: config.fixSandbox ?? 'local',
+                  });
+                }
+                // Record verified fixes as accepted training signal.
+                if (patternsOn && diff.fixVerification?.verified) {
+                  patternDB.record(fix, contextHashFor(diff, fix.category), true, {
+                    route: diff.route.path,
+                    viewport: diff.viewport,
                   });
                 }
               }
@@ -698,6 +724,8 @@ export async function runPipeline(
         const msg = err instanceof Error ? err.message : String(err);
         logger.error(`Fix generation stage failed: ${msg}`);
         reporter.onStageComplete('fix', `Failed: ${msg}`);
+      } finally {
+        patternDB.close();
       }
 
       // Free buffers again — restored for reporting below.
