@@ -25,6 +25,51 @@ export type DiffStatus = 'pass' | 'changed' | 'regression' | 'new' | 'error' | '
 /** AI classification of a visual change. */
 export type ChangeClassification = 'regression' | 'intentional' | 'content_update';
 
+/** Category of an AI-generated fix. */
+export type FixCategory =
+  | 'overflow-fix'
+  | 'spacing-fix'
+  | 'font-fix'
+  | 'responsive-fix'
+  | 'z-index-fix'
+  | 'other';
+
+/** Kind of patch an AI fix produces. */
+export type FixType = 'css' | 'html' | 'config';
+
+/**
+ * A structured, AI-generated fix for a regression.
+ *
+ * Produced by `generateFix()`. Carries a minimal patch (not a full file
+ * rewrite), a confidence score, and a human-readable explanation.
+ */
+export interface SuggestedFix {
+  /** Whether the fix is CSS, HTML, or config. */
+  fixType: FixType;
+  /** Fine-grained category for pattern matching and reporting. */
+  category: FixCategory;
+  /** The minimal patch (e.g. a CSS snippet), not a full file. */
+  patch: string;
+  /** Confidence the fix resolves the regression (0–1). */
+  confidence: number;
+  /** Human-readable explanation of what the fix does and why. */
+  explanation: string;
+  /** Optional CSS selector or file hint the patch targets. */
+  target?: string;
+}
+
+/** Result of verifying a fix in a sandbox (Task 4.2). */
+export interface FixVerification {
+  /** Whether the patch applied cleanly. */
+  fixApplied: boolean;
+  /** Diff percentage after applying the fix (vs baseline). */
+  diffPercentage: number;
+  /** Whether the fix brought the page back within threshold. */
+  verified: boolean;
+  /** Error message when verification failed. */
+  error?: string;
+}
+
 /** Pipeline stage identifier for progress reporting. */
 export type PipelineStage =
   | 'init'
@@ -314,6 +359,10 @@ export interface DiffResult {
   currentImageUrl?: string;
   /** Public URL of the uploaded diff image (set by the upload stage). */
   diffImageUrl?: string;
+  /** Structured AI-generated fix (Task 4.1), if available. */
+  suggestedFix?: SuggestedFix;
+  /** Sandbox verification result for the suggested fix (Task 4.2). */
+  fixVerification?: FixVerification;
 }
 
 /**
