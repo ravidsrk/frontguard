@@ -28,6 +28,8 @@ import { smartFilter } from '../graph/filter.js';
 import { renderPages } from '../render/playwright.js';
 import { compareScreenshot, createNewPageResult } from '../diff/pixel.js';
 import { analyzeWithAI } from '../diff/ai-vision.js';
+import { generateFix } from '../diff/ai-fix.js';
+import { verifyFix } from '../sandbox/verify-fix.js';
 import { GitOrphanStorage } from '../storage/git-orphan.js';
 import { uploadImages } from '../storage/upload-stage.js';
 import { detectPreviewUrl, waitForUrl } from '../utils/preview-url.js';
@@ -636,6 +638,72 @@ export async function runPipeline(
       }
     } else {
       logger.debug('No changed pages to analyze with AI');
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Stage 5.5: GENERATE FIXES (optional — AI CSS fixes for regressions)
+  // -----------------------------------------------------------------------
+  if (config.ai && config.generateFixes) {
+    const aiConfig = config.ai;
+    // Only attempt fixes for genuine regressions identified by AI.
+    const regressionDiffs: Array<{ diff: DiffResult; index: number }> = [];
+    for (let i = 0; i < diffs.length; i++) {
+      const d = diffs[i];
+      if (d.aiAnalysis?.classification === 'regression') {
+        const paths = tempPaths.get(i);
+        if (paths) {
+          d.baselineImage = readBufferFromTemp(paths.baseline);
+          d.currentImage = readBufferFromTemp(paths.current);
+          d.diffImage = readBufferFromTemp(paths.diff);
+        }
+        regressionDiffs.push({ diff: d, index: i });
+      }
+    }
+
+    if (regressionDiffs.length > 0) {
+      reporter.onStageStart(
+        'fix',
+        `Generating fixes for ${regressionDiffs.length} regression(s)…`,
+      );
+      let fixCompleted = 0;
+      try {
+        const [, duration] = await timed(async () => {
+          // Sequential to bound AI cost and (optional) sandbox usage.
+          for (const { diff } of regressionDiffs) {
+            try {
+              const fix = await generateFix(diff, aiConfig);
+              if (fix) {
+                diff.suggestedFix = fix;
+                // Optional sandbox verification (cost-aware, opt-in).
+                if (config.verifyFixes && config.baseUrl) {
+                  diff.fixVerification = await verifyFix(diff, fix, config, {
+                    baseUrl: config.baseUrl,
+                    sandbox: config.fixSandbox ?? 'local',
+                  });
+                }
+              }
+            } catch (err) {
+              logger.warn(
+                `Fix generation failed for ${diff.route.path}: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+            fixCompleted++;
+            reporter.onStageProgress('fix', fixCompleted, regressionDiffs.length, diff.route.path);
+          }
+        });
+        timing.fix = duration;
+        reporter.onStageComplete('fix', `Generated fixes in ${duration}ms`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error(`Fix generation stage failed: ${msg}`);
+        reporter.onStageComplete('fix', `Failed: ${msg}`);
+      }
+
+      // Free buffers again — restored for reporting below.
+      for (const { diff } of regressionDiffs) {
+        disposeBuffers(diff);
+      }
     }
   }
 

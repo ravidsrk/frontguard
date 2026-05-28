@@ -23,6 +23,7 @@ const STAGE_LABELS: Record<PipelineStage, string> = {
   render: '🖥  Rendering',
   compare: '🔍 Comparing',
   analyze: '🤖 Analyzing',
+  fix: '🔧 Generating fixes',
   report: '📄 Reporting',
 };
 
