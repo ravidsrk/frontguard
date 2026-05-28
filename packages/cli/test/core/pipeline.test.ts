@@ -11,6 +11,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PNG } from 'pngjs';
 import { compareScreenshot, createNewPageResult } from '../../src/diff/pixel.js';
+import { toRouteObjects, resolveThreshold } from '../../src/core/pipeline.js';
 import { configSchema } from '../../src/core/config.js';
 import { PluginManager } from '../../src/core/plugins.js';
 import type { ScreenshotResult, Route } from '../../src/core/types.js';
@@ -809,5 +810,51 @@ describe('Plugin hook same-reference bug (regression)', () => {
     expect(result).toBe(original); // same reference
     expect(original.length).toBe(2); // array NOT emptied
     expect(original[0]).toEqual({ status: 'new', route: '/' });
+  });
+});
+
+// ===========================================================================
+// Per-route configuration (Task 1.2)
+// ===========================================================================
+
+describe('toRouteObjects + resolveThreshold', () => {
+  it('converts plain string routes to Route objects', () => {
+    const routes = toRouteObjects(['/', '/about']);
+    expect(routes).toHaveLength(2);
+    expect(routes[0]).toMatchObject({ path: '/', label: 'Home', discoveredVia: 'config' });
+    expect(routes[1]).toMatchObject({ path: '/about', label: '/about' });
+    expect(routes[0].threshold).toBeUndefined();
+  });
+
+  it('carries per-route threshold/ignore/viewport onto Route objects', () => {
+    const routes = toRouteObjects([
+      { path: '/checkout', threshold: 0.01, ignore: [{ selector: '.cart' }], viewport: [1440] },
+    ]);
+    expect(routes[0].threshold).toBe(0.01);
+    expect(routes[0].ignore).toEqual([{ selector: '.cart' }]);
+    expect(routes[0].viewport).toEqual([1440]);
+  });
+
+  it('handles mixed string + object arrays', () => {
+    const routes = toRouteObjects(['/', { path: '/blog', threshold: 0.5 }]);
+    expect(routes[0].threshold).toBeUndefined();
+    expect(routes[1].threshold).toBe(0.5);
+  });
+
+  it('uses custom label when provided', () => {
+    const routes = toRouteObjects([{ path: '/x', label: 'Custom' }]);
+    expect(routes[0].label).toBe('Custom');
+  });
+
+  it('resolveThreshold prefers per-route override', () => {
+    expect(resolveThreshold({ path: '/x', threshold: 0.01 }, 0.1)).toBe(0.01);
+  });
+
+  it('resolveThreshold falls back to global threshold', () => {
+    expect(resolveThreshold({ path: '/x' }, 0.1)).toBe(0.1);
+  });
+
+  it('resolveThreshold treats threshold 0 as a valid override', () => {
+    expect(resolveThreshold({ path: '/x', threshold: 0 }, 0.1)).toBe(0);
   });
 });

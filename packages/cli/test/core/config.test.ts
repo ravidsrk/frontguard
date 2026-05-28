@@ -62,6 +62,66 @@ describe('configSchema', () => {
     expect(config.browsers).toEqual(['chromium', 'firefox']);
     expect(config.workers).toBe(2);
   });
+
+  // --- Per-route configuration (Task 1.2) --------------------------------
+  it('accepts string-only routes (backward compatible)', () => {
+    const config = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      routes: ['/', '/about', '/pricing'],
+    });
+    expect(config.routes).toEqual(['/', '/about', '/pricing']);
+  });
+
+  it('accepts RouteConfig objects with per-route threshold', () => {
+    const config = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      routes: [{ path: '/checkout', threshold: 0.01 }, { path: '/blog', threshold: 0.5 }],
+    });
+    expect(config.routes).toHaveLength(2);
+    expect((config.routes![0] as { threshold: number }).threshold).toBe(0.01);
+  });
+
+  it('accepts mixed string + object route arrays', () => {
+    const config = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      routes: ['/', { path: '/checkout', threshold: 0.01 }],
+    });
+    expect(config.routes![0]).toBe('/');
+    expect((config.routes![1] as { path: string }).path).toBe('/checkout');
+  });
+
+  it('accepts per-route ignore rules and viewport overrides', () => {
+    const config = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      routes: [
+        { path: '/blog', ignore: [{ selector: '.timestamp' }], viewport: [1440] },
+      ],
+    });
+    const route = config.routes![0] as {
+      ignore: { selector: string }[];
+      viewport: number[];
+    };
+    expect(route.ignore[0].selector).toBe('.timestamp');
+    expect(route.viewport).toEqual([1440]);
+  });
+
+  it('rejects per-route threshold above 1', () => {
+    expect(() =>
+      configSchema.parse({
+        baseUrl: 'http://localhost:3000',
+        routes: [{ path: '/x', threshold: 5 }],
+      })
+    ).toThrow(ZodError);
+  });
+
+  it('rejects route object without a path', () => {
+    expect(() =>
+      configSchema.parse({
+        baseUrl: 'http://localhost:3000',
+        routes: [{ threshold: 0.1 }],
+      })
+    ).toThrow(ZodError);
+  });
 });
 
 describe('detectSecrets', () => {
@@ -138,6 +198,28 @@ describe('detectFramework', () => {
 
     const result = await detectFramework(tempDir);
     expect(result).toBe('Remix');
+  });
+
+  it('detects Create React App from react-scripts', async () => {
+    ({ dir: tempDir, cleanup } = createTempDir());
+    writeFiles(tempDir, {
+      'package.json': JSON.stringify({
+        dependencies: { 'react-scripts': '^5.0.0', react: '^18.0.0' },
+      }),
+    });
+
+    const result = await detectFramework(tempDir);
+    expect(result).toBe('Create React App');
+  });
+
+  it('detects Astro from devDependencies', async () => {
+    ({ dir: tempDir, cleanup } = createTempDir());
+    writeFiles(tempDir, {
+      'package.json': JSON.stringify({ devDependencies: { astro: '^4.0.0' } }),
+    });
+
+    const result = await detectFramework(tempDir);
+    expect(result).toBe('Astro');
   });
 
   it('returns null when no framework is detected', async () => {

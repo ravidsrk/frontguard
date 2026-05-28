@@ -1,0 +1,59 @@
+# Frontguard visual regression testing — EXAMPLE workflow.
+#
+# This is a reference example showing how to run Frontguard in CI. Copy it into
+# your own project (or run `npx frontguard init --ci` to generate it for you).
+# It is named `frontguard-example.yml` so it does NOT run in this repo by
+# default — rename to `frontguard.yml` and adjust the dev command to activate.
+name: Frontguard (example)
+
+on:
+  # Disabled by default in this repo. Uncomment to enable on PRs:
+  # pull_request:
+  #   branches: [main, master]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Start dev server
+        run: |
+          npm run dev &
+          npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Run Frontguard
+        run: npx frontguard run --url http://localhost:3000 --output json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
