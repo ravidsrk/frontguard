@@ -29,7 +29,13 @@ import { JSONReporter } from '../report/json.js';
 import { HTMLReporter } from '../report/html.js';
 import { logger, setLogLevel } from '../utils/logger.js';
 import { FixPatternDB } from '../storage/fix-patterns.js';
-import { createMonitorPlugin } from '../plugins/monitor.js';
+import {
+  createMonitorPlugin,
+  createPollingController,
+  runPollingLoop,
+  readRecentHistory,
+  formatHistoryTable,
+} from '../plugins/monitor.js';
 import type { FrontguardConfig, Reporter, BrowserEngine } from '../core/types.js';
 import { writeFileSync, readFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -553,6 +559,9 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--webhook <url>', 'Webhook URL for alerts (Slack, Discord, etc.)')
     .option('--history-dir <dir>', 'Directory to store run history', '.frontguard/monitor-history')
     .option('--interval <minutes>', 'Run repeatedly every N minutes (daemon mode)')
+    .option('--watch', 'Continuously poll (local dev). Use --interval to set the period (default 1m)')
+    .option('--history', 'Show recent stored monitoring history and exit (no checks run)')
+    .option('--limit <n>', 'Number of history rows to show with --history', '20')
     .option('--once', 'Run a single check and exit (default)')
     .option('--verbose', 'Verbose output')
     .option('--debug', 'Debug output')
@@ -560,6 +569,19 @@ export async function main(argv?: string[]): Promise<number> {
       try {
         if (opts.debug) setLogLevel('debug');
         else if (opts.verbose) setLogLevel('info');
+
+        // ----- --history: print stored history and exit (no checks) -----
+        if (opts.history) {
+          const historyDir = opts.historyDir as string;
+          const limit = Math.max(1, parseInt(opts.limit as string, 10) || 20);
+          const records = readRecentHistory(historyDir, limit);
+          logger.info(`📜 Recent monitoring history (${historyDir}):`);
+          // Print the table to stdout so it can be piped/captured cleanly.
+          console.log(formatHistoryTable(records));
+          await emitTelemetry({ command: 'monitor', version: VERSION });
+          exitCode = 0;
+          return;
+        }
 
         const urls = typeof opts.url === 'string'
           ? opts.url.split(',').map((u: string) => u.trim()).filter(Boolean)
@@ -597,15 +619,49 @@ export async function main(argv?: string[]): Promise<number> {
         };
 
         const intervalMin = opts.interval ? parseInt(opts.interval as string, 10) : null;
-        if (intervalMin && intervalMin > 0) {
-          // Daemon mode: loop forever, sleeping between runs.
-          logger.info(`Starting monitor daemon (every ${intervalMin}m). Press Ctrl+C to stop.`);
-          for (;;) {
-            await runOnce().catch((err) =>
-              logger.error(`Monitor run failed: ${err instanceof Error ? err.message : String(err)}`),
-            );
-            await new Promise((r) => setTimeout(r, intervalMin * 60_000));
+        // --watch enters a continuous polling loop. When --interval is also
+        // given it sets the watch period; otherwise default to 1 minute.
+        const isLoop = (intervalMin && intervalMin > 0) || Boolean(opts.watch);
+
+        if (isLoop) {
+          const periodMin = intervalMin && intervalMin > 0 ? intervalMin : 1;
+          const intervalMs = periodMin * 60_000;
+          const mode = opts.watch ? 'watch' : 'daemon';
+          logger.info(
+            `Starting monitor ${mode} (every ${periodMin}m). Press Ctrl+C to stop.`,
+          );
+
+          const controller = createPollingController();
+
+          // ----- Graceful shutdown on SIGINT/SIGTERM -----
+          const onSignal = (signal: NodeJS.Signals): void => {
+            logger.newline();
+            logger.info(`Received ${signal} — shutting down monitor after current iteration…`);
+            controller.stop();
+          };
+          const sigintHandler = (): void => onSignal('SIGINT');
+          const sigtermHandler = (): void => onSignal('SIGTERM');
+          process.on('SIGINT', sigintHandler);
+          process.on('SIGTERM', sigtermHandler);
+
+          try {
+            await runPollingLoop(controller, {
+              intervalMs,
+              iterate: async () => {
+                await runOnce();
+              },
+              onError: (err) =>
+                logger.error(
+                  `Monitor run failed: ${err instanceof Error ? err.message : String(err)}`,
+                ),
+            });
+          } finally {
+            process.removeListener('SIGINT', sigintHandler);
+            process.removeListener('SIGTERM', sigtermHandler);
           }
+
+          logger.info('👋 Monitor stopped.');
+          exitCode = 0;
         } else {
           exitCode = await runOnce();
         }
