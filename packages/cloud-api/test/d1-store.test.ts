@@ -148,4 +148,54 @@ describe('D1Store (SQLite-backed)', () => {
     expect(usage.runsCount).toBe(3);
     expect(usage.screenshotsCount).toBe(10);
   });
+
+  it('Task 8.1: github invites, reviewer flag, project runs, approvals, activity, usage', async () => {
+    await store.createUser({ id: 'u1', plan: 'free', createdAt: 'now' });
+    await store.createUser({ id: 'u2', plan: 'free', createdAt: 'now' });
+    await store.createTeam({ id: 't1', name: 'Acme', plan: 'free', createdAt: 'now' }, 'u1');
+    await store.addMember({ teamId: 't1', userId: 'u2', role: 'member', createdAt: 'now' });
+
+    // GitHub-handle invite (nullable email).
+    await store.createInvitation({
+      id: 'i1', teamId: 't1', githubLogin: 'octocat', role: 'member', token: 'ghtok', createdAt: 'now',
+    });
+    const inv = await store.getInvitationByToken('ghtok');
+    expect(inv?.githubLogin).toBe('octocat');
+    expect(inv?.email).toBeUndefined();
+
+    // Reviewer flag.
+    await store.setReviewer('t1', 'u2', true);
+    expect((await store.getMember('t1', 'u2'))?.reviewer).toBe(true);
+
+    // Project-scoped runs + baseline.
+    await store.createProject({ id: 'p1', teamId: 't1', name: 'Web', createdAt: 'now' });
+    expect((await store.getProjectById('p1'))?.name).toBe('Web');
+    await store.createRun(makeRun('r1'), 'u1');
+    await store.updateRun('r1', { projectId: 'p1', baselinesApproved: true, status: 'completed' });
+    const projectRuns = await store.listProjectRuns('p1');
+    expect(projectRuns.length).toBe(1);
+    expect(projectRuns[0].projectId).toBe('p1');
+    expect((await store.getProjectBaseline('p1'))?.id).toBe('r1');
+
+    // Approvals.
+    await store.addApproval({ id: 'a1', runId: 'r1', projectId: 'p1', reviewerUserId: 'u2', status: 'approved', comment: 'ok', createdAt: 'now' });
+    const approvals = await store.listApprovals('r1');
+    expect(approvals.length).toBe(1);
+    expect(approvals[0].status).toBe('approved');
+
+    // Activity feed.
+    await store.recordActivity({ id: 'act1', teamId: 't1', userId: 'u1', action: 'team.created', target: 't1', createdAt: '2026-01-01' });
+    await store.recordActivity({ id: 'act2', teamId: 't1', userId: 'u1', action: 'project.created', target: 'p1', createdAt: '2026-02-01' });
+    const activity = await store.listActivity('t1');
+    expect(activity.length).toBe(2);
+    expect(activity[0].action).toBe('project.created'); // newest first
+
+    // Team usage aggregation.
+    await store.incrementUsage('u1', '2026-05', 3, 10);
+    await store.incrementUsage('u2', '2026-05', 2, 5);
+    const teamUsage = await store.getTeamUsage('t1', '2026-05');
+    expect(teamUsage.memberCount).toBe(2);
+    expect(teamUsage.runsCount).toBe(5);
+    expect(teamUsage.screenshotsCount).toBe(15);
+  });
 });

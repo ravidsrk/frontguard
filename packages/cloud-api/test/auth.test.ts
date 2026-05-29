@@ -107,6 +107,20 @@ describe('/auth/github routes', () => {
     API_BASE_URL: 'https://api.frontguard.dev',
   };
 
+  /**
+   * Performs the CSRF state handshake: hits GET /auth/github to obtain the
+   * state value + cookie, then returns the query suffix and Cookie header to
+   * use on the callback so the state check passes.
+   */
+  async function startOAuth(): Promise<{ state: string; cookie: string }> {
+    const res = await app.request('/auth/github', {}, oauthEnv);
+    const loc = res.headers.get('location')!;
+    const state = new URL(loc).searchParams.get('state')!;
+    const setCookie = res.headers.get('set-cookie') ?? '';
+    const match = setCookie.match(/fg_oauth_state=([^;]+)/);
+    return { state, cookie: `fg_oauth_state=${match ? match[1] : state}` };
+  }
+
   it('GET /auth/github returns 501 when OAuth is not configured', async () => {
     const res = await app.request('/auth/github');
     expect(res.status).toBe(501);
@@ -133,9 +147,20 @@ describe('/auth/github routes', () => {
     expect((await res.json()).error).toMatch(/Missing code/);
   });
 
+  it('GET /auth/github/callback 403 when state is missing/mismatched', async () => {
+    const res = await app.request('/auth/github/callback?code=x&state=forged', {}, oauthEnv);
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toMatch(/Invalid OAuth state/);
+  });
+
   it('GET /auth/github/callback 502 when token exchange fails', async () => {
     globalThis.fetch = (async () => new Response('nope', { status: 500 })) as typeof fetch;
-    const res = await app.request('/auth/github/callback?code=bad', {}, oauthEnv);
+    const { state, cookie } = await startOAuth();
+    const res = await app.request(
+      `/auth/github/callback?code=bad&state=${state}`,
+      { headers: { Cookie: cookie } },
+      oauthEnv,
+    );
     expect(res.status).toBe(502);
   });
 
@@ -150,13 +175,40 @@ describe('/auth/github routes', () => {
       return new Response('[]', { status: 200 });
     }) as typeof fetch;
 
-    const res = await app.request('/auth/github/callback?code=good', {}, oauthEnv);
+    const { state, cookie } = await startOAuth();
+    const res = await app.request(
+      `/auth/github/callback?code=good&state=${state}`,
+      { headers: { Cookie: cookie } },
+      oauthEnv,
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.user.login).toBe('octocat');
     expect(body.apiKey).toMatch(/^fg_/);
     expect(body.mode).toBe('dev');
     expect(body.note).toMatch(/not be shown again/);
+  });
+
+  it('GET /auth/github/callback sets a session cookie and redirects when redirect=/dashboard', async () => {
+    globalThis.fetch = (async (url: string) => {
+      if (url.includes('oauth/access_token')) {
+        return new Response(JSON.stringify({ access_token: 'gho_tok' }), { status: 200 });
+      }
+      if (url.endsWith('/user')) {
+        return new Response(JSON.stringify({ id: 99, login: 'dashuser', email: 'd@x.com' }), { status: 200 });
+      }
+      return new Response('[]', { status: 200 });
+    }) as typeof fetch;
+
+    const { state, cookie } = await startOAuth();
+    const res = await app.request(
+      `/auth/github/callback?code=good&redirect=/dashboard&state=${state}`,
+      { headers: { Cookie: cookie } },
+      oauthEnv,
+    );
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/dashboard');
+    expect(res.headers.get('set-cookie')).toMatch(/fg_session=/);
   });
 
   it('GET /auth/github/callback reuses an existing user by githubId', async () => {
@@ -171,8 +223,14 @@ describe('/auth/github routes', () => {
     }) as typeof fetch;
     globalThis.fetch = fetchImpl;
 
-    const first = await (await app.request('/auth/github/callback?code=a', {}, oauthEnv)).json();
-    const second = await (await app.request('/auth/github/callback?code=b', {}, oauthEnv)).json();
+    const h1 = await startOAuth();
+    const first = await (
+      await app.request(`/auth/github/callback?code=a&state=${h1.state}`, { headers: { Cookie: h1.cookie } }, oauthEnv)
+    ).json();
+    const h2 = await startOAuth();
+    const second = await (
+      await app.request(`/auth/github/callback?code=b&state=${h2.state}`, { headers: { Cookie: h2.cookie } }, oauthEnv)
+    ).json();
     // Same underlying user id across logins.
     expect(first.user.id).toBe(second.user.id);
     // But a fresh key is minted each time.

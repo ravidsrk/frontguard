@@ -26,6 +26,12 @@ export interface Bindings {
   API_BASE_URL?: string;
   /** Public base URL for serving screenshots/reports. */
   PUBLIC_BASE_URL?: string;
+  /** Secret used to sign dashboard session cookies. */
+  DASHBOARD_SESSION_SECRET?: string;
+  /** Base URL of the GitHub App integration (for the check-run callback). */
+  GITHUB_APP_URL?: string;
+  /** Shared bearer secret presented to the GitHub App completion callback. */
+  FRONTGUARD_CALLBACK_SECRET?: string;
 }
 
 /**
