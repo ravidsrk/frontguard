@@ -9,18 +9,54 @@
  * @module sandbox/daytona
  */
 
+import type { BrowserEngine } from '../core/types.js';
 import type { Sandbox, SandboxPatch, SandboxScreenshotParams } from './types.js';
 import { logger } from '../utils/logger.js';
+import { cropToMaxHeight } from '../render/crop.js';
 
 /** Pre-baked snapshot with Playwright + Frontguard installed. */
 const FRONTGUARD_SNAPSHOT = 'frontguard-playwright-v1';
+
+/** Allowed browser engines (must match what the snapshot renderer accepts). */
+const ALLOWED_BROWSERS: readonly BrowserEngine[] = ['chromium', 'firefox', 'webkit'];
+
+/**
+ * Shell-quotes a value for safe single-argument interpolation: wraps it in
+ * single quotes and escapes any embedded single quote. Nothing inside single
+ * quotes is interpreted by the shell, so this neutralises injection.
+ */
+export function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
+/**
+ * Validates a render URL. Throws if it is not a well-formed http(s) URL or if
+ * it contains control characters (which could smuggle shell metacharacters or
+ * break out of an argument).
+ */
+function validateUrl(raw: string): string {
+   
+  if (/[\u0000-\u001f\u007f]/.test(raw)) {
+    throw new Error('Daytona render: URL contains control characters.');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(`Daytona render: invalid URL "${raw}".`);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Daytona render: unsupported URL protocol "${parsed.protocol}".`);
+  }
+  return parsed.href;
+}
 
 /** Daytona-backed sandbox. */
 export class DaytonaSandbox implements Sandbox {
   private cssPatches: string[] = [];
   private sandbox: {
     process: { executeCommand: (cmd: string) => Promise<{ result: string; exitCode: number }> };
-    fs?: unknown;
+    fs?: { uploadFile?: (file: Buffer, remotePath: string) => Promise<void> };
   } | null = null;
   private daytona: { create: (opts: unknown) => Promise<unknown>; remove: (s: unknown) => Promise<void> } | null = null;
 
@@ -57,19 +93,44 @@ export class DaytonaSandbox implements Sandbox {
   async screenshot(params: SandboxScreenshotParams): Promise<Buffer> {
     if (!this.sandbox) throw new Error('Daytona sandbox not created — call create() first.');
 
-    // Build a small render script and execute it in the sandbox. The snapshot
-    // is expected to have a `frontguard-render` helper; we pass patches via a
-    // temp CSS file. Implementation detail kept minimal and defensive.
-    const css = this.cssPatches.join('\n').replace(/'/g, "'\\''");
+    // --- Validate every interpolated value before it touches a shell ---------
+    const url = validateUrl(params.url);
+    if (!Number.isInteger(params.viewport) || params.viewport <= 0) {
+      throw new Error(`Daytona render: invalid viewport "${params.viewport}".`);
+    }
+    if (!ALLOWED_BROWSERS.includes(params.browser)) {
+      throw new Error(`Daytona render: invalid browser "${params.browser}".`);
+    }
+
+    // CSS is AI-generated from page content, so it is attacker-influenceable.
+    // Never interpolate it into the command. Write it to a temp file inside the
+    // sandbox (via the SDK filesystem) and point the renderer at the path.
+    const css = this.cssPatches.join('\n');
+    const cssPath = '/tmp/frontguard-inject.css';
+    const upload = this.sandbox.fs?.uploadFile;
+    if (typeof upload !== 'function') {
+      throw new Error('Daytona render: sandbox filesystem (fs.uploadFile) is unavailable.');
+    }
+    await upload(Buffer.from(css, 'utf8'), cssPath);
+
+    // All remaining interpolated values are validated above, and quoted as a
+    // belt-and-braces measure so they cannot break out of their argument.
     const cmd =
-      `frontguard-render --url '${params.url}' --viewport ${params.viewport} ` +
-      `--browser ${params.browser} --inject-css '${css}' --out /tmp/shot-b64.txt && cat /tmp/shot-b64.txt`;
+      `frontguard-render --url ${shellQuote(url)} --viewport ${shellQuote(String(params.viewport))} ` +
+      `--browser ${shellQuote(params.browser)} --inject-css-file ${shellQuote(cssPath)} ` +
+      `--out /tmp/shot-b64.txt && cat /tmp/shot-b64.txt`;
 
     const res = await this.sandbox.process.executeCommand(cmd);
     if (res.exitCode !== 0) {
       throw new Error(`Daytona render failed (exit ${res.exitCode})`);
     }
-    return Buffer.from(res.result.trim(), 'base64');
+    let buffer = Buffer.from(res.result.trim(), 'base64');
+
+    // Crop to maxHeight so dimensions match the main renderer on tall pages.
+    if (params.maxHeight && params.maxHeight > 0) {
+      buffer = Buffer.from(await cropToMaxHeight(buffer, params.maxHeight));
+    }
+    return buffer;
   }
 
   async destroy(): Promise<void> {
