@@ -12,6 +12,7 @@ import { screenshotRoutes } from './routes/screenshots.js';
 import { getScreenshotStore, type R2Bucket } from './storage/screenshots.js';
 import { monitorRoutes } from './routes/monitors.js';
 import { dashboardRoutes } from './routes/dashboard.js';
+import { teamRoutes } from './routes/teams.js';
 import { runScheduledChecks } from './scheduler.js';
 import type { AlertEnv } from './alerts/index.js';
 
@@ -172,6 +173,7 @@ app.use('/v1/*', async (c, next) => {
 app.route('/v1/screenshots', screenshotRoutes);
 app.route('/v1/monitors', monitorRoutes);
 app.route('/v1/dashboard', dashboardRoutes);
+app.route('/v1/teams', teamRoutes);
 
 // ---------------------------------------------------------------------------
 // POST /v1/run — Submit a visual regression run

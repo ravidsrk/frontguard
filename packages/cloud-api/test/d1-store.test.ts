@@ -103,6 +103,36 @@ describe('D1Store (SQLite-backed)', () => {
     expect(await store.deleteMonitor('m1', 'u1')).toBe(true);
   });
 
+  it('round-trips teams, members, invitations, and projects', async () => {
+    await store.createUser({ id: 'owner', plan: 'free', createdAt: 'now' });
+    await store.createUser({ id: 'u2', plan: 'free', createdAt: 'now' });
+    await store.createTeam({ id: 't1', name: 'Acme', plan: 'free', createdAt: 'now' }, 'owner');
+    expect((await store.getTeam('t1'))?.name).toBe('Acme');
+    expect((await store.getMember('t1', 'owner'))?.role).toBe('owner');
+
+    await store.addMember({ teamId: 't1', userId: 'u2', role: 'member', createdAt: 'now' });
+    await store.updateMemberRole('t1', 'u2', 'admin');
+    expect((await store.getMember('t1', 'u2'))?.role).toBe('admin');
+    expect((await store.listMembers('t1')).length).toBe(2);
+
+    await store.createInvitation({
+      id: 'i1', teamId: 't1', email: 'x@y.com', role: 'viewer', token: 'tok1', createdAt: 'now',
+    });
+    expect((await store.getInvitationByToken('tok1'))?.email).toBe('x@y.com');
+    expect((await store.acceptInvitation('tok1', 'now'))?.role).toBe('viewer');
+    expect(await store.acceptInvitation('tok1', 'now')).toBeNull();
+
+    await store.createProject({ id: 'p1', teamId: 't1', name: 'Web', repoUrl: 'https://x', createdAt: 'now' });
+    expect((await store.listProjects('t1'))[0].repoUrl).toBe('https://x');
+
+    const teams = await store.listTeamsForUser('u2');
+    expect(teams[0].role).toBe('admin');
+
+    expect(await store.deleteTeam('t1')).toBe(true);
+    expect(await store.getTeam('t1')).toBeNull();
+    expect((await store.listProjects('t1')).length).toBe(0);
+  });
+
   it('stores screenshots and accumulates usage via upsert', async () => {
     await store.createUser({ id: 'u1', plan: 'free', createdAt: 'now' });
     await store.createRun(makeRun('r1'), 'u1');

@@ -14,6 +14,14 @@
 import type { Run, RunResult } from '../types.js';
 import type { Monitor, MonitorStore } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
+import type {
+  Team,
+  TeamMember,
+  TeamInvitation,
+  TeamProject,
+  TeamRole,
+  TeamStore,
+} from './teams.js';
 
 /** A user record. */
 export interface User {
@@ -57,7 +65,7 @@ export interface UsageRecord {
 /**
  * Persistent storage contract. All methods are async to accommodate D1.
  */
-export interface Store extends MonitorStore {
+export interface Store extends MonitorStore, TeamStore {
   // Users
   createUser(user: User): Promise<void>;
   getUser(id: string): Promise<User | null>;
@@ -102,6 +110,10 @@ export class InMemoryStore implements Store {
   private screenshots = new Map<string, ScreenshotRecord[]>();
   private usage = new Map<string, UsageRecord>();
   private monitors = new Map<string, Monitor>();
+  private teams = new Map<string, Team>();
+  private members = new Map<string, TeamMember>(); // key: `${teamId}:${userId}`
+  private invitations = new Map<string, TeamInvitation>(); // key: token
+  private projects = new Map<string, TeamProject>();
 
   async createUser(user: User): Promise<void> {
     this.users.set(user.id, { ...user });
@@ -208,6 +220,86 @@ export class InMemoryStore implements Store {
     return [...this.monitors.values()].filter((m) => isMonitorDue(m, now));
   }
 
+  // Teams --------------------------------------------------------------------
+  async createTeam(team: Team, ownerUserId: string): Promise<void> {
+    this.teams.set(team.id, { ...team });
+    const member: TeamMember = {
+      teamId: team.id,
+      userId: ownerUserId,
+      role: 'owner',
+      createdAt: team.createdAt,
+    };
+    this.members.set(`${team.id}:${ownerUserId}`, member);
+  }
+  async getTeam(id: string): Promise<Team | null> {
+    return this.teams.get(id) ?? null;
+  }
+  async updateTeam(id: string, patch: Partial<Team>): Promise<void> {
+    const t = this.teams.get(id);
+    if (t) Object.assign(t, patch);
+  }
+  async deleteTeam(id: string): Promise<boolean> {
+    for (const [key, m] of this.members) if (m.teamId === id) this.members.delete(key);
+    for (const [key, p] of this.projects) if (p.teamId === id) this.projects.delete(key);
+    for (const [key, inv] of this.invitations) if (inv.teamId === id) this.invitations.delete(key);
+    return this.teams.delete(id);
+  }
+  async listTeamsForUser(userId: string): Promise<Array<Team & { role: TeamRole }>> {
+    const out: Array<Team & { role: TeamRole }> = [];
+    for (const m of this.members.values()) {
+      if (m.userId === userId) {
+        const t = this.teams.get(m.teamId);
+        if (t) out.push({ ...t, role: m.role });
+      }
+    }
+    return out;
+  }
+
+  async addMember(member: TeamMember): Promise<void> {
+    this.members.set(`${member.teamId}:${member.userId}`, { ...member });
+  }
+  async getMember(teamId: string, userId: string): Promise<TeamMember | null> {
+    return this.members.get(`${teamId}:${userId}`) ?? null;
+  }
+  async listMembers(teamId: string): Promise<TeamMember[]> {
+    return [...this.members.values()].filter((m) => m.teamId === teamId);
+  }
+  async updateMemberRole(teamId: string, userId: string, role: TeamRole): Promise<void> {
+    const m = this.members.get(`${teamId}:${userId}`);
+    if (m) m.role = role;
+  }
+  async removeMember(teamId: string, userId: string): Promise<boolean> {
+    return this.members.delete(`${teamId}:${userId}`);
+  }
+
+  async createInvitation(inv: TeamInvitation): Promise<void> {
+    this.invitations.set(inv.token, { ...inv });
+  }
+  async getInvitationByToken(token: string): Promise<TeamInvitation | null> {
+    return this.invitations.get(token) ?? null;
+  }
+  async listInvitations(teamId: string): Promise<TeamInvitation[]> {
+    return [...this.invitations.values()].filter((i) => i.teamId === teamId && !i.acceptedAt);
+  }
+  async acceptInvitation(token: string, at: string): Promise<TeamInvitation | null> {
+    const inv = this.invitations.get(token);
+    if (!inv || inv.acceptedAt) return null;
+    inv.acceptedAt = at;
+    return inv;
+  }
+
+  async createProject(project: TeamProject): Promise<void> {
+    this.projects.set(project.id, { ...project });
+  }
+  async listProjects(teamId: string): Promise<TeamProject[]> {
+    return [...this.projects.values()].filter((p) => p.teamId === teamId);
+  }
+  async deleteProject(id: string, teamId: string): Promise<boolean> {
+    const p = this.projects.get(id);
+    if (p && p.teamId === teamId) return this.projects.delete(id);
+    return false;
+  }
+
   /** Test helper: wipe all data. */
   clear(): void {
     this.users.clear();
@@ -216,6 +308,10 @@ export class InMemoryStore implements Store {
     this.screenshots.clear();
     this.usage.clear();
     this.monitors.clear();
+    this.teams.clear();
+    this.members.clear();
+    this.invitations.clear();
+    this.projects.clear();
   }
 }
 
@@ -226,3 +322,4 @@ export function currentMonth(date = new Date()): string {
 
 export type { Run, RunResult };
 export type { Monitor, MonitorAlerts, MonitorStore } from './monitors.js';
+export type { Team, TeamMember, TeamInvitation, TeamProject, TeamRole, TeamStore } from './teams.js';

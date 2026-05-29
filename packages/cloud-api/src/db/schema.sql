@@ -59,6 +59,46 @@ CREATE TABLE IF NOT EXISTS usage (
   PRIMARY KEY (user_id, month)
 );
 
+-- Teams (workspaces, Task 8.1) -------------------------------------------
+CREATE TABLE IF NOT EXISTS teams (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  plan TEXT NOT NULL DEFAULT 'free',
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS team_members (
+  team_id TEXT NOT NULL REFERENCES teams(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  role TEXT NOT NULL DEFAULT 'member',  -- owner, admin, member, viewer
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (team_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
+
+CREATE TABLE IF NOT EXISTS team_invitations (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL REFERENCES teams(id),
+  email TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'member',
+  token TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL,
+  accepted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_team_invitations_team ON team_invitations(team_id);
+
+CREATE TABLE IF NOT EXISTS team_projects (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL REFERENCES teams(id),
+  name TEXT NOT NULL,
+  repo_url TEXT,
+  config TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_team_projects_team ON team_projects(team_id);
+
 -- Monitors (scheduled production checks, Task 6.1) ------------------------
 CREATE TABLE IF NOT EXISTS monitors (
   id TEXT PRIMARY KEY,
