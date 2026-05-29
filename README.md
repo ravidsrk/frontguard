@@ -4,17 +4,18 @@
 [![npm: @frontguard/cli](https://img.shields.io/npm/v/@frontguard/cli?label=%40frontguard%2Fcli)](https://www.npmjs.com/package/@frontguard/cli)
 [![npm: @frontguard/playwright](https://img.shields.io/npm/v/@frontguard/playwright?label=%40frontguard%2Fplaywright)](https://www.npmjs.com/package/@frontguard/playwright)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-400-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1000+-brightgreen)]()
 
 **AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.**
 
 Backend has Datadog, Sentry, PagerDuty — a $20B+ monitoring ecosystem. Frontend gets... manual QA and hoping for the best. Frontguard changes that.
 
-> **460+ tests** · **multi-browser** · **AI vision analysis** · **self-hostable** · **MIT**
+> **1000+ tests** · **multi-browser** · **AI vision analysis** · **self-hostable** · **MIT**
 
-<!-- Demo: regenerate with `vhs demo/frontguard-demo.tape` → demo/frontguard-demo.gif -->
+<!-- Demo: generate the GIF with `vhs demo/frontguard-demo.tape` → demo/frontguard-demo.gif -->
 <p align="center">
-  <img src="./demo/frontguard-demo.gif" alt="Frontguard demo — init, doctor, run, AI classification" width="800"/>
+  <em>📽️ Demo: <code>frontguard init</code> → <code>doctor</code> → <code>run</code> → AI classification.</em><br/>
+  See the <a href="./demo/frontguard-demo.tape">VHS tape script</a> — render the GIF locally with <code>vhs demo/frontguard-demo.tape</code>.
 </p>
 
 ## Why Frontguard?
@@ -194,12 +195,12 @@ Frontguard ships with a plugin architecture (6 lifecycle hooks) and 3 built-in p
 
 ```typescript
 // frontguard.config.ts
-import { figmaPlugin } from 'frontguard/plugins';
+import { createFigmaPlugin } from '@frontguard/cli/plugins';
 
 export default {
   // ...base config
   plugins: [
-    figmaPlugin({ fileKey: 'your-figma-file-key' }),
+    createFigmaPlugin({ fileKey: 'your-figma-file-key' }),
   ],
 };
 ```
