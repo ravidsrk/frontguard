@@ -10,6 +10,8 @@
  * @module db/teams
  */
 
+import type { Run } from '../types.js';
+
 /** Team roles, highest privilege first. */
 export type TeamRole = 'owner' | 'admin' | 'member' | 'viewer';
 
@@ -28,14 +30,19 @@ export interface TeamMember {
   teamId: string;
   userId: string;
   role: TeamRole;
+  /** Designated baseline reviewer flag. */
+  reviewer?: boolean;
   createdAt: string;
 }
 
-/** A pending invitation. */
+/** A pending invitation. Invites carry either an email or a GitHub login. */
 export interface TeamInvitation {
   id: string;
   teamId: string;
-  email: string;
+  /** Invitee email (nullable — one of email/githubLogin is required). */
+  email?: string;
+  /** Invitee GitHub login (alternative to email). */
+  githubLogin?: string;
   role: TeamRole;
   token: string;
   createdAt: string;
@@ -50,6 +57,38 @@ export interface TeamProject {
   repoUrl?: string;
   config?: string;
   createdAt: string;
+}
+
+/** A baseline approval/rejection by a reviewer (review workflow). */
+export interface BaselineApproval {
+  id: string;
+  runId: string;
+  projectId?: string;
+  reviewerUserId: string;
+  status: 'approved' | 'rejected';
+  comment?: string;
+  createdAt: string;
+}
+
+/** A team activity feed entry. */
+export interface TeamActivity {
+  id: string;
+  teamId: string;
+  userId?: string;
+  action: string;
+  target?: string;
+  /** JSON-serialised metadata blob. */
+  metadata?: string;
+  createdAt: string;
+}
+
+/** Aggregated team usage for a month. */
+export interface TeamUsage {
+  month: string;
+  runsCount: number;
+  screenshotsCount: number;
+  memberCount: number;
+  perMember: Array<{ userId: string; runsCount: number; screenshotsCount: number }>;
 }
 
 /** Capabilities gated by role. */
@@ -91,6 +130,7 @@ export interface TeamStore {
   getMember(teamId: string, userId: string): Promise<TeamMember | null>;
   listMembers(teamId: string): Promise<TeamMember[]>;
   updateMemberRole(teamId: string, userId: string, role: TeamRole): Promise<void>;
+  setReviewer(teamId: string, userId: string, reviewer: boolean): Promise<void>;
   removeMember(teamId: string, userId: string): Promise<boolean>;
 
   createInvitation(inv: TeamInvitation): Promise<void>;
@@ -99,6 +139,22 @@ export interface TeamStore {
   acceptInvitation(token: string, at: string): Promise<TeamInvitation | null>;
 
   createProject(project: TeamProject): Promise<void>;
+  getProjectById(id: string): Promise<TeamProject | null>;
   listProjects(teamId: string): Promise<TeamProject[]>;
   deleteProject(id: string, teamId: string): Promise<boolean>;
+
+  // Project-scoped runs & baselines
+  listProjectRuns(projectId: string, limit?: number): Promise<Run[]>;
+  getProjectBaseline(projectId: string): Promise<Run | null>;
+
+  // Baseline approvals / review workflow
+  addApproval(approval: BaselineApproval): Promise<void>;
+  listApprovals(runId: string): Promise<BaselineApproval[]>;
+
+  // Activity feed
+  recordActivity(activity: TeamActivity): Promise<void>;
+  listActivity(teamId: string, limit?: number): Promise<TeamActivity[]>;
+
+  // Aggregated usage
+  getTeamUsage(teamId: string, month: string): Promise<TeamUsage>;
 }
