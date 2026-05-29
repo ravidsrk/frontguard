@@ -197,8 +197,9 @@ export async function postPrComment(opts, fetchImpl = fetch) {
  * @returns {string}
  */
 export function renderSummary(run, previewUrl) {
-  const passed = run.status === 'passed' || run.status === 'completed';
-  const icon = passed ? '✅' : '⚠️';
+  // Derive the icon from isFailingRun so a completed-with-regressions run shows
+  // ❌, consistent with the fail-build decision.
+  const icon = isFailingRun(run) ? '❌' : '✅';
   const lines = [
     `## ${icon} Frontguard visual check`,
     '',
@@ -221,7 +222,9 @@ export function renderSummary(run, previewUrl) {
  * @returns {boolean}
  */
 export function isFailingRun(run) {
-  if (run.status === 'failed' || run.status === 'error') return true;
+  // A timed-out run never reached a verdict — treat it as a failure so a
+  // failBuild:true configuration fails the build instead of passing silently.
+  if (run.status === 'failed' || run.status === 'error' || run.status === 'timeout') return true;
   const r = run.results;
   if (r && typeof r === 'object' && typeof r.changed === 'number') return r.changed > 0;
   return false;
