@@ -22,6 +22,7 @@ import { JSONReporter } from '../report/json.js';
 import { HTMLReporter } from '../report/html.js';
 import { logger, setLogLevel } from '../utils/logger.js';
 import { FixPatternDB } from '../storage/fix-patterns.js';
+import { createMonitorPlugin } from '../plugins/monitor.js';
 import type { FrontguardConfig, Reporter, BrowserEngine } from '../core/types.js';
 import { writeFileSync, readFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -484,6 +485,83 @@ export async function main(argv?: string[]): Promise<number> {
       try {
         exitCode = await runDoctor(process.cwd());
         await emitTelemetry({ command: 'doctor', version: VERSION });
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
+    });
+
+  // ---------------------------------------------------------------------------
+  // Command: monitor (Task 7.3) — run checks against live production URLs
+  // ---------------------------------------------------------------------------
+
+  program
+    .command('monitor')
+    .description('Monitor live production URLs for visual regressions')
+    .option('-u, --url <urls>', 'Comma-separated URLs to monitor (overrides config)')
+    .option('-c, --config <path>', 'Config file path')
+    .option('-t, --threshold <n>', 'Alert threshold percentage (0-100)', '5')
+    .option('--webhook <url>', 'Webhook URL for alerts (Slack, Discord, etc.)')
+    .option('--history-dir <dir>', 'Directory to store run history', '.frontguard/monitor-history')
+    .option('--interval <minutes>', 'Run repeatedly every N minutes (daemon mode)')
+    .option('--once', 'Run a single check and exit (default)')
+    .option('--verbose', 'Verbose output')
+    .option('--debug', 'Debug output')
+    .action(async (opts) => {
+      try {
+        if (opts.debug) setLogLevel('debug');
+        else if (opts.verbose) setLogLevel('info');
+
+        const urls = typeof opts.url === 'string'
+          ? opts.url.split(',').map((u: string) => u.trim()).filter(Boolean)
+          : undefined;
+
+        const thresholdPct = parseFloat(opts.threshold);
+        const alertThreshold = isNaN(thresholdPct)
+          ? 0.05
+          : thresholdPct > 1
+            ? thresholdPct / 100
+            : thresholdPct;
+
+        const runOnce = async (): Promise<number> => {
+          const config = await buildConfig({ ...opts, url: urls?.[0] ?? opts.url });
+          const monitorUrls = urls ?? config.routes ?? [config.baseUrl];
+
+          const monitorPlugin = createMonitorPlugin({
+            urls: monitorUrls,
+            alertThreshold,
+            alerts: opts.webhook ? { webhook: opts.webhook as string } : undefined,
+            historyDir: opts.historyDir as string,
+          });
+          config.plugins = [...(config.plugins ?? []), monitorPlugin];
+
+          const reporter = new ConsoleReporter();
+          logger.info(`🔍 Monitoring ${monitorUrls.length} URL(s)…`);
+          const result = await runPipeline(config, reporter);
+          const regressions = result.summary.regressions + result.summary.warnings;
+          if (regressions > 0) {
+            logger.error(`⚠ ${regressions} URL(s) exceeded the alert threshold`);
+            return 1;
+          }
+          logger.info('✅ All monitored URLs within threshold');
+          return 0;
+        };
+
+        const intervalMin = opts.interval ? parseInt(opts.interval as string, 10) : null;
+        if (intervalMin && intervalMin > 0) {
+          // Daemon mode: loop forever, sleeping between runs.
+          logger.info(`Starting monitor daemon (every ${intervalMin}m). Press Ctrl+C to stop.`);
+          for (;;) {
+            await runOnce().catch((err) =>
+              logger.error(`Monitor run failed: ${err instanceof Error ? err.message : String(err)}`),
+            );
+            await new Promise((r) => setTimeout(r, intervalMin * 60_000));
+          }
+        } else {
+          exitCode = await runOnce();
+        }
+
+        await emitTelemetry({ command: 'monitor', version: VERSION });
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;

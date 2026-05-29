@@ -59,4 +59,20 @@ describe('CLI', () => {
     const { exitCode } = runCli(['--invalid-option']);
     expect(exitCode).not.toBe(0);
   });
+
+  it('monitor --help lists monitoring options (Task 7.3)', () => {
+    const { stdout, exitCode } = runCli(['monitor', '--help']);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain('--url');
+    expect(stdout).toContain('--webhook');
+    expect(stdout).toContain('--interval');
+    expect(stdout).toContain('--threshold');
+  });
+
+  it('monitor with an invalid URL fails gracefully (exit 2, no crash)', () => {
+    const { exitCode, stdout, stderr } = runCli(['monitor', '--url', 'not-a-valid-url']);
+    // Bad input → graceful FRONTGUARD ERROR, exit 2 (not an unhandled crash).
+    expect(exitCode).toBe(2);
+    expect(stdout + stderr).toMatch(/FRONTGUARD ERROR|Invalid URL|base URL/i);
+  });
 });
