@@ -25,6 +25,7 @@ import type {
   AccessibilityViolation,
   AccessibilityImpact,
   ScreenshotResult,
+  RunResult,
 } from '../core/types.js';
 import { logger } from '../utils/logger.js';
 
@@ -210,6 +211,10 @@ async function auditUrl(
  */
 export function createAccessibilityPlugin(config: AccessibilityConfig = {}): FrontguardPlugin {
   let axeAvailable = false;
+  // Results collected during `afterRender`, surfaced onto the RunResult in
+  // `afterRun`. Kept in closure scope so `afterRun` is the canonical delivery
+  // path regardless of how the pipeline later reads plugin metadata.
+  let collected: AccessibilityResult[] = [];
 
   return {
     name: 'accessibility',
@@ -224,6 +229,7 @@ export function createAccessibilityPlugin(config: AccessibilityConfig = {}): Fro
             'Install it: npm install -D @axe-core/playwright',
         );
       }
+      collected = [];
       ctx.metadata.set(ACCESSIBILITY_RESULTS_KEY, [] as AccessibilityResult[]);
     },
 
@@ -267,6 +273,9 @@ export function createAccessibilityPlugin(config: AccessibilityConfig = {}): Fro
         }
       }
 
+      // Keep the closure copy in sync so `afterRun` can surface them onto the
+      // RunResult, and retain the metadata write for backward compatibility.
+      collected = results;
       ctx.metadata.set(ACCESSIBILITY_RESULTS_KEY, results);
 
       const totalViolations = results.reduce((n, r) => n + r.violations.length, 0);
@@ -282,6 +291,29 @@ export function createAccessibilityPlugin(config: AccessibilityConfig = {}): Fro
         }
       } else {
         logger.debug('Accessibility: no violations found');
+      }
+    },
+
+    /**
+     * Canonical delivery path (Task 5.1): attach the collected
+     * {@link AccessibilityResult}s directly onto the {@link RunResult} so
+     * reporters can render them without depending on plugin-metadata reads.
+     *
+     * Falls back to the context metadata if `afterRender` did not run in the
+     * same plugin instance (e.g. when the metadata was populated externally),
+     * keeping backward compatibility. Idempotent — assigns rather than appends,
+     * so there is no double-counting.
+     */
+    afterRun(result: RunResult, ctx: PluginContext): void {
+      let results = collected;
+      if (results.length === 0) {
+        const fromMeta = ctx.metadata.get(ACCESSIBILITY_RESULTS_KEY);
+        if (Array.isArray(fromMeta) && fromMeta.length > 0) {
+          results = fromMeta as AccessibilityResult[];
+        }
+      }
+      if (results.length > 0) {
+        result.accessibility = results;
       }
     },
   };

@@ -9,7 +9,12 @@ import {
   type RawAxeResults,
 } from '../../src/plugins/accessibility.js';
 import type { PluginContext } from '../../src/core/plugins.js';
-import type { AccessibilityResult, FrontguardConfig } from '../../src/core/types.js';
+import type {
+  AccessibilityResult,
+  FrontguardConfig,
+  RunResult,
+  RunTiming,
+} from '../../src/core/types.js';
 
 const rawSample: RawAxeResults = {
   violations: [
@@ -139,5 +144,75 @@ describe('createAccessibilityPlugin', () => {
     await plugin.setup!(ctx);
     // axe not installed in test env → afterRender returns without throwing
     await expect(plugin.afterRender!([], ctx)).resolves.toBeUndefined();
+  });
+
+  it('exposes an afterRun hook', () => {
+    const plugin = createAccessibilityPlugin();
+    expect(plugin.afterRun).toBeTypeOf('function');
+  });
+
+  function makeRunResult(): RunResult {
+    const timing: RunTiming = { discovery: 0, render: 0, compare: 0, ai: 0, total: 0 };
+    return {
+      summary: { total: 0, passed: 0, regressions: 0, warnings: 0, newPages: 0, errors: 0 },
+      diffs: [],
+      timing,
+      config: { baseUrl: 'http://localhost:3000' } as unknown as FrontguardConfig,
+    };
+  }
+
+  it('afterRun surfaces collected results from metadata onto the RunResult', async () => {
+    const plugin = createAccessibilityPlugin();
+    const ctx: PluginContext = {
+      config: { baseUrl: 'http://localhost:3000' } as unknown as FrontguardConfig,
+      logger: console as unknown as PluginContext['logger'],
+      metadata: new Map(),
+    };
+    await plugin.setup!(ctx);
+
+    // Simulate afterRender having stored results in metadata.
+    const stored: AccessibilityResult[] = [parseAxeResults(rawSample, '/home', 1440)];
+    ctx.metadata.set(ACCESSIBILITY_RESULTS_KEY, stored);
+
+    const result = makeRunResult();
+    await plugin.afterRun!(result, ctx);
+
+    expect(result.accessibility).toBeDefined();
+    expect(result.accessibility).toHaveLength(1);
+    expect(result.accessibility![0].route).toBe('/home');
+    expect(result.accessibility![0].violations).toHaveLength(3);
+  });
+
+  it('afterRun leaves RunResult.accessibility unset when there are no results', async () => {
+    const plugin = createAccessibilityPlugin();
+    const ctx: PluginContext = {
+      config: { baseUrl: 'http://localhost:3000' } as unknown as FrontguardConfig,
+      logger: console as unknown as PluginContext['logger'],
+      metadata: new Map(),
+    };
+    await plugin.setup!(ctx);
+
+    const result = makeRunResult();
+    await plugin.afterRun!(result, ctx);
+
+    expect(result.accessibility).toBeUndefined();
+  });
+
+  it('afterRun is idempotent — assigns rather than appends (no double-counting)', async () => {
+    const plugin = createAccessibilityPlugin();
+    const ctx: PluginContext = {
+      config: { baseUrl: 'http://localhost:3000' } as unknown as FrontguardConfig,
+      logger: console as unknown as PluginContext['logger'],
+      metadata: new Map(),
+    };
+    await plugin.setup!(ctx);
+
+    ctx.metadata.set(ACCESSIBILITY_RESULTS_KEY, [parseAxeResults(rawSample, '/home', 1440)]);
+
+    const result = makeRunResult();
+    await plugin.afterRun!(result, ctx);
+    await plugin.afterRun!(result, ctx);
+
+    expect(result.accessibility).toHaveLength(1);
   });
 });

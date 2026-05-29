@@ -8,7 +8,7 @@
  * @module plugins/monitor
  */
 
-import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, unlinkSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, unlinkSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FrontguardPlugin, PluginContext } from '../core/plugins.js';
 import type { DiffResult, RunResult, FrontguardConfig, Route } from '../core/types.js';
@@ -287,4 +287,157 @@ export function createMonitorPlugin(config: MonitorConfig): FrontguardPlugin {
       ctx.metadata.set('monitor:summary', { total, passed, alerted });
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// History inspection (CLI `monitor --history`)
+// ---------------------------------------------------------------------------
+
+/** A single recent history record paired with the URL slug it belongs to. */
+export interface RecentHistoryRecord extends HistoryEntry {
+  /** The URL slug (directory name) this entry was stored under. */
+  slug: string;
+}
+
+/**
+ * Read recent monitoring history across all per-URL slug directories in
+ * `historyDir`. Entries are sorted newest-first and capped at `limit`.
+ *
+ * Returns an empty array when the directory does not exist or is empty.
+ */
+export function readRecentHistory(historyDir: string, limit = 20): RecentHistoryRecord[] {
+  if (!existsSync(historyDir)) return [];
+
+  const records: RecentHistoryRecord[] = [];
+
+  for (const slug of readdirSync(historyDir)) {
+    const dir = join(historyDir, slug);
+    let isDir = false;
+    try {
+      isDir = statSync(dir).isDirectory();
+    } catch {
+      isDir = false;
+    }
+    if (!isDir) continue;
+
+    const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
+    for (const f of files) {
+      try {
+        const entry = JSON.parse(readFileSync(join(dir, f), 'utf-8')) as HistoryEntry;
+        if (entry && typeof entry.timestamp === 'string') {
+          records.push({ ...entry, slug });
+        }
+      } catch {
+        // Skip malformed entries
+      }
+    }
+  }
+
+  records.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  return records.slice(0, limit);
+}
+
+/**
+ * Format recent history records as a readable, fixed-width summary table.
+ * Pure function — returns the rendered string so it is trivially testable.
+ */
+export function formatHistoryTable(records: RecentHistoryRecord[]): string {
+  if (records.length === 0) {
+    return 'No monitoring history found.';
+  }
+
+  const header = ['TIMESTAMP', 'STATUS', 'DIFF %', 'URL'];
+  const rows = records.map((r) => [
+    r.timestamp,
+    r.status,
+    `${r.diffPercentage.toFixed(2)}%`,
+    r.url,
+  ]);
+
+  const widths = header.map((h, i) =>
+    Math.max(h.length, ...rows.map((row) => row[i].length)),
+  );
+
+  const pad = (cells: string[]): string =>
+    cells.map((c, i) => c.padEnd(widths[i])).join('  ').trimEnd();
+
+  const lines = [pad(header), widths.map((w) => '-'.repeat(w)).join('  '), ...rows.map(pad)];
+  return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Polling loop (CLI `--interval` / `--watch` daemon mode)
+// ---------------------------------------------------------------------------
+
+/** Controls a running {@link runPollingLoop}, enabling graceful shutdown. */
+export interface PollingController {
+  /** Request the loop to stop after the current iteration completes. */
+  stop(): void;
+  /** Whether a stop has been requested. */
+  readonly stopped: boolean;
+}
+
+/** Options for {@link runPollingLoop}. */
+export interface PollingLoopOptions {
+  /** The work to run each iteration. */
+  iterate: () => Promise<void> | void;
+  /** Delay between iterations in milliseconds. */
+  intervalMs: number;
+  /**
+   * Optional cap on the number of iterations (mainly for testing). When
+   * omitted the loop runs until {@link PollingController.stop} is called.
+   */
+  maxIterations?: number;
+  /** Sleep implementation (injectable for tests). Defaults to setTimeout. */
+  sleep?: (ms: number) => Promise<void>;
+  /** Called when an iteration throws (errors never break the loop). */
+  onError?: (err: unknown) => void;
+}
+
+/** Create a {@link PollingController}. */
+export function createPollingController(): PollingController {
+  let stopRequested = false;
+  return {
+    stop() {
+      stopRequested = true;
+    },
+    get stopped() {
+      return stopRequested;
+    },
+  };
+}
+
+/**
+ * Run a polling loop that invokes `iterate` repeatedly, sleeping `intervalMs`
+ * between runs. Stops when the controller's `stop()` is called or when
+ * `maxIterations` is reached. Iteration errors are caught and forwarded to
+ * `onError` so a single failing run never breaks the loop.
+ *
+ * @returns The number of iterations executed.
+ */
+export async function runPollingLoop(
+  controller: PollingController,
+  options: PollingLoopOptions,
+): Promise<number> {
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  let iterations = 0;
+
+  while (!controller.stopped) {
+    if (options.maxIterations !== undefined && iterations >= options.maxIterations) break;
+
+    try {
+      await options.iterate();
+    } catch (err) {
+      if (options.onError) options.onError(err);
+      else throw err;
+    }
+    iterations++;
+
+    if (controller.stopped) break;
+    if (options.maxIterations !== undefined && iterations >= options.maxIterations) break;
+
+    await sleep(options.intervalMs);
+  }
+
+  return iterations;
 }

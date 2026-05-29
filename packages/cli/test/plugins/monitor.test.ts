@@ -2,12 +2,18 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import {
   createMonitorPlugin,
   urlToSlug,
   sendWebhookAlert,
+  readRecentHistory,
+  formatHistoryTable,
+  createPollingController,
+  runPollingLoop,
   type MonitorConfig,
   type AlertPayload,
+  type HistoryEntry,
 } from '../../src/plugins/monitor.js';
 import type { PluginContext } from '../../src/core/plugins.js';
 import type { FrontguardConfig, DiffResult, Route, RunResult, RunTiming } from '../../src/core/types.js';
@@ -252,5 +258,189 @@ describe('AlertPayload structure', () => {
     expect(payload.summary.total).toBe(3);
     expect(payload.summary.passed).toBe(2);
     expect(payload.summary.alerted).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// History inspection (`monitor --history`)
+// ---------------------------------------------------------------------------
+
+describe('readRecentHistory / formatHistoryTable', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'frontguard-monitor-history-'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  function writeEntry(slug: string, file: string, entry: HistoryEntry): void {
+    const dir = join(tempDir, slug);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, file), JSON.stringify(entry, null, 2));
+  }
+
+  it('returns empty array when history dir does not exist', () => {
+    expect(readRecentHistory(join(tempDir, 'nope'))).toEqual([]);
+  });
+
+  it('reads entries across slug dirs, newest-first, capped at limit', () => {
+    writeEntry('example-com', '1.json', {
+      url: 'https://example.com',
+      timestamp: '2024-01-01T00:00:00.000Z',
+      diffPercentage: 1,
+      status: 'pass',
+    });
+    writeEntry('example-com', '2.json', {
+      url: 'https://example.com',
+      timestamp: '2024-01-03T00:00:00.000Z',
+      diffPercentage: 9,
+      status: 'alert',
+    });
+    writeEntry('staging-example-com', '3.json', {
+      url: 'https://staging.example.com',
+      timestamp: '2024-01-02T00:00:00.000Z',
+      diffPercentage: 4,
+      status: 'pass',
+    });
+
+    const records = readRecentHistory(tempDir);
+    expect(records).toHaveLength(3);
+    // newest first
+    expect(records[0].timestamp).toBe('2024-01-03T00:00:00.000Z');
+    expect(records[0].slug).toBe('example-com');
+    expect(records[1].timestamp).toBe('2024-01-02T00:00:00.000Z');
+    expect(records[2].timestamp).toBe('2024-01-01T00:00:00.000Z');
+
+    const limited = readRecentHistory(tempDir, 2);
+    expect(limited).toHaveLength(2);
+    expect(limited[0].timestamp).toBe('2024-01-03T00:00:00.000Z');
+  });
+
+  it('skips malformed JSON entries gracefully', () => {
+    const dir = join(tempDir, 'example-com');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'bad.json'), '{not valid json');
+    writeEntry('example-com', 'good.json', {
+      url: 'https://example.com',
+      timestamp: '2024-01-01T00:00:00.000Z',
+      diffPercentage: 2,
+      status: 'pass',
+    });
+
+    const records = readRecentHistory(tempDir);
+    expect(records).toHaveLength(1);
+    expect(records[0].url).toBe('https://example.com');
+  });
+
+  it('formatHistoryTable shows a message when empty', () => {
+    expect(formatHistoryTable([])).toBe('No monitoring history found.');
+  });
+
+  it('formatHistoryTable renders a readable table with header columns', () => {
+    const table = formatHistoryTable([
+      {
+        url: 'https://example.com',
+        timestamp: '2024-01-03T00:00:00.000Z',
+        diffPercentage: 9.5,
+        status: 'alert',
+        slug: 'example-com',
+      },
+    ]);
+    expect(table).toContain('TIMESTAMP');
+    expect(table).toContain('STATUS');
+    expect(table).toContain('DIFF %');
+    expect(table).toContain('URL');
+    expect(table).toContain('9.50%');
+    expect(table).toContain('alert');
+    expect(table).toContain('https://example.com');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Polling loop & graceful shutdown (`--interval` / `--watch`)
+// ---------------------------------------------------------------------------
+
+describe('runPollingLoop / createPollingController', () => {
+  it('runs the requested number of iterations with maxIterations', async () => {
+    const controller = createPollingController();
+    let count = 0;
+    const iterations = await runPollingLoop(controller, {
+      intervalMs: 0,
+      maxIterations: 3,
+      sleep: async () => {},
+      iterate: () => {
+        count++;
+      },
+    });
+    expect(iterations).toBe(3);
+    expect(count).toBe(3);
+  });
+
+  it('stops cleanly when the controller is stopped (graceful shutdown)', async () => {
+    const controller = createPollingController();
+    let count = 0;
+    const iterations = await runPollingLoop(controller, {
+      intervalMs: 0,
+      sleep: async () => {},
+      iterate: () => {
+        count++;
+        if (count === 2) controller.stop(); // simulate SIGINT after 2 runs
+      },
+    });
+    expect(controller.stopped).toBe(true);
+    expect(iterations).toBe(2);
+    expect(count).toBe(2);
+  });
+
+  it('does not start a new iteration when stopped before running', async () => {
+    const controller = createPollingController();
+    controller.stop();
+    let count = 0;
+    const iterations = await runPollingLoop(controller, {
+      intervalMs: 0,
+      sleep: async () => {},
+      iterate: () => {
+        count++;
+      },
+    });
+    expect(iterations).toBe(0);
+    expect(count).toBe(0);
+  });
+
+  it('forwards iteration errors to onError without breaking the loop', async () => {
+    const controller = createPollingController();
+    const errors: unknown[] = [];
+    let count = 0;
+    const iterations = await runPollingLoop(controller, {
+      intervalMs: 0,
+      maxIterations: 3,
+      sleep: async () => {},
+      onError: (err) => errors.push(err),
+      iterate: () => {
+        count++;
+        throw new Error(`boom ${count}`);
+      },
+    });
+    expect(iterations).toBe(3);
+    expect(errors).toHaveLength(3);
+    expect((errors[0] as Error).message).toBe('boom 1');
+  });
+
+  it('sleeps between iterations using the injected sleep', async () => {
+    const controller = createPollingController();
+    const sleeps: number[] = [];
+    await runPollingLoop(controller, {
+      intervalMs: 5000,
+      maxIterations: 2,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+      iterate: () => {},
+    });
+    // Only one sleep between the two iterations (none after the last).
+    expect(sleeps).toEqual([5000]);
   });
 });
