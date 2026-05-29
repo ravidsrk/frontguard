@@ -31,6 +31,8 @@ function createMockPage(screenshotBuffer: Buffer, viewport = { width: 1280, heig
     screenshot: vi.fn().mockResolvedValue(screenshotBuffer),
     viewportSize: vi.fn().mockReturnValue(viewport),
     addInitScript: vi.fn().mockResolvedValue(undefined),
+    reload: vi.fn().mockResolvedValue(undefined),
+    clock: { setFixedTime: vi.fn().mockResolvedValue(undefined) },
     evaluate: vi.fn().mockResolvedValue(undefined),
   } as any;
 }
@@ -158,7 +160,7 @@ describe('visualTest', () => {
     expect(result.isNewBaseline).toBe(true);
   });
 
-  it('calls addInitScript when freezeTime is set', async () => {
+  it('uses page.clock.setFixedTime when freezeTime is set (works on loaded page)', async () => {
     const img = createPNG(50, 50, [128, 128, 128, 255]);
     const page = createMockPage(img);
 
@@ -167,9 +169,29 @@ describe('visualTest', () => {
       freezeTime: 1700000000000,
     });
 
+    // Prefer the clock API which actually freezes time on an already-loaded
+    // page; the old init-script approach was a no-op for the page under test.
+    expect(page.clock.setFixedTime).toHaveBeenCalledTimes(1);
+    expect(page.clock.setFixedTime).toHaveBeenCalledWith(1700000000000);
+    expect(page.addInitScript).not.toHaveBeenCalled();
+  });
+
+  it('falls back to addInitScript + reload when page.clock is unavailable', async () => {
+    const img = createPNG(50, 50, [128, 128, 128, 255]);
+    const page = createMockPage(img);
+    // Simulate an older Playwright without the clock API.
+    delete page.clock;
+
+    await visualTest(page, 'freeze-fallback', {
+      baselineDir: TEST_BASELINE_DIR,
+      freezeTime: 1700000000000,
+    });
+
     expect(page.addInitScript).toHaveBeenCalledTimes(1);
     const scriptArg = page.addInitScript.mock.calls[0][0];
     expect(scriptArg).toContain('1700000000000');
+    // Reload makes the injected script take effect on the current page.
+    expect(page.reload).toHaveBeenCalledTimes(1);
   });
 
   it('calls evaluate for mask selectors', async () => {
