@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { toShortName, buildSpec, generateFiles, pascal } from '../src/templates.js';
-import { parseArgs, writeProject } from '../src/index.js';
+import { parseArgs, writeProject, run } from '../src/index.js';
 
 describe('toShortName', () => {
   it('slugifies arbitrary input', () => {
@@ -110,5 +110,61 @@ describe('writeProject', () => {
     const files = generateFiles(buildSpec('slack'));
     writeProject(dir, files);
     expect(() => writeProject(dir, files, { force: true })).not.toThrow();
+  });
+});
+
+describe('run (CLI entrypoint)', () => {
+  let dir: string;
+  let stdout: string;
+  let stderr: string;
+  let outSpy: ReturnType<typeof vi.spyOn>;
+  let errSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'fg-run-'));
+    stdout = '';
+    stderr = '';
+    outSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((s: string) => {
+      stdout += s;
+      return true;
+    }) as typeof process.stdout.write);
+    errSpy = vi.spyOn(process.stderr, 'write').mockImplementation(((s: string) => {
+      stderr += s;
+      return true;
+    }) as typeof process.stderr.write);
+  });
+
+  afterEach(() => {
+    outSpy.mockRestore();
+    errSpy.mockRestore();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns 1 and prints usage when no name is given', () => {
+    const code = run([]);
+    expect(code).toBe(1);
+    expect(stderr).toContain('Usage:');
+  });
+
+  it('scaffolds a project and returns 0', () => {
+    const code = run(['slack', '--directory', join(dir, 'out'), '--description', 'Slack alerts']);
+    expect(code).toBe(0);
+    expect(stdout).toContain('Created frontguard-plugin-slack');
+    expect(stdout).toContain('Next steps');
+    expect(existsSync(join(dir, 'out', 'package.json'))).toBe(true);
+  });
+
+  it('returns 1 when refusing to overwrite an existing project', () => {
+    const target = join(dir, 'dup');
+    expect(run(['slack', '--directory', target])).toBe(0);
+    const code = run(['slack', '--directory', target]);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/Error:.*overwrite/);
+  });
+
+  it('overwrites when --force is passed', () => {
+    const target = join(dir, 'forced');
+    expect(run(['slack', '--directory', target])).toBe(0);
+    expect(run(['slack', '--directory', target, '--force'])).toBe(0);
   });
 });

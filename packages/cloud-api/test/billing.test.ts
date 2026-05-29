@@ -146,6 +146,120 @@ describe('billing routes (dev mode)', () => {
     expect(team?.plan).toBe('pro');
   });
 
+  it('checkout 401 without an API key', async () => {
+    const res = await app.request('/v1/billing/checkout', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: 'pro', teamId: 't' }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  // Stripe must be configured for the validation/RBAC branches to be reached
+  // (the route returns 501 before validation otherwise).
+  const stripeEnv = { STRIPE_SECRET_KEY: 'sk', STRIPE_WEBHOOK_SECRET: 'wh', STRIPE_PRICE_PRO: 'price_pro' };
+
+  it('checkout 400 on invalid plan', async () => {
+    const res = await app.request(
+      '/v1/billing/checkout',
+      { method: 'POST', headers: auth('alice'), body: JSON.stringify({ plan: 'enterprise', teamId: 't' }) },
+      stripeEnv,
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/pro.*business/);
+  });
+
+  it('checkout 400 when teamId is missing', async () => {
+    const res = await app.request(
+      '/v1/billing/checkout',
+      { method: 'POST', headers: auth('alice'), body: JSON.stringify({ plan: 'pro' }) },
+      stripeEnv,
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/teamId/);
+  });
+
+  it('checkout 403 when caller is not an owner/admin', async () => {
+    // alice owns the team; bob is only a member.
+    const teamRes = await app.request('/v1/teams', {
+      method: 'POST', headers: auth('alice'), body: JSON.stringify({ name: 'A' }),
+    });
+    const teamId = (await teamRes.json()).id;
+    const store = getMemoryStore();
+    // Resolve bob's demo id and add as a plain member.
+    const { createHash } = await import('node:crypto');
+    const bobId = `demo:${createHash('sha256').update('bob').digest('hex')}`;
+    await store.createUser({ id: bobId, plan: 'free', createdAt: 'now' });
+    await store.addMember({ teamId, userId: bobId, role: 'member', createdAt: 'now' });
+
+    const res = await app.request(
+      '/v1/billing/checkout',
+      { method: 'POST', headers: auth('bob'), body: JSON.stringify({ plan: 'pro', teamId }) },
+      stripeEnv,
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toMatch(/owners\/admins/);
+  });
+
+  it('checkout 200 returns a session when Stripe is configured', async () => {
+    const teamRes = await app.request('/v1/teams', {
+      method: 'POST', headers: auth('alice'), body: JSON.stringify({ name: 'A' }),
+    });
+    const teamId = (await teamRes.json()).id;
+
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ id: 'cs_1', url: 'https://checkout.stripe.com/c/cs_1' }), { status: 200 })) as typeof fetch;
+    try {
+      const res = await app.request(
+        '/v1/billing/checkout',
+        { method: 'POST', headers: auth('alice'), body: JSON.stringify({ plan: 'pro', teamId, email: 'a@b.com' }) },
+        { STRIPE_SECRET_KEY: 'sk', STRIPE_WEBHOOK_SECRET: 'wh', STRIPE_PRICE_PRO: 'price_pro' },
+      );
+      expect(res.status).toBe(200);
+      expect((await res.json()).url).toContain('checkout.stripe.com');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it('webhook 401 on invalid signature when Stripe is configured', async () => {
+    const res = await app.request(
+      '/v1/billing/webhook',
+      { method: 'POST', headers: { 'stripe-signature': 'bad' }, body: '{}' },
+      { STRIPE_SECRET_KEY: 'sk', STRIPE_WEBHOOK_SECRET: 'wh' },
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('webhook 400 on invalid JSON (dev, no signature)', async () => {
+    const res = await app.request('/v1/billing/webhook', { method: 'POST', body: 'not json' });
+    expect(res.status).toBe(400);
+  });
+
+  it('webhook returns handled:false for unrecognised events', async () => {
+    const res = await app.request('/v1/billing/webhook', {
+      method: 'POST', body: JSON.stringify({ type: 'ping', data: { object: {} } }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).handled).toBe(false);
+  });
+
+  it('usage reflects a team plan when teamId is given', async () => {
+    const teamRes = await app.request('/v1/teams', {
+      method: 'POST', headers: auth('alice'), body: JSON.stringify({ name: 'A' }),
+    });
+    const teamId = (await teamRes.json()).id;
+    await getMemoryStore().updateTeam(teamId, { plan: 'pro' });
+
+    const res = await app.request(`/v1/billing/usage?teamId=${teamId}`, { headers: auth('alice') });
+    expect(res.status).toBe(200);
+    expect((await res.json()).plan).toBe('pro');
+  });
+
+  it('usage 401 without an API key', async () => {
+    const res = await app.request('/v1/billing/usage');
+    expect(res.status).toBe(401);
+  });
+
   it('enforces the free run limit with a 402', async () => {
     const store = getMemoryStore();
     // The dev guard maps a token to `demo:<sha256(token)>`; compute that id and
