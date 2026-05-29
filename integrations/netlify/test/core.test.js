@@ -141,8 +141,23 @@ describe('renderSummary', () => {
   });
   it('includes a report link when present', () => {
     const s = renderSummary({ status: 'failed', reportUrl: 'https://report' }, 'https://p');
-    expect(s).toContain('⚠️');
+    expect(s).toContain('❌');
     expect(s).toContain('https://report');
+  });
+  // FIX N2: icon consistency — a completed run WITH regressions shows ❌.
+  it('shows ❌ for a completed run with regressions', () => {
+    const s = renderSummary({ status: 'completed', results: { total: 5, changed: 2 } }, 'https://p');
+    expect(s).toContain('❌');
+    expect(s).not.toContain('✅');
+  });
+  it('shows ✅ for a completed run with no regressions', () => {
+    const s = renderSummary({ status: 'completed', results: { total: 5, changed: 0 } }, 'https://p');
+    expect(s).toContain('✅');
+  });
+  // FIX N1: a timed-out run shows ❌.
+  it('shows ❌ for a timeout status', () => {
+    const s = renderSummary({ status: 'timeout' }, 'https://p');
+    expect(s).toContain('❌');
   });
 });
 
@@ -150,6 +165,10 @@ describe('isFailingRun', () => {
   it('is true for failed/error', () => {
     expect(isFailingRun({ status: 'failed' })).toBe(true);
     expect(isFailingRun({ status: 'error' })).toBe(true);
+  });
+  // FIX N1: a timed-out run must fail the build.
+  it('is true for a timeout status', () => {
+    expect(isFailingRun({ status: 'timeout' })).toBe(true);
   });
   it('is true when changes detected', () => {
     expect(isFailingRun({ status: 'completed', results: { changed: 3 } })).toBe(true);

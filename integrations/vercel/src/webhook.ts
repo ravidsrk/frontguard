@@ -18,6 +18,8 @@
 
 /** Subset of a Vercel webhook payload we consume. */
 export interface VercelWebhookPayload {
+  /** Unique event/delivery id Vercel assigns to each webhook event. */
+  id?: string;
   type: string;
   payload: {
     deployment?: {
@@ -44,6 +46,7 @@ export interface WebhookDecision {
     pullRequestId?: string;
     repoOwner?: string;
     repoSlug?: string;
+    branch?: string;
   };
 }
 
@@ -86,6 +89,25 @@ export function timingSafeEqual(a: string, b: string): boolean {
 }
 
 /**
+ * Validates that a deployment preview URL is safe to forward to the Cloud API
+ * for screenshotting, mitigating SSRF. A URL is allowed only when it uses
+ * `https:` and its host ends with `.vercel.app` (or exactly `vercel.app`).
+ *
+ * @param previewUrl - The fully-qualified preview URL (e.g. `https://x.vercel.app`).
+ */
+export function isAllowedPreviewUrl(previewUrl: string | undefined): boolean {
+  if (!previewUrl) return false;
+  try {
+    const url = new URL(previewUrl);
+    if (url.protocol !== 'https:') return false;
+    const host = url.hostname.toLowerCase();
+    return host === 'vercel.app' || host.endsWith('.vercel.app');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Decides whether a webhook event should trigger a Frontguard run.
  *
  * Rules:
@@ -119,8 +141,30 @@ export function decideFromWebhook(payload: VercelWebhookPayload): WebhookDecisio
       pullRequestId: meta.githubPrId ?? meta.githubCommitRef,
       repoOwner: meta.githubOrg ?? meta.githubCommitOrg,
       repoSlug: meta.githubRepo ?? meta.githubCommitRepo,
+      branch: meta.githubCommitRef ?? meta.gitCommitRef,
     },
   };
+}
+
+/**
+ * GitHub PR linkage forwarded to the Cloud API so it can post results back as a
+ * PR comment (via the existing github-pr reporter).
+ *
+ * NOTE: The Cloud API `/v1/run` contract (see
+ * `packages/cloud-api/src/index.ts`, `runRequestSchema`) does not yet model git
+ * metadata, so we forward it under a dedicated `github` object. Fields:
+ * - `owner`     — repository owner / org (e.g. "acme").
+ * - `repo`      — repository slug (e.g. "web").
+ * - `prNumber`  — pull request number (parsed from the Vercel deployment meta).
+ * - `commitSha` — the deployed commit SHA.
+ * - `branch`    — the git branch / ref the deployment was built from.
+ */
+export interface GitHubRunLinkage {
+  owner?: string;
+  repo?: string;
+  prNumber?: number;
+  commitSha?: string;
+  branch?: string;
 }
 
 /** Cloud API run request body. */
@@ -130,15 +174,50 @@ export interface TriggerRunOptions {
   previewUrl: string;
   /** Optional routes; defaults to ['/'] on the API side. */
   routes?: string[];
+  /** Git metadata forwarded so the API can post a PR comment. */
+  git?: WebhookDecision['git'];
+}
+
+/**
+ * Builds the `github` linkage object from the webhook-extracted git metadata.
+ * Returns `undefined` when no useful linkage can be derived (so we don't send
+ * an empty object to the API).
+ */
+export function buildGitHubLinkage(git?: WebhookDecision['git']): GitHubRunLinkage | undefined {
+  if (!git) return undefined;
+  const prNumber = git.pullRequestId != null ? Number(git.pullRequestId) : undefined;
+  const linkage: GitHubRunLinkage = {
+    owner: git.repoOwner,
+    repo: git.repoSlug,
+    prNumber: Number.isFinite(prNumber) ? prNumber : undefined,
+    commitSha: git.commitSha,
+    branch: git.branch,
+  };
+  // Drop entirely if nothing meaningful is present.
+  if (
+    linkage.owner == null &&
+    linkage.repo == null &&
+    linkage.prNumber == null &&
+    linkage.commitSha == null &&
+    linkage.branch == null
+  ) {
+    return undefined;
+  }
+  return linkage;
 }
 
 /**
  * Triggers a Frontguard run via the Cloud API. Returns the created run id.
+ *
+ * Forwards git metadata (repo owner/slug, PR number, commit SHA, branch) under
+ * a `github` object so the Cloud API can post results back to the linked PR via
+ * the github-pr reporter.
  */
 export async function triggerRun(
   opts: TriggerRunOptions,
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ id: string; statusUrl: string }> {
+  const github = buildGitHubLinkage(opts.git);
   const res = await fetchImpl(`${opts.apiBaseUrl}/v1/run`, {
     method: 'POST',
     headers: {
@@ -148,6 +227,7 @@ export async function triggerRun(
     body: JSON.stringify({
       url: opts.previewUrl,
       routes: opts.routes?.map((path) => ({ path })),
+      ...(github ? { github } : {}),
     }),
   });
   if (!res.ok) {
