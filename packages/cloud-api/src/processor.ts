@@ -1,5 +1,13 @@
 import type { Run, RunResult } from './types.js';
 import { generateReportHtml } from './report-html.js';
+import type { PendingScreenshot } from './storage/persist-screenshots.js';
+
+/**
+ * Optional hook invoked with the screenshots a run produced, so the caller can
+ * persist them (R2 + metadata). Kept as a callback to keep `processRun`
+ * decoupled from storage bindings and easy to test.
+ */
+export type ScreenshotSink = (screenshots: PendingScreenshot[]) => Promise<void>;
 
 /**
  * Process a visual regression run.
@@ -7,8 +15,11 @@ import { generateReportHtml } from './report-html.js';
  * When DAYTONA_API_KEY is set, spins up an ephemeral Daytona sandbox
  * with Playwright and runs real screenshots. Otherwise, falls back to
  * simulated results (for dev/testing).
+ *
+ * If `onScreenshots` is supplied, any screenshots downloaded from the sandbox
+ * are handed to it for persistence before the function resolves.
  */
-export async function processRun(run: Run): Promise<void> {
+export async function processRun(run: Run, onScreenshots?: ScreenshotSink): Promise<void> {
   run.status = 'running';
 
   try {
@@ -35,6 +46,14 @@ export async function processRun(run: Run): Promise<void> {
         timestamp: r.timestamp || new Date().toISOString(),
       }));
       run.completedAt = new Date().toISOString();
+
+      if (onScreenshots && sandboxResult.screenshots?.length) {
+        try {
+          await onScreenshots(sandboxResult.screenshots);
+        } catch {
+          // Persistence is best-effort and must not fail the run.
+        }
+      }
 
       if (sandboxResult.reportHtml && sandboxResult.reportHtml !== '<p>No report generated</p>') {
         run.reportHtml = sandboxResult.reportHtml;
