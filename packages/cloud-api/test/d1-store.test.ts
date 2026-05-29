@@ -80,6 +80,29 @@ describe('D1Store (SQLite-backed)', () => {
     expect(await store.deleteRun('r1', 'u1')).toBe(true);
   });
 
+  it('round-trips monitors and filters due ones', async () => {
+    await store.createUser({ id: 'u1', plan: 'free', createdAt: 'now' });
+    await store.createMonitor({
+      id: 'm1', userId: 'u1', name: 'Home', url: 'https://example.com',
+      routes: ['/', '/pricing'], viewports: [1440, 375], intervalMinutes: 60,
+      alertThreshold: 0.05, alerts: { slack: 'https://hook', email: ['a@b.com'] },
+      enabled: true, lastRunAt: '2026-01-01T10:00:00Z', createdAt: 'now',
+    });
+    const m = await store.getMonitor('m1');
+    expect(m?.routes).toEqual(['/', '/pricing']);
+    expect(m?.alerts?.slack).toBe('https://hook');
+
+    await store.updateMonitor('m1', { enabled: false, lastStatus: 'passed' });
+    expect((await store.getMonitor('m1'))?.enabled).toBe(false);
+
+    // Re-enable and check due filtering.
+    await store.updateMonitor('m1', { enabled: true });
+    const due = await store.listDueMonitors(new Date('2026-01-01T12:00:00Z'));
+    expect(due.map((x) => x.id)).toEqual(['m1']);
+
+    expect(await store.deleteMonitor('m1', 'u1')).toBe(true);
+  });
+
   it('stores screenshots and accumulates usage via upsert', async () => {
     await store.createUser({ id: 'u1', plan: 'free', createdAt: 'now' });
     await store.createRun(makeRun('r1'), 'u1');

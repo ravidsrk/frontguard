@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import app from '../src/index.js';
+import { app } from '../src/index.js';
 import { resetMemoryStore } from '../src/db/factory.js';
 
 const auth = (token = 'tok-user-a') => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });

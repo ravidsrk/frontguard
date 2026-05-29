@@ -10,6 +10,10 @@ import { authRoutes } from './routes/auth.js';
 import { keyRoutes } from './routes/keys.js';
 import { screenshotRoutes } from './routes/screenshots.js';
 import { getScreenshotStore, type R2Bucket } from './storage/screenshots.js';
+import { monitorRoutes } from './routes/monitors.js';
+import { dashboardRoutes } from './routes/dashboard.js';
+import { runScheduledChecks } from './scheduler.js';
+import type { AlertEnv } from './alerts/index.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -163,9 +167,11 @@ app.use('/v1/*', async (c, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// Screenshot routes (mounted after the /v1 auth guard above).
+// Screenshot + monitor routes (mounted after the /v1 auth guard above).
 // ---------------------------------------------------------------------------
 app.route('/v1/screenshots', screenshotRoutes);
+app.route('/v1/monitors', monitorRoutes);
+app.route('/v1/dashboard', dashboardRoutes);
 
 // ---------------------------------------------------------------------------
 // POST /v1/run — Submit a visual regression run
@@ -320,6 +326,35 @@ app.get('/v1/usage', async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// Export — Cloudflare Workers compatible
+// Export — Cloudflare Workers compatible (fetch + scheduled cron, Task 6.1)
 // ---------------------------------------------------------------------------
-export default app;
+
+/** Minimal Workers types to avoid a @cloudflare/workers-types dependency. */
+interface ScheduledEvent {
+  cron: string;
+  scheduledTime: number;
+}
+interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
+export default {
+  fetch: app.fetch,
+  /** Cron trigger — runs due monitors. */
+  async scheduled(
+    _event: ScheduledEvent,
+    env: Bindings & AlertEnv,
+    ctx: ExecutionContext,
+  ): Promise<void> {
+    ctx.waitUntil(
+      runScheduledChecks(env).then((res) => {
+        console.log(
+          `[scheduler] checked=${res.checked} alerted=${res.alerted} errors=${res.errors}`,
+        );
+      }),
+    );
+  },
+};
+
+// Also export the Hono app for tests and embedding.
+export { app };

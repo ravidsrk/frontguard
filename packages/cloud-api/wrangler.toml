@@ -17,6 +17,10 @@ database_id = "REPLACE_WITH_D1_DATABASE_ID"
 binding = "SCREENSHOTS"
 bucket_name = "frontguard-screenshots"
 
+# Cron trigger — drives the monitoring scheduler (Task 6.1).
+[triggers]
+crons = ["*/15 * * * *"]
+
 [vars]
 API_BASE_URL = "https://api.frontguard.dev"
 PUBLIC_BASE_URL = "https://api.frontguard.dev"
@@ -25,3 +29,5 @@ PUBLIC_BASE_URL = "https://api.frontguard.dev"
 #   GITHUB_CLIENT_ID
 #   GITHUB_CLIENT_SECRET
 #   DAYTONA_API_KEY
+#   RESEND_API_KEY     (email alerts, Task 6.2)
+#   ALERT_FROM_EMAIL   (email alerts, Task 6.2)

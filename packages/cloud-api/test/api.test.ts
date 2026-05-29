@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import app from '../src/index.js';
+import { app } from '../src/index.js';
 
 /**
  * Helper — fire a request against the Hono app with a default Bearer token.

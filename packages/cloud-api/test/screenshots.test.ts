@@ -5,7 +5,7 @@ import {
   screenshotKey,
   type R2Bucket,
 } from '../src/storage/screenshots.js';
-import app from '../src/index.js';
+import { app } from '../src/index.js';
 import { resetMemoryStore, getMemoryStore } from '../src/db/factory.js';
 import {
   resetMemoryScreenshotStore,
