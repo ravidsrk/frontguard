@@ -10,6 +10,7 @@
 import type { Store, User, ApiKeyRecord, ScreenshotRecord, UsageRecord } from './store.js';
 import type { Monitor } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
+import type { Team, TeamMember, TeamInvitation, TeamProject, TeamRole } from './teams.js';
 import type { Run } from '../types.js';
 
 /** Minimal D1 typings (avoids depending on @cloudflare/workers-types). */
@@ -318,6 +319,179 @@ export class D1Store implements Store {
       .all<Record<string, unknown>>();
     return results.map(monitorFromRow).filter((m) => isMonitorDue(m, now));
   }
+
+  // Teams --------------------------------------------------------------------
+  async createTeam(team: Team, ownerUserId: string): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO teams (id, name, plan, stripe_customer_id, stripe_subscription_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(team.id, team.name, team.plan, team.stripeCustomerId ?? null, team.stripeSubscriptionId ?? null, team.createdAt)
+      .run();
+    await this.addMember({ teamId: team.id, userId: ownerUserId, role: 'owner', createdAt: team.createdAt });
+  }
+  async getTeam(id: string): Promise<Team | null> {
+    const row = await this.db.prepare(`SELECT * FROM teams WHERE id = ?`).bind(id).first<Record<string, unknown>>();
+    return row ? teamFromRow(row) : null;
+  }
+  async updateTeam(id: string, patch: Partial<Team>): Promise<void> {
+    const current = await this.getTeam(id);
+    if (!current) return;
+    const t = { ...current, ...patch };
+    await this.db
+      .prepare(`UPDATE teams SET name = ?, plan = ?, stripe_customer_id = ?, stripe_subscription_id = ? WHERE id = ?`)
+      .bind(t.name, t.plan, t.stripeCustomerId ?? null, t.stripeSubscriptionId ?? null, id)
+      .run();
+  }
+  async deleteTeam(id: string): Promise<boolean> {
+    await this.db.prepare(`DELETE FROM team_members WHERE team_id = ?`).bind(id).run();
+    await this.db.prepare(`DELETE FROM team_projects WHERE team_id = ?`).bind(id).run();
+    await this.db.prepare(`DELETE FROM team_invitations WHERE team_id = ?`).bind(id).run();
+    const res = await this.db.prepare(`DELETE FROM teams WHERE id = ?`).bind(id).run();
+    return (res.meta?.changes ?? 0) > 0;
+  }
+  async listTeamsForUser(userId: string): Promise<Array<Team & { role: TeamRole }>> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT t.*, m.role AS member_role FROM teams t
+         JOIN team_members m ON m.team_id = t.id WHERE m.user_id = ?`,
+      )
+      .bind(userId)
+      .all<Record<string, unknown>>();
+    return results.map((row) => ({ ...teamFromRow(row), role: String(row.member_role) as TeamRole }));
+  }
+
+  async addMember(member: TeamMember): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO team_members (team_id, user_id, role, created_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(team_id, user_id) DO UPDATE SET role = excluded.role`,
+      )
+      .bind(member.teamId, member.userId, member.role, member.createdAt)
+      .run();
+  }
+  async getMember(teamId: string, userId: string): Promise<TeamMember | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM team_members WHERE team_id = ? AND user_id = ?`)
+      .bind(teamId, userId)
+      .first<Record<string, unknown>>();
+    return row ? memberFromRow(row) : null;
+  }
+  async listMembers(teamId: string): Promise<TeamMember[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM team_members WHERE team_id = ?`)
+      .bind(teamId)
+      .all<Record<string, unknown>>();
+    return results.map(memberFromRow);
+  }
+  async updateMemberRole(teamId: string, userId: string, role: TeamRole): Promise<void> {
+    await this.db
+      .prepare(`UPDATE team_members SET role = ? WHERE team_id = ? AND user_id = ?`)
+      .bind(role, teamId, userId)
+      .run();
+  }
+  async removeMember(teamId: string, userId: string): Promise<boolean> {
+    const res = await this.db
+      .prepare(`DELETE FROM team_members WHERE team_id = ? AND user_id = ?`)
+      .bind(teamId, userId)
+      .run();
+    return (res.meta?.changes ?? 0) > 0;
+  }
+
+  async createInvitation(inv: TeamInvitation): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO team_invitations (id, team_id, email, role, token, created_at, accepted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(inv.id, inv.teamId, inv.email, inv.role, inv.token, inv.createdAt, inv.acceptedAt ?? null)
+      .run();
+  }
+  async getInvitationByToken(token: string): Promise<TeamInvitation | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM team_invitations WHERE token = ?`)
+      .bind(token)
+      .first<Record<string, unknown>>();
+    return row ? invitationFromRow(row) : null;
+  }
+  async listInvitations(teamId: string): Promise<TeamInvitation[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM team_invitations WHERE team_id = ? AND accepted_at IS NULL`)
+      .bind(teamId)
+      .all<Record<string, unknown>>();
+    return results.map(invitationFromRow);
+  }
+  async acceptInvitation(token: string, at: string): Promise<TeamInvitation | null> {
+    const inv = await this.getInvitationByToken(token);
+    if (!inv || inv.acceptedAt) return null;
+    await this.db.prepare(`UPDATE team_invitations SET accepted_at = ? WHERE token = ?`).bind(at, token).run();
+    return { ...inv, acceptedAt: at };
+  }
+
+  async createProject(project: TeamProject): Promise<void> {
+    await this.db
+      .prepare(`INSERT INTO team_projects (id, team_id, name, repo_url, config, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
+      .bind(project.id, project.teamId, project.name, project.repoUrl ?? null, project.config ?? null, project.createdAt)
+      .run();
+  }
+  async listProjects(teamId: string): Promise<TeamProject[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM team_projects WHERE team_id = ? ORDER BY created_at DESC`)
+      .bind(teamId)
+      .all<Record<string, unknown>>();
+    return results.map(projectFromRow);
+  }
+  async deleteProject(id: string, teamId: string): Promise<boolean> {
+    const res = await this.db
+      .prepare(`DELETE FROM team_projects WHERE id = ? AND team_id = ?`)
+      .bind(id, teamId)
+      .run();
+    return (res.meta?.changes ?? 0) > 0;
+  }
+}
+
+function teamFromRow(row: Record<string, unknown>): Team {
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    plan: String(row.plan ?? 'free'),
+    stripeCustomerId: row.stripe_customer_id != null ? String(row.stripe_customer_id) : undefined,
+    stripeSubscriptionId: row.stripe_subscription_id != null ? String(row.stripe_subscription_id) : undefined,
+    createdAt: String(row.created_at),
+  };
+}
+
+function memberFromRow(row: Record<string, unknown>): TeamMember {
+  return {
+    teamId: String(row.team_id),
+    userId: String(row.user_id),
+    role: String(row.role) as TeamRole,
+    createdAt: String(row.created_at),
+  };
+}
+
+function invitationFromRow(row: Record<string, unknown>): TeamInvitation {
+  return {
+    id: String(row.id),
+    teamId: String(row.team_id),
+    email: String(row.email),
+    role: String(row.role) as TeamRole,
+    token: String(row.token),
+    createdAt: String(row.created_at),
+    acceptedAt: row.accepted_at != null ? String(row.accepted_at) : undefined,
+  };
+}
+
+function projectFromRow(row: Record<string, unknown>): TeamProject {
+  return {
+    id: String(row.id),
+    teamId: String(row.team_id),
+    name: String(row.name),
+    repoUrl: row.repo_url != null ? String(row.repo_url) : undefined,
+    config: row.config != null ? String(row.config) : undefined,
+    createdAt: String(row.created_at),
+  };
 }
 
 function monitorFromRow(row: Record<string, unknown>): Monitor {
