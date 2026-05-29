@@ -8,9 +8,18 @@
  */
 
 import type { Store, User, ApiKeyRecord, ScreenshotRecord, UsageRecord } from './store.js';
-import type { Monitor } from './monitors.js';
+import type { Monitor, MonitorRun, MonitorRunStatus, MonitorAlertState } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
-import type { Team, TeamMember, TeamInvitation, TeamProject, TeamRole } from './teams.js';
+import type {
+  Team,
+  TeamMember,
+  TeamInvitation,
+  TeamProject,
+  TeamRole,
+  BaselineApproval,
+  TeamActivity,
+  TeamUsage,
+} from './teams.js';
 import type { Run } from '../types.js';
 
 /** Minimal D1 typings (avoids depending on @cloudflare/workers-types). */
@@ -28,6 +37,7 @@ export interface D1Database {
 interface RunRow {
   id: string;
   user_id: string;
+  project_id: string | null;
   status: string;
   config: string;
   results: string | null;
@@ -71,6 +81,7 @@ function rowToRun(row: RunRow): Run {
     reportUrl: cfg.reportUrl ?? null,
     reportHtml: row.report_html ?? undefined,
     baselinesApproved: row.baselines_approved === 1,
+    projectId: row.project_id ?? undefined,
     error: row.error ?? undefined,
   };
 }
@@ -134,12 +145,13 @@ export class D1Store implements Store {
   async createRun(run: Run, userId: string): Promise<void> {
     await this.db
       .prepare(
-        `INSERT INTO runs (id, user_id, status, config, results, report_html, routes_count, regressions_count, baselines_approved, error, created_at, completed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO runs (id, user_id, project_id, status, config, results, report_html, routes_count, regressions_count, baselines_approved, error, created_at, completed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         run.id,
         userId,
+        run.projectId ?? null,
         run.status,
         runConfig(run),
         run.results ? JSON.stringify(run.results) : null,
@@ -175,9 +187,10 @@ export class D1Store implements Store {
     const merged = { ...current, ...patch };
     await this.db
       .prepare(
-        `UPDATE runs SET status = ?, config = ?, results = ?, report_html = ?, routes_count = ?, regressions_count = ?, baselines_approved = ?, error = ?, completed_at = ? WHERE id = ?`,
+        `UPDATE runs SET project_id = ?, status = ?, config = ?, results = ?, report_html = ?, routes_count = ?, regressions_count = ?, baselines_approved = ?, error = ?, completed_at = ? WHERE id = ?`,
       )
       .bind(
+        merged.projectId ?? null,
         merged.status,
         runConfig(merged),
         merged.results ? JSON.stringify(merged.results) : null,
@@ -319,6 +332,71 @@ export class D1Store implements Store {
       .all<Record<string, unknown>>();
     return results.map(monitorFromRow).filter((m) => isMonitorDue(m, now));
   }
+  async addMonitorRun(run: MonitorRun): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO monitor_runs (id, monitor_id, user_id, status, regressions_count, attempts, screenshots, error, created_at, completed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        run.id,
+        run.monitorId,
+        run.userId,
+        run.status,
+        run.regressionsCount,
+        run.attempts,
+        run.screenshots ? JSON.stringify(run.screenshots) : null,
+        run.error ?? null,
+        run.createdAt,
+        run.completedAt ?? null,
+      )
+      .run();
+  }
+  async listMonitorRuns(monitorId: string, limit = 50): Promise<MonitorRun[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM monitor_runs WHERE monitor_id = ? ORDER BY created_at DESC LIMIT ?`)
+      .bind(monitorId, limit)
+      .all<Record<string, unknown>>();
+    return results.map(monitorRunFromRow);
+  }
+  async pruneMonitorRuns(userId: string, cutoff: string): Promise<number> {
+    const res = await this.db
+      .prepare(`DELETE FROM monitor_runs WHERE user_id = ? AND created_at < ?`)
+      .bind(userId, cutoff)
+      .run();
+    return res.meta?.changes ?? 0;
+  }
+  async getAlertState(monitorId: string): Promise<MonitorAlertState | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM monitor_alert_state WHERE monitor_id = ?`)
+      .bind(monitorId)
+      .first<Record<string, unknown>>();
+    if (!row) return null;
+    return {
+      monitorId: String(row.monitor_id),
+      lastFingerprint: row.last_fingerprint != null ? String(row.last_fingerprint) : undefined,
+      lastAlertAt: row.last_alert_at != null ? String(row.last_alert_at) : undefined,
+      snoozedUntil: row.snoozed_until != null ? String(row.snoozed_until) : undefined,
+    };
+  }
+  async setAlertState(state: MonitorAlertState): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO monitor_alert_state (monitor_id, last_fingerprint, last_alert_at, snoozed_until)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(monitor_id) DO UPDATE SET
+           last_fingerprint = excluded.last_fingerprint,
+           last_alert_at = excluded.last_alert_at,
+           snoozed_until = excluded.snoozed_until`,
+      )
+      .bind(
+        state.monitorId,
+        state.lastFingerprint ?? null,
+        state.lastAlertAt ?? null,
+        state.snoozedUntil ?? null,
+      )
+      .run();
+  }
 
   // Teams --------------------------------------------------------------------
   async createTeam(team: Team, ownerUserId: string): Promise<void> {
@@ -365,10 +443,10 @@ export class D1Store implements Store {
   async addMember(member: TeamMember): Promise<void> {
     await this.db
       .prepare(
-        `INSERT INTO team_members (team_id, user_id, role, created_at) VALUES (?, ?, ?, ?)
+        `INSERT INTO team_members (team_id, user_id, role, reviewer, created_at) VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(team_id, user_id) DO UPDATE SET role = excluded.role`,
       )
-      .bind(member.teamId, member.userId, member.role, member.createdAt)
+      .bind(member.teamId, member.userId, member.role, member.reviewer ? 1 : 0, member.createdAt)
       .run();
   }
   async getMember(teamId: string, userId: string): Promise<TeamMember | null> {
@@ -391,6 +469,12 @@ export class D1Store implements Store {
       .bind(role, teamId, userId)
       .run();
   }
+  async setReviewer(teamId: string, userId: string, reviewer: boolean): Promise<void> {
+    await this.db
+      .prepare(`UPDATE team_members SET reviewer = ? WHERE team_id = ? AND user_id = ?`)
+      .bind(reviewer ? 1 : 0, teamId, userId)
+      .run();
+  }
   async removeMember(teamId: string, userId: string): Promise<boolean> {
     const res = await this.db
       .prepare(`DELETE FROM team_members WHERE team_id = ? AND user_id = ?`)
@@ -402,10 +486,19 @@ export class D1Store implements Store {
   async createInvitation(inv: TeamInvitation): Promise<void> {
     await this.db
       .prepare(
-        `INSERT INTO team_invitations (id, team_id, email, role, token, created_at, accepted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO team_invitations (id, team_id, email, github_login, role, token, created_at, accepted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(inv.id, inv.teamId, inv.email, inv.role, inv.token, inv.createdAt, inv.acceptedAt ?? null)
+      .bind(
+        inv.id,
+        inv.teamId,
+        inv.email ?? null,
+        inv.githubLogin ?? null,
+        inv.role,
+        inv.token,
+        inv.createdAt,
+        inv.acceptedAt ?? null,
+      )
       .run();
   }
   async getInvitationByToken(token: string): Promise<TeamInvitation | null> {
@@ -435,6 +528,13 @@ export class D1Store implements Store {
       .bind(project.id, project.teamId, project.name, project.repoUrl ?? null, project.config ?? null, project.createdAt)
       .run();
   }
+  async getProjectById(id: string): Promise<TeamProject | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM team_projects WHERE id = ?`)
+      .bind(id)
+      .first<Record<string, unknown>>();
+    return row ? projectFromRow(row) : null;
+  }
   async listProjects(teamId: string): Promise<TeamProject[]> {
     const { results } = await this.db
       .prepare(`SELECT * FROM team_projects WHERE team_id = ? ORDER BY created_at DESC`)
@@ -448,6 +548,90 @@ export class D1Store implements Store {
       .bind(id, teamId)
       .run();
     return (res.meta?.changes ?? 0) > 0;
+  }
+
+  async listProjectRuns(projectId: string, limit = 50): Promise<Run[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ?`)
+      .bind(projectId, limit)
+      .all<RunRow>();
+    return results.map(rowToRun);
+  }
+  async getProjectBaseline(projectId: string): Promise<Run | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT * FROM runs WHERE project_id = ? AND baselines_approved = 1 ORDER BY created_at DESC LIMIT 1`,
+      )
+      .bind(projectId)
+      .first<RunRow>();
+    return row ? rowToRun(row) : null;
+  }
+
+  async addApproval(approval: BaselineApproval): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO baseline_approvals (id, run_id, project_id, reviewer_user_id, status, comment, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        approval.id,
+        approval.runId,
+        approval.projectId ?? null,
+        approval.reviewerUserId,
+        approval.status,
+        approval.comment ?? null,
+        approval.createdAt,
+      )
+      .run();
+  }
+  async listApprovals(runId: string): Promise<BaselineApproval[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM baseline_approvals WHERE run_id = ? ORDER BY created_at DESC`)
+      .bind(runId)
+      .all<Record<string, unknown>>();
+    return results.map(approvalFromRow);
+  }
+
+  async recordActivity(activity: TeamActivity): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO team_activity (id, team_id, user_id, action, target, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        activity.id,
+        activity.teamId,
+        activity.userId ?? null,
+        activity.action,
+        activity.target ?? null,
+        activity.metadata ?? null,
+        activity.createdAt,
+      )
+      .run();
+  }
+  async listActivity(teamId: string, limit = 50): Promise<TeamActivity[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM team_activity WHERE team_id = ? ORDER BY created_at DESC LIMIT ?`)
+      .bind(teamId, limit)
+      .all<Record<string, unknown>>();
+    return results.map(activityFromRow);
+  }
+
+  async getTeamUsage(teamId: string, month: string): Promise<TeamUsage> {
+    const members = await this.listMembers(teamId);
+    const perMember = await Promise.all(
+      members.map(async (m) => {
+        const u = await this.getUsage(m.userId, month);
+        return { userId: m.userId, runsCount: u.runsCount, screenshotsCount: u.screenshotsCount };
+      }),
+    );
+    return {
+      month,
+      runsCount: perMember.reduce((s, m) => s + m.runsCount, 0),
+      screenshotsCount: perMember.reduce((s, m) => s + m.screenshotsCount, 0),
+      memberCount: members.length,
+      perMember,
+    };
   }
 }
 
@@ -467,6 +651,7 @@ function memberFromRow(row: Record<string, unknown>): TeamMember {
     teamId: String(row.team_id),
     userId: String(row.user_id),
     role: String(row.role) as TeamRole,
+    reviewer: row.reviewer === 1 || row.reviewer === true,
     createdAt: String(row.created_at),
   };
 }
@@ -475,11 +660,36 @@ function invitationFromRow(row: Record<string, unknown>): TeamInvitation {
   return {
     id: String(row.id),
     teamId: String(row.team_id),
-    email: String(row.email),
+    email: row.email != null ? String(row.email) : undefined,
+    githubLogin: row.github_login != null ? String(row.github_login) : undefined,
     role: String(row.role) as TeamRole,
     token: String(row.token),
     createdAt: String(row.created_at),
     acceptedAt: row.accepted_at != null ? String(row.accepted_at) : undefined,
+  };
+}
+
+function approvalFromRow(row: Record<string, unknown>): BaselineApproval {
+  return {
+    id: String(row.id),
+    runId: String(row.run_id),
+    projectId: row.project_id != null ? String(row.project_id) : undefined,
+    reviewerUserId: String(row.reviewer_user_id),
+    status: String(row.status) as BaselineApproval['status'],
+    comment: row.comment != null ? String(row.comment) : undefined,
+    createdAt: String(row.created_at),
+  };
+}
+
+function activityFromRow(row: Record<string, unknown>): TeamActivity {
+  return {
+    id: String(row.id),
+    teamId: String(row.team_id),
+    userId: row.user_id != null ? String(row.user_id) : undefined,
+    action: String(row.action),
+    target: row.target != null ? String(row.target) : undefined,
+    metadata: row.metadata != null ? String(row.metadata) : undefined,
+    createdAt: String(row.created_at),
   };
 }
 
@@ -509,6 +719,21 @@ function monitorFromRow(row: Record<string, unknown>): Monitor {
     lastRunAt: row.last_run_at != null ? String(row.last_run_at) : undefined,
     lastStatus: row.last_status != null ? String(row.last_status) : undefined,
     createdAt: String(row.created_at),
+  };
+}
+
+function monitorRunFromRow(row: Record<string, unknown>): MonitorRun {
+  return {
+    id: String(row.id),
+    monitorId: String(row.monitor_id),
+    userId: String(row.user_id),
+    status: String(row.status) as MonitorRunStatus,
+    regressionsCount: Number(row.regressions_count ?? 0),
+    attempts: Number(row.attempts ?? 1),
+    screenshots: row.screenshots != null ? (JSON.parse(String(row.screenshots)) as string[]) : undefined,
+    error: row.error != null ? String(row.error) : undefined,
+    createdAt: String(row.created_at),
+    completedAt: row.completed_at != null ? String(row.completed_at) : undefined,
   };
 }
 

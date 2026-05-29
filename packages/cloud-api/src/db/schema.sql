@@ -23,6 +23,7 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 CREATE TABLE IF NOT EXISTS runs (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id),
+  project_id TEXT REFERENCES team_projects(id),
   status TEXT NOT NULL DEFAULT 'queued',
   config TEXT NOT NULL,          -- JSON blob
   results TEXT,                  -- JSON blob
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS runs (
   completed_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_user ON runs(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id, created_at);
 
 -- Screenshots (metadata only — images live in R2) -------------------------
 CREATE TABLE IF NOT EXISTS screenshots (
@@ -73,6 +75,7 @@ CREATE TABLE IF NOT EXISTS team_members (
   team_id TEXT NOT NULL REFERENCES teams(id),
   user_id TEXT NOT NULL REFERENCES users(id),
   role TEXT NOT NULL DEFAULT 'member',  -- owner, admin, member, viewer
+  reviewer INTEGER NOT NULL DEFAULT 0,  -- designated baseline reviewer flag
   created_at TEXT NOT NULL,
   PRIMARY KEY (team_id, user_id)
 );
@@ -81,7 +84,8 @@ CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
 CREATE TABLE IF NOT EXISTS team_invitations (
   id TEXT PRIMARY KEY,
   team_id TEXT NOT NULL REFERENCES teams(id),
-  email TEXT NOT NULL,
+  email TEXT,                            -- nullable: one of email/github_login required
+  github_login TEXT,                     -- invite by GitHub handle
   role TEXT NOT NULL DEFAULT 'member',
   token TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL,
@@ -98,6 +102,30 @@ CREATE TABLE IF NOT EXISTS team_projects (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_team_projects_team ON team_projects(team_id);
+
+-- Baseline approvals (review workflow, Task 8.1) --------------------------
+CREATE TABLE IF NOT EXISTS baseline_approvals (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id),
+  project_id TEXT REFERENCES team_projects(id),
+  reviewer_user_id TEXT NOT NULL REFERENCES users(id),
+  status TEXT NOT NULL,                  -- approved, rejected
+  comment TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_baseline_approvals_run ON baseline_approvals(run_id, created_at);
+
+-- Team activity feed (Task 8.1) -------------------------------------------
+CREATE TABLE IF NOT EXISTS team_activity (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL REFERENCES teams(id),
+  user_id TEXT,
+  action TEXT NOT NULL,                  -- team.created, member.invited, etc.
+  target TEXT,
+  metadata TEXT,                         -- JSON blob
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_team_activity_team ON team_activity(team_id, created_at);
 
 -- Monitors (scheduled production checks, Task 6.1) ------------------------
 CREATE TABLE IF NOT EXISTS monitors (
@@ -117,3 +145,27 @@ CREATE TABLE IF NOT EXISTS monitors (
 );
 CREATE INDEX IF NOT EXISTS idx_monitors_user ON monitors(user_id);
 CREATE INDEX IF NOT EXISTS idx_monitors_due ON monitors(enabled, last_run_at);
+
+-- Per-monitor run history (Task 6.1) --------------------------------------
+CREATE TABLE IF NOT EXISTS monitor_runs (
+  id TEXT PRIMARY KEY,
+  monitor_id TEXT NOT NULL REFERENCES monitors(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  status TEXT NOT NULL,           -- passed, regression, error
+  regressions_count INTEGER NOT NULL DEFAULT 0,
+  attempts INTEGER NOT NULL DEFAULT 1,
+  screenshots TEXT,               -- JSON: array of R2 keys
+  error TEXT,
+  created_at TEXT NOT NULL,
+  completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_monitor_runs_monitor ON monitor_runs(monitor_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_monitor_runs_user ON monitor_runs(user_id, created_at);
+
+-- Alert state per monitor (dedup + snooze, Task 6.2) ----------------------
+CREATE TABLE IF NOT EXISTS monitor_alert_state (
+  monitor_id TEXT PRIMARY KEY REFERENCES monitors(id),
+  last_fingerprint TEXT,         -- hash of the last alerted regression set
+  last_alert_at TEXT,
+  snoozed_until TEXT             -- ISO timestamp until which alerts are suppressed
+);

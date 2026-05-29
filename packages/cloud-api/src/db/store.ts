@@ -12,7 +12,7 @@
  */
 
 import type { Run, RunResult } from '../types.js';
-import type { Monitor, MonitorStore } from './monitors.js';
+import type { Monitor, MonitorRun, MonitorAlertState, MonitorStore } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
 import type {
   Team,
@@ -21,6 +21,9 @@ import type {
   TeamProject,
   TeamRole,
   TeamStore,
+  BaselineApproval,
+  TeamActivity,
+  TeamUsage,
 } from './teams.js';
 
 /** A user record. */
@@ -110,10 +113,14 @@ export class InMemoryStore implements Store {
   private screenshots = new Map<string, ScreenshotRecord[]>();
   private usage = new Map<string, UsageRecord>();
   private monitors = new Map<string, Monitor>();
+  private monitorRuns: MonitorRun[] = [];
+  private alertState = new Map<string, MonitorAlertState>();
   private teams = new Map<string, Team>();
   private members = new Map<string, TeamMember>(); // key: `${teamId}:${userId}`
   private invitations = new Map<string, TeamInvitation>(); // key: token
   private projects = new Map<string, TeamProject>();
+  private approvals: BaselineApproval[] = [];
+  private activity: TeamActivity[] = [];
 
   async createUser(user: User): Promise<void> {
     this.users.set(user.id, { ...user });
@@ -219,6 +226,29 @@ export class InMemoryStore implements Store {
   async listDueMonitors(now: Date): Promise<Monitor[]> {
     return [...this.monitors.values()].filter((m) => isMonitorDue(m, now));
   }
+  async addMonitorRun(run: MonitorRun): Promise<void> {
+    this.monitorRuns.push({ ...run });
+  }
+  async listMonitorRuns(monitorId: string, limit = 50): Promise<MonitorRun[]> {
+    return this.monitorRuns
+      .filter((r) => r.monitorId === monitorId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
+  }
+  async pruneMonitorRuns(userId: string, cutoff: string): Promise<number> {
+    const cut = new Date(cutoff).getTime();
+    const before = this.monitorRuns.length;
+    this.monitorRuns = this.monitorRuns.filter(
+      (r) => r.userId !== userId || new Date(r.createdAt).getTime() >= cut,
+    );
+    return before - this.monitorRuns.length;
+  }
+  async getAlertState(monitorId: string): Promise<MonitorAlertState | null> {
+    return this.alertState.get(monitorId) ?? null;
+  }
+  async setAlertState(state: MonitorAlertState): Promise<void> {
+    this.alertState.set(state.monitorId, { ...state });
+  }
 
   // Teams --------------------------------------------------------------------
   async createTeam(team: Team, ownerUserId: string): Promise<void> {
@@ -256,7 +286,15 @@ export class InMemoryStore implements Store {
   }
 
   async addMember(member: TeamMember): Promise<void> {
-    this.members.set(`${member.teamId}:${member.userId}`, { ...member });
+    // Match D1 ON CONFLICT semantics: update role on an existing membership
+    // but preserve the original reviewer flag and createdAt.
+    const key = `${member.teamId}:${member.userId}`;
+    const existing = this.members.get(key);
+    if (existing) {
+      existing.role = member.role;
+    } else {
+      this.members.set(key, { ...member });
+    }
   }
   async getMember(teamId: string, userId: string): Promise<TeamMember | null> {
     return this.members.get(`${teamId}:${userId}`) ?? null;
@@ -267,6 +305,10 @@ export class InMemoryStore implements Store {
   async updateMemberRole(teamId: string, userId: string, role: TeamRole): Promise<void> {
     const m = this.members.get(`${teamId}:${userId}`);
     if (m) m.role = role;
+  }
+  async setReviewer(teamId: string, userId: string, reviewer: boolean): Promise<void> {
+    const m = this.members.get(`${teamId}:${userId}`);
+    if (m) m.reviewer = reviewer;
   }
   async removeMember(teamId: string, userId: string): Promise<boolean> {
     return this.members.delete(`${teamId}:${userId}`);
@@ -291,6 +333,9 @@ export class InMemoryStore implements Store {
   async createProject(project: TeamProject): Promise<void> {
     this.projects.set(project.id, { ...project });
   }
+  async getProjectById(id: string): Promise<TeamProject | null> {
+    return this.projects.get(id) ?? null;
+  }
   async listProjects(teamId: string): Promise<TeamProject[]> {
     return [...this.projects.values()].filter((p) => p.teamId === teamId);
   }
@@ -298,6 +343,57 @@ export class InMemoryStore implements Store {
     const p = this.projects.get(id);
     if (p && p.teamId === teamId) return this.projects.delete(id);
     return false;
+  }
+
+  async listProjectRuns(projectId: string, limit = 50): Promise<Run[]> {
+    return [...this.runs.values()]
+      .map((r) => r.run)
+      .filter((r) => r.projectId === projectId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
+  }
+  async getProjectBaseline(projectId: string): Promise<Run | null> {
+    const approved = [...this.runs.values()]
+      .map((r) => r.run)
+      .filter((r) => r.projectId === projectId && r.baselinesApproved)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return approved[0] ?? null;
+  }
+
+  async addApproval(approval: BaselineApproval): Promise<void> {
+    this.approvals.push({ ...approval });
+  }
+  async listApprovals(runId: string): Promise<BaselineApproval[]> {
+    return this.approvals
+      .filter((a) => a.runId === runId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async recordActivity(activity: TeamActivity): Promise<void> {
+    this.activity.push({ ...activity });
+  }
+  async listActivity(teamId: string, limit = 50): Promise<TeamActivity[]> {
+    return this.activity
+      .filter((a) => a.teamId === teamId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
+  }
+
+  async getTeamUsage(teamId: string, month: string): Promise<TeamUsage> {
+    const members = await this.listMembers(teamId);
+    const perMember = await Promise.all(
+      members.map(async (m) => {
+        const u = await this.getUsage(m.userId, month);
+        return { userId: m.userId, runsCount: u.runsCount, screenshotsCount: u.screenshotsCount };
+      }),
+    );
+    return {
+      month,
+      runsCount: perMember.reduce((s, m) => s + m.runsCount, 0),
+      screenshotsCount: perMember.reduce((s, m) => s + m.screenshotsCount, 0),
+      memberCount: members.length,
+      perMember,
+    };
   }
 
   /** Test helper: wipe all data. */
@@ -308,10 +404,14 @@ export class InMemoryStore implements Store {
     this.screenshots.clear();
     this.usage.clear();
     this.monitors.clear();
+    this.monitorRuns = [];
+    this.alertState.clear();
     this.teams.clear();
     this.members.clear();
     this.invitations.clear();
     this.projects.clear();
+    this.approvals = [];
+    this.activity = [];
   }
 }
 
@@ -321,5 +421,23 @@ export function currentMonth(date = new Date()): string {
 }
 
 export type { Run, RunResult };
-export type { Monitor, MonitorAlerts, MonitorStore } from './monitors.js';
-export type { Team, TeamMember, TeamInvitation, TeamProject, TeamRole, TeamStore } from './teams.js';
+export type {
+  Monitor,
+  MonitorAlerts,
+  MonitorStore,
+  MonitorRun,
+  MonitorConfig,
+  MonitorRunStatus,
+  MonitorAlertState,
+} from './monitors.js';
+export type {
+  Team,
+  TeamMember,
+  TeamInvitation,
+  TeamProject,
+  TeamRole,
+  TeamStore,
+  BaselineApproval,
+  TeamActivity,
+  TeamUsage,
+} from './teams.js';
