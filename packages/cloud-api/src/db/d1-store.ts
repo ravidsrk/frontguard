@@ -8,6 +8,8 @@
  */
 
 import type { Store, User, ApiKeyRecord, ScreenshotRecord, UsageRecord } from './store.js';
+import type { Monitor } from './monitors.js';
+import { isMonitorDue } from './monitors.js';
 import type { Run } from '../types.js';
 
 /** Minimal D1 typings (avoids depending on @cloudflare/workers-types). */
@@ -245,6 +247,95 @@ export class D1Store implements Store {
         }
       : { userId, month, runsCount: 0, screenshotsCount: 0 };
   }
+
+  // Monitors -----------------------------------------------------------------
+  async createMonitor(m: Monitor): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO monitors (id, user_id, name, url, routes, viewports, interval_minutes, alert_threshold, alerts, enabled, last_run_at, last_status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        m.id,
+        m.userId,
+        m.name,
+        m.url,
+        JSON.stringify(m.routes),
+        JSON.stringify(m.viewports),
+        m.intervalMinutes,
+        m.alertThreshold,
+        m.alerts ? JSON.stringify(m.alerts) : null,
+        m.enabled ? 1 : 0,
+        m.lastRunAt ?? null,
+        m.lastStatus ?? null,
+        m.createdAt,
+      )
+      .run();
+  }
+  async getMonitor(id: string): Promise<Monitor | null> {
+    const row = await this.db.prepare(`SELECT * FROM monitors WHERE id = ?`).bind(id).first<Record<string, unknown>>();
+    return row ? monitorFromRow(row) : null;
+  }
+  async listMonitors(userId: string): Promise<Monitor[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM monitors WHERE user_id = ? ORDER BY created_at DESC`)
+      .bind(userId)
+      .all<Record<string, unknown>>();
+    return results.map(monitorFromRow);
+  }
+  async updateMonitor(id: string, patch: Partial<Monitor>): Promise<void> {
+    const current = await this.getMonitor(id);
+    if (!current) return;
+    const m = { ...current, ...patch };
+    await this.db
+      .prepare(
+        `UPDATE monitors SET name = ?, url = ?, routes = ?, viewports = ?, interval_minutes = ?, alert_threshold = ?, alerts = ?, enabled = ?, last_run_at = ?, last_status = ? WHERE id = ?`,
+      )
+      .bind(
+        m.name,
+        m.url,
+        JSON.stringify(m.routes),
+        JSON.stringify(m.viewports),
+        m.intervalMinutes,
+        m.alertThreshold,
+        m.alerts ? JSON.stringify(m.alerts) : null,
+        m.enabled ? 1 : 0,
+        m.lastRunAt ?? null,
+        m.lastStatus ?? null,
+        id,
+      )
+      .run();
+  }
+  async deleteMonitor(id: string, userId: string): Promise<boolean> {
+    const res = await this.db.prepare(`DELETE FROM monitors WHERE id = ? AND user_id = ?`).bind(id, userId).run();
+    return (res.meta?.changes ?? 0) > 0;
+  }
+  async listDueMonitors(now: Date): Promise<Monitor[]> {
+    // Fetch enabled monitors and filter in JS (interval comparison is awkward
+    // in portable SQL). Monitor counts are small, so this is fine.
+    const { results } = await this.db
+      .prepare(`SELECT * FROM monitors WHERE enabled = 1`)
+      .all<Record<string, unknown>>();
+    return results.map(monitorFromRow).filter((m) => isMonitorDue(m, now));
+  }
+}
+
+function monitorFromRow(row: Record<string, unknown>): Monitor {
+  return {
+    id: String(row.id),
+    userId: String(row.user_id),
+    name: String(row.name),
+    url: String(row.url),
+    routes: JSON.parse(String(row.routes ?? '[]')) as string[],
+    viewports: JSON.parse(String(row.viewports ?? '[]')) as number[],
+    intervalMinutes: Number(row.interval_minutes ?? 60),
+    alertThreshold: Number(row.alert_threshold ?? 0.05),
+    alerts: row.alerts != null ? (JSON.parse(String(row.alerts)) as Monitor['alerts']) : undefined,
+    enabled: row.enabled === 1 || row.enabled === true,
+    lastRunAt: row.last_run_at != null ? String(row.last_run_at) : undefined,
+    lastStatus: row.last_status != null ? String(row.last_status) : undefined,
+    createdAt: String(row.created_at),
+  };
 }
 
 function userFromRow(row: Record<string, unknown>): User {

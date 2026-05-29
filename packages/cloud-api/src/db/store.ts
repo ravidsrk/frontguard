@@ -12,6 +12,8 @@
  */
 
 import type { Run, RunResult } from '../types.js';
+import type { Monitor, MonitorStore } from './monitors.js';
+import { isMonitorDue } from './monitors.js';
 
 /** A user record. */
 export interface User {
@@ -55,7 +57,7 @@ export interface UsageRecord {
 /**
  * Persistent storage contract. All methods are async to accommodate D1.
  */
-export interface Store {
+export interface Store extends MonitorStore {
   // Users
   createUser(user: User): Promise<void>;
   getUser(id: string): Promise<User | null>;
@@ -99,6 +101,7 @@ export class InMemoryStore implements Store {
   private runs = new Map<string, { run: Run; userId: string }>();
   private screenshots = new Map<string, ScreenshotRecord[]>();
   private usage = new Map<string, UsageRecord>();
+  private monitors = new Map<string, Monitor>();
 
   async createUser(user: User): Promise<void> {
     this.users.set(user.id, { ...user });
@@ -182,6 +185,29 @@ export class InMemoryStore implements Store {
     );
   }
 
+  // Monitors -----------------------------------------------------------------
+  async createMonitor(m: Monitor): Promise<void> {
+    this.monitors.set(m.id, { ...m });
+  }
+  async getMonitor(id: string): Promise<Monitor | null> {
+    return this.monitors.get(id) ?? null;
+  }
+  async listMonitors(userId: string): Promise<Monitor[]> {
+    return [...this.monitors.values()].filter((m) => m.userId === userId);
+  }
+  async updateMonitor(id: string, patch: Partial<Monitor>): Promise<void> {
+    const m = this.monitors.get(id);
+    if (m) Object.assign(m, patch);
+  }
+  async deleteMonitor(id: string, userId: string): Promise<boolean> {
+    const m = this.monitors.get(id);
+    if (m && m.userId === userId) return this.monitors.delete(id);
+    return false;
+  }
+  async listDueMonitors(now: Date): Promise<Monitor[]> {
+    return [...this.monitors.values()].filter((m) => isMonitorDue(m, now));
+  }
+
   /** Test helper: wipe all data. */
   clear(): void {
     this.users.clear();
@@ -189,6 +215,7 @@ export class InMemoryStore implements Store {
     this.runs.clear();
     this.screenshots.clear();
     this.usage.clear();
+    this.monitors.clear();
   }
 }
 
@@ -198,3 +225,4 @@ export function currentMonth(date = new Date()): string {
 }
 
 export type { Run, RunResult };
+export type { Monitor, MonitorAlerts, MonitorStore } from './monitors.js';

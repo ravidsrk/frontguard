@@ -58,3 +58,22 @@ CREATE TABLE IF NOT EXISTS usage (
   screenshots_count INTEGER DEFAULT 0,
   PRIMARY KEY (user_id, month)
 );
+
+-- Monitors (scheduled production checks, Task 6.1) ------------------------
+CREATE TABLE IF NOT EXISTS monitors (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  routes TEXT NOT NULL,          -- JSON array
+  viewports TEXT NOT NULL,       -- JSON array
+  interval_minutes INTEGER NOT NULL DEFAULT 60,
+  alert_threshold REAL NOT NULL DEFAULT 0.05,
+  alerts TEXT,                   -- JSON: { slack?, email?[] }
+  enabled INTEGER NOT NULL DEFAULT 1,
+  last_run_at TEXT,
+  last_status TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_monitors_user ON monitors(user_id);
+CREATE INDEX IF NOT EXISTS idx_monitors_due ON monitors(enabled, last_run_at);
