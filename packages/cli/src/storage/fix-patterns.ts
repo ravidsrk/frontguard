@@ -40,8 +40,10 @@ CREATE TABLE IF NOT EXISTS fix_patterns (
   css_patch TEXT NOT NULL,
   context_hash TEXT NOT NULL,
   accepted INTEGER NOT NULL,
+  accept_count INTEGER NOT NULL DEFAULT 1,
   confidence REAL NOT NULL,
   created_at TEXT NOT NULL,
+  last_used_at TEXT,
   route TEXT,
   viewport INTEGER
 );
@@ -96,6 +98,7 @@ export class FixPatternDB {
       if (this.path !== ':memory:') mkdirSync(dirname(this.path), { recursive: true });
       this.db = new Ctor(this.path);
       this.db.exec(SCHEMA);
+      this.migrate();
       this.available = true;
       return true;
     } catch (err) {
@@ -105,14 +108,33 @@ export class FixPatternDB {
     }
   }
 
+  /**
+   * Adds columns introduced after the original schema to pre-existing DBs.
+   * `ADD COLUMN` throws if the column already exists, so each is guarded.
+   */
+  private migrate(): void {
+    if (!this.db) return;
+    const addColumn = (ddl: string): void => {
+      try {
+        this.db!.exec(ddl);
+      } catch {
+        /* column already exists — nothing to do */
+      }
+    };
+    addColumn(`ALTER TABLE fix_patterns ADD COLUMN accept_count INTEGER NOT NULL DEFAULT 1`);
+    addColumn(`ALTER TABLE fix_patterns ADD COLUMN last_used_at TEXT`);
+  }
+
   /** Whether the SQLite backend is usable. */
   isAvailable(): boolean {
     return this.available;
   }
 
   /**
-   * Records a fix decision. Upserts by id so re-recording the same fix flips
-   * its accepted/rejected state rather than duplicating.
+   * Records a fix decision. Upserts by id: re-recording the same accepted fix
+   * for the same context increments `accept_count` (so a repeatedly-accepted
+   * pattern can cross the reuse threshold). Recording it as rejected resets the
+   * acceptance state. `last_used_at` tracks the most recent recording.
    */
   record(
     fix: SuggestedFix,
@@ -122,12 +144,18 @@ export class FixPatternDB {
   ): FixPattern | null {
     if (!this.db) return null;
     const id = patternId(contextHash, fix.patch);
-    const createdAt = new Date().toISOString();
+    const now = new Date().toISOString();
+    // On conflict, increment the accept_count only when this recording is an
+    // acceptance; a rejection forces accepted=0 and leaves the count alone.
     this.db
       .prepare(
-        `INSERT INTO fix_patterns (id, category, css_patch, context_hash, accepted, confidence, created_at, route, viewport)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET accepted = excluded.accepted, created_at = excluded.created_at`,
+        `INSERT INTO fix_patterns (id, category, css_patch, context_hash, accepted, accept_count, confidence, created_at, last_used_at, route, viewport)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           accepted = excluded.accepted,
+           accept_count = accept_count + CASE WHEN excluded.accepted = 1 THEN 1 ELSE 0 END,
+           confidence = excluded.confidence,
+           last_used_at = excluded.last_used_at`,
       )
       .run(
         id,
@@ -135,8 +163,10 @@ export class FixPatternDB {
         fix.patch,
         contextHash,
         accepted ? 1 : 0,
+        accepted ? 1 : 0,
         fix.confidence,
-        createdAt,
+        now,
+        now,
         meta?.route ?? null,
         meta?.viewport ?? null,
       );
@@ -147,7 +177,7 @@ export class FixPatternDB {
       contextHash,
       accepted,
       confidence: fix.confidence,
-      createdAt,
+      createdAt: now,
       route: meta?.route,
       viewport: meta?.viewport,
     };
@@ -165,14 +195,14 @@ export class FixPatternDB {
       .get(contextHash) as { n: number };
     if (rejected.n > 0) return null;
 
+    // accept_count accumulates each time the same fix is recorded as accepted
+    // for this context, so a single row can cross the reuse threshold.
     const row = this.db
       .prepare(
-        `SELECT css_patch AS cssPatch, category, COUNT(*) AS n
+        `SELECT css_patch AS cssPatch, category, accept_count AS n
          FROM fix_patterns
-         WHERE context_hash = ? AND accepted = 1
-         GROUP BY css_patch
-         HAVING n >= ?
-         ORDER BY MAX(created_at) DESC
+         WHERE context_hash = ? AND accepted = 1 AND accept_count >= ?
+         ORDER BY accept_count DESC, last_used_at DESC
          LIMIT 1`,
       )
       .get(contextHash, minAccepted) as { cssPatch: string; category: FixCategory; n: number } | undefined;

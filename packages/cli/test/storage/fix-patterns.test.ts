@@ -81,6 +81,20 @@ describe('FixPatternDB (in-memory)', () => {
     expect(found?.cssPatch).toBe(fix.patch);
   });
 
+  it('accumulates accept_count when the same fix is recorded repeatedly', () => {
+    const ctx = contextHashFor(makeDiff(), 'overflow-fix');
+    // Record the exact same (context, patch) twice — collapses to one row.
+    db.record(fix, ctx, true, { route: '/dashboard', viewport: 1440 });
+    db.record(fix, ctx, true, { route: '/dashboard', viewport: 1440 });
+    // Below threshold of 3.
+    expect(db.findAcceptedPattern(ctx, 3)).toBeNull();
+    // Third acceptance crosses the threshold.
+    db.record(fix, ctx, true, { route: '/dashboard', viewport: 1440 });
+    const found = db.findAcceptedPattern(ctx, 3);
+    expect(found?.cssPatch).toBe(fix.patch);
+    expect(found?.category).toBe(fix.category);
+  });
+
   it('refuses to reuse a pattern that has any rejection', () => {
     const ctx = contextHashFor(makeDiff(), 'overflow-fix');
     db.record(fix, ctx, true);
