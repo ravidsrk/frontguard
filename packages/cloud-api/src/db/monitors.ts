@@ -33,6 +33,46 @@ export interface Monitor {
   createdAt: string;
 }
 
+/**
+ * Alias for the saved monitor configuration. A "config" is the persisted
+ * definition of what/when to check; a {@link MonitorRun} is one execution of it.
+ */
+export type MonitorConfig = Monitor;
+
+/** The outcome status of a single monitor execution. */
+export type MonitorRunStatus = 'passed' | 'regression' | 'error';
+
+/**
+ * A single execution of a monitor. Persisted to `monitor_runs` so history is
+ * retained per monitor (not just the latest status on the monitor row).
+ */
+export interface MonitorRun {
+  id: string;
+  monitorId: string;
+  userId: string;
+  status: MonitorRunStatus;
+  regressionsCount: number;
+  /** How many attempts were made (1 = first try, 2 = one retry). */
+  attempts: number;
+  /** R2 keys of screenshots captured during the run. */
+  screenshots?: string[];
+  error?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+/**
+ * Per-monitor alert state used for deduplication and snoozing (Task 6.2).
+ */
+export interface MonitorAlertState {
+  monitorId: string;
+  /** Fingerprint of the last alerted regression set (for dedup). */
+  lastFingerprint?: string;
+  lastAlertAt?: string;
+  /** ISO timestamp until which alerts are suppressed. */
+  snoozedUntil?: string;
+}
+
 /** Storage operations for monitors (implemented by both stores). */
 export interface MonitorStore {
   createMonitor(m: Monitor): Promise<void>;
@@ -45,6 +85,24 @@ export interface MonitorStore {
    * older than `intervalMinutes` relative to `now`.
    */
   listDueMonitors(now: Date): Promise<Monitor[]>;
+
+  // Monitor run history (Task 6.1) ------------------------------------------
+  /** Records a completed monitor execution. */
+  addMonitorRun(run: MonitorRun): Promise<void>;
+  /** Lists recent runs for a monitor, newest first. */
+  listMonitorRuns(monitorId: string, limit?: number): Promise<MonitorRun[]>;
+  /**
+   * Deletes monitor runs older than `cutoff` (ISO string), scoped to a single
+   * user. Used to enforce per-plan history retention without touching other
+   * tenants' history. Returns the number of rows removed.
+   */
+  pruneMonitorRuns(userId: string, cutoff: string): Promise<number>;
+
+  // Alert state (dedup + snooze, Task 6.2) ----------------------------------
+  /** Returns the alert state for a monitor (or null if none recorded). */
+  getAlertState(monitorId: string): Promise<MonitorAlertState | null>;
+  /** Upserts the alert state for a monitor. */
+  setAlertState(state: MonitorAlertState): Promise<void>;
 }
 
 /** Returns true if a monitor is due to run at `now`. */
