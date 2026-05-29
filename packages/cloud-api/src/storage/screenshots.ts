@@ -6,7 +6,8 @@
  * - {@link MemoryScreenshotStore} — in-process map (dev & tests).
  *
  * Image *metadata* (route, viewport, r2 key) is tracked in the {@link Store}
- * (D1); the raw bytes live here. Keys follow `runs/<runId>/<type>/<route>-<vp>-<browser>.png`.
+ * (D1); the raw bytes live here. Keys are namespaced per-user so a run's blobs
+ * are isolated by owner: `<userId>/<runId>/<route>-<vp>-<browser>-<type>.png`.
  *
  * @module storage/screenshots
  */
@@ -30,15 +31,23 @@ export interface ScreenshotStore {
   put(key: string, bytes: Uint8Array): Promise<void>;
   get(key: string): Promise<Uint8Array | null>;
   delete(key: string): Promise<void>;
-  /** Deletes every object under a run's prefix. */
-  deleteRun(runId: string): Promise<void>;
+  /** Deletes every object under a run's prefix (scoped to the owning user). */
+  deleteRun(userId: string, runId: string): Promise<void>;
+}
+
+/** Builds the per-user run prefix under which all of a run's blobs live. */
+export function runPrefix(userId: string, runId: string): string {
+  return `${userId}/${runId}/`;
 }
 
 /**
  * Builds a deterministic, collision-safe object key for a screenshot.
- * The route path is sanitised into a filename-safe slug.
+ * The route path is sanitised into a filename-safe slug. Keys are namespaced
+ * by owner so blobs are isolated per user:
+ * `<userId>/<runId>/<route>-<viewport>-<browser>-<type>.png`.
  */
 export function screenshotKey(
+  userId: string,
   runId: string,
   type: 'baseline' | 'current' | 'diff',
   route: string,
@@ -46,7 +55,7 @@ export function screenshotKey(
   browser: string,
 ): string {
   const slug = route.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'root';
-  return `runs/${runId}/${type}/${slug}-${viewport}-${browser}.png`;
+  return `${runPrefix(userId, runId)}${slug}-${viewport}-${browser}-${type}.png`;
 }
 
 // ---------------------------------------------------------------------------
@@ -69,8 +78,8 @@ export class R2ScreenshotStore implements ScreenshotStore {
   async delete(key: string): Promise<void> {
     await this.bucket.delete(key);
   }
-  async deleteRun(runId: string): Promise<void> {
-    const prefix = `runs/${runId}/`;
+  async deleteRun(userId: string, runId: string): Promise<void> {
+    const prefix = runPrefix(userId, runId);
     const { objects } = await this.bucket.list({ prefix });
     if (objects.length > 0) {
       await this.bucket.delete(objects.map((o) => o.key));
@@ -95,8 +104,8 @@ export class MemoryScreenshotStore implements ScreenshotStore {
   async delete(key: string): Promise<void> {
     this.blobs.delete(key);
   }
-  async deleteRun(runId: string): Promise<void> {
-    const prefix = `runs/${runId}/`;
+  async deleteRun(userId: string, runId: string): Promise<void> {
+    const prefix = runPrefix(userId, runId);
     for (const key of [...this.blobs.keys()]) {
       if (key.startsWith(prefix)) this.blobs.delete(key);
     }
