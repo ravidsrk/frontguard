@@ -31,3 +31,7 @@ PUBLIC_BASE_URL = "https://api.frontguard.dev"
 #   DAYTONA_API_KEY
 #   RESEND_API_KEY     (email alerts, Task 6.2)
 #   ALERT_FROM_EMAIL   (email alerts, Task 6.2)
+#   STRIPE_SECRET_KEY      (billing, Task 8.2)
+#   STRIPE_WEBHOOK_SECRET  (billing, Task 8.2)
+#   STRIPE_PRICE_PRO       (billing — Stripe Price id)
+#   STRIPE_PRICE_BUSINESS  (billing — Stripe Price id)
