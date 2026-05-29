@@ -103,6 +103,42 @@ export function decidePullRequest(event: PullRequestEvent): PrDecision {
   };
 }
 
+/** A decision about an `installation` event. */
+export interface InstallationDecision {
+  bootstrap: boolean;
+  reason: string;
+  installationId?: number;
+  account?: string;
+  /** Repos explicitly listed in the payload (may be empty → list via API). */
+  repositories?: Array<{ name: string; full_name: string }>;
+}
+
+/** Which installation actions warrant a config bootstrap. */
+const INSTALL_BOOTSTRAP_ACTIONS = ['created', 'added'];
+
+/**
+ * Decides whether an `installation` (or `installation_repositories`) event
+ * should trigger the config-bootstrap flow.
+ *
+ * Bootstrap runs when the app is freshly installed (`created`) or repos are
+ * added to an existing installation (`added`).
+ */
+export function decideInstallation(event: InstallationEvent): InstallationDecision {
+  if (!INSTALL_BOOTSTRAP_ACTIONS.includes(event.action)) {
+    return { bootstrap: false, reason: `Ignored installation action: ${event.action}` };
+  }
+  if (!event.installation?.id) {
+    return { bootstrap: false, reason: 'No installation id in payload' };
+  }
+  return {
+    bootstrap: true,
+    reason: `Installation ${event.action}`,
+    installationId: event.installation.id,
+    account: event.installation.account?.login,
+    repositories: event.repositories,
+  };
+}
+
 /** GitHub Check Run conclusion values. */
 export type CheckConclusion = 'success' | 'failure' | 'neutral' | 'action_required';
 
