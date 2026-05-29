@@ -21,18 +21,28 @@ export async function visualTest(
 
   const storage = new BaselineStorage(opts.baselineDir);
 
-  // Freeze time if requested
+  // Freeze time if requested.
+  // The page is typically already navigated by the caller, so an init script
+  // (which only runs on the NEXT navigation) would be a no-op here. Prefer the
+  // page.clock API which freezes time on the live page; fall back to injecting
+  // an init script and reloading on older Playwright versions.
   if (opts.freezeTime !== false) {
-    const ts = opts.freezeTime === true ? 0 : opts.freezeTime;
-    await page.addInitScript(`{
-      const __ts = ${ts};
-      const __D = Date;
-      Date = class extends __D {
-        constructor(...a) { if(!a.length) return new __D(__ts); return new __D(...a); }
-        static now() { return __ts; }
-      };
-      Date.prototype = __D.prototype;
-    }`);
+    const ts = opts.freezeTime === true ? 0 : (opts.freezeTime ?? 0);
+    const clock = (page as { clock?: { setFixedTime?: (t: number) => Promise<void> } }).clock;
+    if (clock?.setFixedTime) {
+      await clock.setFixedTime(ts);
+    } else {
+      await page.addInitScript(`{
+        const __ts = ${ts};
+        const __D = Date;
+        const __FrozenDate = class extends __D {
+          constructor(...a) { super(...(a.length ? a : [__ts])); }
+          static now() { return __ts; }
+        };
+        window.Date = __FrozenDate;
+      }`);
+      await page.reload();
+    }
   }
 
   // Mask elements
