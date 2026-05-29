@@ -10,9 +10,12 @@ import { authRoutes } from './routes/auth.js';
 import { keyRoutes } from './routes/keys.js';
 import { screenshotRoutes } from './routes/screenshots.js';
 import { getScreenshotStore, type R2Bucket } from './storage/screenshots.js';
+import { persistScreenshots, type PendingScreenshot } from './storage/persist-screenshots.js';
+import { completeCheckRun } from './github-callback.js';
 import { monitorRoutes } from './routes/monitors.js';
-import { dashboardRoutes } from './routes/dashboard.js';
+import { dashboardRoutes, sessionDashboardRoutes } from './routes/dashboard.js';
 import { teamRoutes } from './routes/teams.js';
+import { can } from './db/teams.js';
 import { billingRoutes } from './routes/billing.js';
 import { getPlan, checkLimit } from './billing/plans.js';
 import { runScheduledChecks } from './scheduler.js';
@@ -57,6 +60,19 @@ const runRequestSchema = z.object({
     })
     .nullable()
     .optional(),
+  projectId: z.string().optional(),
+  // CI linkage (Tasks 7.1/7.2): forwarded by the Vercel/GitHub integrations so
+  // the run can post a PR comment and complete the originating Check Run.
+  github: z
+    .object({
+      owner: z.string(),
+      repo: z.string(),
+      prNumber: z.number().int().optional(),
+      commitSha: z.string().optional(),
+    })
+    .optional(),
+  checkRunId: z.number().int().optional(),
+  installationId: z.number().int().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -112,6 +128,10 @@ app.get('/health', (c) => c.json({ status: 'ok', version: '0.1.0' }));
 app.route('/auth', authRoutes);
 app.route('/v1/keys', keyRoutes);
 app.route('/v1/billing', billingRoutes);
+
+// Browser dashboard (session-cookie auth) — mounted before the /v1 guard so it
+// is NOT behind the API-key requirement.
+app.route('/dashboard', sessionDashboardRoutes);
 
 // ---------------------------------------------------------------------------
 // Middleware — Auth for all /v1/* routes
@@ -201,11 +221,28 @@ app.post('/v1/run', async (c) => {
   const store = c.get('store');
   const userId = c.get('userId');
 
+  // Project scoping (Task 8.1): if a projectId is supplied, the caller must be
+  // a member of the project's team with run_tests capability.
+  let projectTeamId: string | undefined;
+  if (data.projectId) {
+    const project = await store.getProjectById(data.projectId);
+    if (!project) return c.json({ error: 'Project not found' }, 404);
+    const member = await store.getMember(project.teamId, userId);
+    if (!member || !can(member.role, 'run_tests')) {
+      return c.json({ error: 'Not a member of the project team' }, 403);
+    }
+    projectTeamId = project.teamId;
+  }
+
   // Plan enforcement (Task 8.2): block runs that exceed the monthly limit.
   // Plan is resolved from the optional team scope, else the user's default.
+  // A team's plan may only be claimed by an actual member of that team —
+  // otherwise any user could pass ?teamId=<business-team> to bypass limits.
   const teamId = c.req.query('teamId');
   let planId = 'free';
   if (teamId) {
+    const member = await store.getMember(teamId, userId);
+    if (!member) return c.json({ error: 'Not a member of the requested team' }, 403);
     const team = await store.getTeam(teamId);
     if (team) planId = team.plan;
   } else {
@@ -240,21 +277,49 @@ app.post('/v1/run', async (c) => {
     createdAt: new Date().toISOString(),
     results: null,
     reportUrl: null,
+    projectId: data.projectId,
+    github: data.github,
+    checkRunId: data.checkRunId,
+    installationId: data.installationId,
   };
 
   await store.createRun(run, userId);
   await store.incrementUsage(userId, currentMonth(), 1, 0);
 
+  // Record project run submission to the team activity feed.
+  if (data.projectId && projectTeamId) {
+    await store.recordActivity({
+      id: crypto.randomUUID(),
+      teamId: projectTeamId,
+      userId,
+      action: 'run.submitted',
+      target: runId,
+      metadata: JSON.stringify({ projectId: data.projectId, url: run.url }),
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  // Persist screenshots produced by the sandbox to R2 + metadata store.
+  const blobs = getScreenshotStore(c.env?.SCREENSHOTS as R2Bucket | undefined);
+  let persistedShots = 0;
+  const onScreenshots = async (shots: PendingScreenshot[]): Promise<void> => {
+    persistedShots = await persistScreenshots(store, blobs, userId, runId, shots);
+  };
+
   // Process async — mutates `run`, then persists the final state.
-  processRun(run)
+  processRun(run, onScreenshots)
     .catch((err: Error) => {
       run.status = 'failed';
       run.error = err.message;
     })
     .finally(() => {
-      const screenshots = run.results?.length ?? 0;
+      // Meter the number of screenshots actually persisted, falling back to the
+      // result count when no screenshots were captured (e.g. simulated runs).
+      const screenshots = persistedShots || (run.results?.length ?? 0);
       void store.updateRun(runId, run);
       if (screenshots > 0) void store.incrementUsage(userId, currentMonth(), 0, screenshots);
+      // Complete the originating GitHub Check Run, if this run came from CI.
+      if (run.github) void completeCheckRun(c.env ?? {}, run);
     });
 
   return c.json(
@@ -330,12 +395,13 @@ app.post('/v1/baselines/:runId/approve', async (c) => {
 app.delete('/v1/runs/:id', async (c) => {
   const store = c.get('store');
   const id = c.req.param('id');
-  const deleted = await store.deleteRun(id, c.get('userId'));
+  const userId = c.get('userId');
+  const deleted = await store.deleteRun(id, userId);
   if (deleted) {
     // Best-effort cleanup of R2 screenshot blobs for this run.
     try {
       const blobs = getScreenshotStore(c.env?.SCREENSHOTS as R2Bucket | undefined);
-      await blobs.deleteRun(id);
+      await blobs.deleteRun(userId, id);
     } catch {
       /* non-fatal */
     }

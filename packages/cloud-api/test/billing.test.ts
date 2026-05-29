@@ -255,6 +255,17 @@ describe('billing routes (dev mode)', () => {
     expect((await res.json()).plan).toBe('pro');
   });
 
+  it('rejects usage for a team the caller is not a member of (no plan bypass)', async () => {
+    const teamRes = await app.request('/v1/teams', {
+      method: 'POST', headers: auth('alice'), body: JSON.stringify({ name: 'A' }),
+    });
+    const teamId = (await teamRes.json()).id;
+    await getMemoryStore().updateTeam(teamId, { plan: 'business' });
+    // Mallory is not a member; she must not inherit the business plan.
+    const res = await app.request(`/v1/billing/usage?teamId=${teamId}`, { headers: auth('mallory') });
+    expect(res.status).toBe(403);
+  });
+
   it('usage 401 without an API key', async () => {
     const res = await app.request('/v1/billing/usage');
     expect(res.status).toBe(401);

@@ -135,8 +135,11 @@ billingRoutes.get('/usage', async (c) => {
   const store = getStore(c.env);
   const teamId = c.req.query('teamId');
   // Resolve the plan from the team (if given) else the user's default (free).
+  // A team's plan may only be claimed by an actual member of that team.
   let planId = 'free';
   if (teamId) {
+    const member = await store.getMember(teamId, userId);
+    if (!member) return c.json({ error: 'Not a member of the requested team' }, 403);
     const team = await store.getTeam(teamId);
     if (team) planId = team.plan;
   }

@@ -68,6 +68,26 @@ describe('POST /v1/run', () => {
     expect(body.statusUrl).toContain(body.id);
   });
 
+  it('rejects ?teamId for a team the caller is not a member of (no plan bypass)', async () => {
+    const { getMemoryStore } = await import('../src/db/factory.js');
+    // Create a business team owned by someone else.
+    const teamRes = await request('/v1/teams', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'BizCo' }),
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer team-owner' },
+    });
+    const teamId = (await teamRes.json()).id;
+    await getMemoryStore().updateTeam(teamId, { plan: 'business' });
+
+    // A different caller tries to inherit the business plan via teamId → 403.
+    const res = await app.request(`/v1/run?teamId=${teamId}`, {
+      method: 'POST',
+      body: JSON.stringify({ url: 'https://example.com' }),
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer outsider' },
+    });
+    expect(res.status).toBe(403);
+  });
+
   it('applies default routes, viewports, browsers, and threshold', async () => {
     const createRes = await request('/v1/run', {
       method: 'POST',
