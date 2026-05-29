@@ -13,13 +13,20 @@ import {
 } from '../src/storage/screenshots.js';
 
 describe('screenshotKey', () => {
-  it('builds a sanitised, deterministic key', () => {
-    expect(screenshotKey('run1', 'baseline', '/products/shoes', 1440, 'chromium')).toBe(
-      'runs/run1/baseline/products_shoes-1440-chromium.png',
+  it('builds a sanitised, user-namespaced, deterministic key', () => {
+    expect(screenshotKey('user1', 'run1', 'baseline', '/products/shoes', 1440, 'chromium')).toBe(
+      'user1/run1/products_shoes-1440-chromium-baseline.png',
     );
   });
   it('maps the root path to "root"', () => {
-    expect(screenshotKey('r', 'diff', '/', 375, 'webkit')).toBe('runs/r/diff/root-375-webkit.png');
+    expect(screenshotKey('u', 'r', 'diff', '/', 375, 'webkit')).toBe('u/r/root-375-webkit-diff.png');
+  });
+  it('namespaces blobs by owning user', () => {
+    const a = screenshotKey('userA', 'run1', 'current', '/', 1440, 'chromium');
+    const b = screenshotKey('userB', 'run1', 'current', '/', 1440, 'chromium');
+    expect(a).not.toBe(b);
+    expect(a.startsWith('userA/run1/')).toBe(true);
+    expect(b.startsWith('userB/run1/')).toBe(true);
   });
 });
 
@@ -42,13 +49,20 @@ describe('MemoryScreenshotStore', () => {
     expect(await store.get('k')).toBeNull();
   });
 
-  it('deletes all blobs under a run prefix', async () => {
-    await store.put('runs/r1/baseline/a.png', new Uint8Array([1]));
-    await store.put('runs/r1/current/a.png', new Uint8Array([2]));
-    await store.put('runs/r2/baseline/a.png', new Uint8Array([3]));
-    await store.deleteRun('r1');
+  it('deletes all blobs under a user/run prefix', async () => {
+    await store.put('u1/r1/a-1440-chromium-baseline.png', new Uint8Array([1]));
+    await store.put('u1/r1/a-1440-chromium-current.png', new Uint8Array([2]));
+    await store.put('u1/r2/a-1440-chromium-baseline.png', new Uint8Array([3]));
+    await store.deleteRun('u1', 'r1');
     expect(store.size()).toBe(1);
-    expect(await store.get('runs/r2/baseline/a.png')).not.toBeNull();
+    expect(await store.get('u1/r2/a-1440-chromium-baseline.png')).not.toBeNull();
+  });
+
+  it('does not delete another user run with the same runId', async () => {
+    await store.put('u1/r1/a-1440-chromium-baseline.png', new Uint8Array([1]));
+    await store.put('u2/r1/a-1440-chromium-baseline.png', new Uint8Array([2]));
+    await store.deleteRun('u1', 'r1');
+    expect(await store.get('u2/r1/a-1440-chromium-baseline.png')).not.toBeNull();
   });
 });
 
@@ -86,13 +100,13 @@ describe('R2ScreenshotStore', () => {
     expect(await store.get('k')).toEqual(bytes);
   });
 
-  it('deletes all run objects via list+delete', async () => {
+  it('deletes all run objects via list+delete (user-scoped)', async () => {
     const bucket = fakeBucket();
     const store = new R2ScreenshotStore(bucket);
-    await store.put('runs/r1/baseline/a.png', new Uint8Array([1]));
-    await store.put('runs/r1/current/b.png', new Uint8Array([2]));
-    await store.put('runs/r2/x.png', new Uint8Array([3]));
-    await store.deleteRun('r1');
+    await store.put('u1/r1/a-1440-chromium-baseline.png', new Uint8Array([1]));
+    await store.put('u1/r1/b-1440-chromium-current.png', new Uint8Array([2]));
+    await store.put('u1/r2/x-1440-chromium-baseline.png', new Uint8Array([3]));
+    await store.deleteRun('u1', 'r1');
     expect(bucket.store.size).toBe(1);
   });
 });
@@ -119,7 +133,7 @@ describe('GET /v1/screenshots routes (dev mode)', () => {
     // Manually attach a screenshot record + blob (simulating the processor).
     const store = getMemoryStore();
     const blobs = getMemoryScreenshotStore();
-    const key = screenshotKey(runId, 'baseline', '/', 1440, 'chromium');
+    const key = screenshotKey('owner-user', runId, 'baseline', '/', 1440, 'chromium');
     await blobs.put(key, new Uint8Array([137, 80, 78, 71]));
     await store.addScreenshot({
       id: 'shot1', runId, route: '/', viewport: 1440, browser: 'chromium',
@@ -137,7 +151,7 @@ describe('GET /v1/screenshots routes (dev mode)', () => {
     const runId = await seedRun('owner');
     const store = getMemoryStore();
     const blobs = getMemoryScreenshotStore();
-    const key = screenshotKey(runId, 'baseline', '/', 1440, 'chromium');
+    const key = screenshotKey('owner-user', runId, 'baseline', '/', 1440, 'chromium');
     await blobs.put(key, new Uint8Array([137, 80, 78, 71]));
     await store.addScreenshot({
       id: 'shot1', runId, route: '/', viewport: 1440, browser: 'chromium',
