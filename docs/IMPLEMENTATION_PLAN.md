@@ -1316,11 +1316,11 @@ CREATE TABLE team_projects (
 **Dependencies:** Task 8.1 (cloud for registry hosting, optional).
 
 **Acceptance criteria:**
-- [ ] `frontguard plugin install frontguard-plugin-slack` installs from npm
-- [ ] Plugins follow naming convention: `frontguard-plugin-*`
-- [ ] Plugin authoring guide with template project
-- [ ] `create-frontguard-plugin` scaffolds a working plugin with tests
-- [ ] Plugin system handles version conflicts gracefully
+- [x] `frontguard plugin install frontguard-plugin-slack` installs from npm
+- [x] Plugins follow naming convention: `frontguard-plugin-*`
+- [x] Plugin authoring guide with template project
+- [x] `create-frontguard-plugin` scaffolds a working plugin with tests
+- [ ] Plugin system handles version conflicts gracefully (version-conflict handling: outstanding)
 
 **Complexity:** M (4-5 days)
 **Priority:** P2 for Phase 5
