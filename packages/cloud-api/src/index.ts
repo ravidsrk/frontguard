@@ -13,6 +13,8 @@ import { getScreenshotStore, type R2Bucket } from './storage/screenshots.js';
 import { monitorRoutes } from './routes/monitors.js';
 import { dashboardRoutes } from './routes/dashboard.js';
 import { teamRoutes } from './routes/teams.js';
+import { billingRoutes } from './routes/billing.js';
+import { getPlan, checkLimit } from './billing/plans.js';
 import { runScheduledChecks } from './scheduler.js';
 import type { AlertEnv } from './alerts/index.js';
 
@@ -109,6 +111,7 @@ app.get('/health', (c) => c.json({ status: 'ok', version: '0.1.0' }));
 // ---------------------------------------------------------------------------
 app.route('/auth', authRoutes);
 app.route('/v1/keys', keyRoutes);
+app.route('/v1/billing', billingRoutes);
 
 // ---------------------------------------------------------------------------
 // Middleware — Auth for all /v1/* routes
@@ -197,6 +200,33 @@ app.post('/v1/run', async (c) => {
   const data = parsed.data;
   const store = c.get('store');
   const userId = c.get('userId');
+
+  // Plan enforcement (Task 8.2): block runs that exceed the monthly limit.
+  // Plan is resolved from the optional team scope, else the user's default.
+  const teamId = c.req.query('teamId');
+  let planId = 'free';
+  if (teamId) {
+    const team = await store.getTeam(teamId);
+    if (team) planId = team.plan;
+  } else {
+    const user = await store.getUser(userId);
+    if (user) planId = user.plan;
+  }
+  const plan = getPlan(planId);
+  const usage = await store.getUsage(userId, currentMonth());
+  const limitCheck = checkLimit(plan, 'runsPerMonth', usage.runsCount, 1);
+  if (!limitCheck.allowed) {
+    return c.json(
+      {
+        error: `Monthly run limit reached (${limitCheck.limit} on the ${plan.name} plan).`,
+        limit: limitCheck.limit,
+        current: limitCheck.current,
+        upgradeUrl: 'https://frontguard.dev/pricing',
+      },
+      402,
+    );
+  }
+
   const runId = crypto.randomUUID();
   const run: Run = {
     id: runId,
