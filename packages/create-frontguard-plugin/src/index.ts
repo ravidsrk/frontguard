@@ -13,8 +13,9 @@
  * @module index
  */
 
-import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildSpec, generateFiles, type GeneratedFile } from './templates.js';
 
 /** Parsed CLI arguments. */
@@ -109,8 +110,24 @@ export function run(argv: string[]): number {
   return 0;
 }
 
+/**
+ * Returns true when this module is the process entrypoint.
+ *
+ * Resolves both paths via the real filesystem path so it works for a direct
+ * `node dist/index.js` invocation AND for the `create-frontguard-plugin` bin
+ * symlink created by npm/npx (where `process.argv[1]` does not end in
+ * `index.js`).
+ */
+export function isEntrypoint(argv1: string | undefined, moduleUrl: string): boolean {
+  if (!argv1) return false;
+  try {
+    return realpathSync(argv1) === realpathSync(fileURLToPath(moduleUrl));
+  } catch {
+    return false;
+  }
+}
+
 // Auto-run when executed directly.
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
-if (process.argv[1] && process.argv[1].endsWith('index.js')) {
+if (isEntrypoint(process.argv[1], import.meta.url)) {
   process.exit(run(process.argv.slice(2)));
 }
