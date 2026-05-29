@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import GitHubStars from './GitHubStars';
 
 const navLinks = [
   { label: 'Features', href: '#features' },
   { label: 'Docs', href: 'https://docs.frontguard.dev' },
-  { label: 'GitHub', href: 'https://github.com/ravidsrk/frontguard' },
 ];
 
 export default function Nav() {
@@ -59,7 +59,7 @@ export default function Nav() {
         </a>
 
         {/* Desktop links */}
-        <div className="hidden items-center gap-8 md:flex">
+        <div className="hidden items-center gap-6 md:flex">
           {navLinks.map((link) => (
             <a
               key={link.label}
@@ -70,6 +70,7 @@ export default function Nav() {
               {link.label}
             </a>
           ))}
+          <GitHubStars />
           <a
             href="#getting-started"
             className="touch-manipulation rounded-lg bg-[var(--color-cta)] px-4 py-2 text-sm font-semibold text-[var(--color-bg)] transition-colors hover:bg-[var(--color-cta-hover)]"
@@ -125,6 +126,9 @@ export default function Nav() {
                 {link.label}
               </a>
             ))}
+            <div className="mt-2" onClick={() => setMobileOpen(false)}>
+              <GitHubStars className="w-full justify-center" />
+            </div>
             <a
               href="#getting-started"
               onClick={() => setMobileOpen(false)}

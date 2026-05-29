@@ -5,7 +5,7 @@ const features = [
     eyebrow: 'AI analysis',
     title: 'It tells you why, not where',
     description:
-      'Instead of "pixels differ at coordinates 340,890," you get: "the submit button overflows on mobile because the new padding pushes it outside the flex container." GPT-4o vision reads the screenshot the way a senior engineer would.',
+      'Instead of "pixels differ at coordinates 340,890," you get: "the submit button overflows on mobile because the new padding pushes it outside the flex container." AI vision reads the screenshot the way a senior engineer would — on your own OpenAI or Anthropic key.',
   },
   {
     eyebrow: 'Anti-flake consensus',
@@ -53,7 +53,7 @@ export default function Features() {
             className="font-[family-name:var(--font-display)] text-2xl font-bold leading-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl"
           >
             Built for the problems{' '}
-            <span className="text-[var(--color-text-muted)]">pixel diffs can{'\u2019'}t solve.</span>
+            <span className="text-[var(--color-text-secondary)]">pixel diffs can{'\u2019'}t solve.</span>
           </h2>
         </div>
 
@@ -93,9 +93,9 @@ export default function Features() {
                     </div>
                     <pre className="overflow-x-auto whitespace-pre-wrap break-words p-4 font-[family-name:var(--font-mono)] text-xs sm:text-sm leading-relaxed">
                       <code>
-                        <span className="text-[var(--color-danger)]">/checkout @ 375px — REGRESSION (4.2% diff)</span>{'\n'}
-                        <span className="text-[var(--color-accent)]">  AI: The submit button is being pushed outside its{'\n'}       parent flex container by the new 24px padding.{'\n'}       Visible from 320px to 414px viewports.</span>{'\n'}
-                        <span className="text-[var(--color-text-muted)]">  Suggested fix: reduce padding to 16px or add{'\n'}                   `flex-shrink: 0` to .submit-btn.</span>
+                        <span className="text-[var(--color-danger)]">/pricing @ 1280px — REGRESSION (3.1% diff)</span>{'\n'}
+                        <span className="text-[var(--color-accent)]">  AI: The "Most popular" badge text dropped to{'\n'}       #94a3b8 on a #f1f5f9 card — contrast fell to{'\n'}       1.9:1, below the WCAG AA 4.5:1 threshold.</span>{'\n'}
+                        <span className="text-[var(--color-text-muted)]">  Suggested fix: restore badge color to #0f172a{'\n'}                   or darken the card background.</span>
                       </code>
                     </pre>
                   </div>

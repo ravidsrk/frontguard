@@ -16,6 +16,8 @@ const rows: ComparisonRow[] = [
 { feature: 'Playwright native', frontguard: true, percy: false, chromatic: false, playwright: true },
 { feature: 'Works without Storybook', frontguard: true, percy: true, chromatic: false, playwright: true },
 { feature: 'Auto-fix suggestions', frontguard: true, percy: false, chromatic: false, playwright: false },
+{ feature: 'Managed hosted dashboard', frontguard: false, percy: true, chromatic: true, playwright: false },
+{ feature: 'Nothing to self-host', frontguard: false, percy: true, chromatic: true, playwright: false },
 ];
 
 function CellValue({ value }: { value: boolean | 'partial' }) {
@@ -61,10 +63,16 @@ className={`mb-12 md:mb-16 text-center ${inView ? 'animate-fade-up' : 'opacity-0
 >
 <h2 id="comparison-heading" className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--color-text)] [text-wrap:balance] md:text-3xl lg:text-4xl">
 Why not Percy? Or Chromatic?{' '}
-<span className="text-[var(--color-text-muted)]">
+<span className="text-[var(--color-text-secondary)]">
 Or just Playwright screenshots?
 </span>
 </h2>
+<p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-[var(--color-text-muted)]">
+Honest tradeoff: Percy and Chromatic give you a polished managed
+dashboard with nothing to host. Frontguard trades that for open
+source, AI explanations, and zero per-screenshot fees — running
+entirely in your own CI.
+</p>
 </div>
 
 {/* Desktop table — hidden on mobile */}

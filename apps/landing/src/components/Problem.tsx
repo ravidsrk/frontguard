@@ -29,7 +29,7 @@ id="problem-heading"
 className={`mx-auto max-w-3xl text-center font-[family-name:var(--font-display)] text-2xl font-bold leading-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl ${inView ? 'animate-fade-up' : 'opacity-0'}`}
 >
 Your CI catches code bugs.{' '}
-<span className="text-[var(--color-text-muted)]">
+<span className="text-[var(--color-text-secondary)]">
 But who catches the visual ones?
 </span>
 </h2>

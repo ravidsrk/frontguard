@@ -10,9 +10,9 @@ const stats = [
     </svg>
   ),
 },
-{ value: '< 2 min', label: 'Setup Time', icon: null },
-{ value: '3 Browsers', label: 'Chromium, Firefox, WebKit', icon: null },
-{ value: 'GPT-4o', label: 'Vision-based diff analysis', icon: null },
+{ value: '30 sec', label: 'Setup Time', icon: null },
+{ value: '3 Browsers', label: 'Chromium, Firefox, WebKit (Safari)', icon: null },
+{ value: 'AI Vision', label: 'Explains the root cause, not just the pixels', icon: null },
 ];
 
 export default function SocialProof() {
