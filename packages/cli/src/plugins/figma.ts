@@ -105,6 +105,43 @@ export async function fetchFigmaImage(
 }
 
 // ---------------------------------------------------------------------------
+// Design reference (Task 8.4 — model-as-judge)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolves the Figma design reference PNG for a route, for use by the
+ * model-as-judge mode (Task 8.4).
+ *
+ * Returns `null` when no token is configured or the route has no Figma page
+ * mapping — judge mode then falls back to heuristic evaluation.
+ *
+ * @param config    - Figma config (fileKey, pages, scale, token).
+ * @param routePath - The route to resolve a design frame for.
+ * @returns The exported Figma frame PNG, or null if unavailable.
+ */
+export async function fetchDesignReference(
+  config: FigmaConfig,
+  routePath: string,
+): Promise<Buffer | null> {
+  const token = config.accessToken || process.env['FIGMA_ACCESS_TOKEN'];
+  if (!token) return null;
+
+  const nodeId = config.pages?.[routePath];
+  if (!nodeId) return null;
+
+  try {
+    return await fetchFigmaImage(config.fileKey, nodeId, token, config.scale ?? 2);
+  } catch (err) {
+    logger.warn(
+      `FigmaPlugin: Could not fetch design reference for "${routePath}": ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Image Resizing
 // ---------------------------------------------------------------------------
 

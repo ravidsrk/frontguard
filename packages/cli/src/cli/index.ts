@@ -12,7 +12,7 @@
 
 import { Command } from 'commander';
 import { loadConfig, detectFramework, generateDefaultConfig } from '../core/config.js';
-import { runPipeline, updateBaselines } from '../core/pipeline.js';
+import { runPipeline, runJudgePipeline, updateBaselines } from '../core/pipeline.js';
 import { runDoctor } from './doctor.js';
 import { getFrameworkInfo } from '../templates/index.js';
 import { generateGitHubActionsWorkflow } from '../templates/github-actions.js';
@@ -239,6 +239,8 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--generate-fixes', 'Generate AI-powered CSS fixes for regressions (requires AI)')
     .option('--verify-fixes', 'Verify generated fixes in a sandbox (implies --generate-fixes)')
     .option('--fix-sandbox <kind>', 'Sandbox for fix verification: local or daytona', 'local')
+    .option('--mode <mode>', 'Run mode: compare (baseline diff) or judge (AI design eval, beta)', 'compare')
+    .option('--experimental', 'Enable experimental features (required for --mode judge)')
     .action(async (opts) => {
       try {
         // Set log level
@@ -260,6 +262,46 @@ export async function main(argv?: string[]): Promise<number> {
           await updateBaselines(config, reporter);
           logger.info('✅ Baselines updated successfully');
           exitCode = 0;
+          return;
+        }
+
+        // Model-as-judge mode (Task 8.4, experimental)
+        if (opts.mode === 'judge') {
+          if (!opts.experimental) {
+            logger.error(
+              '⚠️  Judge mode is experimental. Re-run with --experimental to enable it:\n' +
+                '    frontguard run --mode judge --experimental',
+            );
+            exitCode = 2;
+            return;
+          }
+          if (!config.ai) {
+            logger.error(
+              'Judge mode requires AI configuration. Add an `ai` block to your config ' +
+                '(provider + model) and set the matching API key env var.',
+            );
+            exitCode = 2;
+            return;
+          }
+          logger.warn('🧪 Judge mode (beta): evaluating against design intent — no baselines used.');
+          const judgeResult = await runJudgePipeline(config, reporter);
+          const js = judgeResult.summary;
+          logger.info('');
+          logger.info('─'.repeat(60));
+          logger.info(
+            `Judge results: ${js.total} judged, ${js.passed} passed, ` +
+              `${js.regressions} failed, ${js.warnings} with warnings, ${js.errors} errors`,
+          );
+          logger.info('─'.repeat(60));
+          if (js.errors > 0 && js.regressions === 0) {
+            exitCode = 2;
+          } else if (js.regressions > 0) {
+            logger.error(`❌ ${js.regressions} screenshot(s) failed the design bar`);
+            exitCode = 1;
+          } else {
+            logger.info('✅ All screenshots passed the design bar');
+            exitCode = 0;
+          }
           return;
         }
 
