@@ -67,6 +67,8 @@ describe('CLI', () => {
     expect(stdout).toContain('--webhook');
     expect(stdout).toContain('--interval');
     expect(stdout).toContain('--threshold');
+    expect(stdout).toContain('--watch');
+    expect(stdout).toContain('--history');
   });
 
   it('monitor with an invalid URL fails gracefully (exit 2, no crash)', () => {
@@ -74,5 +76,17 @@ describe('CLI', () => {
     // Bad input → graceful FRONTGUARD ERROR, exit 2 (not an unhandled crash).
     expect(exitCode).toBe(2);
     expect(stdout + stderr).toMatch(/FRONTGUARD ERROR|Invalid URL|base URL/i);
+  });
+
+  it('monitor --history prints history summary and exits 0 without running checks', () => {
+    const { exitCode, stdout, stderr } = runCli([
+      'monitor',
+      '--history',
+      '--history-dir',
+      '.frontguard/does-not-exist-history',
+    ]);
+    expect(exitCode).toBe(0);
+    // No history dir → friendly empty message, no pipeline run.
+    expect(stdout + stderr).toMatch(/No monitoring history found|Recent monitoring history/i);
   });
 });
