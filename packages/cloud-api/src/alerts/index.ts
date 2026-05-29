@@ -9,6 +9,7 @@
  */
 
 import type { Monitor } from '../db/monitors.js';
+import type { Store } from '../db/store.js';
 
 /** A single regression detected during a monitor check. */
 export interface MonitorAlert {
@@ -17,6 +18,27 @@ export interface MonitorAlert {
   viewport: number;
   diffPercentage: number;
   threshold: number;
+}
+
+/**
+ * Builds a stable fingerprint of a regression set, used to suppress duplicate
+ * alerts. Only the affected route+viewport pairs matter — the diff percentage
+ * fluctuates run-to-run, so it's excluded.
+ */
+export function alertFingerprint(alerts: MonitorAlert[]): string {
+  return alerts
+    .map((a) => `${a.route}@${a.viewport}`)
+    .sort()
+    .join('|');
+}
+
+/** Why a dispatch was (or wasn't) attempted — returned for logging/tests. */
+export type AlertDispatchReason = 'sent' | 'snoozed' | 'duplicate' | 'no-alerts';
+
+/** Result of a stateful dispatch attempt. */
+export interface StatefulDispatchResult {
+  reason: AlertDispatchReason;
+  deliveries: AlertDeliveryResult[];
 }
 
 /** Result of attempting to deliver to one channel. */
@@ -154,4 +176,50 @@ export async function dispatchAlerts(
     results.push(await sendEmailAlert(env, monitor.alerts.email, monitor, alerts, fetchImpl));
   }
   return results;
+}
+
+/**
+ * Dispatches alerts with deduplication and snooze support (Task 6.2).
+ *
+ * - **Snooze:** if the monitor is snoozed past `now`, nothing is sent.
+ * - **Dedup:** if the regression set's fingerprint matches the last alerted
+ *   fingerprint, the alert is suppressed (the same regression won't alert
+ *   twice). A *different* regression set always alerts.
+ *
+ * Alert state is read from and written back to the {@link Store}.
+ */
+export async function dispatchAlertsWithState(
+  env: AlertEnv,
+  store: Store,
+  monitor: Monitor,
+  alerts: MonitorAlert[],
+  now: Date = new Date(),
+  fetchImpl: typeof fetch = fetch,
+): Promise<StatefulDispatchResult> {
+  if (alerts.length === 0) return { reason: 'no-alerts', deliveries: [] };
+
+  const state = await store.getAlertState(monitor.id);
+
+  // Snooze check.
+  if (state?.snoozedUntil && new Date(state.snoozedUntil).getTime() > now.getTime()) {
+    return { reason: 'snoozed', deliveries: [] };
+  }
+
+  // Dedup check.
+  const fingerprint = alertFingerprint(alerts);
+  if (state?.lastFingerprint === fingerprint) {
+    return { reason: 'duplicate', deliveries: [] };
+  }
+
+  const deliveries = await dispatchAlerts(env, monitor, alerts, fetchImpl);
+
+  // Record the fingerprint so an identical regression set won't re-alert.
+  await store.setAlertState({
+    monitorId: monitor.id,
+    lastFingerprint: fingerprint,
+    lastAlertAt: now.toISOString(),
+    snoozedUntil: state?.snoozedUntil,
+  });
+
+  return { reason: 'sent', deliveries };
 }
