@@ -1,0 +1,27 @@
+name = "frontguard-cloud-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 — persistent storage (Task 5.2)
+# Create with: wrangler d1 create frontguard
+# Then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "frontguard"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# R2 — screenshot storage (Task 5.4)
+# Create with: wrangler r2 bucket create frontguard-screenshots
+[[r2_buckets]]
+binding = "SCREENSHOTS"
+bucket_name = "frontguard-screenshots"
+
+[vars]
+API_BASE_URL = "https://api.frontguard.dev"
+PUBLIC_BASE_URL = "https://api.frontguard.dev"
+
+# Secrets (set via `wrangler secret put`):
+#   GITHUB_CLIENT_ID
+#   GITHUB_CLIENT_SECRET
+#   DAYTONA_API_KEY

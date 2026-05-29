@@ -3,20 +3,24 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 import type { Run } from './types.js';
 import { processRun } from './processor.js';
+import { getStore, isProduction, type Bindings } from './db/factory.js';
+import { currentMonth, type Store } from './db/store.js';
+import { hashKey } from './auth/keys.js';
+import { authRoutes } from './routes/auth.js';
+import { keyRoutes } from './routes/keys.js';
+import { screenshotRoutes } from './routes/screenshots.js';
+import { getScreenshotStore, type R2Bucket } from './storage/screenshots.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 type Variables = {
   apiKey: string;
+  userId: string;
+  store: Store;
 };
 
-const app = new Hono<{ Variables: Variables }>();
-
-// ---------------------------------------------------------------------------
-// In-memory store (will migrate to KV / D1 later)
-// ---------------------------------------------------------------------------
-const runs = new Map<string, Run>();
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // ---------------------------------------------------------------------------
 // Simple rate limiter - 100 requests per minute per API key
@@ -55,16 +59,15 @@ app.use(
   '*',
   cors({
     origin: (origin) => {
-      // Allow frontguard.dev, localhost dev, and Fly.io previews
       const allowed = [
         'https://frontguard.dev',
         'https://www.frontguard.dev',
         'https://docs.frontguard.dev',
       ];
-      if (!origin) return origin; // Allow non-browser requests (CLI, curl)
-      if (origin.startsWith('http://localhost:')) return origin; // Local dev
+      if (!origin) return origin;
+      if (origin.startsWith('http://localhost:')) return origin;
       if (allowed.includes(origin)) return origin;
-      return undefined; // Block others
+      return undefined;
     },
     credentials: true,
   }),
@@ -83,13 +86,52 @@ app.use('*', async (c, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// Middleware — Resolve the store for every request (D1 in prod, memory in dev)
+// ---------------------------------------------------------------------------
+app.use('*', async (c, next) => {
+  c.set('store', getStore(c.env));
+  await next();
+});
+
+// ---------------------------------------------------------------------------
+// Health check (outside /v1/* — no auth required)
+// ---------------------------------------------------------------------------
+app.get('/health', (c) => c.json({ status: 'ok', version: '0.1.0' }));
+
+// ---------------------------------------------------------------------------
+// Auth + API-key management routes (mounted before the /v1 guard so the OAuth
+// callback and key bootstrap don't require a pre-existing key).
+// ---------------------------------------------------------------------------
+app.route('/auth', authRoutes);
+app.route('/v1/keys', keyRoutes);
+
+// ---------------------------------------------------------------------------
 // Middleware — Auth for all /v1/* routes
 // ---------------------------------------------------------------------------
 app.use('/v1/*', async (c, next) => {
   const apiKey = c.req.header('Authorization')?.replace('Bearer ', '');
   if (!apiKey) return c.json({ error: 'Missing API key' }, 401);
-  // Store for downstream use
+
+  const store = c.get('store');
+  let userId: string;
+
+  if (isProduction(c.env)) {
+    // Production: resolve the key hash to a user.
+    const keyHash = await hashKey(apiKey);
+    const record = await store.getApiKey(keyHash);
+    if (!record) return c.json({ error: 'Invalid API key' }, 401);
+    userId = record.userId;
+    await store.touchApiKey(keyHash, new Date().toISOString());
+  } else {
+    // Dev / tests: accept any token and scope data to a per-token demo user.
+    userId = `demo:${await hashKey(apiKey)}`;
+    if (!(await store.getUser(userId))) {
+      await store.createUser({ id: userId, plan: 'free', createdAt: new Date().toISOString() });
+    }
+  }
+
   c.set('apiKey', apiKey);
+  c.set('userId', userId);
   await next();
 });
 
@@ -97,7 +139,7 @@ app.use('/v1/*', async (c, next) => {
 // Middleware — Rate limiting for all /v1/* routes
 // ---------------------------------------------------------------------------
 app.use('/v1/*', async (c, next) => {
-  const apiKey = c.get('apiKey') as string;
+  const apiKey = c.get('apiKey');
   const now = Date.now();
   const window = 60_000; // 1 minute
   const limit = 100;
@@ -121,29 +163,32 @@ app.use('/v1/*', async (c, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// Health check (outside /v1/* — no auth required)
+// Screenshot routes (mounted after the /v1 auth guard above).
 // ---------------------------------------------------------------------------
-app.get('/health', (c) => c.json({ status: 'ok', version: '0.1.0' }));
+app.route('/v1/screenshots', screenshotRoutes);
 
 // ---------------------------------------------------------------------------
 // POST /v1/run — Submit a visual regression run
 // ---------------------------------------------------------------------------
 app.post('/v1/run', async (c) => {
-  const body = await c.req.json();
+  const body = await c.req.json().catch(() => ({}));
 
-  // Validate request body with Zod
   const parsed = runRequestSchema.safeParse(body);
   if (!parsed.success) {
+    const fieldErrors = parsed.error.flatten().fieldErrors;
+    const fields = Object.keys(fieldErrors);
     return c.json(
       {
-        error: 'Invalid request',
-        details: parsed.error.flatten().fieldErrors,
+        error: `Invalid request: missing or invalid field(s): ${fields.join(', ')}`,
+        details: fieldErrors,
       },
       400,
     );
   }
 
   const data = parsed.data;
+  const store = c.get('store');
+  const userId = c.get('userId');
   const runId = crypto.randomUUID();
   const run: Run = {
     id: runId,
@@ -159,14 +204,20 @@ app.post('/v1/run', async (c) => {
     reportUrl: null,
   };
 
-  // Store run
-  runs.set(runId, run);
+  await store.createRun(run, userId);
+  await store.incrementUsage(userId, currentMonth(), 1, 0);
 
-  // Process async (simulate for now — real impl would queue to worker)
-  processRun(run).catch((err: Error) => {
-    run.status = 'failed';
-    run.error = err.message;
-  });
+  // Process async — mutates `run`, then persists the final state.
+  processRun(run)
+    .catch((err: Error) => {
+      run.status = 'failed';
+      run.error = err.message;
+    })
+    .finally(() => {
+      const screenshots = run.results?.length ?? 0;
+      void store.updateRun(runId, run);
+      if (screenshots > 0) void store.incrementUsage(userId, currentMonth(), 0, screenshots);
+    });
 
   return c.json(
     {
@@ -182,31 +233,36 @@ app.post('/v1/run', async (c) => {
 // ---------------------------------------------------------------------------
 // GET /v1/runs/:id — Check run status
 // ---------------------------------------------------------------------------
-app.get('/v1/runs/:id', (c) => {
-  const run = runs.get(c.req.param('id'));
+app.get('/v1/runs/:id', async (c) => {
+  const store = c.get('store');
+  const id = c.req.param('id');
+  const run = await store.getRun(id);
   if (!run) return c.json({ error: 'Run not found' }, 404);
+  if ((await store.getRunOwner(id)) !== c.get('userId')) {
+    return c.json({ error: 'Run not found' }, 404);
+  }
   return c.json(run);
 });
 
 // ---------------------------------------------------------------------------
 // GET /v1/runs — List runs
 // ---------------------------------------------------------------------------
-app.get('/v1/runs', (c) => {
-  const allRuns = Array.from(runs.values())
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    )
-    .slice(0, 50);
+app.get('/v1/runs', async (c) => {
+  const store = c.get('store');
+  const allRuns = await store.listRuns(c.get('userId'), 50);
   return c.json({ runs: allRuns, total: allRuns.length });
 });
 
 // ---------------------------------------------------------------------------
 // GET /v1/reports/:id — Get HTML report
 // ---------------------------------------------------------------------------
-app.get('/v1/reports/:id', (c) => {
-  const run = runs.get(c.req.param('id'));
-  if (!run) return c.json({ error: 'Run not found' }, 404);
+app.get('/v1/reports/:id', async (c) => {
+  const store = c.get('store');
+  const id = c.req.param('id');
+  const run = await store.getRun(id);
+  if (!run || (await store.getRunOwner(id)) !== c.get('userId')) {
+    return c.json({ error: 'Run not found' }, 404);
+  }
   if (run.status !== 'completed') {
     return c.json({ error: 'Run not yet completed', status: run.status }, 202);
   }
@@ -220,32 +276,44 @@ app.get('/v1/reports/:id', (c) => {
 // POST /v1/baselines/:runId/approve — Approve new baselines
 // ---------------------------------------------------------------------------
 app.post('/v1/baselines/:runId/approve', async (c) => {
-  const run = runs.get(c.req.param('runId'));
-  if (!run) return c.json({ error: 'Run not found' }, 404);
-  run.baselinesApproved = true;
-  return c.json({ approved: true, runId: run.id });
+  const store = c.get('store');
+  const id = c.req.param('runId');
+  const run = await store.getRun(id);
+  if (!run || (await store.getRunOwner(id)) !== c.get('userId')) {
+    return c.json({ error: 'Run not found' }, 404);
+  }
+  await store.updateRun(id, { baselinesApproved: true });
+  return c.json({ approved: true, runId: id });
 });
 
 // ---------------------------------------------------------------------------
 // DELETE /v1/runs/:id — Delete a run
 // ---------------------------------------------------------------------------
-app.delete('/v1/runs/:id', (c) => {
-  const deleted = runs.delete(c.req.param('id'));
+app.delete('/v1/runs/:id', async (c) => {
+  const store = c.get('store');
+  const id = c.req.param('id');
+  const deleted = await store.deleteRun(id, c.get('userId'));
+  if (deleted) {
+    // Best-effort cleanup of R2 screenshot blobs for this run.
+    try {
+      const blobs = getScreenshotStore(c.env?.SCREENSHOTS as R2Bucket | undefined);
+      await blobs.deleteRun(id);
+    } catch {
+      /* non-fatal */
+    }
+  }
   return c.json({ deleted });
 });
 
 // ---------------------------------------------------------------------------
 // GET /v1/usage — Usage stats for API key
 // ---------------------------------------------------------------------------
-app.get('/v1/usage', (c) => {
-  const total = runs.size;
-  const screenshots = Array.from(runs.values()).reduce(
-    (sum, r) => sum + (r.results?.length || 0),
-    0,
-  );
+app.get('/v1/usage', async (c) => {
+  const store = c.get('store');
+  const usage = await store.getUsage(c.get('userId'), currentMonth());
   return c.json({
-    runs: total,
-    screenshots,
+    runs: usage.runsCount,
+    screenshots: usage.screenshotsCount,
     period: 'current_month',
     limits: { runs: 500, screenshots: 5000 },
   });
