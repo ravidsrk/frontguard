@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createFigmaPlugin, type FigmaConfig } from '../../src/plugins/figma.js';
+import { createFigmaPlugin, fetchDesignReference, type FigmaConfig } from '../../src/plugins/figma.js';
 import type { PluginContext } from '../../src/core/plugins.js';
 import type { DiffResult, ScreenshotResult, RunResult, FrontguardConfig } from '../../src/core/types.js';
 import { createTestPng } from '../fixtures/helpers.js';
@@ -318,5 +318,56 @@ describe('FigmaPlugin.teardown', () => {
 
     expect(ctx.metadata.has('figma:accessToken')).toBe(false);
     expect(ctx.metadata.has('figma:images')).toBe(false);
+  });
+});
+
+describe('fetchDesignReference (Task 8.4 — judge mode)', () => {
+  const origToken = process.env.FIGMA_ACCESS_TOKEN;
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    if (origToken === undefined) delete process.env.FIGMA_ACCESS_TOKEN;
+    else process.env.FIGMA_ACCESS_TOKEN = origToken;
+  });
+
+  it('returns null when no token is configured', async () => {
+    delete process.env.FIGMA_ACCESS_TOKEN;
+    const ref = await fetchDesignReference({ fileKey: 'f', pages: { '/': '1:2' } }, '/');
+    expect(ref).toBeNull();
+  });
+
+  it('returns null when the route has no page mapping', async () => {
+    const ref = await fetchDesignReference(
+      { fileKey: 'f', pages: { '/other': '1:2' }, accessToken: 'tok' },
+      '/missing',
+    );
+    expect(ref).toBeNull();
+  });
+
+  it('fetches and returns the design PNG when mapped', async () => {
+    const png = createTestPng(50, 50, 0, 0, 255);
+    const fetchSpy = vi.fn(async (url: string) => {
+      if (url.includes('api.figma.com')) {
+        return new Response(JSON.stringify({ err: null, images: { '1:2': 'https://cdn/figma.png' } }), { status: 200 });
+      }
+      return new Response(png, { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const ref = await fetchDesignReference(
+      { fileKey: 'f', pages: { '/': '1:2' }, accessToken: 'tok' },
+      '/',
+    );
+    expect(ref).not.toBeNull();
+    expect(Buffer.isBuffer(ref)).toBe(true);
+  });
+
+  it('returns null (no throw) when the Figma API errors', async () => {
+    const fetchSpy = vi.fn(async () => new Response('nope', { status: 500 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const ref = await fetchDesignReference(
+      { fileKey: 'f', pages: { '/': '1:2' }, accessToken: 'tok' },
+      '/',
+    );
+    expect(ref).toBeNull();
   });
 });

@@ -22,12 +22,15 @@ import type {
   RunTiming,
   Reporter,
 } from './types.js';
+import type { JudgeResult } from './types.js';
 import { discoverRoutes } from '../discovery/crawler.js';
 import { discoverRoutesFromFilesystem } from '../discovery/filesystem.js';
 import { smartFilter } from '../graph/filter.js';
 import { renderPages } from '../render/playwright.js';
 import { compareScreenshot, createNewPageResult } from '../diff/pixel.js';
 import { analyzeWithAI } from '../diff/ai-vision.js';
+import { judgeScreenshot } from '../diff/model-judge.js';
+import { fetchDesignReference } from '../plugins/figma.js';
 import { generateFix, FIX_CATEGORIES } from '../diff/ai-fix.js';
 import { verifyFix } from '../sandbox/verify-fix.js';
 import { FixPatternDB, contextHashFor } from '../storage/fix-patterns.js';
@@ -919,6 +922,146 @@ export async function updateBaselines(
 // ---------------------------------------------------------------------------
 // Internal: Build RunResult
 // ---------------------------------------------------------------------------
+
+/**
+ * Runs the **model-as-judge** (zero-baseline) pipeline (Task 8.4).
+ *
+ * Flow: `discover → render → judge → report`. No baselines are read or written.
+ * Each rendered screenshot is evaluated against design intent (Figma frame when
+ * configured, otherwise UI heuristics). Returns a {@link RunResult} whose
+ * `judgements` array carries the verdicts; `diffs` is left empty.
+ *
+ * @experimental Gated behind `--mode judge --experimental`.
+ */
+export async function runJudgePipeline(
+  config: FrontguardConfig,
+  reporter: Reporter,
+): Promise<RunResult> {
+  const totalStart = performance.now();
+  const timing: RunTiming = { discovery: 0, render: 0, compare: 0, ai: 0, total: 0 };
+
+  if (!config.ai) {
+    throw new Error('Judge mode requires AI configuration (config.ai with a provider + model).');
+  }
+
+  // Stage 1: DISCOVER ------------------------------------------------------
+  reporter.onStageStart('discover', 'Determining routes to judge…');
+  let routes: Route[] = [];
+  try {
+    const [discovered, duration] = await timed(() => discoverAllRoutes(config));
+    routes = discovered;
+    timing.discovery = duration;
+    reporter.onStageComplete('discover', `Found ${routes.length} route(s)`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error(`Discovery failed: ${msg}`);
+    routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
+    reporter.onStageComplete('discover', 'Failed — falling back to /');
+  }
+  if (routes.length === 0) {
+    routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
+  }
+
+  const totalCombinations = routes.length * config.viewports.length * config.browsers.length;
+
+  // Stage 2: RENDER --------------------------------------------------------
+  let screenshots: ScreenshotResult[] = [];
+  reporter.onStageStart('render', `Capturing ${totalCombinations} screenshot(s)…`);
+  try {
+    const [captured, duration] = await timed(() => renderPages(routes, config));
+    screenshots = captured;
+    timing.render = duration;
+    reporter.onStageComplete('render', `Captured ${screenshots.length} screenshot(s) in ${duration}ms`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error(`Render stage failed: ${msg}`);
+    reporter.onStageComplete('render', `Failed: ${msg}`);
+  }
+
+  if (screenshots.length === 0) {
+    const empty = buildJudgeResult([], timing, totalStart, config);
+    reporter.onComplete(empty);
+    return empty;
+  }
+
+  // Stage 3: JUDGE ---------------------------------------------------------
+  reporter.onStageStart('analyze', `Judging ${screenshots.length} screenshot(s) with ${config.ai.provider}/${config.ai.model}…`);
+  const judgements: JudgeResult[] = [];
+  const judgeConfig = config.judge;
+
+  // Cache Figma references per route (avoid refetching across viewports).
+  const referenceCache = new Map<string, Buffer | null>();
+  async function referenceFor(routePath: string): Promise<Buffer | undefined> {
+    if (!judgeConfig?.figmaFileKey || !judgeConfig.figmaPages) return undefined;
+    if (!referenceCache.has(routePath)) {
+      const ref = await fetchDesignReference(
+        {
+          fileKey: judgeConfig.figmaFileKey,
+          pages: judgeConfig.figmaPages,
+          scale: judgeConfig.figmaScale,
+        },
+        routePath,
+      );
+      referenceCache.set(routePath, ref);
+    }
+    return referenceCache.get(routePath) ?? undefined;
+  }
+
+  const [, judgeDuration] = await timed(async () => {
+    await processBatched(screenshots, AI_BATCH_SIZE, async (shot, index) => {
+      const figmaReference = await referenceFor(shot.route.path);
+      const verdict = await judgeScreenshot(shot, { ai: config.ai!, figmaReference });
+      judgements.push(verdict);
+      reporter.onStageProgress(
+        'analyze',
+        index + 1,
+        screenshots.length,
+        `${shot.route.path} @ ${shot.viewport}px → ${verdict.pass ? 'pass' : 'fail'}`,
+      );
+    });
+  });
+  timing.ai = judgeDuration;
+  reporter.onStageComplete('analyze', `Judged ${judgements.length} screenshot(s) in ${judgeDuration}ms`);
+
+  timing.total = Math.round(performance.now() - totalStart);
+  const result = buildJudgeResult(judgements, timing, totalStart, config);
+  reporter.onComplete(result);
+  return result;
+}
+
+/**
+ * Builds a {@link RunResult} from judge verdicts. Maps verdicts onto the
+ * summary counts so existing reporters/exit-code logic keep working:
+ * failing judgements count as `regressions`, error verdicts as `errors`.
+ */
+function buildJudgeResult(
+  judgements: JudgeResult[],
+  timing: RunTiming,
+  _totalStart: number,
+  config: FrontguardConfig,
+): RunResult {
+  const errors = judgements.filter((j) => j.error).length;
+  const failed = judgements.filter((j) => !j.pass && !j.error).length;
+  const passed = judgements.filter((j) => j.pass).length;
+  const warnings = judgements.filter(
+    (j) => j.pass && j.issues.some((i) => i.severity === 'warning'),
+  ).length;
+
+  return {
+    summary: {
+      total: judgements.length,
+      passed,
+      regressions: failed,
+      warnings,
+      newPages: 0,
+      errors,
+    },
+    diffs: [],
+    judgements,
+    timing,
+    config,
+  };
+}
 
 function buildResult(
   diffs: DiffResult[],

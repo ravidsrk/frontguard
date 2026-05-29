@@ -303,6 +303,27 @@ export interface FrontguardConfig {
   verifyFixes?: boolean;
   /** Sandbox backend for fix verification (default: 'local'). */
   fixSandbox?: 'local' | 'daytona';
+  /** Model-as-judge (zero-baseline) configuration (Task 8.4). */
+  judge?: JudgeConfig;
+}
+
+/**
+ * Configuration for model-as-judge (zero-baseline) mode (Task 8.4).
+ *
+ * When `judge` mode is active, screenshots are evaluated against design intent
+ * by an AI model rather than compared against baselines.
+ */
+export interface JudgeConfig {
+  /**
+   * Optional Figma file key. When set (with a `FIGMA_ACCESS_TOKEN` and a
+   * `pages` mapping), the judge compares each screenshot against its Figma
+   * frame for design compliance. Without it, heuristic evaluation is used.
+   */
+  figmaFileKey?: string;
+  /** Map of route path → Figma node id, used to fetch design references. */
+  figmaPages?: Record<string, string>;
+  /** Figma export scale factor (default 2). */
+  figmaScale?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -464,6 +485,65 @@ export interface AIAnalysis {
 }
 
 // ---------------------------------------------------------------------------
+// Model-as-Judge Interfaces (Task 8.4)
+// ---------------------------------------------------------------------------
+
+/** Category of a judge-detected issue. */
+export type JudgeIssueCategory =
+  | 'alignment'
+  | 'contrast'
+  | 'overflow'
+  | 'spacing'
+  | 'typography'
+  | 'responsive'
+  | 'color'
+  | 'design-deviation'
+  | 'accessibility'
+  | 'other';
+
+/** A single issue raised by the model judge. */
+export interface JudgeIssue {
+  /** Category of the issue. */
+  category: JudgeIssueCategory;
+  /** Severity of the issue. */
+  severity: Severity;
+  /** Human-readable description of what's wrong. */
+  description: string;
+  /** Optional element/region hint (selector or rough location). */
+  location?: string;
+  /** Optional remediation suggestion. */
+  suggestion?: string;
+}
+
+/**
+ * Verdict from the model-as-judge evaluation of a single screenshot.
+ *
+ * Unlike {@link AIAnalysis} (which compares against a baseline), a judge
+ * evaluates a screenshot against design intent — Figma frames or general UI
+ * heuristics — with no baseline required.
+ */
+export interface JudgeResult {
+  /** The route that was judged. */
+  route: Route;
+  /** Viewport width used for the judgement. */
+  viewport: number;
+  /** Browser engine used for the judgement. */
+  browser: BrowserEngine;
+  /** Whether the screenshot passes the quality bar. */
+  pass: boolean;
+  /** Issues found during evaluation. */
+  issues: JudgeIssue[];
+  /** Overall confidence in the verdict (`0–1`). */
+  confidence: number;
+  /** Whether a Figma design reference informed the judgement. */
+  withDesignReference: boolean;
+  /** Raw LLM response for debugging / audit. */
+  rawResponse?: string;
+  /** Error message if the judgement failed. */
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Run Result Interfaces
 // ---------------------------------------------------------------------------
 
@@ -517,6 +597,8 @@ export interface RunResult {
   config: FrontguardConfig;
   /** Accessibility audit results (Task 5.1), if the a11y plugin ran. */
   accessibility?: AccessibilityResult[];
+  /** Model-as-judge verdicts (Task 8.4), if judge mode ran. */
+  judgements?: JudgeResult[];
 }
 
 // ---------------------------------------------------------------------------
