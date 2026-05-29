@@ -13,7 +13,8 @@
   "homepage": "https://frontguard.dev",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "integrations/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

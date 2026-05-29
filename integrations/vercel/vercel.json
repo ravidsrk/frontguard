@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/handler.ts": {
+      "runtime": "edge"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/webhook", "destination": "/src/handler.ts" },
+    { "source": "/api/install", "destination": "/src/handler.ts" },
+    { "source": "/health", "destination": "/src/handler.ts" }
+  ]
+}

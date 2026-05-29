@@ -1,0 +1,22 @@
+# Frontguard GitHub App manifest (Task 7.2)
+# Used with the GitHub App manifest flow for one-click creation:
+#   https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest
+name: Frontguard
+url: https://frontguard.dev
+hook_attributes:
+  url: https://github-app.frontguard.dev/webhook
+redirect_url: https://frontguard.dev/github/setup
+public: true
+default_events:
+  - pull_request
+  - check_run
+  - installation
+  - installation_repositories
+default_permissions:
+  # Read PR metadata + head SHA.
+  pull_requests: write
+  # Create/update Check Runs.
+  checks: write
+  # Read repo contents (config detection) + open bootstrap PRs.
+  contents: write
+  metadata: read
