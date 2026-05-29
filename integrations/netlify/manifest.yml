@@ -1,0 +1,27 @@
+# Frontguard Netlify Build Plugin manifest (Task 8.3)
+# https://docs.netlify.com/integrations/build-plugins/create-plugins/
+name: "@frontguard/netlify-plugin"
+inputs:
+  - name: apiUrl
+    description: Frontguard Cloud API base URL.
+    default: https://api.frontguard.dev
+  - name: apiKey
+    description: >-
+      Frontguard API key. Prefer the FRONTGUARD_API_KEY site environment
+      variable over setting this in netlify.toml.
+    required: false
+  - name: routes
+    description: List of routes (paths) to screenshot.
+    default:
+      - "/"
+  - name: failBuild
+    description: Fail the Netlify build if visual changes are detected.
+    default: false
+  - name: productionToo
+    description: Also run on the production deploy context (default previews only).
+    default: false
+  - name: githubToken
+    description: >-
+      GitHub token for posting results to the PR. Prefer the GITHUB_TOKEN site
+      environment variable.
+    required: false
