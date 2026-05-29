@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { detectPreviewUrl } from '../../src/utils/preview-url.js';
+import { detectPreviewUrl, waitForUrl } from '../../src/utils/preview-url.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,5 +94,52 @@ describe('detectPreviewUrl', () => {
   it('trims whitespace from env var values', () => {
     process.env.VERCEL_URL = '  my-app.vercel.app  ';
     expect(detectPreviewUrl()).toBe('https://my-app.vercel.app');
+  });
+});
+
+describe('waitForUrl', () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('returns true immediately on a 2xx response', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(null, { status: 200 })) as typeof fetch;
+    const ok = await waitForUrl('https://x.test', { maxAttempts: 3, intervalMs: 0 });
+    expect(ok).toBe(true);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats 3xx as ready', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(null, { status: 302 })) as typeof fetch;
+    expect(await waitForUrl('https://x.test', { maxAttempts: 2, intervalMs: 0 })).toBe(true);
+  });
+
+  it('retries on non-ready status then succeeds', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    globalThis.fetch = fetchMock as typeof fetch;
+    const ok = await waitForUrl('https://x.test', { maxAttempts: 3, intervalMs: 0 });
+    expect(ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries on fetch rejection (network error)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    globalThis.fetch = fetchMock as typeof fetch;
+    expect(await waitForUrl('https://x.test', { maxAttempts: 3, intervalMs: 0 })).toBe(true);
+  });
+
+  it('returns false after exhausting all attempts', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(null, { status: 500 })) as typeof fetch;
+    const ok = await waitForUrl('https://x.test', { maxAttempts: 3, intervalMs: 0 });
+    expect(ok).toBe(false);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
   });
 });

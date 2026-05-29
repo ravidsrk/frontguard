@@ -6,7 +6,14 @@ auth.json
 .env
 .env.*
 *.log
-core
+# Core dumps — match the dump files at repo/package/app roots only, never the
+# `src/core/` or `test/core/` source directories (the old bare `core` pattern
+# silently excluded real source files).
+/core
+/packages/*/core
+/apps/*/core
+/integrations/*/core
+core.*
 .frontguard/
 frontguard-report/
 

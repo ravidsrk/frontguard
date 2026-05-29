@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { createHash } from 'node:crypto';
 import { InMemoryStore } from '../src/db/store.js';
 import { can, roleAtLeast } from '../src/db/teams.js';
 import { app } from '../src/index.js';
-import { resetMemoryStore } from '../src/db/factory.js';
+import { resetMemoryStore, getMemoryStore } from '../src/db/factory.js';
 
 describe('role capabilities', () => {
   it('owner can do everything', () => {
@@ -153,5 +154,86 @@ describe('/v1/teams routes (dev mode)', () => {
     expect(createRes.status).toBe(201);
     const listRes = await app.request(`/v1/teams/${id}/projects`, { headers: auth('alice') });
     expect((await listRes.json()).total).toBe(1);
+  });
+
+  // Helper: add bob as a member of alice's team via invite+accept.
+  async function addBob(teamId: string, role = 'member'): Promise<void> {
+    const inv = await app.request(`/v1/teams/${teamId}/invitations`, {
+      method: 'POST', headers: auth('alice'), body: JSON.stringify({ email: 'bob@x.com', role }),
+    });
+    await app.request('/v1/teams/invitations/accept', {
+      method: 'POST', headers: auth('bob'), body: JSON.stringify({ token: (await inv.json()).token }),
+    });
+  }
+
+  it('owner updates a member role', async () => {
+    const id = await createTeam('alice');
+    await addBob(id);
+    const bobId = `demo:${createHash('sha256').update('bob').digest('hex')}`;
+    const res = await app.request(`/v1/teams/${id}/members/${bobId}`, {
+      method: 'PATCH', headers: auth('alice'), body: JSON.stringify({ role: 'admin' }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).updated).toBe(true);
+    expect((await getMemoryStore().getMember(id, bobId))?.role).toBe('admin');
+  });
+
+  it('rejects an invalid member role with 400', async () => {
+    const id = await createTeam('alice');
+    await addBob(id);
+    const bobId = `demo:${createHash('sha256').update('bob').digest('hex')}`;
+    const res = await app.request(`/v1/teams/${id}/members/${bobId}`, {
+      method: 'PATCH', headers: auth('alice'), body: JSON.stringify({ role: 'superuser' }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('members cannot update roles (403)', async () => {
+    const id = await createTeam('alice');
+    await addBob(id);
+    const bobId = `demo:${createHash('sha256').update('bob').digest('hex')}`;
+    const res = await app.request(`/v1/teams/${id}/members/${bobId}`, {
+      method: 'PATCH', headers: auth('bob'), body: JSON.stringify({ role: 'owner' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('owner removes a member', async () => {
+    const id = await createTeam('alice');
+    await addBob(id);
+    const bobId = `demo:${createHash('sha256').update('bob').digest('hex')}`;
+    const res = await app.request(`/v1/teams/${id}/members/${bobId}`, {
+      method: 'DELETE', headers: auth('alice'),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).removed).toBe(true);
+    expect(await getMemoryStore().getMember(id, bobId)).toBeFalsy();
+  });
+
+  it('lists projects requires membership (404 for non-members)', async () => {
+    const id = await createTeam('alice');
+    const res = await app.request(`/v1/teams/${id}/projects`, { headers: auth('bob') });
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects invalid project payloads with 400', async () => {
+    const id = await createTeam('alice');
+    const res = await app.request(`/v1/teams/${id}/projects`, {
+      method: 'POST', headers: auth('alice'), body: JSON.stringify({ repoUrl: 'x' }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('deletes a project', async () => {
+    const id = await createTeam('alice');
+    const created = await app.request(`/v1/teams/${id}/projects`, {
+      method: 'POST', headers: auth('alice'), body: JSON.stringify({ name: 'Web' }),
+    });
+    const projectId = (await created.json()).id;
+    const res = await app.request(`/v1/teams/${id}/projects/${projectId}`, {
+      method: 'DELETE', headers: auth('alice'),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).deleted).toBe(true);
   });
 });
