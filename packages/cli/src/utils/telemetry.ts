@@ -24,7 +24,7 @@ const SEND_TIMEOUT_MS = 1500;
 /** A single telemetry event. All fields are anonymous. */
 export interface TelemetryEvent {
   /** Command invoked. */
-  command: 'run' | 'init' | 'update-baselines' | 'doctor' | 'monitor';
+  command: 'run' | 'init' | 'update-baselines' | 'doctor' | 'monitor' | 'plugin-install';
   /** Frontguard version. */
   version: string;
   /** Number of routes tested (run only). */

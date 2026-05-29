@@ -1,4 +1,4 @@
 {
 "title": "Guides",
-"pages": ["ai-analysis", "custom-plugins", "github-actions", "migrate-from-backstopjs", "migrate-from-lost-pixel", "frontguard-vs-percy", "frontguard-vs-chromatic"]
+"pages": ["ai-analysis", "custom-plugins", "create-plugin", "github-actions", "migrate-from-backstopjs", "migrate-from-lost-pixel", "frontguard-vs-percy", "frontguard-vs-chromatic"]
 }

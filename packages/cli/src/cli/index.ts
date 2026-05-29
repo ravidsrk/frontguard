@@ -13,6 +13,13 @@
 import { Command } from 'commander';
 import { loadConfig, detectFramework, generateDefaultConfig } from '../core/config.js';
 import { runPipeline, runJudgePipeline, updateBaselines } from '../core/pipeline.js';
+import {
+  installPlugin,
+  uninstallPlugin,
+  listInstalledPlugins,
+  resolvePackageName,
+  detectPackageManager,
+} from '../core/plugin-registry.js';
 import { runDoctor } from './doctor.js';
 import { getFrameworkInfo } from '../templates/index.js';
 import { generateGitHubActionsWorkflow } from '../templates/github-actions.js';
@@ -677,6 +684,79 @@ export async function main(argv?: string[]): Promise<number> {
         }
         return 0;
       });
+    });
+
+  // ---------------------------------------------------------------------------
+  // Command: plugin (Task 8.5) — install / list / uninstall marketplace plugins
+  // ---------------------------------------------------------------------------
+
+  const pluginCmd = program
+    .command('plugin')
+    .description('Manage Frontguard plugins from the npm registry');
+
+  pluginCmd
+    .command('install <name>')
+    .alias('add')
+    .description('Install a Frontguard plugin (e.g. "slack" → frontguard-plugin-slack)')
+    .action(async (name: string) => {
+      try {
+        const pm = detectPackageManager();
+        const target = resolvePackageName(name);
+        logger.info(`Installing ${target} with ${pm}…`);
+        const { packageName } = await installPlugin(name, { pm });
+        logger.info(`✅ Installed ${packageName}`);
+        logger.info(
+          `Add it to your config:\n` +
+            `  import plugin from '${packageName}';\n` +
+            `  export default { plugins: [plugin()] };`,
+        );
+        exitCode = 0;
+        await emitTelemetry({ command: 'plugin-install', version: VERSION });
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
+    });
+
+  pluginCmd
+    .command('uninstall <name>')
+    .alias('remove')
+    .description('Uninstall a Frontguard plugin')
+    .action(async (name: string) => {
+      try {
+        const { packageName } = await uninstallPlugin(name);
+        logger.info(`✅ Uninstalled ${packageName}`);
+        exitCode = 0;
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
+    });
+
+  pluginCmd
+    .command('list')
+    .alias('ls')
+    .description('List installed Frontguard plugins')
+    .action(async () => {
+      try {
+        const installed = listInstalledPlugins();
+        if (installed.length === 0) {
+          logger.info('No Frontguard plugins installed.');
+          logger.info('Browse plugins on npm: https://www.npmjs.com/search?q=frontguard-plugin');
+          exitCode = 0;
+          return;
+        }
+        logger.info(`Installed plugins (${installed.length}):`);
+        for (const p of installed) {
+          const ver = p.version ? `@${p.version}` : '';
+          const desc = p.description ? ` — ${p.description}` : '';
+          logger.info(`  • ${p.shortName} (${p.packageName}${ver})${desc}`);
+        }
+        exitCode = 0;
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
     });
 
   // ---------------------------------------------------------------------------
