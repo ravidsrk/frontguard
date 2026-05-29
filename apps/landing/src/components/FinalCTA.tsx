@@ -13,19 +13,19 @@ className={`flex flex-col items-center gap-6 ${inView ? 'animate-fade-up' : 'opa
 Never find out about CSS bugs from your users again
 </h2>
 <p className="max-w-xl text-base sm:text-lg text-[var(--color-text-muted)]">
-Install Frontguard in 30 seconds. Catch the bugs that pixel diffs miss.
+One npm install and a few lines in your Playwright tests. Catch the bugs that pixel diffs miss.
 </p>
 <a
 href="https://docs.frontguard.dev/docs/quick-start"
 className="touch-manipulation mt-2 inline-flex items-center gap-2 rounded-xl bg-[var(--color-cta)] px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-semibold text-[var(--color-bg)] shadow-lg shadow-orange-500/20 transition-[background-color,box-shadow] hover:bg-[var(--color-cta-hover)] hover:shadow-orange-500/30"
 >
-Install Frontguard in 30 Seconds
+Read the Quick Start
 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
 <path d="M3.5 9h11M10 4.5l4.5 4.5-4.5 4.5" />
 </svg>
 </a>
 <p className="text-sm text-[var(--color-text-dim)]">
-No credit card required. Free forever for individual developers.
+Free and open source under the MIT License. No account, no usage limits.
 </p>
 </div>
 </div>

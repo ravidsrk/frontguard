@@ -28,6 +28,7 @@
 
   /* Text */
   --color-text: #f1f5f9;
+  --color-text-secondary: #cbd5e1; /* legible secondary headlines on dark bg */
   --color-text-muted: #94a3b8;
   --color-text-dim: #768BA2;
 

@@ -13,13 +13,9 @@ const terminalLines: { prompt: boolean; text: string; tone?: string }[] = [
   { prompt: true, text: 'npx frontguard doctor' },
   { prompt: false, text: '✅ Node.js · Playwright · browsers · git — all checks passed' },
   { prompt: true, text: 'npx frontguard run --url http://localhost:3000' },
-  { prompt: false, text: '✘ /dashboard @ 375px — 2.34% changed', tone: 'text-red-400' },
-  {
-    prompt: false,
-    text: "  AI: \"Sidebar overlaps content (flex-direction change)\"",
-    tone: 'text-[var(--color-accent)]',
-  },
-  { prompt: false, text: '  🔴 Critical (confidence: 94%) — fix suggested', tone: 'text-red-400' },
+  { prompt: false, text: '✔ Discovered 8 routes · captured 24 screenshots (3.2s)', tone: 'text-[var(--color-success)]' },
+  { prompt: false, text: '✔ 24/24 checkpoints match baseline — no regressions', tone: 'text-[var(--color-success)]' },
+  { prompt: false, text: '  Done in 6.8s. Nothing to review.', tone: 'text-[var(--color-text-muted)]' },
 ];
 
 export default function DemoSection() {
@@ -41,7 +37,7 @@ export default function DemoSection() {
             See it in action
           </h2>
           <p className="mt-4 text-lg text-[var(--color-text-muted)]">
-            Init, check, run — and get an AI explanation of what broke. No dashboard required.
+            Three commands from zero to a green run. No config, no dashboard, no signup.
           </p>
         </div>
 
