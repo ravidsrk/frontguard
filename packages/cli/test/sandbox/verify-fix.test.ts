@@ -38,6 +38,7 @@ class FakeSandbox implements Sandbox {
   created = false;
   destroyed = false;
   patches: string[] = [];
+  lastParams?: import('../../src/sandbox/types.js').SandboxScreenshotParams;
   constructor(private readonly shot: Buffer, private readonly failOn?: 'create' | 'screenshot') {}
   async create() {
     if (this.failOn === 'create') throw new Error('boom-create');
@@ -46,7 +47,8 @@ class FakeSandbox implements Sandbox {
   async applyPatch(p: { content: string }) {
     this.patches.push(p.content);
   }
-  async screenshot() {
+  async screenshot(params: import('../../src/sandbox/types.js').SandboxScreenshotParams) {
+    this.lastParams = params;
     if (this.failOn === 'screenshot') throw new Error('boom-shot');
     return this.shot;
   }
@@ -145,6 +147,35 @@ describe('verifyFix', () => {
     });
     expect(result.fixApplied).toBe(false);
     expect(sandbox.destroyed).toBe(true);
+  });
+
+  it('threads config.maxHeight into the sandbox screenshot params', async () => {
+    const baseline = createTestPng(20, 20, 0, 0, 0);
+    const sandbox = new FakeSandbox(baseline);
+    const cfg = { ...baseConfig, maxHeight: 5000 } as unknown as FrontguardConfig;
+    await verifyFix(makeDiff(baseline), fix, cfg, {
+      baseUrl: 'http://localhost:3000',
+      sandboxImpl: sandbox,
+    });
+    expect(sandbox.lastParams?.maxHeight).toBe(5000);
+  });
+
+  it('verifies an effective fix on a tall page (baseline cropped to maxHeight)', async () => {
+    // The main renderer crops the baseline to maxHeight; the sandbox crops the
+    // after-fix buffer identically, so dimensions match and the diff is real
+    // instead of always 100%.
+    const maxHeight = 100;
+    const baselineCropped = createTestPng(20, maxHeight, 0, 0, 0);
+    // Fake sandbox returns a buffer already cropped to the same dimensions.
+    const sandbox = new FakeSandbox(baselineCropped);
+    const cfg = { ...baseConfig, maxHeight } as unknown as FrontguardConfig;
+    const result = await verifyFix(makeDiff(baselineCropped), fix, cfg, {
+      baseUrl: 'http://localhost:3000',
+      sandboxImpl: sandbox,
+    });
+    expect(sandbox.lastParams?.maxHeight).toBe(maxHeight);
+    expect(result.verified).toBe(true);
+    expect(result.diffPercentage).toBe(0);
   });
 
   it('respects per-route threshold override', async () => {

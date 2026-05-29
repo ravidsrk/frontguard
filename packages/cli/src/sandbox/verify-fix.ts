@@ -90,6 +90,7 @@ export async function verifyFix(
       viewport: diff.viewport,
       browser: diff.browser,
       viewportHeight: config.viewportHeight,
+      maxHeight: config.maxHeight,
     });
 
     const afterDiff = diffPercentageBetween(diff.baselineImage, afterBuffer);

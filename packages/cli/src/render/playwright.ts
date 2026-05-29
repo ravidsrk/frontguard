@@ -15,7 +15,6 @@ import {
   type BrowserContext,
   type Page,
 } from 'playwright';
-import { PNG } from 'pngjs';
 import type {
   FrontguardConfig,
   Route,
@@ -23,6 +22,7 @@ import type {
   BrowserEngine,
 } from '../core/types.js';
 import { logger } from '../utils/logger.js';
+import { cropToMaxHeight } from './crop.js';
 
 // ---------------------------------------------------------------------------
 // Browser engine map
@@ -400,47 +400,4 @@ function findConsensusScreenshot(buffers: Buffer[]): Buffer {
   return groups[0].buffer;
 }
 
-/**
- * Crop a PNG buffer to a maximum height, preserving width.
- * If the image is shorter than maxHeight it is returned unchanged.
- */
-async function cropToMaxHeight(
-  buffer: Buffer,
-  maxHeight: number,
-): Promise<Buffer> {
-  return new Promise<Buffer>((resolve, reject) => {
-    const png = new PNG();
-    png.parse(buffer, (err, parsed) => {
-      if (err) {
-        // If we can't parse, return the original buffer rather than crashing
-        logger.warn(`Could not parse PNG for cropping: ${err.message}`);
-        resolve(buffer);
-        return;
-      }
 
-      if (parsed.height <= maxHeight) {
-        resolve(buffer);
-        return;
-      }
-
-      // Create a cropped PNG
-      const cropped = new PNG({ width: parsed.width, height: maxHeight });
-      const bytesPerRow = parsed.width * 4;
-
-      for (let y = 0; y < maxHeight; y++) {
-        parsed.data.copy(
-          cropped.data,
-          y * bytesPerRow,
-          y * bytesPerRow,
-          (y + 1) * bytesPerRow,
-        );
-      }
-
-      const chunks: Uint8Array[] = [];
-      const stream = cropped.pack();
-      stream.on('data', (chunk: Uint8Array) => chunks.push(chunk));
-      stream.on('end', () => resolve(Buffer.concat(chunks) as Buffer));
-      stream.on('error', reject);
-    });
-  });
-}
