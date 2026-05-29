@@ -10,6 +10,7 @@
 
 import type { Sandbox, SandboxPatch, SandboxScreenshotParams } from './types.js';
 import { logger } from '../utils/logger.js';
+import { cropToMaxHeight } from '../render/crop.js';
 
 /** Local Playwright-based sandbox. */
 export class LocalSandbox implements Sandbox {
@@ -62,9 +63,15 @@ export class LocalSandbox implements Sandbox {
       // Let the layout settle after patches.
       await page.waitForTimeout(300);
 
-      const buffer = await page.screenshot({ fullPage: true, type: 'png' });
+      let buffer = Buffer.from(await page.screenshot({ fullPage: true, type: 'png' }));
       await context.close();
-      return Buffer.from(buffer);
+
+      // Crop to maxHeight so the after-fix buffer matches the main renderer's
+      // baseline dimensions on tall pages (otherwise the diff is always 100%).
+      if (params.maxHeight && params.maxHeight > 0) {
+        buffer = Buffer.from(await cropToMaxHeight(buffer, params.maxHeight));
+      }
+      return buffer;
     } finally {
       await browser.close();
     }

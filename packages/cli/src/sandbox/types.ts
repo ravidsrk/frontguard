@@ -31,6 +31,12 @@ export interface SandboxScreenshotParams {
   browser: BrowserEngine;
   /** Optional viewport height (defaults to 720). */
   viewportHeight?: number;
+  /**
+   * Optional max screenshot height in px. When set, the captured full-page
+   * screenshot is cropped to this height, matching the main renderer so the
+   * before/after buffers share dimensions on tall pages.
+   */
+  maxHeight?: number;
 }
 
 /**

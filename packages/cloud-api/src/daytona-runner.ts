@@ -14,6 +14,14 @@ export interface RunRequest {
   openaiKey?: string;
 }
 
+/** A screenshot PNG downloaded from the sandbox, awaiting persistence. */
+export interface SandboxScreenshot {
+  /** Reporter image basename, e.g. `home_1440_chromium_0_baseline`. */
+  name: string;
+  type: 'baseline' | 'current' | 'diff';
+  bytes: Uint8Array;
+}
+
 export interface RunResult {
   results: Array<{
     route: string;
@@ -27,6 +35,8 @@ export interface RunResult {
   }>;
   reportHtml: string;
   duration: number;
+  /** Screenshot PNGs downloaded from `{outputDir}/images/` (may be empty). */
+  screenshots: SandboxScreenshot[];
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +165,11 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
       // Report not generated
     }
 
-    return { results, reportHtml, duration };
+    // Download screenshot PNGs written by the reporter under output/images/.
+    // Best-effort: a missing images dir simply yields no screenshots.
+    const screenshots = await downloadScreenshots(sandbox, `${outputDir}/images`);
+
+    return { results, reportHtml, duration, screenshots };
   } finally {
     // Always destroy the sandbox — best-effort cleanup
     try {
@@ -164,4 +178,54 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
       // Sandbox may already be deleted via ephemeral + autoDeleteInterval
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Screenshot download
+// ---------------------------------------------------------------------------
+
+/** A minimal structural view of the Daytona sandbox filesystem we rely on. */
+interface SandboxFs {
+  fs: {
+    listFiles(path: string): Promise<Array<{ name: string }>>;
+    downloadFile(remotePath: string, timeout?: number): Promise<Buffer>;
+  };
+}
+
+/** Maps a reporter image basename to its screenshot type. */
+function screenshotTypeFromName(name: string): SandboxScreenshot['type'] | null {
+  if (name.endsWith('_baseline')) return 'baseline';
+  if (name.endsWith('_current')) return 'current';
+  if (name.endsWith('_diff')) return 'diff';
+  return null;
+}
+
+/**
+ * Downloads every `*.png` written by the HTML reporter under `imagesDir`.
+ * Exported for testing. Best-effort: returns `[]` if the directory is missing.
+ */
+export async function downloadScreenshots(
+  sandbox: SandboxFs,
+  imagesDir: string,
+): Promise<SandboxScreenshot[]> {
+  let entries: Array<{ name: string }>;
+  try {
+    entries = await sandbox.fs.listFiles(imagesDir);
+  } catch {
+    return [];
+  }
+  const out: SandboxScreenshot[] = [];
+  for (const entry of entries) {
+    if (!entry.name.endsWith('.png')) continue;
+    const base = entry.name.slice(0, -4);
+    const type = screenshotTypeFromName(base);
+    if (!type) continue;
+    try {
+      const buf = await sandbox.fs.downloadFile(`${imagesDir}/${entry.name}`);
+      out.push({ name: base, type, bytes: new Uint8Array(buf) });
+    } catch {
+      // Skip unreadable files.
+    }
+  }
+  return out;
 }
