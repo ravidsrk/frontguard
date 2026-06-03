@@ -144,6 +144,7 @@ export function createThirdPartyScriptPlugin(
 ): FrontguardPlugin {
   const historyDir = config.historyDir ?? '.frontguard/script-inventory';
   let collected: ThirdPartyScriptResult[] = [];
+  let nextInventory: ScriptInventory | null = null;
 
   return {
     name: 'frontguard-third-party-scripts',
@@ -177,7 +178,7 @@ export function createThirdPartyScriptPlugin(
         next[key] = thirdParty;
       }
 
-      saveInventory(historyDir, next);
+      nextInventory = next;
       collected = results;
       ctx.metadata.set('third-party-scripts:results', results);
 
@@ -192,6 +193,9 @@ export function createThirdPartyScriptPlugin(
     afterRun(result: RunResult): void {
       if (collected.length > 0) {
         result.thirdPartyScripts = collected;
+      }
+      if (nextInventory !== null) {
+        saveInventory(historyDir, nextInventory);
       }
     },
   };
