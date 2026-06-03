@@ -573,6 +573,36 @@ export interface RunTiming {
  * Includes aggregate summary, per-route diffs, timing, and the config
  * that was used so reports can reproduce the run.
  */
+/**
+ * A single performance budget result for one route × viewport, surfaced onto
+ * the {@link RunResult} so reporters can correlate budget violations with the
+ * visual diff for the same route. Mirrors the perf-budgets plugin's internal
+ * `BudgetCheckResult` without coupling core types to the plugin module.
+ */
+export interface PerfReport {
+  /** Route path. */
+  route: string;
+  /** Viewport width in px. */
+  viewport: number;
+  /** Collected metrics for this route × viewport. */
+  metrics: {
+    lcp?: number;
+    cls?: number;
+    ttfb?: number;
+    /** Total page weight in bytes. */
+    pageWeight?: number;
+    /** Number of resource requests. */
+    resources?: number;
+  };
+  /** Budget violations (empty when the route is within all budgets). */
+  violations: Array<{
+    metric: string;
+    actual: number;
+    budget: number;
+    unit: string;
+  }>;
+}
+
 export interface RunResult {
   /** Aggregate summary counts. */
   summary: {
@@ -597,8 +627,30 @@ export interface RunResult {
   config: FrontguardConfig;
   /** Accessibility audit results (Task 5.1), if the a11y plugin ran. */
   accessibility?: AccessibilityResult[];
+  /** Performance budget results, if the perf-budgets plugin ran. */
+  perf?: PerfReport[];
+  /** Third-party script inventory changes, if the third-party-scripts plugin ran. */
+  thirdPartyScripts?: ThirdPartyScriptResult[];
   /** Model-as-judge verdicts (Task 8.4), if judge mode ran. */
   judgements?: JudgeResult[];
+}
+
+/**
+ * Third-party script inventory change for one route × viewport, surfaced onto
+ * the {@link RunResult} by the third-party-scripts plugin. Reports script
+ * origins that appeared or disappeared since the previous run.
+ */
+export interface ThirdPartyScriptResult {
+  /** Route path. */
+  route: string;
+  /** Viewport width in px. */
+  viewport: number;
+  /** Third-party origins newly present this run. */
+  added: string[];
+  /** Third-party origins no longer present this run. */
+  removed: string[];
+  /** Full third-party origin list observed this run. */
+  current: string[];
 }
 
 // ---------------------------------------------------------------------------

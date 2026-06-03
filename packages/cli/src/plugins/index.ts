@@ -51,3 +51,11 @@ export type {
   AccessibilityConfig,
   RawAxeResults,
 } from './accessibility.js';
+
+// Third-party script monitoring plugin
+export {
+  createThirdPartyScriptPlugin,
+  extractScriptOrigins,
+  diffScriptInventory,
+} from './third-party-scripts.js';
+export type { ThirdPartyScriptConfig } from './third-party-scripts.js';

@@ -14,6 +14,7 @@ import type {
   RunResult,
   FrontguardConfig,
   Route,
+  PerfReport,
 } from '../core/types.js';
 
 // ---------------------------------------------------------------------------
@@ -283,9 +284,29 @@ export function createPerfBudgetPlugin(config: PerfBudgetConfig): FrontguardPlug
     },
 
     // ----- afterRun -----
-    afterRun(_result: RunResult, ctx: PluginContext): void {
+    afterRun(result: RunResult, ctx: PluginContext): void {
       const total = budgetResults.length;
       const failed = budgetResults.filter((r) => !r.passed).length;
+
+      // Surface results onto the RunResult so reporters can correlate perf
+      // budget violations with the visual diff for the same route × viewport
+      // (canonical-delivery pattern, mirroring the a11y plugin).
+      if (budgetResults.length > 0) {
+        result.perf = budgetResults.map(
+          (r): PerfReport => ({
+            route: r.route,
+            viewport: r.viewport,
+            metrics: {
+              lcp: r.metrics.lcp,
+              cls: r.metrics.cls,
+              ttfb: r.metrics.ttfb,
+              pageWeight: r.metrics.pageWeight,
+              resources: r.metrics.resources,
+            },
+            violations: r.violations,
+          }),
+        );
+      }
 
       // Store summary in metadata for reporters
       ctx.metadata.set('perf:summary', { total, passed: total - failed, failed });
