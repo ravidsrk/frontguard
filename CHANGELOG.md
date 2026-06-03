@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-06-03
+
+The "earn trust" release. The core engine is joined by an AI auto-fix moat, a
+cloud platform, production monitoring, and a full integration surface.
+
+### Added
+
+- **`frontguard doctor`** — environment diagnostics for sources of
+  non-determinism (Node, Playwright/Chromium versions, browser availability,
+  config validity, git state)
+- **`frontguard monitor`** — live production URL monitoring with `--once`,
+  `--watch`/`--interval` daemon polling, `--history` inspection, and webhook alerts
+- **Per-route overrides** — `routes` entries may be objects with per-route
+  `threshold`, `ignore`, and `viewport`
+- **PR thumbnail grid** — PR comments embed before/after/diff thumbnails, backed
+  by a 4-backend image-upload layer (Cloudflare R2, AWS S3, GitHub Actions
+  artifacts, local) configured via `imageUpload`
+- **AI fix generation + sandbox verification** — `generateFixes` produces minimal
+  CSS patches; `verifyFixes` applies them in a sandbox (`fixSandbox: 'local' | 'daytona'`),
+  re-renders, and re-compares against baseline, marking verified fixes distinctly
+- **Fix-pattern database** — `better-sqlite3`-backed store with `accept-fix`,
+  `reject-fix`, and `export-patterns` commands; the pipeline reuses patterns
+  accepted ≥3 times before calling the AI
+- **Accessibility audits** — axe-core plugin running in the same render pass,
+  reporting WCAG violations (contrast, alt text, target size, focus, heading
+  order) in console, HTML, and PR reports; optional `failOnViolation`
+- **Performance budgets + visual correlation** — perf-budgets plugin collects
+  LCP/CLS/TTFB/page-weight/requests; budget violations are surfaced on
+  `RunResult.perf` and **correlated inline with the visual diff for the same route**
+- **Third-party script monitoring** — new plugin inventories `<script src>`
+  origins per page and reports third-party origins added/removed since the
+  previous run (`RunResult.thirdPartyScripts`)
+- **PagerDuty alerts** — cloud monitors deliver to PagerDuty (Events API v2)
+  alongside Slack and email, with fingerprint-based deduplication and snooze
+- **Cloud platform** (`packages/cloud-api`) — Hono service with run submission,
+  status, reports, baseline approval, usage metering; Cloudflare D1 persistence
+  and R2 screenshot storage; GitHub OAuth + hashed API keys + rate limiting
+- **Production monitoring scheduler** — Cloudflare Workers Cron trigger runs due
+  monitors on cadence, retries, prunes history per plan, and meters usage
+- **Teams & billing** — multi-tenant teams with roles, invitations, baseline
+  approvals, and an activity feed; Stripe billing with per-plan limits/gates
+- **Integrations** — real Vercel OAuth app (webhook-driven preview runs), Netlify
+  Build Plugin, and GitHub App (signature verification, Check Runs, install flow)
+- **Judge mode** — model-as-judge verdicts on a run
+- **Docs** — new guides for AI fixes, accessibility, performance budgets,
+  third-party scripts, production monitoring, and the cloud API; configuration
+  reference extended with per-route overrides and image upload
+
+### Changed
+
+- **Documentation site** migrated from VitePress to Fumadocs (Next.js + MDX)
+- **Reporters** (console, HTML, PR, JSON) now render accessibility, performance,
+  and third-party-script sections in addition to visual diffs
+- Version bumped to **0.2.0**
+
+### Fixed
+
+- **`freezeTime`** now actually freezes the clock during rendering
+
 ## [0.1.0] - 2026-01-01
 
 ### Added

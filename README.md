@@ -183,13 +183,15 @@ export default {
 
 ## Plugins
 
-Frontguard ships with a plugin architecture (6 lifecycle hooks) and 3 built-in plugins:
+Frontguard ships with a plugin architecture (6 lifecycle hooks) and 5 built-in plugins:
 
 | Plugin | Description | Key Features |
 |--------|-------------|--------------|
 | **Figma** (`src/plugins/figma.ts`) | Design-to-code comparison | Figma API integration, design token extraction, component mapping |
-| **Performance Budgets** (`src/plugins/perf-budgets.ts`) | Bundle size & Web Vitals | LCP/FID/CLS thresholds, budget violation reporting |
-| **Monitor** (`src/plugins/monitor.ts`) | Production visual monitoring | Uptime checks, latency tracking, alerting thresholds |
+| **Performance Budgets** (`src/plugins/perf-budgets.ts`) | Web Vitals & budgets | LCP/CLS/TTFB thresholds, violations correlated with the visual diff |
+| **Accessibility** (`src/plugins/accessibility.ts`) | axe-core audits | WCAG checks (contrast, alt text, target size, focus, headings) in the same render pass |
+| **Third-Party Scripts** (`src/plugins/third-party-scripts.ts`) | Script drift detection | Flags ad/analytics/widget origins that appear or disappear between runs |
+| **Monitor** (`src/plugins/monitor.ts`) | Production visual monitoring (CLI + optional cloud scheduler) | Live-URL checks, threshold alerting, history tracking |
 
 **Plugin lifecycle hooks:** `beforeDiscover`, `afterDiscover`, `afterRender`, `afterCompare`, `afterRun`, `onError`
 
@@ -216,7 +218,7 @@ src/
 ├── diff/             # Pixel diff + AI vision analysis
 ├── storage/          # Git orphan branch baselines
 ├── report/           # Console, JSON, HTML, GitHub PR reporters
-├── plugins/          # Figma, perf budgets, monitoring
+├── plugins/          # Figma, perf budgets, accessibility, third-party scripts, monitoring
 └── utils/            # Redaction, logging, retry
 ```
 

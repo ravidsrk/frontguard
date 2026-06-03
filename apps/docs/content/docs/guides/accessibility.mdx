@@ -1,0 +1,72 @@
+---
+title: Accessibility Audits
+description: Run axe-core accessibility checks in the same render pass as your visual tests — contrast, alt text, target size, focus, and heading order — surfaced in every report.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Accessibility Audits
+
+Frontguard can run an [axe-core](https://github.com/dequelabs/axe-core)
+accessibility audit on every route in the **same render pass** as your visual
+tests — no extra rendering cost. WCAG violations are reported in the console,
+HTML, and PR reports right alongside the visual diffs.
+
+## Enabling it
+
+The accessibility plugin uses `@axe-core/playwright` as an optional peer
+dependency. Install it and add the plugin to your config:
+
+```bash
+npm install -D @axe-core/playwright
+```
+
+```typescript title="frontguard.config.ts"
+import { createAccessibilityPlugin } from 'frontguard/plugins';
+
+export default {
+  baseUrl: 'http://localhost:3000',
+  plugins: [
+    createAccessibilityPlugin({
+      impact: 'serious',     // minimum impact to report
+      failOnViolation: false, // report-only by default
+    }),
+  ],
+};
+```
+
+<Callout type="info">
+  If `@axe-core/playwright` isn't installed, the plugin warns once and skips —
+  it never fails your run for a missing dependency.
+</Callout>
+
+## What it checks
+
+axe-core covers the common WCAG rules, including:
+
+| Rule | Catches |
+|------|---------|
+| `color-contrast` | Text/background contrast below WCAG thresholds |
+| `image-alt` | Images missing alt text |
+| `target-size` | Touch targets that are too small |
+| `focus-*` | Missing/invisible focus indicators |
+| `heading-order` | Skipped or out-of-order heading levels |
+
+## Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `impact` | `'minor' \| 'moderate' \| 'serious' \| 'critical'` | `'minor'` | Minimum impact level to report |
+| `rules` | `string[]` | — | Allowlist of axe rule ids (only these run) |
+| `excludeRules` | `string[]` | — | Denylist of axe rule ids |
+| `failOnViolation` | `boolean` | `false` | Fail the run on violations at/above `impact` |
+
+By default, accessibility violations are reported as **warnings** and don't fail
+the build. Set `failOnViolation: true` to make `serious`/`critical` violations a
+hard failure — useful for enforcing an a11y gate in CI.
+
+## In reports
+
+Violations appear under an **♿ Accessibility** section in every reporter, grouped
+by route and viewport, each with its impact level, rule id (linked to the axe
+help page), description, and the offending element selector.

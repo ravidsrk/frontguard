@@ -1,0 +1,102 @@
+---
+title: Cloud API
+description: Optional hosted rendering, persistent history, team collaboration, and multi-channel alerting. The CLI is fully self-hostable — the cloud is for teams that want managed infrastructure.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Cloud API
+
+The Frontguard CLI is **fully self-hostable** — it renders locally, stores
+baselines in your own git repo, and never requires an account. The Cloud API is
+an optional managed layer for teams that want hosted rendering, persistent
+history, shared baselines, and team collaboration.
+
+<Callout type="info">
+  You never need the cloud to use Frontguard. Reach for it when you want a team
+  to share baselines and history, or want rendering to run off your machines.
+</Callout>
+
+## Architecture
+
+The cloud is a [Hono](https://hono.dev) service deployed on Cloudflare Workers:
+
+- **Runs** are submitted to the API and executed in an ephemeral
+  [Daytona](https://daytona.io) sandbox (Playwright pre-installed).
+- **Persistent storage** uses Cloudflare **D1** (SQLite) for run/monitor/team
+  metadata and **R2** for screenshot blobs.
+- **Auth** is GitHub OAuth (for the dashboard) plus hashed API keys (for CI),
+  with per-key rate limiting.
+
+## Authentication
+
+<Callout type="info">
+  Sign in to the dashboard with GitHub, then create an API key for CI use. Pass
+  it as a bearer token on every request.
+</Callout>
+
+```bash
+export FRONTGUARD_API_KEY=fg_live_…
+curl -H "Authorization: Bearer $FRONTGUARD_API_KEY" https://api.frontguard.dev/v1/usage
+```
+
+## Key endpoints
+
+| Method & path | Purpose |
+|---------------|---------|
+| `POST /v1/run` | Submit a visual regression run (async) |
+| `GET /v1/runs/:id` | Check run status |
+| `GET /v1/runs` | List runs |
+| `GET /v1/reports/:id` | Fetch the HTML report |
+| `POST /v1/baselines/:runId/approve` | Approve a run's screenshots as baselines |
+| `GET /v1/screenshots/:runId` | List screenshot metadata for a run |
+| `GET /v1/usage` | Current usage against plan limits |
+| `GET/POST /v1/monitors` | Manage production monitors |
+| `GET/POST /v1/teams` | Manage teams and members |
+
+## Alerting
+
+Production monitors deliver alerts to multiple channels, with deduplication and
+snooze so a single ongoing regression doesn't page you every cron cycle.
+
+| Channel | Configure with | Notes |
+|---------|----------------|-------|
+| **Slack** | `alerts.slack` (incoming webhook URL) | Block Kit message |
+| **Email** | `alerts.email` (array of addresses) | Via Resend |
+| **PagerDuty** | `alerts.pagerduty` (Events API v2 routing key) | Opens an incident; `dedup_key` groups identical regression sets |
+
+- **Deduplication:** alerts are fingerprinted by the set of affected
+  route+viewport pairs. An identical regression set won't alert twice; a
+  *different* set always does.
+- **Snooze:** `POST /v1/monitors/:id/snooze` suppresses alerts for N hours.
+- **Test:** `POST /v1/monitors/:id/test-alert` sends a sample to every
+  configured channel (bypasses dedup/snooze).
+
+```bash title="A monitor with all three channels"
+curl -X POST https://api.frontguard.dev/v1/monitors \
+  -H "Authorization: Bearer $FRONTGUARD_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Checkout",
+    "url": "https://shop.example.com",
+    "routes": ["/checkout"],
+    "intervalMinutes": 30,
+    "alertThreshold": 0.01,
+    "alerts": {
+      "slack": "https://hooks.slack.com/services/…",
+      "email": ["oncall@example.com"],
+      "pagerduty": "R0UT1NGK3Y…"
+    }
+  }'
+```
+
+## Plans & limits
+
+| Plan | Runs/mo | Screenshots/mo | History | Team | Monitors | Prod monitoring |
+|------|--------|----------------|---------|------|----------|-----------------|
+| Free | 50 | 500 | 7 days | 1 | 1 | — |
+| Pro | 500 | 5,000 | 30 days | 10 | 10 | — |
+| Business | Unlimited | Unlimited | 90 days | 50 | Unlimited | ✅ |
+
+Billing is handled through Stripe. Teams add shared baselines, role-based access
+(viewer / reviewer / admin), approval workflows, and an activity feed.
