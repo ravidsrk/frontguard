@@ -7,7 +7,9 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 # CLI Commands
 
-Frontguard provides three commands: `run`, `init`, and `update-baselines`.
+Frontguard provides: `run`, `init`, `update-baselines`, `doctor`, `monitor`, the
+fix-pattern commands (`accept-fix`, `reject-fix`, `export-patterns`), and the
+`plugin` subcommands (`install`, `uninstall`, `list`).
 
 ## `frontguard run`
 
@@ -104,6 +106,85 @@ This command:
 <Callout type="warn">
   This overwrites existing baselines. Make sure the current state of your app is correct before running this command.
 </Callout>
+
+---
+
+## `frontguard doctor`
+
+Diagnoses your environment for sources of non-determinism before you run tests —
+the table-stakes "is everything set up right?" check.
+
+```bash
+frontguard doctor
+```
+
+It checks Node and Playwright/Chromium versions, browser availability, config
+validity, and git state, printing actionable warnings for anything that could
+cause flaky diffs (missing browser binaries, an invalid config, etc.). Exit code
+`0` means the environment is ready.
+
+---
+
+## `frontguard monitor`
+
+Runs visual checks against **live production URLs** instead of a local dev
+server — the CLI side of production monitoring. See the
+[Production Monitoring guide](/docs/guides/production-monitoring) for the full
+workflow.
+
+```bash
+frontguard monitor --url https://example.com,https://example.com/pricing
+```
+
+### Options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-u, --url <urls>` | Comma-separated URLs to monitor | From config |
+| `-c, --config <path>` | Config file path | Auto-detected |
+| `-t, --threshold <n>` | Alert threshold percentage (0–100) | `5` |
+| `--webhook <url>` | Webhook URL for alerts (Slack, Discord, …) | — |
+| `--history-dir <dir>` | Directory to store run history | `.frontguard/monitor-history` |
+| `--interval <minutes>` | Run repeatedly every N minutes (daemon mode) | — |
+| `--watch` | Continuously poll (local dev) | `false` |
+| `--history` | Print recent stored history and exit | `false` |
+| `--limit <n>` | History rows to show with `--history` | `20` |
+| `--once` | Run a single check and exit | (default) |
+
+```bash title="One-off check"
+frontguard monitor --url https://example.com --threshold 2
+```
+
+```bash title="Daemon mode — check every 15 minutes"
+frontguard monitor --url https://example.com --interval 15 --webhook $SLACK_WEBHOOK
+```
+
+```bash title="Inspect stored history"
+frontguard monitor --history --limit 50
+```
+
+---
+
+## Fix-pattern commands
+
+Frontguard learns from the AI fixes you accept or reject. See the
+[AI Fixes guide](/docs/guides/ai-fixes) for the full loop.
+
+| Command | Description |
+|---------|-------------|
+| `frontguard accept-fix <id>` | Mark a suggested fix as accepted (positive training signal) |
+| `frontguard reject-fix <id>` | Mark a suggested fix as rejected (negative signal) |
+| `frontguard export-patterns` | Export the local fix-pattern database as JSON |
+
+---
+
+## Plugin commands
+
+| Command | Description |
+|---------|-------------|
+| `frontguard plugin install <name>` | Install a Frontguard plugin from npm |
+| `frontguard plugin uninstall <name>` | Remove an installed plugin |
+| `frontguard plugin list` | List installed plugins |
 
 ---
 

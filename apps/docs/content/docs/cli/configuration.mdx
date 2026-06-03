@@ -79,7 +79,7 @@ export default {
 |--------|------|---------|-------------|
 | `version` | `number` | `1` | Config schema version |
 | `baseUrl` | `string` | — | **Required.** Base URL of the application under test |
-| `routes` | `string[]` | — | Explicit list of route paths to test |
+| `routes` | `(string \| RouteConfig)[]` | — | Explicit routes — plain strings or per-route override objects |
 | `discover` | `DiscoverOptions` | — | Auto-discovery configuration |
 | `viewports` | `number[]` | `[375, 768, 1440]` | Viewport widths in pixels |
 | `browsers` | `BrowserEngine[]` | `['chromium']` | Browser engines: `chromium`, `firefox`, `webkit` |
@@ -98,6 +98,32 @@ Route discovery supports three modes:
 - **Crawler** — Follows links starting from `startUrl`
 - **Filesystem** — Reads routes from framework file structure (Next.js `app/`, SvelteKit `routes/`, etc.)
 - **Config** — Explicit `routes` array
+
+### Per-Route Overrides
+
+Different pages need different sensitivity. A marketing page with a rotating
+testimonial carousel needs a looser threshold than a checkout form. Any entry
+in `routes` can be an object instead of a plain string:
+
+```typescript
+routes: [
+  '/',                                          // global threshold
+  { path: '/checkout', threshold: 0.001 },      // strict — 0.1%
+  { path: '/blog/*', threshold: 0.05 },         // lenient — 5%
+  { path: '/pricing', ignore: ['.testimonial-carousel'] },
+  { path: '/gallery', viewport: [1440] },       // only test at desktop
+]
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `path` | `string` | **Required.** Route path (the only required field) |
+| `threshold` | `number` | Overrides the global `threshold` for this route (0.0–1.0) |
+| `ignore` | `IgnoreRule[]` | Additional ignore rules applied only to this route |
+| `viewport` | `number[]` | Restrict this route to specific viewport widths |
+| `label` | `string` | Human-readable label shown in reports |
+
+When `threshold` is omitted, the route inherits the global `threshold`.
 
 ### AI Configuration
 
@@ -171,6 +197,44 @@ npx playwright codegen --save-storage=playwright-auth.json http://localhost:3000
 
 <Callout type="info">
   **Anti-flake rendering**: Set `antiFlakeRenders: 2` to capture each page twice. If both renders produce different results compared to the baseline, the diff is real. If only one does, it's a flake and gets ignored.
+</Callout>
+
+### Image Upload (PR Thumbnails)
+
+To embed before/after/diff **thumbnails** directly in GitHub PR comments, the
+images need a public URL — GitHub can't render local file paths. Configure an
+`imageUpload` backend and the PR reporter renders an inline `<table>` of
+thumbnails linking to the full-size images. Without it, PR comments fall back to
+a text-only summary.
+
+```typescript
+imageUpload: {
+  provider: 'r2', // 'r2' | 's3' | 'github-artifacts' | 'local'
+  bucket: 'frontguard-screenshots',
+  endpoint: 'https://<account>.r2.cloudflarestorage.com',
+  publicUrlPrefix: 'https://cdn.example.com', // public domain for the bucket
+}
+```
+
+| Provider | Use case | Credentials |
+|----------|----------|-------------|
+| `r2` | Cloudflare R2 (recommended) | `FRONTGUARD_S3_ACCESS_KEY` / `FRONTGUARD_S3_SECRET_KEY` |
+| `s3` | AWS S3 | `FRONTGUARD_S3_ACCESS_KEY` / `FRONTGUARD_S3_SECRET_KEY` |
+| `github-artifacts` | Link to CI run artifacts | Uses `GITHUB_*` env in Actions |
+| `local` | Local dev / CI artifact dir | None |
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `provider` | `string` | **Required.** Backend: `r2`, `s3`, `github-artifacts`, `local` |
+| `bucket` | `string` | Bucket name (R2/S3) |
+| `region` | `string` | Region (S3; R2 uses `auto`) |
+| `endpoint` | `string` | Custom endpoint (R2 account endpoint) |
+| `publicUrlPrefix` | `string` | Public URL prefix for a custom domain / public bucket |
+| `project` | `string` | Namespace used in object keys (default `frontguard`) |
+
+<Callout type="info">
+  Only "interesting" diffs (regressions, changes, new pages, flakes) are
+  uploaded — not every passing screenshot — keeping storage and PR comments lean.
 </Callout>
 
 ### Baselines
