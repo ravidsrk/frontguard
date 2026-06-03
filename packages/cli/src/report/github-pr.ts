@@ -7,7 +7,7 @@
  * @module report/github-pr
  */
 
-import type { Reporter, PipelineStage, RunResult, DiffResult } from '../core/types.js';
+import type { Reporter, PipelineStage, RunResult, DiffResult, PerfReport } from '../core/types.js';
 import { logger } from '../utils/logger.js';
 
 // ---------------------------------------------------------------------------
@@ -18,6 +18,15 @@ const COMMENT_MARKER = '<!-- frontguard-report -->';
 const MAX_COMMENT_SIZE = 60_000; // GitHub's comment limit is ~65536, leave margin
 const GITHUB_API = 'https://api.github.com';
 
+/** Formats a perf metric value with its unit (ms → s, bytes → KB). */
+function formatPerfValue(value: number, unit: string): string {
+  if (unit === 'ms') return `${(value / 1000).toFixed(2)}s`;
+  if (unit === 'KB') return `${value.toFixed(0)}KB`;
+  if (unit === 'reqs') return `${Math.round(value)} reqs`;
+  if (unit === '') return value.toFixed(3);
+  return `${value}${unit}`;
+}
+
 // ---------------------------------------------------------------------------
 // GitHub PR Reporter
 // ---------------------------------------------------------------------------
@@ -26,6 +35,8 @@ export class GitHubPRReporter implements Reporter {
   private owner: string;
   private repo: string;
   private prNumber: number;
+  /** Perf results keyed by `route@viewport`, populated per `generateComment`. */
+  private perfByKey = new Map<string, PerfReport>();
 
   constructor(options?: { owner?: string; repo?: string; prNumber?: number }) {
     this.owner = options?.owner ?? '';
@@ -81,6 +92,12 @@ export class GitHubPRReporter implements Reporter {
     const { summary } = result;
     const sections: string[] = [];
 
+    // Index perf results by route@viewport so each diff can be annotated with
+    // the budget violations for the same page (perf ↔ visual correlation).
+    this.perfByKey = new Map(
+      (result.perf ?? []).map((p) => [`${p.route}@${p.viewport}`, p]),
+    );
+
     // Marker for finding existing comments
     sections.push(COMMENT_MARKER);
 
@@ -88,10 +105,17 @@ export class GitHubPRReporter implements Reporter {
     // badge — but still surface accessibility violations if any were found.
     const allPassing = summary.regressions === 0 && summary.warnings === 0 && summary.errors === 0 && summary.newPages === 0;
     const hasA11yViolations = !!result.accessibility?.some((r) => r.violations.length > 0);
+    const hasPerfViolations = !!result.perf?.some((p) => p.violations.length > 0);
     if (allPassing && summary.total > 0) {
       sections.push(`# ✅ Frontguard — All ${summary.total} pages match baselines`);
       if (hasA11yViolations) {
         sections.push(this.generateAccessibilitySection(result));
+      }
+      if (hasPerfViolations) {
+        sections.push(this.generatePerformanceSection(result));
+      }
+      if (result.thirdPartyScripts && result.thirdPartyScripts.some((t) => t.added.length > 0 || t.removed.length > 0)) {
+        sections.push(this.generateThirdPartyScriptsSection(result));
       }
       sections.push(this.generateFooter(result));
       return sections.join('\n\n');
@@ -121,6 +145,16 @@ export class GitHubPRReporter implements Reporter {
     // Accessibility (Task 5.1)
     if (result.accessibility && result.accessibility.some((r) => r.violations.length > 0)) {
       sections.push(this.generateAccessibilitySection(result));
+    }
+
+    // Performance budgets — correlated with the visual diffs above.
+    if (result.perf && result.perf.some((p) => p.violations.length > 0)) {
+      sections.push(this.generatePerformanceSection(result));
+    }
+
+    // Third-party script changes.
+    if (result.thirdPartyScripts && result.thirdPartyScripts.some((t) => t.added.length > 0 || t.removed.length > 0)) {
+      sections.push(this.generateThirdPartyScriptsSection(result));
     }
 
     // Summary table
@@ -198,10 +232,69 @@ export class GitHubPRReporter implements Reporter {
         lines.push(...this.renderFix(diff));
       }
 
+      // Perf ↔ visual correlation: surface budget violations for this page.
+      lines.push(...this.renderPerfForDiff(diff));
+
       lines.push('</details>');
       lines.push('');
     }
 
+    return lines.join('\n');
+  }
+
+  /**
+   * Renders an inline performance note for a diff when the same route ×
+   * viewport breached a perf budget — joining the visual regression with the
+   * performance regression ("this page shifted *and* is over its LCP budget").
+   * Returns an empty array when there is nothing to report.
+   */
+  private renderPerfForDiff(diff: DiffResult): string[] {
+    const perf = this.perfByKey.get(`${diff.route.path}@${diff.viewport}`);
+    if (!perf || perf.violations.length === 0) return [];
+    const items = perf.violations
+      .map((v) => `${v.metric} ${formatPerfValue(v.actual, v.unit)} > ${formatPerfValue(v.budget, v.unit)}`)
+      .join(', ');
+    return [`> ⚡ **Performance** — over budget: ${items}`, ''];
+  }
+
+  /**
+   * Renders a summary section of all perf-budget violations across the run.
+   */
+  private generatePerformanceSection(result: RunResult): string {
+    const withViolations = (result.perf ?? []).filter((p) => p.violations.length > 0);
+    const total = withViolations.reduce((n, p) => n + p.violations.length, 0);
+    const lines: string[] = [`## ⚡ Performance budgets (${total} violation${total !== 1 ? 's' : ''})`, ''];
+    lines.push('| Route | Viewport | Metric | Actual | Budget |');
+    lines.push('|:---|:---:|:---|:---:|:---:|');
+    for (const p of withViolations) {
+      for (const v of p.violations) {
+        lines.push(
+          `| \`${p.route}\` | ${p.viewport}px | ${v.metric} | ${formatPerfValue(v.actual, v.unit)} | ${formatPerfValue(v.budget, v.unit)} |`,
+        );
+      }
+    }
+    return lines.join('\n');
+  }
+
+  /**
+   * Renders a section listing third-party script origins that appeared or
+   * disappeared since the previous run.
+   */
+  private generateThirdPartyScriptsSection(result: RunResult): string {
+    const changed = (result.thirdPartyScripts ?? []).filter(
+      (t) => t.added.length > 0 || t.removed.length > 0,
+    );
+    const lines: string[] = ['## 🧩 Third-party scripts', ''];
+    for (const t of changed) {
+      lines.push(`<details>`);
+      lines.push(`<summary>\`${t.route}\` @ ${t.viewport}px — ${t.added.length} added, ${t.removed.length} removed</summary>`);
+      lines.push('');
+      for (const o of t.added) lines.push(`- ➕ \`${o}\``);
+      for (const o of t.removed) lines.push(`- ➖ \`${o}\``);
+      lines.push('');
+      lines.push('</details>');
+      lines.push('');
+    }
     return lines.join('\n');
   }
 
@@ -288,6 +381,8 @@ export class GitHubPRReporter implements Reporter {
         lines.push(`> **AI:** ${diff.aiAnalysis.explanation}`);
         lines.push('');
       }
+
+      lines.push(...this.renderPerfForDiff(diff));
 
       lines.push('</details>');
       lines.push('');

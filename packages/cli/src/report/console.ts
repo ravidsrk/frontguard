@@ -124,6 +124,8 @@ export class ConsoleReporter implements Reporter {
     }
 
     this.printAccessibility(result);
+    this.printPerformance(result);
+    this.printThirdPartyScripts(result);
     this.printSummary(result);
   }
 
@@ -156,6 +158,47 @@ export class ConsoleReporter implements Reporter {
             (target ? chalk.dim(` (${target})`) : ''),
         );
       }
+      console.log('');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Performance budgets (correlated with visual diffs)
+  // -------------------------------------------------------------------------
+
+  private printPerformance(result: RunResult): void {
+    const perf = (result.perf ?? []).filter((p) => p.violations.length > 0);
+    if (perf.length === 0) return;
+    const total = perf.reduce((n, p) => n + p.violations.length, 0);
+    console.log(chalk.yellow.bold(`  ⚡ PERFORMANCE BUDGETS (${total} violation${total !== 1 ? 's' : ''})`));
+    console.log('');
+    for (const p of perf) {
+      console.log(chalk.yellow(`    ${p.route} @ ${p.viewport}px`));
+      for (const v of p.violations) {
+        console.log(
+          `      ${chalk.bold(v.metric)}: ${formatPerf(v.actual, v.unit)} ` +
+            chalk.dim(`(budget ${formatPerf(v.budget, v.unit)})`),
+        );
+      }
+      console.log('');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Third-party scripts
+  // -------------------------------------------------------------------------
+
+  private printThirdPartyScripts(result: RunResult): void {
+    const changed = (result.thirdPartyScripts ?? []).filter(
+      (t) => t.added.length > 0 || t.removed.length > 0,
+    );
+    if (changed.length === 0) return;
+    console.log(chalk.cyan.bold('  🧩 THIRD-PARTY SCRIPTS'));
+    console.log('');
+    for (const t of changed) {
+      console.log(chalk.cyan(`    ${t.route} @ ${t.viewport}px`));
+      for (const o of t.added) console.log(`      ${chalk.green('+')} ${o}`);
+      for (const o of t.removed) console.log(`      ${chalk.red('-')} ${o}`);
       console.log('');
     }
   }
@@ -337,4 +380,13 @@ function padCenter(str: string, width: number): string {
   const left = Math.floor(remaining / 2);
   const right = remaining - left;
   return ' '.repeat(left) + str + ' '.repeat(right);
+}
+
+/** Formats a perf metric value with its unit (ms → s, bytes already KB). */
+function formatPerf(value: number, unit: string): string {
+  if (unit === 'ms') return `${(value / 1000).toFixed(2)}s`;
+  if (unit === 'KB') return `${value.toFixed(0)}KB`;
+  if (unit === 'reqs') return `${Math.round(value)} reqs`;
+  if (unit === '') return value.toFixed(3);
+  return `${value}${unit}`;
 }

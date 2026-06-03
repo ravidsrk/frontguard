@@ -1,0 +1,72 @@
+---
+title: Performance Budgets
+description: Collect Core Web Vitals during rendering, enforce budgets, and see performance regressions correlated with the visual diff for the same page.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Performance Budgets
+
+Frontguard collects performance metrics during the same render it uses for visual
+testing, checks them against budgets you set, and — the differentiator —
+**correlates a budget violation with the visual diff for the same page**. So a
+report doesn't just say "this page shifted"; it says "this page shifted *and* is
+over its LCP budget."
+
+## Enabling it
+
+Add the perf-budgets plugin and define your budgets:
+
+```typescript title="frontguard.config.ts"
+import { createPerfBudgetPlugin } from 'frontguard/plugins';
+
+export default {
+  baseUrl: 'http://localhost:3000',
+  plugins: [
+    createPerfBudgetPlugin({
+      budgets: {
+        lcp: 2500,           // Largest Contentful Paint (ms)
+        cls: 0.1,            // Cumulative Layout Shift
+        ttfb: 600,           // Time to First Byte (ms)
+        maxPageWeight: 1024, // KB
+        maxRequests: 60,
+      },
+      failOnBudgetExceeded: false,
+    }),
+  ],
+};
+```
+
+## Budgets
+
+| Budget | Unit | Measures |
+|--------|------|----------|
+| `lcp` | ms | Largest Contentful Paint |
+| `cls` | — | Cumulative Layout Shift |
+| `fid` | ms | First Input Delay |
+| `tbt` | ms | Total Blocking Time (estimated) |
+| `ttfb` | ms | Time to First Byte |
+| `maxPageWeight` | KB | Total transferred page weight |
+| `maxRequests` | count | Number of resource requests |
+
+Set `failOnBudgetExceeded: true` to fail the run when any budget is breached.
+
+## Perf ↔ visual correlation
+
+When a route both has a visual diff **and** breaches a perf budget, the two are
+joined in the report:
+
+- **Inline** — each regression/warning in the PR comment gets a
+  `⚡ Performance — over budget: lcp 3.20s > 2.50s` note right inside its details
+  block.
+- **Summary** — a standalone **⚡ Performance budgets** section lists every
+  violation across the run (route, viewport, metric, actual, budget).
+
+The same data is available in the console and HTML reports, and on
+`RunResult.perf` in the JSON output for programmatic use.
+
+<Callout type="info">
+  Budgets are static thresholds. Run-over-run "this page got 400ms slower *since
+  last time*" (CWV delta) correlation is on the roadmap — see
+  [ROADMAP](https://github.com/frontguard/frontguard/blob/main/docs/ROADMAP.md).
+</Callout>

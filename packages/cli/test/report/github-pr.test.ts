@@ -290,3 +290,55 @@ describe('GitHubPRReporter', () => {
     expect(reporter).toBeDefined();
   });
 });
+
+describe('GitHubPRReporter — perf ↔ visual correlation', () => {
+  it('annotates a regressed diff with its perf-budget violation', () => {
+    const reporter = new GitHubPRReporter();
+    const result = makeRunResult(
+      [makeDiff({ status: 'regression', diffPercentage: 8, route: { path: '/home' }, viewport: 1440 })],
+      {
+        perf: [
+          {
+            route: '/home',
+            viewport: 1440,
+            metrics: { lcp: 3200 },
+            violations: [{ metric: 'lcp', actual: 3200, budget: 2500, unit: 'ms' }],
+          },
+        ],
+      },
+    );
+    const comment = reporter.generateComment(result);
+    // Inline correlation inside the regression block.
+    expect(comment).toContain('⚡ **Performance**');
+    expect(comment).toContain('lcp 3.20s > 2.50s');
+    // Standalone summary section.
+    expect(comment).toContain('## ⚡ Performance budgets (1 violation)');
+  });
+
+  it('omits perf output when there are no violations', () => {
+    const reporter = new GitHubPRReporter();
+    const result = makeRunResult(
+      [makeDiff({ status: 'regression', diffPercentage: 8, route: { path: '/home' }, viewport: 1440 })],
+      {
+        perf: [{ route: '/home', viewport: 1440, metrics: { lcp: 1200 }, violations: [] }],
+      },
+    );
+    const comment = reporter.generateComment(result);
+    expect(comment).not.toContain('Performance');
+  });
+
+  it('renders a third-party scripts section when origins changed', () => {
+    const reporter = new GitHubPRReporter();
+    const result = makeRunResult(
+      [makeDiff({ status: 'regression', diffPercentage: 8, route: { path: '/home' }, viewport: 1440 })],
+      {
+        thirdPartyScripts: [
+          { route: '/home', viewport: 1440, added: ['https://ads.example.com'], removed: [], current: ['https://ads.example.com'] },
+        ],
+      },
+    );
+    const comment = reporter.generateComment(result);
+    expect(comment).toContain('## 🧩 Third-party scripts');
+    expect(comment).toContain('https://ads.example.com');
+  });
+});

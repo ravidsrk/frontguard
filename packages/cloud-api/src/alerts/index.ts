@@ -43,7 +43,7 @@ export interface StatefulDispatchResult {
 
 /** Result of attempting to deliver to one channel. */
 export interface AlertDeliveryResult {
-  channel: 'slack' | 'email';
+  channel: 'slack' | 'email' | 'pagerduty';
   ok: boolean;
   error?: string;
 }
@@ -107,6 +107,41 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/**
+ * Builds a PagerDuty Events API v2 payload for a set of alerts. Exposed for
+ * testing.
+ *
+ * The `dedup_key` reuses {@link alertFingerprint} so PagerDuty groups identical
+ * regression sets into a single incident (matching our own alert dedup), while
+ * a *different* regression set opens a distinct incident.
+ */
+export function buildPagerDutyPayload(
+  routingKey: string,
+  monitor: Monitor,
+  alerts: MonitorAlert[],
+): unknown {
+  return {
+    routing_key: routingKey,
+    event_action: 'trigger',
+    dedup_key: `frontguard-${monitor.id}-${alertFingerprint(alerts)}`,
+    payload: {
+      summary: `Frontguard: ${alerts.length} visual regression(s) on ${monitor.name}`,
+      source: monitor.url,
+      severity: 'warning',
+      custom_details: {
+        monitor: monitor.name,
+        url: monitor.url,
+        regressions: alerts.map((a) => ({
+          route: a.route,
+          viewport: a.viewport,
+          diff_percentage: Number((a.diffPercentage * 100).toFixed(2)),
+          threshold: Number((a.threshold * 100).toFixed(2)),
+        })),
+      },
+    },
+  };
+}
+
 /** Posts a Slack alert via an incoming webhook. Never throws. */
 export async function sendSlackAlert(
   webhookUrl: string,
@@ -123,6 +158,25 @@ export async function sendSlackAlert(
     return { channel: 'slack', ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}` };
   } catch (err) {
     return { channel: 'slack', ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Triggers a PagerDuty incident via the Events API v2. Never throws. */
+export async function sendPagerDutyAlert(
+  routingKey: string,
+  monitor: Monitor,
+  alerts: MonitorAlert[],
+  fetchImpl: typeof fetch = fetch,
+): Promise<AlertDeliveryResult> {
+  try {
+    const res = await fetchImpl('https://events.pagerduty.com/v2/enqueue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildPagerDutyPayload(routingKey, monitor, alerts)),
+    });
+    return { channel: 'pagerduty', ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}` };
+  } catch (err) {
+    return { channel: 'pagerduty', ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -174,6 +228,9 @@ export async function dispatchAlerts(
   }
   if (monitor.alerts?.email && monitor.alerts.email.length > 0) {
     results.push(await sendEmailAlert(env, monitor.alerts.email, monitor, alerts, fetchImpl));
+  }
+  if (monitor.alerts?.pagerduty) {
+    results.push(await sendPagerDutyAlert(monitor.alerts.pagerduty, monitor, alerts, fetchImpl));
   }
   return results;
 }
