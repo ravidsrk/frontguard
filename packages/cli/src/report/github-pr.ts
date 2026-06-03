@@ -114,6 +114,9 @@ export class GitHubPRReporter implements Reporter {
       if (hasPerfViolations) {
         sections.push(this.generatePerformanceSection(result));
       }
+      if (result.thirdPartyScripts && result.thirdPartyScripts.some((t) => t.added.length > 0 || t.removed.length > 0)) {
+        sections.push(this.generateThirdPartyScriptsSection(result));
+      }
       sections.push(this.generateFooter(result));
       return sections.join('\n\n');
     }
