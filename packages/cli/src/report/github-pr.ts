@@ -27,6 +27,12 @@ function formatPerfValue(value: number, unit: string): string {
   return `${value}${unit}`;
 }
 
+/** Formats a relative delta fraction as a signed percentage (0.33 → "+33%"). */
+function formatDeltaPct(frac: number): string {
+  const pct = Math.round(frac * 100);
+  return `${pct >= 0 ? '+' : ''}${pct}%`;
+}
+
 // ---------------------------------------------------------------------------
 // GitHub PR Reporter
 // ---------------------------------------------------------------------------
@@ -105,7 +111,9 @@ export class GitHubPRReporter implements Reporter {
     // badge — but still surface accessibility violations if any were found.
     const allPassing = summary.regressions === 0 && summary.warnings === 0 && summary.errors === 0 && summary.newPages === 0;
     const hasA11yViolations = !!result.accessibility?.some((r) => r.violations.length > 0);
-    const hasPerfViolations = !!result.perf?.some((p) => p.violations.length > 0);
+    const hasPerfViolations = !!result.perf?.some(
+      (p) => p.violations.length > 0 || (p.regressions?.length ?? 0) > 0,
+    );
     if (allPassing && summary.total > 0) {
       sections.push(`# ✅ Frontguard — All ${summary.total} pages match baselines`);
       if (hasA11yViolations) {
@@ -147,8 +155,9 @@ export class GitHubPRReporter implements Reporter {
       sections.push(this.generateAccessibilitySection(result));
     }
 
-    // Performance budgets — correlated with the visual diffs above.
-    if (result.perf && result.perf.some((p) => p.violations.length > 0)) {
+    // Performance — budget violations + run-over-run regressions, correlated
+    // with the visual diffs above.
+    if (result.perf && result.perf.some((p) => p.violations.length > 0 || (p.regressions?.length ?? 0) > 0)) {
       sections.push(this.generatePerformanceSection(result));
     }
 
@@ -232,7 +241,8 @@ export class GitHubPRReporter implements Reporter {
         lines.push(...this.renderFix(diff));
       }
 
-      // Perf ↔ visual correlation: surface budget violations for this page.
+      // Perf ↔ visual correlation: surface budget violations and run-over-run
+      // regressions for this page.
       lines.push(...this.renderPerfForDiff(diff));
 
       lines.push('</details>');
@@ -244,35 +254,74 @@ export class GitHubPRReporter implements Reporter {
 
   /**
    * Renders an inline performance note for a diff when the same route ×
-   * viewport breached a perf budget — joining the visual regression with the
-   * performance regression ("this page shifted *and* is over its LCP budget").
-   * Returns an empty array when there is nothing to report.
+   * viewport breached a perf budget or regressed since the last run — joining
+   * the visual change with the performance change ("this page shifted *and* is
+   * over its LCP budget" / "*and* its TTFB is up 35% since last run"). Returns
+   * an empty array when there is nothing to report.
    */
   private renderPerfForDiff(diff: DiffResult): string[] {
     const perf = this.perfByKey.get(`${diff.route.path}@${diff.viewport}`);
-    if (!perf || perf.violations.length === 0) return [];
-    const items = perf.violations
-      .map((v) => `${v.metric} ${formatPerfValue(v.actual, v.unit)} > ${formatPerfValue(v.budget, v.unit)}`)
-      .join(', ');
-    return [`> ⚡ **Performance** — over budget: ${items}`, ''];
+    if (!perf) return [];
+    const parts: string[] = [];
+    if (perf.violations.length > 0) {
+      parts.push(
+        'over budget: ' +
+          perf.violations
+            .map((v) => `${v.metric} ${formatPerfValue(v.actual, v.unit)} > ${formatPerfValue(v.budget, v.unit)}`)
+            .join(', '),
+      );
+    }
+    if (perf.regressions && perf.regressions.length > 0) {
+      parts.push(
+        'regressed since last run: ' +
+          perf.regressions
+            .map((r) => `${r.metric} ${formatDeltaPct(r.deltaPct)} (${formatPerfValue(r.previous, r.unit)} → ${formatPerfValue(r.current, r.unit)})`)
+            .join(', '),
+      );
+    }
+    if (parts.length === 0) return [];
+    return [`> ⚡ **Performance** — ${parts.join('; ')}`, ''];
   }
 
   /**
-   * Renders a summary section of all perf-budget violations across the run.
+   * Renders a summary section of perf-budget violations and run-over-run
+   * regressions across the run.
    */
   private generatePerformanceSection(result: RunResult): string {
-    const withViolations = (result.perf ?? []).filter((p) => p.violations.length > 0);
-    const total = withViolations.reduce((n, p) => n + p.violations.length, 0);
-    const lines: string[] = [`## ⚡ Performance budgets (${total} violation${total !== 1 ? 's' : ''})`, ''];
-    lines.push('| Route | Viewport | Metric | Actual | Budget |');
-    lines.push('|:---|:---:|:---|:---:|:---:|');
-    for (const p of withViolations) {
-      for (const v of p.violations) {
-        lines.push(
-          `| \`${p.route}\` | ${p.viewport}px | ${v.metric} | ${formatPerfValue(v.actual, v.unit)} | ${formatPerfValue(v.budget, v.unit)} |`,
-        );
+    const perf = result.perf ?? [];
+    const withViolations = perf.filter((p) => p.violations.length > 0);
+    const withRegressions = perf.filter((p) => (p.regressions?.length ?? 0) > 0);
+    const violationCount = withViolations.reduce((n, p) => n + p.violations.length, 0);
+    const lines: string[] = ['## ⚡ Performance', ''];
+
+    if (violationCount > 0) {
+      lines.push(`**${violationCount} budget violation${violationCount !== 1 ? 's' : ''}**`, '');
+      lines.push('| Route | Viewport | Metric | Actual | Budget |');
+      lines.push('|:---|:---:|:---|:---:|:---:|');
+      for (const p of withViolations) {
+        for (const v of p.violations) {
+          lines.push(
+            `| \`${p.route}\` | ${p.viewport}px | ${v.metric} | ${formatPerfValue(v.actual, v.unit)} | ${formatPerfValue(v.budget, v.unit)} |`,
+          );
+        }
+      }
+      lines.push('');
+    }
+
+    if (withRegressions.length > 0) {
+      const regCount = withRegressions.reduce((n, p) => n + (p.regressions?.length ?? 0), 0);
+      lines.push(`**${regCount} regression${regCount !== 1 ? 's' : ''} since last run**`, '');
+      lines.push('| Route | Viewport | Metric | Previous | Current | Δ |');
+      lines.push('|:---|:---:|:---|:---:|:---:|:---:|');
+      for (const p of withRegressions) {
+        for (const r of p.regressions ?? []) {
+          lines.push(
+            `| \`${p.route}\` | ${p.viewport}px | ${r.metric} | ${formatPerfValue(r.previous, r.unit)} | ${formatPerfValue(r.current, r.unit)} | ${formatDeltaPct(r.deltaPct)} |`,
+          );
+        }
       }
     }
+
     return lines.join('\n');
   }
 

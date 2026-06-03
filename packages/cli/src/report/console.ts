@@ -167,10 +167,11 @@ export class ConsoleReporter implements Reporter {
   // -------------------------------------------------------------------------
 
   private printPerformance(result: RunResult): void {
-    const perf = (result.perf ?? []).filter((p) => p.violations.length > 0);
+    const perf = (result.perf ?? []).filter(
+      (p) => p.violations.length > 0 || (p.regressions?.length ?? 0) > 0,
+    );
     if (perf.length === 0) return;
-    const total = perf.reduce((n, p) => n + p.violations.length, 0);
-    console.log(chalk.yellow.bold(`  ⚡ PERFORMANCE BUDGETS (${total} violation${total !== 1 ? 's' : ''})`));
+    console.log(chalk.yellow.bold('  ⚡ PERFORMANCE'));
     console.log('');
     for (const p of perf) {
       console.log(chalk.yellow(`    ${p.route} @ ${p.viewport}px`));
@@ -178,6 +179,13 @@ export class ConsoleReporter implements Reporter {
         console.log(
           `      ${chalk.bold(v.metric)}: ${formatPerf(v.actual, v.unit)} ` +
             chalk.dim(`(budget ${formatPerf(v.budget, v.unit)})`),
+        );
+      }
+      for (const r of p.regressions ?? []) {
+        console.log(
+          `      ${chalk.bold(r.metric)}: ${formatPerf(r.current, r.unit)} ` +
+            chalk.red(`(↑ ${formatDeltaPct(r.deltaPct)} since last run`) +
+            chalk.dim(`, was ${formatPerf(r.previous, r.unit)})`),
         );
       }
       console.log('');
@@ -389,4 +397,10 @@ function formatPerf(value: number, unit: string): string {
   if (unit === 'reqs') return `${Math.round(value)} reqs`;
   if (unit === '') return value.toFixed(3);
   return `${value}${unit}`;
+}
+
+/** Formats a relative delta fraction as a signed percentage (0.33 → "+33%"). */
+function formatDeltaPct(frac: number): string {
+  const pct = Math.round(frac * 100);
+  return `${pct >= 0 ? '+' : ''}${pct}%`;
 }

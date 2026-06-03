@@ -7,10 +7,47 @@
  * @module diff/ai-vision
  */
 
-import type { DiffResult, AIAnalysis, AIConfig, ChangeClassification, Severity } from '../core/types.js';
+import type {
+  DiffResult,
+  AIAnalysis,
+  AIConfig,
+  ChangeClassification,
+  Severity,
+  AccessibilityViolation,
+} from '../core/types.js';
 import { retry } from '../utils/retry.js';
 import { logger } from '../utils/logger.js';
 import { PNG } from 'pngjs';
+
+/** Optional extra context fused into the AI analysis prompt. */
+export interface AnalyzeContext {
+  /** Accessibility violations found on this route × viewport (axe-core). */
+  accessibility?: AccessibilityViolation[];
+}
+
+/**
+ * Builds a one-line accessibility context string for the AI prompt from a set
+ * of violations, so the model can correlate a visual change with a known a11y
+ * issue (e.g. a contrast regression that is also a visual change). Returns an
+ * empty string when there are no violations. Pure — exposed for testing.
+ */
+export function buildAccessibilityContext(violations: AccessibilityViolation[]): string {
+  if (!violations || violations.length === 0) return '';
+  // De-duplicate by rule id, keep a stable order, and cap to avoid bloating the
+  // prompt on pages with many violations.
+  const seen = new Set<string>();
+  const summary: string[] = [];
+  for (const v of violations) {
+    if (seen.has(v.id)) continue;
+    seen.add(v.id);
+    summary.push(`${v.id} (${v.impact})`);
+    if (summary.length >= 10) break;
+  }
+  return (
+    `Known accessibility issues on this page (axe-core): ${summary.join(', ')}. ` +
+    `If the visual change relates to any of these, note the connection in your explanation.`
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -113,6 +150,7 @@ export class AIAnalysisError extends Error {
 export async function analyzeWithAI(
   diff: DiffResult,
   config: AIConfig,
+  context?: AnalyzeContext,
 ): Promise<AIAnalysis> {
   const apiKey = getApiKey(config.provider);
 
@@ -134,6 +172,12 @@ export async function analyzeWithAI(
     `Pixel diff: ${diff.diffPercentage.toFixed(2)}% of pixels changed`,
   ];
   if (diff.status) contextLines.push(`Status: ${diff.status}`);
+  // Fuse accessibility findings so the model can correlate a visual change with
+  // a known a11y issue on the same page.
+  if (context?.accessibility && context.accessibility.length > 0) {
+    const a11yContext = buildAccessibilityContext(context.accessibility);
+    if (a11yContext) contextLines.push(a11yContext);
+  }
   const contextText = contextLines.join('\n');
 
   logger.debug(`Analyzing ${diff.route.path} @ ${diff.viewport}px with ${config.provider}/${config.model}`);
