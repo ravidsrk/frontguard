@@ -54,7 +54,7 @@ process.on('uncaughtException', (error) => {
 // ---------------------------------------------------------------------------
 // Version (read from package.json at build time, fallback to hardcoded)
 // ---------------------------------------------------------------------------
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 // ---------------------------------------------------------------------------
 // Config Builder (merges CLI opts with config file)

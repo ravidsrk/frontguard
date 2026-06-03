@@ -86,6 +86,8 @@ interface SerializedRunResult {
   timing: RunResult['timing'];
   diffs: SerializedDiff[];
   accessibility?: RunResult['accessibility'];
+  perf?: RunResult['perf'];
+  thirdPartyScripts?: RunResult['thirdPartyScripts'];
   config: {
     baseUrl: string;
     viewports: number[];
@@ -106,6 +108,8 @@ function serializeRunResult(result: RunResult): SerializedRunResult {
     timing: result.timing,
     diffs: result.diffs.map(serializeDiff),
     accessibility: result.accessibility,
+    perf: result.perf,
+    thirdPartyScripts: result.thirdPartyScripts,
     config: {
       baseUrl: result.config.baseUrl,
       viewports: result.config.viewports,

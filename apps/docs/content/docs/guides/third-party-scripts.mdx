@@ -1,0 +1,68 @@
+---
+title: Third-Party Script Monitoring
+description: Detect when ad networks, analytics SDKs, or chat widgets appear or disappear on a page between runs — before they silently break your layout.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Third-Party Script Monitoring
+
+An ad partner swaps a creative, an analytics vendor ships a new tag, a chat widget
+auto-updates — and your layout breaks. You don't find out until a customer
+complains. Frontguard's third-party script plugin inventories the scripts on each
+page and reports when third-party origins **appear or disappear** between runs.
+
+## How it works
+
+During rendering, the plugin parses each page's DOM snapshot for `<script src>`
+origins and classifies them as first-party (same origin as your `baseUrl`) or
+third-party. It persists the third-party inventory per route+viewport and diffs
+the current run against the previous one:
+
+- The **first run** for a page establishes a baseline (no diff reported).
+- Subsequent runs report any **added** or **removed** third-party origins.
+
+## Enabling it
+
+```typescript title="frontguard.config.ts"
+import { createThirdPartyScriptPlugin } from 'frontguard/plugins';
+
+export default {
+  baseUrl: 'https://shop.example.com',
+  plugins: [
+    createThirdPartyScriptPlugin({
+      historyDir: '.frontguard/script-inventory', // default
+    }),
+  ],
+};
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `historyDir` | `string` | `.frontguard/script-inventory` | Where the inventory is persisted between runs |
+
+## In reports
+
+When third-party origins change, a **🧩 Third-party scripts** section lists what
+appeared (`➕`) and disappeared (`➖`) per page:
+
+```
+🧩 THIRD-PARTY SCRIPTS
+    /            @ 1440px
+      + https://ads.network
+      - https://old-analytics.io
+```
+
+The same findings are available on `RunResult.thirdPartyScripts` in the JSON
+output, and rendered in the HTML and PR reports.
+
+<Callout type="info">
+  Only `http(s)` script origins are tracked — inline scripts and `data:`/`blob:`
+  URIs are ignored, since they aren't third-party network resources.
+</Callout>
+
+<Callout type="warn">
+  This pairs naturally with [production monitoring](/docs/guides/production-monitoring):
+  run it on a schedule against your live site to catch third-party drift in the
+  next cycle instead of from a customer report.
+</Callout>
