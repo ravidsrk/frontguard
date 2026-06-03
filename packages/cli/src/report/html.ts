@@ -87,6 +87,8 @@ ${renderHeader(result)}
     </div>
     ${routeData.map((r, i) => renderRouteDetail(r.path, r.diffs, i, resolveImage)).join('\n    ')}
     ${renderAccessibilitySection(result)}
+    ${renderPerformanceSection(result)}
+    ${renderThirdPartyScriptsSection(result)}
   </main>
 </div>
 ${renderTimingFooter(result)}
@@ -349,6 +351,62 @@ function renderAccessibilitySection(result: RunResult): string {
 
   return `<section class="a11y-section" id="a11y-section">
       <h2>♿ Accessibility (${total} violation${total !== 1 ? 's' : ''})</h2>
+      ${blocks}
+    </section>`;
+}
+
+function formatPerfValue(value: number, unit: string): string {
+  if (unit === 'ms') return `${(value / 1000).toFixed(2)}s`;
+  if (unit === 'KB') return `${value.toFixed(0)}KB`;
+  if (unit === 'reqs') return `${Math.round(value)} reqs`;
+  if (unit === '') return value.toFixed(3);
+  return `${value}${unit}`;
+}
+
+function renderPerformanceSection(result: RunResult): string {
+  const withViolations = (result.perf ?? []).filter((p) => p.violations.length > 0);
+  if (withViolations.length === 0) return '';
+  const total = withViolations.reduce((n, p) => n + p.violations.length, 0);
+
+  const rows = withViolations
+    .flatMap((p) =>
+      p.violations.map(
+        (v) => `<tr>
+            <td><code>${escapeHtml(p.route)}</code></td>
+            <td>${p.viewport}px</td>
+            <td>${escapeHtml(v.metric)}</td>
+            <td>${escapeHtml(formatPerfValue(v.actual, v.unit))}</td>
+            <td>${escapeHtml(formatPerfValue(v.budget, v.unit))}</td>
+          </tr>`,
+      ),
+    )
+    .join('\n');
+
+  return `<section class="perf-section" id="perf-section">
+      <h2>⚡ Performance budgets (${total} violation${total !== 1 ? 's' : ''})</h2>
+      <table class="a11y-table">
+        <thead><tr><th>Route</th><th>Viewport</th><th>Metric</th><th>Actual</th><th>Budget</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </section>`;
+}
+
+function renderThirdPartyScriptsSection(result: RunResult): string {
+  const changed = (result.thirdPartyScripts ?? []).filter(
+    (t) => t.added.length > 0 || t.removed.length > 0,
+  );
+  if (changed.length === 0) return '';
+
+  const blocks = changed
+    .map((t) => {
+      const added = t.added.map((o) => `<li>➕ <code>${escapeHtml(o)}</code></li>`).join('');
+      const removed = t.removed.map((o) => `<li>➖ <code>${escapeHtml(o)}</code></li>`).join('');
+      return `<h3>${escapeHtml(t.route)} @ ${t.viewport}px</h3><ul>${added}${removed}</ul>`;
+    })
+    .join('\n');
+
+  return `<section class="tps-section" id="tps-section">
+      <h2>🧩 Third-party scripts</h2>
       ${blocks}
     </section>`;
 }

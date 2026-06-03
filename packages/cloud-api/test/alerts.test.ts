@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   buildSlackPayload,
   buildEmailHtml,
+  buildPagerDutyPayload,
   sendSlackAlert,
   sendEmailAlert,
+  sendPagerDutyAlert,
   dispatchAlerts,
   dispatchAlertsWithState,
   alertFingerprint,
@@ -43,6 +45,22 @@ describe('alert payload builders', () => {
     expect(html).toContain('1 visual regression');
     expect(html).toContain('<table');
     expect(html).toContain('12.00%');
+  });
+
+  it('builds a PagerDuty Events API v2 payload with a fingerprint-based dedup key', () => {
+    const p = buildPagerDutyPayload('rk-123', monitor, alerts) as {
+      routing_key: string;
+      event_action: string;
+      dedup_key: string;
+      payload: { summary: string; source: string; severity: string; custom_details: unknown };
+    };
+    expect(p.routing_key).toBe('rk-123');
+    expect(p.event_action).toBe('trigger');
+    expect(p.dedup_key).toBe(`frontguard-${monitor.id}-${alertFingerprint(alerts)}`);
+    expect(p.payload.summary).toContain('1 visual regression');
+    expect(p.payload.source).toBe(monitor.url);
+    expect(p.payload.severity).toBe('warning');
+    expect(JSON.stringify(p.payload.custom_details)).toContain('12');
   });
 });
 
@@ -93,12 +111,47 @@ describe('sendEmailAlert', () => {
   });
 });
 
+describe('sendPagerDutyAlert', () => {
+  it('posts to the Events API v2 enqueue endpoint on success', async () => {
+    let capturedUrl = '';
+    const fakeFetch = (async (url: string) => {
+      capturedUrl = url;
+      return new Response('{}', { status: 202 });
+    }) as unknown as typeof fetch;
+    const res = await sendPagerDutyAlert('rk-123', monitor, alerts, fakeFetch);
+    expect(res).toEqual({ channel: 'pagerduty', ok: true, error: undefined });
+    expect(capturedUrl).toBe('https://events.pagerduty.com/v2/enqueue');
+  });
+  it('reports failure on non-2xx without throwing', async () => {
+    const fakeFetch = (async () => new Response('bad', { status: 400 })) as unknown as typeof fetch;
+    const res = await sendPagerDutyAlert('rk', monitor, alerts, fakeFetch);
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain('400');
+  });
+  it('catches network errors', async () => {
+    const fakeFetch = (async () => {
+      throw new Error('pd down');
+    }) as unknown as typeof fetch;
+    const res = await sendPagerDutyAlert('rk', monitor, alerts, fakeFetch);
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain('pd down');
+  });
+});
+
 describe('dispatchAlerts', () => {
   it('dispatches to both configured channels', async () => {
     const fakeFetch = (async () => new Response('{}', { status: 200 })) as unknown as typeof fetch;
     const results = await dispatchAlerts({ RESEND_API_KEY: 'k' }, monitor, alerts, fakeFetch);
     expect(results.map((r) => r.channel).sort()).toEqual(['email', 'slack']);
     expect(results.every((r) => r.ok)).toBe(true);
+  });
+
+  it('routes to PagerDuty when a routing key is configured', async () => {
+    const fakeFetch = (async () => new Response('{}', { status: 202 })) as unknown as typeof fetch;
+    const pdMonitor = { ...monitor, alerts: { pagerduty: 'rk-123' } };
+    const results = await dispatchAlerts({}, pdMonitor, alerts, fakeFetch);
+    expect(results.map((r) => r.channel)).toEqual(['pagerduty']);
+    expect(results[0].ok).toBe(true);
   });
 
   it('returns empty for no alerts', async () => {

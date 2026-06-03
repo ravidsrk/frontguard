@@ -40,6 +40,7 @@ const createSchema = z.object({
     .object({
       slack: z.string().url().optional(),
       email: z.array(z.string().email()).optional(),
+      pagerduty: z.string().min(1).optional(),
     })
     .optional(),
   enabled: z.boolean().default(true),
@@ -147,7 +148,11 @@ monitorRoutes.post('/:id/test-alert', async (c) => {
   const id = c.req.param('id');
   const m = await store.getMonitor(id);
   if (!m || m.userId !== c.get('userId')) return c.json({ error: 'Monitor not found' }, 404);
-  if (!m.alerts?.slack && !(m.alerts?.email && m.alerts.email.length > 0)) {
+  const hasChannel =
+    !!m.alerts?.slack ||
+    (!!m.alerts?.email && m.alerts.email.length > 0) ||
+    !!m.alerts?.pagerduty;
+  if (!hasChannel) {
     return c.json({ error: 'No alert channels configured for this monitor' }, 400);
   }
   const sample: MonitorAlert[] = [

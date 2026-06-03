@@ -14,6 +14,8 @@ export interface MonitorAlerts {
   slack?: string;
   /** Email recipients. */
   email?: string[];
+  /** PagerDuty Events API v2 routing (integration) key. */
+  pagerduty?: string;
 }
 
 /** A saved monitor. */
