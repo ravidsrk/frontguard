@@ -5,9 +5,18 @@
  * to test all code paths without real network calls.
  */
 
-import { analyzeWithAI, AIAnalysisError } from '../../src/diff/ai-vision.js';
-import type { DiffResult, AIConfig, AIAnalysis } from '../../src/core/types.js';
+import { analyzeWithAI, AIAnalysisError, buildAccessibilityContext } from '../../src/diff/ai-vision.js';
+import type { DiffResult, AIConfig, AIAnalysis, AccessibilityViolation } from '../../src/core/types.js';
 import { createTestPng } from '../fixtures/helpers.js';
+
+const a11yViolation = (id: string, impact: AccessibilityViolation['impact']): AccessibilityViolation => ({
+  id,
+  impact,
+  description: `${id} description`,
+  help: `${id} help`,
+  helpUrl: `https://dequeuniversity.com/rules/axe/${id}`,
+  nodes: [{ target: ['.el'] }],
+});
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -144,6 +153,27 @@ describe('analyzeWithAI', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url] = fetchSpy.mock.calls[0];
     expect(url).toBe('https://api.openai.com/v1/chat/completions');
+  });
+
+  it('fuses accessibility findings into the prompt when provided', async () => {
+    fetchSpy.mockResolvedValueOnce(openAIResponse(validAIJson()) as Response);
+
+    await analyzeWithAI(makeDiff(), openaiConfig(), {
+      accessibility: [a11yViolation('color-contrast', 'serious')],
+    });
+
+    const body = String(fetchSpy.mock.calls[0][1]?.body ?? '');
+    expect(body).toContain('Known accessibility issues');
+    expect(body).toContain('color-contrast (serious)');
+  });
+
+  it('does not add accessibility context when none is provided', async () => {
+    fetchSpy.mockResolvedValueOnce(openAIResponse(validAIJson()) as Response);
+
+    await analyzeWithAI(makeDiff(), openaiConfig());
+
+    const body = String(fetchSpy.mock.calls[0][1]?.body ?? '');
+    expect(body).not.toContain('Known accessibility issues');
   });
 
   // -----------------------------------------------------------------------
@@ -468,5 +498,29 @@ describe('analyzeWithAI', () => {
 
     const result = await analyzeWithAI(makeDiff(), anthropicConfig());
     expect(result.classification).toBe('intentional');
+  });
+});
+
+describe('buildAccessibilityContext', () => {
+  it('returns an empty string for no violations', () => {
+    expect(buildAccessibilityContext([])).toBe('');
+  });
+
+  it('summarises rule ids with impact and a correlation instruction', () => {
+    const ctx = buildAccessibilityContext([
+      a11yViolation('color-contrast', 'serious'),
+      a11yViolation('image-alt', 'critical'),
+    ]);
+    expect(ctx).toContain('color-contrast (serious)');
+    expect(ctx).toContain('image-alt (critical)');
+    expect(ctx).toContain('note the connection');
+  });
+
+  it('de-duplicates repeated rule ids', () => {
+    const ctx = buildAccessibilityContext([
+      a11yViolation('color-contrast', 'serious'),
+      a11yViolation('color-contrast', 'serious'),
+    ]);
+    expect(ctx.match(/color-contrast/g)).toHaveLength(1);
   });
 });

@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   createPerfBudgetPlugin,
   checkBudgets,
+  computePerfRegressions,
   extractMetricsFromSnapshot,
   PERF_COLLECTION_SCRIPT,
   type PerfBudgetConfig,
@@ -378,5 +382,89 @@ describe('PERF_COLLECTION_SCRIPT', () => {
     expect(PERF_COLLECTION_SCRIPT.length).toBeGreaterThan(0);
     expect(PERF_COLLECTION_SCRIPT).toContain('performance.getEntriesByType');
     expect(PERF_COLLECTION_SCRIPT).toContain('__frontguard_perf');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: computePerfRegressions (run-over-run delta)
+// ---------------------------------------------------------------------------
+
+describe('computePerfRegressions', () => {
+  const base: PerfMetrics = { resources: 10, pageWeight: 500 * 1024, ttfb: 400, domContentLoaded: 800 };
+
+  it('flags a metric that degraded beyond the threshold', () => {
+    const prev = { ...base, ttfb: 400 };
+    const curr = { ...base, ttfb: 600 }; // +50%
+    const regs = computePerfRegressions(prev, curr, 0.2);
+    expect(regs).toHaveLength(1);
+    expect(regs[0]).toMatchObject({ metric: 'ttfb', previous: 400, current: 600 });
+    expect(regs[0].deltaPct).toBeCloseTo(0.5, 5);
+  });
+
+  it('ignores changes within the threshold', () => {
+    const prev = { ...base, ttfb: 400 };
+    const curr = { ...base, ttfb: 440 }; // +10%, under 20%
+    expect(computePerfRegressions(prev, curr, 0.2)).toEqual([]);
+  });
+
+  it('ignores improvements (faster than before)', () => {
+    const prev = { ...base, ttfb: 600 };
+    const curr = { ...base, ttfb: 400 };
+    expect(computePerfRegressions(prev, curr, 0.2)).toEqual([]);
+  });
+
+  it('reports pageWeight regressions in KB', () => {
+    const prev = { ...base, pageWeight: 500 * 1024 };
+    const curr = { ...base, pageWeight: 800 * 1024 }; // +60%
+    const regs = computePerfRegressions(prev, curr, 0.2);
+    const weight = regs.find((r) => r.metric === 'pageWeight');
+    expect(weight).toBeDefined();
+    expect(weight!.unit).toBe('KB');
+    expect(weight!.previous).toBe(500);
+    expect(weight!.current).toBe(800);
+  });
+
+  it('skips metrics with a non-positive previous value', () => {
+    const prev = { ...base, ttfb: 0 };
+    const curr = { ...base, ttfb: 500 };
+    expect(computePerfRegressions(prev, curr, 0.2).find((r) => r.metric === 'ttfb')).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: trackRegressions across runs (persistence)
+// ---------------------------------------------------------------------------
+
+describe('createPerfBudgetPlugin — run-over-run regression tracking', () => {
+  let historyDir: string;
+  afterEach(() => {
+    if (historyDir) rmSync(historyDir, { recursive: true, force: true });
+  });
+
+  function runOnce(historyDir: string, ttfb: number): RunResult {
+    const plugin = createPerfBudgetPlugin({
+      budgets: {},
+      trackRegressions: true,
+      historyDir,
+      regressionThreshold: 0.2,
+    });
+    const ctx = makeContext();
+    const metrics: PerfMetrics = { resources: 10, pageWeight: 400 * 1024, ttfb, domContentLoaded: 700 };
+    plugin.afterRender!([makeScreenshot('/', 1440, metrics)], ctx);
+    plugin.afterCompare!([makeDiff('/', 1440)], ctx);
+    const result = makeRunResult([makeDiff('/', 1440)]);
+    plugin.afterRun!(result, ctx);
+    return result;
+  }
+
+  it('establishes a baseline on first run, flags a regression on the next', () => {
+    historyDir = mkdtempSync(join(tmpdir(), 'fg-perf-'));
+
+    const r1 = runOnce(historyDir, 400);
+    expect(r1.perf?.[0].regressions ?? []).toEqual([]); // no prior run
+
+    const r2 = runOnce(historyDir, 600); // +50% TTFB
+    const regs = r2.perf?.[0].regressions ?? [];
+    expect(regs.some((x) => x.metric === 'ttfb')).toBe(true);
   });
 });

@@ -312,7 +312,29 @@ describe('GitHubPRReporter — perf ↔ visual correlation', () => {
     expect(comment).toContain('⚡ **Performance**');
     expect(comment).toContain('lcp 3.20s > 2.50s');
     // Standalone summary section.
-    expect(comment).toContain('## ⚡ Performance budgets (1 violation)');
+    expect(comment).toContain('## ⚡ Performance');
+    expect(comment).toContain('1 budget violation');
+  });
+
+  it('surfaces a run-over-run perf regression inline and in the summary', () => {
+    const reporter = new GitHubPRReporter();
+    const result = makeRunResult(
+      [makeDiff({ status: 'regression', diffPercentage: 8, route: { path: '/home' }, viewport: 1440 })],
+      {
+        perf: [
+          {
+            route: '/home',
+            viewport: 1440,
+            metrics: { ttfb: 540 },
+            violations: [],
+            regressions: [{ metric: 'ttfb', previous: 400, current: 540, deltaPct: 0.35, unit: 'ms' }],
+          },
+        ],
+      },
+    );
+    const comment = reporter.generateComment(result);
+    expect(comment).toContain('regressed since last run: ttfb +35%');
+    expect(comment).toContain('1 regression since last run');
   });
 
   it('omits perf output when there are no violations', () => {
