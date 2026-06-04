@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 import type { Run } from './types.js';
 import { processRun } from './processor.js';
+import { emitRunTelemetry, runMetricsFromRun, type OtelEnv } from './otel/index.js';
 import { getStore, isProduction, type Bindings } from './db/factory.js';
 import { currentMonth, type Store } from './db/store.js';
 import { hashKey } from './auth/keys.js';
@@ -320,6 +321,8 @@ app.post('/v1/run', async (c) => {
       if (screenshots > 0) void store.incrementUsage(userId, currentMonth(), 0, screenshots);
       // Complete the originating GitHub Check Run, if this run came from CI.
       if (run.github) void completeCheckRun(c.env ?? {}, run);
+      // Export OTLP metrics (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
+      void emitRunTelemetry((c.env ?? {}) as OtelEnv, runMetricsFromRun(run));
     });
 
   return c.json(
