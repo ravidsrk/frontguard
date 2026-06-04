@@ -98,11 +98,15 @@ routes: [
 
 # Genuinely Remaining (in code)
 
-The only self-contained engineering gap left needs an external account to build and verify — everything else is external/distribution work (below).
+The code-buildable backlog is essentially empty — the remaining items need external accounts/collectors to *verify*, not to write.
 
-🔴 **Daytona sandbox fix verification** — `fixSandbox: 'daytona'` is accepted in config and the cloud Daytona *run* sandbox exists, but the Daytona *fix-verify* path (`sandbox/daytona.ts`) is a stub. Local verification works today; Daytona is the remote-scale version. *Needs a Daytona account/API key to build and test.*
+✅ **Daytona sandbox fix verification** — **shipped.** `sandbox/daytona.ts` is a full implementation: it boots a Daytona sandbox via `@daytonaio/sdk`, uploads the AI-generated CSS to a temp file (never interpolated into a shell), runs the renderer, and returns the screenshot, with URL/viewport/browser validation and graceful failure when the SDK or `DAYTONA_API_KEY` is absent. Verifying it end-to-end needs a Daytona account; the code is done.
 
-*Recently closed:* **run-over-run CWV delta correlation** (perf metrics are persisted and run-over-run regressions are flagged and correlated with the visual diff) and **accessibility-aware AI analysis** (axe-core findings are fused into the AI classification prompt) are now shipped — see "What's Shipped".
+✅ **OpenTelemetry export** — **shipped** (cloud-api `otel/`): run/monitor completions emit OTLP/HTTP metrics to a configurable `OTEL_EXPORTER_OTLP_ENDPOINT` (no-op when unset). Point it at any OTLP collector (Datadog, Grafana, Honeycomb) to make Frontguard the visual module in your observability stack.
+
+✅ **Native Slack app** — **shipped** (`integrations/slack-app/`): signing-secret verification, OAuth install, the `url_verification` handshake, and `chat.postMessage` posting — same bar as the Vercel/GitHub-App integrations (functional handler + tests; activation needs a registered Slack app).
+
+*Also recently closed:* **run-over-run CWV delta correlation** and **accessibility-aware AI analysis** — see "What's Shipped".
 
 ---
 
@@ -110,16 +114,13 @@ The only self-contained engineering gap left needs an external account to build 
 
 These can't be completed from the codebase alone — they need accounts, recording, external repos, or human distribution. Tracked here so they aren't mistaken for shipped work.
 
-🟠 **Demo GIF + 30-second video** — *Owner action:* screen-record the zero-to-first-regression flow (real regression detected → AI explanation → diff overlay → PR comment) and embed it at the top of the README. The launch lives or dies on the first 10 seconds.
+🟠 **Demo GIF + 30-second video** — the VHS tape (`demo/frontguard-demo.tape`) is **written**. *Owner action:* run `vhs demo/frontguard-demo.tape` against a running app to render `demo/frontguard-demo.gif`, then embed it at the top of the README. The launch lives or dies on the first 10 seconds.
 
-🟠 **Real-world validation on 5 OSS repos** — *Owner action:* run Frontguard against a Next.js app, a Tailwind dashboard, a component library, an e-commerce storefront, and a docs site (needs cloning the repos + AI API keys + render time). Record true positives, false positives, false negatives, and classification accuracy. If accuracy is below 70% on real diffs, retune prompts before promoting AI as a feature.
+🟠 **Real-world validation on 5 OSS repos** — the harness is **built** (`validation/run-external.sh` + `validation/repos.json`: a Next.js app, Tailwind dashboard, component-library docs, e-commerce storefront, docs site). *Owner action:* run `./validation/run-external.sh` with AI API keys set (needs cloning the repos + render time) and fill in `validation/results-v0.2.md` with TP/FP/FN and classification accuracy. If accuracy is below 70% on real diffs, retune prompts before promoting AI as a feature.
 
 🟠 **v0.2 launch** — *Owner action:* pre-seed credibility in r/Playwright and r/QualityAssurance for 2 weeks, submit to awesome-playwright, then Show HN + r/Playwright + r/webdev + X thread on a Tue/Wed 9–10am ET, followed by a Dev.to walkthrough. Respond to every issue and comment personally.
 
-🟠 **External-account integrations**
-- **Vercel Integration Marketplace listing** — the OAuth app works; publishing to the Marketplace is a separate submission with pricing/screenshots/category metadata.
-- **OpenTelemetry export** — deps are present, no exporter wired. Build so Frontguard *is* the visual module in Datadog/Grafana.
-- **Native Slack app** — generic incoming-webhook alerting works; a first-class Slack app (OAuth, slash commands) is unbuilt.
+🟠 **Vercel Integration Marketplace listing** — the OAuth app works; publishing to the Marketplace is a separate submission with pricing/screenshots/category metadata. (The **OTel export** and **native Slack app** that previously sat here are now shipped — see "Genuinely Remaining".)
 
 🟠 **Long-horizon moat** — fine-tuned visual analysis model (after 10K+ labeled comparisons) and a community fix-pattern marketplace. Both depend on accumulated real-world usage data.
 
