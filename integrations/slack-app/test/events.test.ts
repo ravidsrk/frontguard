@@ -52,7 +52,7 @@ describe('buildCommandResponse', () => {
   it('acknowledges a status subcommand with the url', () => {
     const res = buildCommandResponse({ ...base, text: 'status https://example.com' }) as { text: string };
     expect(res.text).toContain('https://example.com');
-    expect(res.text).toContain('Queued');
+    expect(res.text).toContain('not yet implemented');
   });
 
   it('shows help by default', () => {

@@ -61,8 +61,8 @@ export function createSlackApp() {
 
     const decision = parseSlackEnvelope(body);
     if (decision.kind === 'url_verification') {
-      // Slack expects the challenge echoed back verbatim.
-      return c.text(decision.challenge);
+      // Slack expects the challenge in a JSON response body.
+      return c.json({ challenge: decision.challenge });
     }
     // Events are acknowledged immediately; real processing would be queued.
     return c.json({ ok: true });
@@ -92,10 +92,15 @@ export function createSlackApp() {
       clientId: env.SLACK_CLIENT_ID,
       clientSecret: env.SLACK_CLIENT_SECRET,
       redirectUri: env.SLACK_REDIRECT_URI,
-      scopes: (env.SLACK_SCOPES ?? 'chat:write,commands').split(','),
+      scopes: (env.SLACK_SCOPES ?? 'chat:write,commands').split(',').map((s) => s.trim()),
     };
 
     const code = c.req.query('code');
+    const error = c.req.query('error');
+    if (error) {
+      // User denied authorization or OAuth error occurred.
+      return c.json({ error: `OAuth failed: ${error}` }, 400);
+    }
     if (!code) {
       // No code yet → kick off the authorize flow.
       return c.redirect(buildSlackAuthorizeUrl(config, c.req.query('state')));

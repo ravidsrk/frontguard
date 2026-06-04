@@ -75,7 +75,7 @@ export function buildCommandResponse(cmd: SlackCommand): unknown {
   if (sub === 'status' && arg) {
     return {
       response_type: 'ephemeral',
-      text: `🔍 Queued a visual check for \`${arg}\`. I'll post the result here when it's done.`,
+      text: `🔍 Visual check for \`${arg}\` is not yet implemented. This command is a placeholder.`,
     };
   }
 

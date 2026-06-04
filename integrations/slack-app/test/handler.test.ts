@@ -28,7 +28,8 @@ describe('createSlackApp', () => {
     const sig = await signSlack(body, ts, SECRET);
     const res = await app.request('/slack/events', { method: 'POST', headers: signedHeaders(body, ts, sig), body }, env);
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe('chal-xyz');
+    const json = await res.json();
+    expect(json).toEqual({ challenge: 'chal-xyz' });
   });
 
   it('rejects an unsigned events request with 401', async () => {
