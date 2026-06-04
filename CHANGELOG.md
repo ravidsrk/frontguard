@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OpenTelemetry export** (cloud-api) — run completions emit OTLP/HTTP metrics
+  (`frontguard.runs`, `comparisons`, `regressions`, `warnings`, `run.duration`)
+  to a configurable `OTEL_EXPORTER_OTLP_ENDPOINT`. Implemented as plain OTLP/HTTP
+  over `fetch` (no `@opentelemetry/*` SDK) so it runs on Cloudflare Workers;
+  no-op when unset, best-effort so it never breaks a run.
+- **Native Slack app** (`integrations/slack-app`) — a Hono handler with Slack
+  signing-secret verification (+ replay guard), the `url_verification` handshake,
+  the `/frontguard` slash command, OAuth v2 install, and `chat.postMessage`
+  result posting. Ships with a Slack app manifest.
 - **Run-over-run performance regressions** — the perf-budgets plugin can now
   persist each run's metrics (`trackRegressions`) and flag any metric (LCP, CLS,
   TTFB, page weight) that degraded beyond `regressionThreshold` since the last
