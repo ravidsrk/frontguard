@@ -29,6 +29,7 @@ export type {
 export {
   createPerfBudgetPlugin,
   checkBudgets,
+  computePerfRegressions,
   extractMetricsFromSnapshot,
   PERF_COLLECTION_SCRIPT,
 } from './perf-budgets.js';

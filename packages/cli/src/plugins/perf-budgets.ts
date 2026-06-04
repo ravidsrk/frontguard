@@ -7,6 +7,8 @@
  * @module plugins/perf-budgets
  */
 
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { FrontguardPlugin, PluginContext } from '../core/plugins.js';
 import type {
   ScreenshotResult,
@@ -41,7 +43,38 @@ export interface PerfBudgetConfig {
   };
   /** Fail the run if budgets are exceeded (vs just warning). */
   failOnBudgetExceeded?: boolean;
+  /**
+   * Track run-over-run regressions: persist this run's metrics and flag any
+   * metric that degraded beyond {@link regressionThreshold} since the last run.
+   * Surfaces "↑ since last run" deltas in reports, in addition to static budgets.
+   */
+  trackRegressions?: boolean;
+  /** Directory where per-run metrics are persisted. Default `.frontguard/perf-history`. */
+  historyDir?: string;
+  /**
+   * Relative increase that counts as a regression (0.2 = 20% worse than the
+   * previous run). Default `0.2`.
+   */
+  regressionThreshold?: number;
 }
+
+/** Persisted metrics keyed by `route@viewport`, for run-over-run comparison. */
+type MetricsHistory = Record<string, PerfMetrics>;
+
+const METRICS_HISTORY_FILE = 'metrics.json';
+
+/** Metrics compared run-over-run. All are "lower is better". */
+const TRACKED_METRICS: Array<{
+  key: string;
+  unit: string;
+  /** Returns the comparable value (e.g. bytes → KB), or undefined if absent. */
+  valueOf: (m: PerfMetrics) => number | undefined;
+}> = [
+  { key: 'lcp', unit: 'ms', valueOf: (m) => m.lcp },
+  { key: 'cls', unit: '', valueOf: (m) => m.cls },
+  { key: 'ttfb', unit: 'ms', valueOf: (m) => m.ttfb },
+  { key: 'pageWeight', unit: 'KB', valueOf: (m) => (m.pageWeight !== undefined ? m.pageWeight / 1024 : undefined) },
+];
 
 // ---------------------------------------------------------------------------
 // Metric Types
@@ -193,6 +226,45 @@ function metricKey(routePath: string, viewport: number): string {
   return `${routePath}@${viewport}`;
 }
 
+/**
+ * Computes run-over-run regressions: tracked metrics whose value increased by
+ * more than `threshold` (a fraction) relative to the previous run. Pure function,
+ * exposed for testing. Metrics absent on either run, or with a non-positive
+ * previous value, are skipped (no meaningful baseline to compare against).
+ */
+export function computePerfRegressions(
+  prev: PerfMetrics,
+  curr: PerfMetrics,
+  threshold: number,
+): NonNullable<PerfReport['regressions']> {
+  const regressions: NonNullable<PerfReport['regressions']> = [];
+  for (const t of TRACKED_METRICS) {
+    const prevV = t.valueOf(prev);
+    const currV = t.valueOf(curr);
+    if (prevV === undefined || currV === undefined || prevV <= 0) continue;
+    const deltaPct = (currV - prevV) / prevV;
+    if (deltaPct > threshold) {
+      regressions.push({ metric: t.key, previous: prevV, current: currV, deltaPct, unit: t.unit });
+    }
+  }
+  return regressions;
+}
+
+function loadMetricsHistory(historyDir: string): MetricsHistory {
+  const path = join(historyDir, METRICS_HISTORY_FILE);
+  if (!existsSync(path)) return {};
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8')) as MetricsHistory;
+  } catch {
+    return {};
+  }
+}
+
+function saveMetricsHistory(historyDir: string, history: MetricsHistory): void {
+  mkdirSync(historyDir, { recursive: true });
+  writeFileSync(join(historyDir, METRICS_HISTORY_FILE), JSON.stringify(history, null, 2));
+}
+
 // ---------------------------------------------------------------------------
 // Plugin Factory
 // ---------------------------------------------------------------------------
@@ -288,12 +360,22 @@ export function createPerfBudgetPlugin(config: PerfBudgetConfig): FrontguardPlug
       const total = budgetResults.length;
       const failed = budgetResults.filter((r) => !r.passed).length;
 
+      // Run-over-run regression tracking: load the previous run's metrics so we
+      // can flag any metric that degraded since last time, then persist this
+      // run's metrics for the next comparison.
+      const trackRegressions = config.trackRegressions ?? false;
+      const historyDir = config.historyDir ?? '.frontguard/perf-history';
+      const regressionThreshold = config.regressionThreshold ?? 0.2;
+      const prevMetrics = trackRegressions ? loadMetricsHistory(historyDir) : {};
+      const nextMetrics: MetricsHistory = trackRegressions ? { ...prevMetrics } : {};
+
       // Surface results onto the RunResult so reporters can correlate perf
       // budget violations with the visual diff for the same route × viewport
       // (canonical-delivery pattern, mirroring the a11y plugin).
       if (budgetResults.length > 0) {
-        result.perf = budgetResults.map(
-          (r): PerfReport => ({
+        result.perf = budgetResults.map((r): PerfReport => {
+          const key = metricKey(r.route, r.viewport);
+          const report: PerfReport = {
             route: r.route,
             viewport: r.viewport,
             metrics: {
@@ -304,9 +386,22 @@ export function createPerfBudgetPlugin(config: PerfBudgetConfig): FrontguardPlug
               resources: r.metrics.resources,
             },
             violations: r.violations,
-          }),
-        );
+          };
+          if (trackRegressions) {
+            const prev = prevMetrics[key];
+            if (prev) {
+              const regressions = computePerfRegressions(prev, r.metrics, regressionThreshold);
+              if (regressions.length > 0) report.regressions = regressions;
+            }
+            nextMetrics[key] = r.metrics;
+          }
+          return report;
+        });
       }
+
+      // Persist this run's metrics after results are built (transactional —
+      // a run that aborts before afterRun won't advance the baseline).
+      if (trackRegressions) saveMetricsHistory(historyDir, nextMetrics);
 
       // Store summary in metadata for reporters
       ctx.metadata.set('perf:summary', { total, passed: total - failed, failed });

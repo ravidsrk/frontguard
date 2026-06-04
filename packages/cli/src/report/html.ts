@@ -363,31 +363,67 @@ function formatPerfValue(value: number, unit: string): string {
   return `${value}${unit}`;
 }
 
-function renderPerformanceSection(result: RunResult): string {
-  const withViolations = (result.perf ?? []).filter((p) => p.violations.length > 0);
-  if (withViolations.length === 0) return '';
-  const total = withViolations.reduce((n, p) => n + p.violations.length, 0);
+function formatDeltaPct(frac: number): string {
+  const pct = Math.round(frac * 100);
+  return `${pct >= 0 ? '+' : ''}${pct}%`;
+}
 
-  const rows = withViolations
-    .flatMap((p) =>
-      p.violations.map(
-        (v) => `<tr>
+function renderPerformanceSection(result: RunResult): string {
+  const perf = result.perf ?? [];
+  const withViolations = perf.filter((p) => p.violations.length > 0);
+  const withRegressions = perf.filter((p) => (p.regressions?.length ?? 0) > 0);
+  if (withViolations.length === 0 && withRegressions.length === 0) return '';
+
+  const blocks: string[] = [];
+
+  if (withViolations.length > 0) {
+    const total = withViolations.reduce((n, p) => n + p.violations.length, 0);
+    const rows = withViolations
+      .flatMap((p) =>
+        p.violations.map(
+          (v) => `<tr>
             <td><code>${escapeHtml(p.route)}</code></td>
             <td>${p.viewport}px</td>
             <td>${escapeHtml(v.metric)}</td>
             <td>${escapeHtml(formatPerfValue(v.actual, v.unit))}</td>
             <td>${escapeHtml(formatPerfValue(v.budget, v.unit))}</td>
           </tr>`,
-      ),
-    )
-    .join('\n');
-
-  return `<section class="perf-section" id="perf-section">
-      <h2>⚡ Performance budgets (${total} violation${total !== 1 ? 's' : ''})</h2>
+        ),
+      )
+      .join('\n');
+    blocks.push(`<h3>${total} budget violation${total !== 1 ? 's' : ''}</h3>
       <table class="a11y-table">
         <thead><tr><th>Route</th><th>Viewport</th><th>Metric</th><th>Actual</th><th>Budget</th></tr></thead>
         <tbody>${rows}</tbody>
-      </table>
+      </table>`);
+  }
+
+  if (withRegressions.length > 0) {
+    const total = withRegressions.reduce((n, p) => n + (p.regressions?.length ?? 0), 0);
+    const rows = withRegressions
+      .flatMap((p) =>
+        (p.regressions ?? []).map(
+          (r) => `<tr>
+            <td><code>${escapeHtml(p.route)}</code></td>
+            <td>${p.viewport}px</td>
+            <td>${escapeHtml(r.metric)}</td>
+            <td>${escapeHtml(formatPerfValue(r.previous, r.unit))}</td>
+            <td>${escapeHtml(formatPerfValue(r.current, r.unit))}</td>
+            <td>${escapeHtml(formatDeltaPct(r.deltaPct))}</td>
+          </tr>`,
+        ),
+      )
+      .join('\n');
+    blocks.push(`<h3>${total} regression${total !== 1 ? 's' : ''} since last run</h3>
+      <table class="a11y-table">
+        <thead><tr><th>Route</th><th>Viewport</th><th>Metric</th><th>Previous</th><th>Current</th><th>Δ</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`);
+  }
+
+  return `<section class="perf-section" id="perf-section">
+      <h2>⚡ Performance</h2>
+      ${blocks.join('\n')}
     </section>`;
 }
 

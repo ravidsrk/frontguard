@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Run-over-run performance regressions** — the perf-budgets plugin can now
+  persist each run's metrics (`trackRegressions`) and flag any metric (LCP, CLS,
+  TTFB, page weight) that degraded beyond `regressionThreshold` since the last
+  run. Regressions surface on `RunResult.perf[].regressions`, inline with the
+  visual diff and in a summary table across console/HTML/PR reports.
+- **Accessibility-aware AI analysis** — when the accessibility plugin is active,
+  axe-core violations for a route × viewport are fused into the AI analysis
+  prompt so the model can correlate a visual change with a known a11y issue
+  (e.g. a contrast regression that is also a visual change).
+
 ## [0.2.0] - 2026-06-03
 
 The "earn trust" release. The core engine is joined by an AI auto-fix moat, a
