@@ -60,9 +60,12 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Check bundle size
+        # Gates the library entry (dist/index.js, built from src/core/pipeline.ts).
+        # Runtime deps are externalized in tsup.config.ts, so this measures only
+        # first-party code — a regression here means our own bundle grew, not a dep.
         run: |
           SIZE=$(wc -c < packages/cli/dist/index.js)
-          echo "Bundle size: $SIZE bytes"
+          echo "Bundle size: $SIZE bytes (budget 160000)"
           if [ "$SIZE" -gt 160000 ]; then
             echo "⚠️ Bundle exceeds 160KB"
             exit 1

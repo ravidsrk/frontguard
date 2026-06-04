@@ -21,6 +21,8 @@ import type {
   RunResult,
   RunTiming,
   Reporter,
+  AccessibilityResult,
+  AccessibilityViolation,
 } from './types.js';
 import type { JudgeResult } from './types.js';
 import { discoverRoutes } from '../discovery/crawler.js';
@@ -593,13 +595,30 @@ export async function runPipeline(
       const aiConfig = config.ai;
       let completed = 0;
 
+      // Build an accessibility lookup so AI analysis can correlate a visual
+      // change with known a11y issues on the same route × viewport (e.g. a
+      // contrast regression that is also a visual change). Populated by the
+      // accessibility plugin's afterRender hook, which runs before this stage.
+      const a11yByKey = new Map<string, AccessibilityViolation[]>();
+      const a11yMeta = pluginCtx.metadata.get('accessibility:results');
+      if (Array.isArray(a11yMeta)) {
+        for (const r of a11yMeta as AccessibilityResult[]) {
+          if (r?.violations?.length) a11yByKey.set(`${r.route}@${r.viewport}`, r.violations);
+        }
+      }
+
       try {
         const [, duration] = await timed(async () => {
           await processBatched(
             changedDiffsWithIndices,
             AI_BATCH_SIZE,
             async ({ diff }) => {
-              const analysis = await analyzeWithAI(diff, aiConfig);
+              const accessibility = a11yByKey.get(`${diff.route.path}@${diff.viewport}`);
+              const analysis = await analyzeWithAI(
+                diff,
+                aiConfig,
+                accessibility ? { accessibility } : undefined,
+              );
               diff.aiAnalysis = analysis;
 
               // If AI says intentional with high confidence, downgrade regression → warning status

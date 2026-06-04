@@ -117,6 +117,16 @@ AI: "Button padding changed from 16px to 8px in Header.module.css.
   AI suggestions are advisory. Always review changes in context before applying fixes.
 </Callout>
 
+## Accessibility correlation
+
+When the [accessibility plugin](/docs/guides/accessibility) is active, the
+axe-core violations found on a page are fused into the AI analysis prompt for
+that same route and viewport. This lets the model connect the two signals — for
+example, noting that a visual change which darkened a button is *also* the
+`color-contrast` violation flagged on that page, rather than treating them as
+unrelated. No extra configuration is needed: register the accessibility plugin
+and the AI analysis picks up its findings automatically.
+
 ## Cost Optimization
 
 AI analysis only runs on pages with detected visual diffs. Pages that pass pixel comparison are never sent to the AI.

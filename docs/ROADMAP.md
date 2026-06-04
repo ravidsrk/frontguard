@@ -31,7 +31,7 @@ The core engine, the AI moat, the cloud platform, and the integration surface ar
 
 ✅ **Anti-flake rendering** — Multi-render consensus via `findConsensusScreenshot()` (default `antiFlakeRenders: 3`), combined with SSIM perceptual matching. Solves the #1 reason teams abandon visual testing. Runs in <10 seconds where Percy adds 5+ minutes.
 
-✅ **AI analysis & classification** — Dual-model analysis (GPT-4o + Anthropic vision). Classifies every diff as regression, intentional change, or content update, with severity scoring, confidence levels, and a `suggestedFix` field. No competitor has this.
+✅ **AI analysis & classification** — Dual-model analysis (GPT-4o + Anthropic vision). Classifies every diff as regression, intentional change, or content update, with severity scoring, confidence levels, and a `suggestedFix` field. When the accessibility plugin is active, axe-core findings for the page are **fused into the analysis prompt** so the model can correlate a visual change with a known a11y issue. No competitor has this.
 
 ✅ **Screenshot diffing** — Dual-engine: pixelmatch for pixel precision + a full SSIM implementation for perceptual matching.
 
@@ -68,7 +68,7 @@ routes: [
 
 ✅ **Accessibility audits** — axe-core plugin (`plugins/accessibility.ts`) runs in the same render pass; reports WCAG violations (contrast, alt text, target size, focus, heading order) in console, HTML, **and** PR reports; optional `failOnViolation`.
 
-✅ **Performance budgets + visual correlation** — Perf-budgets plugin collects LCP/CLS/TTFB/page-weight/requests and enforces budgets. Budget violations are now surfaced on `RunResult.perf` and **correlated inline with the visual diff for the same route** in every reporter ("this page shifted *and* is over its LCP budget").
+✅ **Performance budgets + visual correlation** — Perf-budgets plugin collects LCP/CLS/TTFB/page-weight/requests and enforces budgets. Budget violations are surfaced on `RunResult.perf` and **correlated inline with the visual diff for the same route** in every reporter ("this page shifted *and* is over its LCP budget"). With `trackRegressions`, it also persists metrics and flags **run-over-run regressions** ("*and* its TTFB is up 35% since last run").
 
 ✅ **Third-party script monitoring** — `plugins/third-party-scripts.ts` inventories `<script src>` origins per page, classifies first- vs third-party against `baseUrl`, and reports origins that appeared/disappeared since the previous run (ad networks, analytics SDKs, chat widgets).
 
@@ -98,13 +98,11 @@ routes: [
 
 # Genuinely Remaining (in code)
 
-Small, self-contained engineering gaps — everything else is external work (below).
+The only self-contained engineering gap left needs an external account to build and verify — everything else is external/distribution work (below).
 
 🔴 **Daytona sandbox fix verification** — `fixSandbox: 'daytona'` is accepted in config and the cloud Daytona *run* sandbox exists, but the Daytona *fix-verify* path (`sandbox/daytona.ts`) is a stub. Local verification works today; Daytona is the remote-scale version. *Needs a Daytona account/API key to build and test.*
 
-🔴 **Run-over-run CWV delta correlation** — Perf budgets are static thresholds, and budget violations are now correlated with visual diffs. The richer "homepage got 400ms slower *since the last run*" requires persisting baseline perf metrics and diffing them — a natural follow-up to the shipped correlation.
-
-🔴 **Accessibility in AI analysis** — a11y findings are reported alongside visual diffs but are not yet fed into the AI classification prompt (e.g. "this contrast regression is also a visual change"). Reporting is done; fusion into the AI path is not.
+*Recently closed:* **run-over-run CWV delta correlation** (perf metrics are persisted and run-over-run regressions are flagged and correlated with the visual diff) and **accessibility-aware AI analysis** (axe-core findings are fused into the AI classification prompt) are now shipped — see "What's Shipped".
 
 ---
 
@@ -141,7 +139,7 @@ The "Datadog for frontend" move. The rendering, diffing, AI analysis, scheduler,
 
 🟡 **Integration layer** — Slack + email + PagerDuty + generic webhooks work. *Remaining:* native Slack app and OpenTelemetry export (see follow-ups) to position Frontguard as "the visual layer you embed."
 
-🟡 **Performance visual correlation** — Budget-violation ↔ visual-diff correlation is shipped. *Remaining:* run-over-run CWV delta correlation (see genuinely-remaining).
+✅ **Performance visual correlation** — Budget-violation ↔ visual-diff correlation is shipped, as is **run-over-run CWV delta** correlation (a page that got slower since the last run is flagged and joined to its visual diff).
 
 **Pricing evolution:**
 - Add Monitoring tier: $49/mo — unlimited production URLs, hourly checks, alerting

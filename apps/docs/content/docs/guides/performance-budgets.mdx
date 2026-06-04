@@ -32,6 +32,10 @@ export default {
         maxRequests: 60,
       },
       failOnBudgetExceeded: false,
+
+      // Run-over-run regression tracking (optional)
+      trackRegressions: true,
+      regressionThreshold: 0.2, // flag metrics >20% worse than last run
     }),
   ],
 };
@@ -65,8 +69,36 @@ joined in the report:
 The same data is available in the console and HTML reports, and on
 `RunResult.perf` in the JSON output for programmatic use.
 
+## Run-over-run regressions
+
+Static budgets answer "is this page within target?" Regression tracking answers
+a sharper question: "did this page get *slower than it was last time*?" Enable
+`trackRegressions` and Frontguard persists each run's metrics (under `historyDir`,
+default `.frontguard/perf-history`) and flags any metric that degraded by more
+than `regressionThreshold` since the previous run.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `trackRegressions` | `boolean` | `false` | Persist metrics and flag run-over-run regressions |
+| `historyDir` | `string` | `.frontguard/perf-history` | Where per-run metrics are stored |
+| `regressionThreshold` | `number` | `0.2` | Relative increase that counts as a regression (0.2 = 20% worse) |
+
+Tracked metrics are LCP, CLS, TTFB, and page weight (all "lower is better"). The
+first run establishes a baseline; subsequent runs report deltas like:
+
+```
+⚡ PERFORMANCE
+    /            @ 1440px
+      ttfb: 0.54s (↑ +35% since last run, was 0.40s)
+```
+
+In the PR comment this is correlated inline with the visual diff — a page that
+both shifted **and** got slower since the last run shows
+`⚡ Performance — regressed since last run: ttfb +35% (0.40s → 0.54s)` right in
+its details block, plus a "regressions since last run" table in the summary.
+
 <Callout type="info">
-  Budgets are static thresholds. Run-over-run "this page got 400ms slower *since
-  last time*" (CWV delta) correlation is on the roadmap — see
-  [ROADMAP](https://github.com/frontguard/frontguard/blob/main/docs/ROADMAP.md).
+  Metrics are persisted in `afterRun`, after results are built — so a run that
+  aborts midway (e.g. an accessibility `failOnViolation`) won't silently advance
+  the baseline and hide a regression on the next run.
 </Callout>

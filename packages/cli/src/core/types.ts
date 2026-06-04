@@ -601,6 +601,21 @@ export interface PerfReport {
     budget: number;
     unit: string;
   }>;
+  /**
+   * Metrics that degraded beyond the configured threshold **since the previous
+   * run** (run-over-run regression), if delta tracking is enabled. Empty/omitted
+   * when there is no prior run or nothing regressed.
+   */
+  regressions?: Array<{
+    metric: string;
+    /** Value on the previous run. */
+    previous: number;
+    /** Value on this run. */
+    current: number;
+    /** Relative change as a fraction (0.33 = 33% worse). */
+    deltaPct: number;
+    unit: string;
+  }>;
 }
 
 export interface RunResult {
