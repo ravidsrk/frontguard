@@ -1,0 +1,43 @@
+# Frontguard Slack app manifest.
+#
+# Create the app at https://api.slack.com/apps → "From an app manifest", paste
+# this, then set the request URLs to your deployed handler:
+#   Events:        https://<host>/slack/events
+#   Slash command: https://<host>/slack/commands
+#   OAuth redirect: https://<host>/slack/oauth/callback
+#
+# Copy the Signing Secret and Client ID/Secret into the handler's env:
+#   SLACK_SIGNING_SECRET, SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_REDIRECT_URI
+
+display_information:
+  name: Frontguard
+  description: AI-powered visual regression alerts and checks, in Slack.
+  background_color: "#0d1117"
+
+features:
+  bot_user:
+    display_name: frontguard
+    always_online: true
+  slash_commands:
+    - command: /frontguard
+      url: https://example.com/slack/commands
+      description: Run a visual check or get help
+      usage_hint: status <url>
+      should_escape: false
+
+oauth_config:
+  redirect_urls:
+    - https://example.com/slack/oauth/callback
+  scopes:
+    bot:
+      - chat:write
+      - commands
+
+settings:
+  event_subscriptions:
+    request_url: https://example.com/slack/events
+    bot_events:
+      - app_mention
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
