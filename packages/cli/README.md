@@ -154,12 +154,12 @@ Frontguard ships with a plugin architecture (6 lifecycle hooks) and 3 built-in p
 
 ```typescript
 // frontguard.config.ts
-import { figmaPlugin } from 'frontguard/plugins';
+import { createFigmaPlugin } from '@frontguard/cli/plugins';
 
 export default {
   // ...base config
   plugins: [
-    figmaPlugin({ fileKey: 'your-figma-file-key' }),
+    createFigmaPlugin({ fileKey: 'your-figma-file-key' }),
   ],
 };
 ```
