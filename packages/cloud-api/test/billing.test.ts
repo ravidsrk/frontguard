@@ -108,6 +108,14 @@ describe('billing routes (dev mode)', () => {
   beforeEach(() => resetMemoryStore());
   const auth = (t: string) => ({ Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' });
 
+  // Helper: produces a current-timestamp `stripe-signature` header for the
+  // given payload, signed with the supplied webhook secret.
+  function stripeSig(payload: string, secret: string): string {
+    const ts = Math.floor(Date.now() / 1000);
+    const mac = createHmac('sha256', secret).update(`${ts}.${payload}`).digest('hex');
+    return `t=${ts},v1=${mac}`;
+  }
+
   it('GET /v1/billing/usage returns plan + limits', async () => {
     const res = await app.request('/v1/billing/usage', { headers: auth('alice') });
     expect(res.status).toBe(200);
@@ -128,7 +136,7 @@ describe('billing routes (dev mode)', () => {
     expect(res.status).toBe(501);
   });
 
-  it('webhook updates a team plan (no signature in dev)', async () => {
+  it('webhook updates a team plan when the signature is valid', async () => {
     const teamRes = await app.request('/v1/teams', {
       method: 'POST', headers: auth('alice'), body: JSON.stringify({ name: 'A' }),
     });
@@ -138,12 +146,47 @@ describe('billing routes (dev mode)', () => {
       type: 'checkout.session.completed',
       data: { object: { client_reference_id: teamId, customer: 'cus_1', subscription: 'sub_1', metadata: { plan: 'pro', team_id: teamId } } },
     };
-    const res = await app.request('/v1/billing/webhook', { method: 'POST', body: JSON.stringify(event) });
+    const body = JSON.stringify(event);
+    const res = await app.request(
+      '/v1/billing/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': stripeSig(body, 'wh') },
+        body,
+      },
+      { STRIPE_WEBHOOK_SECRET: 'wh' },
+    );
     expect(res.status).toBe(200);
     expect((await res.json()).plan).toBe('pro');
 
     const team = await getMemoryStore().getTeam(teamId);
     expect(team?.plan).toBe('pro');
+  });
+
+  it('webhook returns 503 when STRIPE_WEBHOOK_SECRET is unset (P0-7)', async () => {
+    // The cloud previously accepted unsigned events when no secret was
+    // configured — any anonymous POST could upgrade a team to business. The
+    // hardened route refuses every event until the secret is provisioned.
+    const res = await app.request('/v1/billing/webhook', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'checkout.session.completed', data: { object: {} } }),
+    });
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/not configured/i);
+  });
+
+  it('webhook 401 when signed with the wrong secret', async () => {
+    const body = JSON.stringify({ type: 'ping', data: { object: {} } });
+    const res = await app.request(
+      '/v1/billing/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': stripeSig(body, 'attacker_secret') },
+        body,
+      },
+      { STRIPE_WEBHOOK_SECRET: 'correct_secret' },
+    );
+    expect(res.status).toBe(401);
   });
 
   it('checkout 401 without an API key', async () => {
@@ -230,15 +273,31 @@ describe('billing routes (dev mode)', () => {
     expect(res.status).toBe(401);
   });
 
-  it('webhook 400 on invalid JSON (dev, no signature)', async () => {
-    const res = await app.request('/v1/billing/webhook', { method: 'POST', body: 'not json' });
+  it('webhook 400 on invalid JSON when signature is valid', async () => {
+    const body = 'not json';
+    const res = await app.request(
+      '/v1/billing/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': stripeSig(body, 'wh') },
+        body,
+      },
+      { STRIPE_WEBHOOK_SECRET: 'wh' },
+    );
     expect(res.status).toBe(400);
   });
 
-  it('webhook returns handled:false for unrecognised events', async () => {
-    const res = await app.request('/v1/billing/webhook', {
-      method: 'POST', body: JSON.stringify({ type: 'ping', data: { object: {} } }),
-    });
+  it('webhook returns handled:false for unrecognised (but signed) events', async () => {
+    const body = JSON.stringify({ type: 'ping', data: { object: {} } });
+    const res = await app.request(
+      '/v1/billing/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': stripeSig(body, 'wh') },
+        body,
+      },
+      { STRIPE_WEBHOOK_SECRET: 'wh' },
+    );
     expect(res.status).toBe(200);
     expect((await res.json()).handled).toBe(false);
   });
