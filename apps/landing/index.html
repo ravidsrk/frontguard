@@ -7,18 +7,14 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/logo-16.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/logo-180.png" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="Visual regression testing for Playwright. Catches CSS bugs in CI, explains why they broke, and suggests the fix. Free, open source — get started in 30 seconds." />
-<title>Frontguard — Visual regression testing for Playwright</title>
+<meta name="description" content="AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production. Open source CLI under MIT, Pro cloud at $29/mo." />
+<title>Frontguard — AI-powered visual regression testing</title>
 <meta name="theme-color" content="#06080c" />
-
-<!-- Publication dates -->
-<meta name="date" content="2026-05-26" />
-<meta name="last-modified" content="2026-05-26" />
 
 <!-- Open Graph -->
 <meta property="og:type" content="website" />
-<meta property="og:title" content="Frontguard — Visual regression testing for Playwright" />
-<meta property="og:description" content="Visual regression testing that tells you what broke, why it broke, and how to fix it. Plugs into Playwright. Runs in CI. Free and open source." />
+<meta property="og:title" content="Frontguard — AI-powered visual regression testing" />
+<meta property="og:description" content="Detect, understand, and fix visual bugs before they ship to production. Anti-flake consensus, AI classification, sandbox-verified fixes. Open source under MIT." />
 <meta property="og:url" content="https://frontguard.dev" />
 <meta property="og:image" content="https://frontguard.dev/og-image.png" />
 <meta property="og:image:width" content="1200" />
@@ -27,158 +23,133 @@
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="Frontguard — Visual regression testing for Playwright" />
-<meta name="twitter:description" content="Visual regression testing that tells you what broke, why it broke, and how to fix it. Plugs into Playwright. Runs in CI." />
+<meta name="twitter:site" content="@ravidsrk" />
+<meta name="twitter:creator" content="@ravidsrk" />
+<meta name="twitter:title" content="Frontguard — AI-powered visual regression testing" />
+<meta name="twitter:description" content="Detect, understand, and fix visual bugs before they ship to production. Anti-flake consensus, AI classification, sandbox-verified fixes." />
 <meta name="twitter:image" content="https://frontguard.dev/og-image.png" />
 
 <!-- Additional SEO -->
 <meta name="author" content="Ravindra Kumar" />
-<meta name="keywords" content="visual regression testing, playwright, screenshot testing, AI, CSS bugs, visual QA, CI/CD, open source" />
+<meta name="keywords" content="visual regression testing, AI visual testing, Playwright, Storybook visual testing, frontend testing, CSS regression, screenshot testing, open source visual testing, MCP server" />
 <link rel="canonical" href="https://frontguard.dev" />
 
 <!-- Security -->
 <meta http-equiv="X-Content-Type-Options" content="nosniff" />
 <meta name="referrer" content="strict-origin-when-cross-origin" />
 
-<!-- Structured Data: SoftwareApplication -->
+<!-- Structured Data: SoftwareApplication. Offers only — no fabricated
+     review-rating block until validation/results-v0.2.md has measured
+     numbers from real users. -->
 <script type="application/ld+json">
 {
-"@context": "https://schema.org",
-"@type": "SoftwareApplication",
-"name": "Frontguard",
-"applicationCategory": "DeveloperApplication",
-"applicationSubCategory": "Testing Tool",
-"operatingSystem": "Any",
-"offers": {
-"@type": "Offer",
-"price": "0",
-"priceCurrency": "USD",
-"description": "Free and open source"
-},
-"description": "Visual regression testing for Playwright. Detects regressions, explains why they happened, suggests fixes. Open source under MIT.",
-"url": "https://frontguard.dev",
-"license": "https://opensource.org/licenses/MIT",
-"downloadUrl": "https://www.npmjs.com/package/frontguard",
-"softwareVersion": "0.1.0",
-"author": {
-"@type": "Person",
-"name": "Ravindra Kumar",
-"url": "https://github.com/ravidsrk"
-},
-"codeRepository": "https://github.com/ravidsrk/frontguard",
-"aggregateRating": {
-"@type": "AggregateRating",
-"ratingValue": "4.8",
-"ratingCount": "36",
-"bestRating": "5",
-"worstRating": "1"
-}
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Frontguard",
+  "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "Testing Tool",
+  "operatingSystem": "Linux, macOS, Windows",
+  "description": "AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.",
+  "url": "https://frontguard.dev",
+  "license": "https://opensource.org/licenses/MIT",
+  "downloadUrl": "https://www.npmjs.com/package/@frontguard/cli",
+  "author": {
+    "@type": "Person",
+    "name": "Ravindra Kumar",
+    "url": "https://github.com/ravidsrk"
+  },
+  "codeRepository": "https://github.com/ravidsrk/frontguard",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "Free CLI",
+      "price": "0",
+      "priceCurrency": "USD",
+      "description": "MIT-licensed CLI. Bring your own OpenAI or Anthropic key."
+    },
+    {
+      "@type": "Offer",
+      "name": "Pro",
+      "price": "29",
+      "priceCurrency": "USD",
+      "description": "Hosted cloud, team baselines, history, flake-score badges."
+    }
+  ]
 }
 </script>
 
-<!-- Structured Data: FAQPage -->
+<!-- Structured Data: FAQPage — answers mirror the React FAQ component
+     verbatim. No fabricated stats, no invented citations. -->
 <script type="application/ld+json">
 {
-"@context": "https://schema.org",
-"@type": "FAQPage",
-"mainEntity": [
-{
-"@type": "Question",
-"name": "What is Frontguard?",
-"acceptedAnswer": {
-"@type": "Answer",
-"text": "Frontguard is a free, open-source visual regression testing tool for Playwright. It captures screenshots during CI runs and compares them to stored baselines. When changes are detected, AI explains what broke and suggests a fix. It is MIT licensed with no per-screenshot fees or usage limits."
-}
-},
-{
-"@type": "Question",
-"name": "How does Frontguard detect visual regressions?",
-"acceptedAnswer": {
-"@type": "Answer",
-"text": "Frontguard captures screenshots using Playwright's browser engines and compares them pixel-by-pixel against baselines. It takes three screenshots per checkpoint and uses majority consensus to filter flaky results. Genuine differences are analyzed by GPT-4o vision, which explains the root cause in plain English."
-}
-},
-{
-"@type": "Question",
-"name": "Which frameworks does Frontguard support?",
-"acceptedAnswer": {
-"@type": "Answer",
-"text": "Frontguard works with any framework Playwright can test. This includes React, Vue, Angular, Svelte, Next.js, Nuxt, Astro, and Remix. It operates at the browser level, so it is completely framework-agnostic. No special adapters or plugins are needed."
-}
-},
-{
-"@type": "Question",
-"name": "Is Frontguard free?",
-"acceptedAnswer": {
-"@type": "Answer",
-"text": "Yes, Frontguard is completely free and open source under the MIT License. There are no per-screenshot fees, no monthly limits, and no paid tiers. You run it in your own CI environment. The only optional cost is OpenAI API usage for AI analysis."
-}
-},
-{
-"@type": "Question",
-"name": "How do I set up Frontguard in my CI pipeline?",
-"acceptedAnswer": {
-"@type": "Answer",
-"text": "Setup takes three steps. Install the package with npm install @frontguard/playwright. Add visualTest() calls to your Playwright tests. Then run npx playwright test in your CI workflow. Frontguard works with GitHub Actions, GitLab CI, CircleCI, and Jenkins."
-}
-},
-{
-"@type": "Question",
-"name": "How does Frontguard compare to Percy and Chromatic?",
-"acceptedAnswer": {
-"@type": "Answer",
-"text": "Frontguard is fully open source with no per-screenshot pricing. Unlike Percy and Chromatic, it includes AI analysis that explains why regressions happened. It also offers anti-flake consensus and auto-fix CSS suggestions. The trade-off is self-hosting instead of a managed cloud service."
-}
-},
-{
-"@type": "Question",
-"name": "Does Frontguard work with React, Vue, and Angular?",
-"acceptedAnswer": {
-"@type": "Answer",
-"text": "Yes, Frontguard works with React, Vue, Angular, and every other web framework. It operates through Playwright's browser automation and tests rendered output directly. No framework-specific plugins or adapters are needed. Add visual checkpoints with a single function call."
-}
-},
-{
-"@type": "Question",
-"name": "What viewport sizes does Frontguard test?",
-"acceptedAnswer": {
-"@type": "Answer",
-"text": "By default, Frontguard tests three viewports: 1280×800 for desktop, 768×1024 for tablet, and 375×812 for mobile. You can customize these in your frontguard.config.ts file or with CLI flags. Custom viewports help test specific devices or breakpoints."
-}
-}
-]
-}
-</script>
-
-<!-- Structured Data: WebPage -->
-<script type="application/ld+json">
-{
-"@context": "https://schema.org",
-"@type": "WebPage",
-"name": "Frontguard — Visual regression testing for Playwright",
-"description": "Visual regression testing for Playwright. Catches CSS bugs in CI, explains why they broke, and suggests the fix.",
-"url": "https://frontguard.dev",
-"datePublished": "2026-05-26",
-"dateModified": "2026-05-26",
-"author": {
-"@type": "Person",
-"name": "Ravindra Kumar",
-"url": "https://github.com/ravidsrk"
-},
-"publisher": {
-"@type": "Organization",
-"name": "Frontguard",
-"url": "https://frontguard.dev"
-},
-"breadcrumb": {
-"@type": "BreadcrumbList",
-"itemListElement": [{
-"@type": "ListItem",
-"position": 1,
-"name": "Home",
-"item": "https://frontguard.dev"
-}]
-}
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How do I install Frontguard?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Run npm install @frontguard/cli to install the engine, then npx frontguard init to write a typed config and npx frontguard run --url <your URL> to do your first scan. The Playwright plugin is a thin wrapper: npm install -D @frontguard/cli @frontguard/playwright."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does Frontguard handle cross-OS rendering differences?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Playwright's own docs warn that local rendering varies by OS and hardware. Frontguard ships a pinned Docker renderer image with Chromium, Firefox, and WebKit so baselines render byte-equivalently on macOS, Linux, and CI. Enable with frontguard run --docker."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I self-host the cloud?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. The cloud (Hono on Cloudflare Workers with D1 and R2) is MIT-licensed and runs locally via docker-compose up — miniflare for the Worker runtime, SQLite in place of D1, and a local-disk adapter in place of R2."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What environment variables does Frontguard read?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "For AI: FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY. The Playwright plugin also accepts unprefixed OPENAI_API_KEY / ANTHROPIC_API_KEY when present. For the hosted cloud: FRONTGUARD_API_URL and FRONTGUARD_API_KEY. frontguard doctor reads exactly the same env names the runtime reads."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "OpenAI or Anthropic — which should I use?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Either works. Frontguard sends the diff image, the DOM snapshot, console errors, and axe-core findings. Claude Sonnet is the default when both keys are present; GPT-4o is the fallback. Switch with ai.provider in frontguard.config.ts."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does Frontguard work with Storybook?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. frontguard init detects an existing Storybook (looks for .storybook/main.ts) and scaffolds a Storybook-aware config. The adapter walks the Storybook iframe, runs each story's play() function, and produces one screenshot per story by viewport."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is there an MCP server for in-IDE agents?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "@frontguard/mcp exposes list_regressions(pr_id), get_suggested_fix(diff_id), accept_baseline(diff_id), and recent_runs(repo, branch) to Claude Code, Cursor, Cline, and Copilot. Run as npx @frontguard/mcp and drop the snippet into your mcp.json."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the data retention policy for screenshots?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The CLI never sends screenshots anywhere except the AI provider you configured. On the hosted cloud, baselines and diff thumbnails are stored in R2 under your team scope; default retention is 30 days on Pro, configurable up to 1 year on Enterprise."
+      }
+    }
+  ]
 }
 </script>
 
@@ -189,37 +160,50 @@
 </head>
 <body>
 <div id="root">
-<!-- Static HTML fallback for search engine crawlers. React replaces this on mount. -->
+<!-- Static HTML fallback for search engine crawlers. Mirrors the React tree
+     section-by-section (hero / problem / how it works / features /
+     comparison / quick start / validation / pricing / FAQ / footer)
+     so crawlers and React see the same product. React replaces this on
+     mount. No fabricated stats, no invented citations, no fake review block. -->
 <style>
-.seo-fallback { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #e2e8f0; background: #06080c; margin: 0; padding: 0; line-height: 1.7; }
-.seo-fallback a { color: #f97316; text-decoration: underline; }
+.seo-fallback { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #cbd5e1; background: #06080c; margin: 0; padding: 0; line-height: 1.7; }
+.seo-fallback a { color: #22d3ee; text-decoration: underline; text-underline-offset: 2px; }
 .seo-fallback h1, .seo-fallback h2, .seo-fallback h3 { font-family: 'Outfit', system-ui, sans-serif; color: #f1f5f9; line-height: 1.2; }
 .seo-fallback h1 { font-size: 2.25rem; font-weight: 800; margin: 0 0 1rem; }
-.seo-fallback h2 { font-size: 1.75rem; font-weight: 700; margin: 2.5rem 0 1rem; }
-.seo-fallback h3 { font-size: 1.125rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }
+.seo-fallback h2 { font-size: 1.5rem; font-weight: 700; margin: 2.5rem 0 0.75rem; }
+.seo-fallback h3 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: #e2e8f0; }
 .seo-fallback p, .seo-fallback li { color: #94a3b8; }
-.seo-fallback .wrap { max-width: 48rem; margin: 0 auto; padding: 2rem 1.5rem; }
-.seo-fallback nav ul { list-style: none; display: flex; gap: 1.5rem; padding: 0; }
-.seo-fallback section { padding: 2rem 0; border-top: 1px solid #1e293b; }
-.seo-fallback pre, .seo-fallback code { font-family: 'JetBrains Mono', monospace; font-size: 0.875rem; background: #0f172a; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; display: block; color: #e2e8f0; }
+.seo-fallback strong { color: #e2e8f0; }
+.seo-fallback .wrap { max-width: 56rem; margin: 0 auto; padding: 2rem 1.5rem; }
+.seo-fallback nav.top ul { list-style: none; display: flex; flex-wrap: wrap; gap: 1.25rem; padding: 0; margin: 0 0 2rem; }
+.seo-fallback section { padding: 1.5rem 0; border-top: 1px solid #1e293b; }
+.seo-fallback section:first-of-type { border-top: 0; padding-top: 0; }
+.seo-fallback pre, .seo-fallback code { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #e2e8f0; }
+.seo-fallback pre { background: #0f172a; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
 .seo-fallback footer { border-top: 1px solid #1e293b; margin-top: 2rem; padding-top: 2rem; }
-.seo-fallback footer ul { list-style: none; padding: 0; }
-.seo-fallback .cta { display: inline-block; background: #f97316; color: #06080c; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; text-decoration: none; margin-right: 1rem; }
+.seo-fallback .cta { display: inline-block; background: #f97316; color: #06080c; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; text-decoration: none; margin-right: 0.75rem; }
 .seo-fallback .cta-secondary { display: inline-block; border: 1px solid #334155; padding: 0.75rem 1.5rem; border-radius: 0.5rem; color: #e2e8f0; text-decoration: none; }
+.seo-fallback table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.9rem; }
+.seo-fallback th, .seo-fallback td { border: 1px solid #1e293b; padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
+.seo-fallback th { background: #0f172a; color: #f1f5f9; }
+.seo-fallback .pricing-grid { display: grid; gap: 1rem; grid-template-columns: 1fr; margin: 1rem 0; }
+.seo-fallback .pricing-card { border: 1px solid #1e293b; border-radius: 0.5rem; padding: 1rem; }
+.seo-fallback .pricing-card h3 { margin-top: 0; }
+.seo-fallback .source { color: #64748b; font-size: 0.8rem; }
 </style>
 <div class="seo-fallback">
 <div class="wrap">
 
-<!-- Header / Nav -->
 <header>
-<nav aria-label="Main navigation">
+<nav class="top" aria-label="Main navigation">
 <a href="/" aria-label="Frontguard home"><strong>frontguard</strong></a>
 <ul>
+<li><a href="#how-it-works">How it works</a></li>
 <li><a href="#features">Features</a></li>
-<li><a href="#how-it-works">How It Works</a></li>
-<li><a href="#comparison">Comparison</a></li>
+<li><a href="#comparison">Compare</a></li>
+<li><a href="#install">Install</a></li>
+<li><a href="#pricing">Pricing</a></li>
 <li><a href="#faq">FAQ</a></li>
-<li><a href="#getting-started">Getting Started</a></li>
 <li><a href="https://docs.frontguard.dev" target="_blank" rel="noopener noreferrer">Docs</a></li>
 <li><a href="https://github.com/ravidsrk/frontguard" target="_blank" rel="noopener noreferrer">GitHub</a></li>
 </ul>
@@ -227,240 +211,178 @@
 </header>
 
 <main>
-<!-- Hero -->
+
 <section aria-labelledby="hero-heading">
-<p>Open source · MIT Licensed · <a href="#getting-started">Get started free</a> · <a href="#problem">Why visual testing?</a> · <a href="#author">About the author</a></p>
-<h1 id="hero-heading">Your CSS broke the checkout page. <span>Frontguard caught it.</span></h1>
-<p>Frontguard is a free, open-source <strong>visual regression testing</strong> tool for <a href="https://playwright.dev" target="_blank" rel="noopener noreferrer">Playwright</a>. It captures screenshots of every page in your web app. It compares them against baselines. Then AI explains what changed, why it broke, and how to fix it. No per-screenshot fees. No SaaS dashboard. Just <strong>screenshot testing</strong> that runs in your <strong>CI/CD testing</strong> pipeline. Results post directly to your pull request.</p>
+<p><strong>Open source · MIT · BYO AI key</strong></p>
+<h1 id="hero-heading">Visual bugs ship past every other test. Frontguard catches them.</h1>
+<p><strong>AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.</strong></p>
+<p>Anti-flake consensus, AI classification, sandbox-verified fixes. Runs in your CI on your own OpenAI or Anthropic key — screenshots never touch a Frontguard server.</p>
 <p>
-<a href="#getting-started" class="cta">Install in 30 Seconds</a>
-<a href="https://github.com/ravidsrk/frontguard" target="_blank" rel="noopener noreferrer" class="cta-secondary">View on GitHub</a>
+<a href="#install" class="cta">Install</a>
+<a href="#demo" class="cta-secondary">See it work</a>
 </p>
-<p>Last updated: May 2026</p>
 </section>
 
-<!-- Problem -->
 <section id="problem" aria-labelledby="problem-heading">
-<h2 id="problem-heading">Why visual regression testing matters</h2>
-<p>Frontend teams ship CSS changes every day. New components, design system updates, responsive tweaks, dark mode adjustments. Any of these can silently break layouts on pages you never thought to check. CSS and styling bugs account for roughly 30% of all frontend issues reported by end users. Yet most CI pipelines only run unit and integration tests that verify logic, not appearance. The average time to detect a visual regression without automation is 4.7 hours. That is measured from deploy to the first customer complaint. In that window, your broken checkout page or misaligned pricing table is live in production. It costs conversions and erodes trust.</p>
-<p><strong>Visual QA automation</strong> eliminates that gap. Capture screenshots at every pull request. Compare them pixel-by-pixel against known-good baselines. You catch visual regressions before they reach production. But traditional screenshot diffing has its own problems. It floods teams with false positives from font rendering, animation timing, and sub-pixel anti-aliasing. Frontguard solves both problems. It catches real <strong>CSS bug detection</strong> failures while filtering out the noise that makes other tools unusable at scale.</p>
-<p>Visual regression testing catches bugs that unit tests miss. Unit tests verify logic. Integration tests verify data flow. But neither checks what users actually see on the screen. According to the 2024 State of Frontend Development survey by The Software House, 59% of frontend teams reported shipping visual bugs to production that existing test suites failed to catch. These bugs include misaligned layouts, overlapping text, broken responsive designs, and invisible elements hidden by CSS overflow rules. The root cause is a testing gap: functional tests confirm that elements exist and behave correctly, but they cannot evaluate whether those elements look correct to a human viewer. Visual regression testing closes this gap by comparing rendered screenshots pixel-by-pixel against approved baselines. When a CSS change causes a heading to overlap a button or a modal to render off-screen, only a visual test catches it. This is why leading frontend teams now treat visual testing as essential, not optional.</p>
-
-<h3>CSS changes break layouts silently</h3>
-<p>A padding change in your shared button component breaks the checkout flow on mobile. Your functional tests pass because the button still exists and is clickable. You find out three hours later from a customer screenshot posted in Slack. This is the reality for teams without <strong>visual regression testing</strong> in their pipeline.</p>
-<h3>Screenshot diffs are 90% noise without intelligence</h3>
-<p>Your team approved 47 baseline updates last sprint without reviewing them. Every sub-pixel font rendering difference gets flagged as a regression. Engineers stop paying attention. Signal drowns in noise. Real regressions slip through. The tool that was supposed to catch bugs becomes the tool everyone ignores.</p>
-<h3>Manual QA doesn't scale</h3>
-<p>Every deploy needs eyes on 30 pages across 3 breakpoints. That is 90 manual checks every single time. At two deploys per day, that is 180 visual inspections daily. That is a full-time job just to verify CSS did not break anything. <strong>Visual QA automation</strong> reclaims that time and makes it repeatable.</p>
+<h2 id="problem-heading">Why pixel diffs alone fail — the state of the space, mid-2026</h2>
+<h3>01 — Lost Pixel sunset narrowed the OSS path</h3>
+<p>Lost Pixel was acqui-hired by Figma in 2026 and the repository was archived on 2026-04-22. The OSS tools that remain (Playwright built-in, BackstopJS, reg-suit) stop at "a pixel diff happened" — no review UI, no anti-flake, no AI to explain what changed. <span class="source">Source: lost-pixel.com · github.com/lost-pixel/lost-pixel.</span></p>
+<h3>02 — Playwright's own docs warn rendering differs by OS</h3>
+<p>Playwright's <code>toHaveScreenshot</code> embeds <code>chromium-darwin</code> in the baseline filename for a reason: macOS renders one outline width, Linux another. A baseline captured on a developer's M2 silently rejects every CI run on Linux. <span class="source">Source: playwright.dev/docs/test-snapshots.</span></p>
+<h3>03 — The Percy / Chromatic price cliff</h3>
+<p>Chromatic's Free tier is Chrome-only and excludes accessibility, TurboSnap, and UI Review; the next step is Starter at $179/month. Argos's published comparison puts 100K snapshots at $510/mo on Argos vs $8,999/mo on Percy. <span class="source">Source: chromatic.com/pricing · argos-ci.com/pricing.</span></p>
 </section>
 
-<!-- How It Works -->
 <section id="how-it-works" aria-labelledby="how-it-works-heading">
-<h2 id="how-it-works-heading">How Frontguard works: 4 steps to automated visual testing</h2>
-              <img src="/logo-64.webp" alt="Frontguard logo — AI-powered visual regression testing for Playwright" width="64" height="64" loading="lazy" style="margin:1rem 0" />
+<h2 id="how-it-works-heading">How Frontguard works — Detect, Understand, Fix</h2>
+<h3>Detect — anti-flake consensus + SSIM</h3>
+<p>Each route renders three times across Chromium, Firefox, and WebKit. Majority wins; flake noise from spinners, fonts, and animation timing drops out before a diff is even computed. SSIM perceptual matching is the fallback when pixel-equality is too strict.</p>
+<h3>Understand — AI classifies what changed</h3>
+<p>Surviving diffs go to GPT-4o or Claude Sonnet vision with the DOM, console errors, and axe-core findings inline. The model returns a category (layout / color / content / accessibility), a confidence score, and a plain-English explanation of the root cause — not just "pixels differ at 340,890".</p>
+<h3>Fix — sandbox-verified patch</h3>
+<p>The AI proposes a CSS, HTML, or config patch with a target selector. Frontguard applies it in a local Playwright sandbox (or Daytona when configured), re-renders the page, and only ships the suggestion if the diff disappears. Apply with one click in the PR comment.</p>
+</section>
 
-<p>Frontguard integrates directly with <a href="https://playwright.dev/docs/intro" target="_blank" rel="noopener noreferrer">Playwright's test runner</a>. It adds <strong>visual regression testing</strong> to your existing test suite. No separate tools, no additional browser installations, no config files to maintain. Here is how the process works end to end:</p>
+<section id="features" aria-labelledby="features-heading">
+<h2 id="features-heading">Six features built for the problems pixel diffs can't solve</h2>
+<h3>Anti-flake consensus — three captures, majority wins</h3>
+<p>Each route is rendered three times. Spinners mid-animation, font flicker, blinking carets — anything that disagrees with itself is dropped before the diff is even computed.</p>
+<h3>AI classification — tells you why, not just where</h3>
+<p>Surviving diffs go to GPT-4o or Claude Sonnet vision; the model returns category, confidence, and explanation — on your own provider key.</p>
+<h3>Sandbox-verified fixes — we don't ship a fix unless we tried it</h3>
+<p>Every AI patch is applied in a local Playwright sandbox or Daytona snapshot, the page is re-rendered, and the suggestion only ships if the diff disappears.</p>
+<h3>Plugin architecture — 6 lifecycle hooks, real plugins included</h3>
+<p>onDiscover, onBeforeCapture, onAfterCapture, onBeforeDiff, onAfterDiff, onReport. Built-ins: axe-core accessibility, Figma compare, performance budgets, monitor, third-party-script drift detection.</p>
+<h3>CI-native — GitHub Action + PR comment, no signup</h3>
+<p>Composite GitHub Action; baseline / current / diff thumbnails posted as a single update-in-place PR comment. Status check sets pass/fail. Works on GitLab CI, CircleCI, Jenkins via the same CLI.</p>
+<h3>Self-hostable — MIT, the cloud is optional</h3>
+<p>The CLI is fully self-contained: git-orphan baselines, local sandbox, your own AI key. The hosted cloud adds team baselines, history, and flake-score badges — and the same stack runs under docker-compose on your laptop.</p>
+</section>
 
-<h3>Step 1 — Install the Playwright plugin</h3>
-<p>Run a single command to add Frontguard to your project. The <code>@frontguard/playwright</code> package is on <a href="https://www.npmjs.com/package/frontguard" target="_blank" rel="noopener noreferrer">npm</a> and installs in seconds. No native dependencies. No browser downloads beyond what Playwright already provides. No account signup required. It works immediately with your existing <a href="https://playwright.dev/docs/test-configuration" target="_blank" rel="noopener noreferrer">Playwright configuration</a>.</p>
-<pre><code>npm install @frontguard/playwright</code></pre>
+<section id="comparison" aria-labelledby="comparison-heading">
+<h2 id="comparison-heading">Vs Percy / Chromatic / Argos</h2>
+<p>Every cell describes documented competitor behaviour from each vendor's pricing page, docs, or 2026 release notes. Full sources in <a href="https://github.com/ravidsrk/frontguard/blob/main/docs/research.md" target="_blank" rel="noopener noreferrer">docs/research.md</a>.</p>
+<table>
+<thead>
+<tr><th>Feature</th><th>Frontguard</th><th>Percy</th><th>Chromatic</th><th>Argos</th></tr>
+</thead>
+<tbody>
+<tr><td>Free tier</td><td>CLI free forever (MIT, BYO AI key)</td><td>5,000 screenshots/mo · all browsers</td><td>5,000 snapshots/mo · Chrome-only · no a11y</td><td>5,000 screenshots/mo · unlimited Playwright traces</td></tr>
+<tr><td>Paid entry</td><td>Pro $29/mo (cloud + dashboard)</td><td>Desktop ≈ $199/mo (per percy.io 2026 roundup)</td><td>Starter $179/mo (35K snapshots · adds UI Review)</td><td>Pro from $100/mo (35K screenshots)</td></tr>
+<tr><td>Snapshot overage</td><td>Spend cap, no per-screenshot surcharge</td><td>Quote-walled above tier</td><td>$0.008 / snapshot on Starter and Pro</td><td>$0.004 / extra screenshot · $0.0015 Storybook</td></tr>
+<tr><td>AI diff explanation</td><td>Plain-English category + confidence + cause</td><td>Visual Review Agent (NL summaries) · late 2025</td><td>No diff-classification AI (pixel + SteadySnap)</td><td>Explicitly markets "no AI overhead"</td></tr>
+<tr><td>Sandbox-verified fixes</td><td>Patch + re-render in local Playwright / Daytona</td><td>Not advertised</td><td>Not advertised</td><td>Not advertised</td></tr>
+<tr><td>Self-host</td><td>docker-compose recipe · MIT cloud</td><td>SaaS only</td><td>SaaS only</td><td>MIT, self-host possible from source</td></tr>
+<tr><td>Storybook integration</td><td>Detector + play()-aware adapter</td><td>SDK</td><td>Native @chromatic-com/storybook add-on</td><td>@argos-ci/storybook</td></tr>
+<tr><td>MCP server</td><td>@frontguard/mcp (list_regressions, get_suggested_fix)</td><td>Not shipped</td><td>Per-branch /mcp endpoint · Storybook 10.3+ · React-first</td><td>Not shipped</td></tr>
+<tr><td>Cross-OS render normalisation</td><td>--docker pinned Chromium/Firefox/WebKit image</td><td>Cloud DOM snapshotting</td><td>Cloud render farm</td><td>Runs whatever you upload</td></tr>
+</tbody>
+</table>
+</section>
 
-<h3>Step 2 — Add visual checkpoints to your tests</h3>
-<p>Import the <code>visualTest</code> function and call it at any point in your <strong>Playwright testing</strong> flow. Each call captures a screenshot, assigns it a name, and stores the baseline. Add visual checkpoints to existing tests. No need to rewrite your test suite.</p>
-<pre><code>import { test } from '@playwright/test';
+<section id="install" aria-labelledby="install-heading">
+<h2 id="install-heading">Install in 30 seconds</h2>
+<h3>CLI</h3>
+<pre><code>npm install @frontguard/cli
+npx frontguard init
+npx frontguard run --url http://localhost:3000</code></pre>
+
+<h3>Playwright plugin</h3>
+<pre><code>npm install -D @frontguard/cli @frontguard/playwright</code></pre>
+<pre><code>import { test, expect } from '@playwright/test';
 import { visualTest } from '@frontguard/playwright';
 
-test('checkout page', async ({ page }) =&gt; {
-  await page.goto('https://myapp.com/checkout');
+test('checkout @ 375px', async ({ page }) =&gt; {
+  await page.goto('http://localhost:3000/checkout');
   const result = await visualTest(page, 'checkout');
   expect(result.passed).toBe(true);
 });</code></pre>
 
-<h3>Step 3 — Run in CI with your existing pipeline</h3>
-<p>Frontguard runs wherever Playwright runs. <a href="https://docs.github.com/en/actions" target="_blank" rel="noopener noreferrer">GitHub Actions</a>, GitLab CI, CircleCI, Jenkins, or any other <strong>CI/CD testing</strong> environment. No special containers or services needed. Just run your normal test command.</p>
-<pre><code>npx playwright test</code></pre>
-
-<h3>Step 4 — Review AI-powered analysis in your PR</h3>
-<p>When a visual regression is detected, Frontguard posts a comment on your pull request. It includes side-by-side diffs and an AI-generated explanation. You don't stare at pixel diffs. Frontguard gives you a plain-English summary. Example: "The submit button overflows on mobile. Padding-left of 24px exceeds the flex container's space." The <strong>CSS bug detection</strong> engine pinpoints the root cause and suggests a fix.</p>
-<p>Frontguard's AI analysis uses screenshot diffing combined with DOM inspection to identify root causes. When a regression is detected, the system captures the changed screenshot and the baseline side by side. It then sends both images to GPT-4o vision along with extracted CSS properties from the affected elements. The AI model compares layout, spacing, color, and typography between the two states. It identifies which CSS property changed and traces the visual impact across the page. For example, if a margin change on a container causes downstream elements to shift, the AI reports both the direct cause and the cascading effect. According to internal testing across 200 visual regressions, Frontguard's AI correctly identified the root-cause CSS property 87% of the time on the first analysis. This accuracy rate improves to 94% when the AI has access to the git diff of the associated pull request.</p>
+<h3>GitHub Action</h3>
+<pre><code>- name: Frontguard
+  uses: ravidsrk/frontguard@v1
+  with:
+    url: ${{ steps.preview.outputs.url }}
+  env:
+    FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}</code></pre>
+<p>Full reference in the <a href="https://docs.frontguard.dev" target="_blank" rel="noopener noreferrer">documentation</a>.</p>
 </section>
 
-<!-- Features -->
-<section id="features" aria-labelledby="features-heading">
-<h2 id="features-heading">Features built for the problems pixel diffs can't solve</h2>
-              <img src="/logo.webp" alt="Frontguard features — zero-config visual regression testing with AI analysis" width="200" height="200" loading="lazy" style="margin:1rem 0;border-radius:1rem" />
-
-<p>Frontguard is not just another <strong>screenshot testing</strong> tool. Every feature addresses a pain point that makes existing tools impractical for real teams. Here is what sets Frontguard apart from Percy, Chromatic, and native Playwright assertions.</p>
-
-<article>
-<h3>AI-Powered Analysis — It tells you why, not just where</h3>
-<p>Traditional diff tools highlight changed pixels and leave you to figure out the rest. Frontguard sends flagged screenshots to GPT-4o vision. It reads visual context like a senior frontend engineer would. Instead of "pixels differ at 340,890," you get an actionable explanation. Example: "The submit button overflows on mobile because new padding pushes it outside the flex container. Fix: change padding-left from 24px to 16px." This <strong>CSS bug detection</strong> approach reduces investigation time from hours to seconds. Reports are useful to designers, product managers, and engineers alike.</p>
-<p>The cost of undetected visual regressions extends beyond user experience. According to a 2023 Stripe developer survey, 85% of online shoppers will not return to a website after a poor visual experience. Cart abandonment rates increase by 7% when checkout pages display layout issues such as overlapping buttons or misaligned form fields. For e-commerce teams processing one million dollars in monthly revenue, a single undetected CSS regression on the checkout page can cost seventy thousand dollars or more before it is identified and fixed. Traditional QA processes catch only 60% of visual issues before production, according to data from Testim's 2024 testing automation report. Automated visual regression testing tools like Frontguard close this gap by testing every page at every viewport on every pull request. The result is fewer production incidents, faster release cycles, and higher customer confidence.</p>
-</article>
-
-<article>
-<h3>Anti-Flake Consensus — 3 screenshots, majority wins</h3>
-<p>Flaky visual tests are the top reason teams disable <strong>screenshot testing</strong> entirely. A spinner mid-animation. A loading skeleton that persists one extra frame. A blinking cursor in the hero section. Any of these create false positives that erode trust. Frontguard captures three screenshots of every checkpoint and applies a consensus algorithm. If two of three match the baseline, the test passes. Only genuine, reproducible regressions are flagged. This eliminates noise from traditional pixel-diff tools. Your visual test suite stays reliable without constant baseline updates.</p>
-</article>
-
-<article>
-<h3>Smart Route Discovery — Point at a URL, test every page</h3>
-<p>Maintaining a manual route list is tedious and error-prone. Frontguard includes an automatic crawler. It walks your sitemap, discovers every reachable page, and builds the test matrix. Add a new page and it is automatically included. Remove a page and its baselines are cleaned up. Zero configuration. Zero maintenance. Complete coverage.</p>
-</article>
-
-<article>
-<h3>PR-Native Review — Diffs render in the GitHub thread</h3>
-<p>Context switching kills productivity. Frontguard posts visual diff results directly as <a href="https://docs.github.com/en/pull-requests" target="_blank" rel="noopener noreferrer">GitHub PR comments</a>. Each comment includes side-by-side images, the AI explanation, and approve/reject controls. Your team reviews visual changes where they review code. No separate dashboard. No additional login. No extra notification stream. This keeps <strong>visual QA automation</strong> integrated into your workflow, not bolted on as an afterthought.</p>
-</article>
-
-<article>
-<h3>Multi-Browser Testing — Chromium, Firefox, WebKit in one command</h3>
-<p>That Safari <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_flexible_box_layout" target="_blank" rel="noopener noreferrer">flexbox bug</a> a customer found last quarter? Frontguard would have caught it at PR time. It runs <strong>visual regression testing</strong> across Chromium, Firefox, and WebKit with one command. Each browser engine gets its own baseline set. Engine-specific rendering differences are tracked independently. Cross-browser false positives never happen.</p>
-</article>
-
-<article>
-<h3>Plugin System — 6 lifecycle hooks for custom workflows</h3>
-<p>Every team has unique needs. Compare production screenshots against <a href="https://www.figma.com" target="_blank" rel="noopener noreferrer">Figma</a> design mocks. Set visual performance budgets. Monitor live pages on a schedule. The plugin system exposes six lifecycle hooks: <code>onBeforeCapture</code>, <code>onAfterCapture</code>, <code>onBeforeDiff</code>, <code>onAfterDiff</code>, <code>onReport</code>, and <code>onCleanup</code>. These let you extend Frontguard for any visual testing workflow.</p>
-</article>
+<section id="validation" aria-labelledby="validation-heading">
+<h2 id="validation-heading">Validation results coming soon</h2>
+<p>Frontguard's AI classifier is validated against real diffs from five open-source repos: shadcn-ui taxonomy, shadcn-ui next-template, chakra-ui-docs, medusajs storefront, and shuding nextra. We publish the measured accuracy, false-positive rate, and per-category breakdown — and gate the launch on accuracy &ge; 70% and FPR &lt; 15%.</p>
+<p>No accuracy number ships on this page until that run lands. Live harness: <a href="https://github.com/ravidsrk/frontguard/blob/main/validation/results-v0.2.md" target="_blank" rel="noopener noreferrer">validation/results-v0.2.md</a>.</p>
 </section>
 
-<!-- Comparison -->
-<section id="comparison" aria-labelledby="comparison-heading">
-<h2 id="comparison-heading">Frontguard vs Percy vs Chromatic vs Playwright screenshots</h2>
-<p>Choosing a <strong>visual regression testing</strong> tool means weighing cost, accuracy, and integration depth. Here is how Frontguard compares to the most common alternatives:</p>
-<ul>
-<li><strong>AI analysis:</strong> Frontguard ✔ — Percy ✗ — Chromatic ✗ — <a href="https://playwright.dev/docs/test-snapshots" target="_blank" rel="noopener noreferrer">Playwright snapshots</a> ✗</li>
-<li><strong>Open source:</strong> Frontguard ✔ (MIT) — Playwright ✔ — Chromatic partial — Percy ✗</li>
-<li><strong>No per-screenshot fees:</strong> Frontguard ✔ — Playwright ✔ — Percy ✗ ($$$) — Chromatic ✗ ($$$)</li>
-<li><strong>Anti-flake consensus:</strong> Frontguard ✔ — all others ✗</li>
-<li><strong>Playwright native integration:</strong> Frontguard ✔ — Playwright ✔ — Percy ✗ — Chromatic ✗</li>
-<li><strong>Works without Storybook:</strong> Frontguard ✔ — Percy ✔ — Playwright ✔ — Chromatic ✗ (requires Storybook)</li>
-<li><strong>Auto-fix CSS suggestions:</strong> Frontguard ✔ — all others ✗</li>
-<li><strong>Smart route discovery:</strong> Frontguard ✔ — all others ✗</li>
-</ul>
-<p>Percy and Chromatic are excellent SaaS products. But their per-screenshot pricing becomes expensive at scale. Playwright's built-in snapshot testing provides basic pixel diffs. It offers no analysis, no flake protection, and no PR integration beyond pass/fail. Frontguard combines the best of all approaches. It offers Playwright's reliability, Percy's workflow integration, and AI-powered analysis that none of them provide. All at zero cost under the <a href="https://github.com/ravidsrk/frontguard/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>.</p>
-<p>In benchmarks comparing visual regression tools, Frontguard processes 24 screenshots across 3 viewports in under 7 seconds on average. Percy requires uploading screenshots to a cloud service. This adds 15–45 seconds of network latency per test run depending on connection speed. Chromatic requires Storybook as a prerequisite, adding build complexity and limiting testing to component isolation rather than full-page flows. Playwright's built-in assertions run locally but lack diffing intelligence, flake protection, and automated PR reporting. According to npm download statistics from May 2026, Frontguard averages over 2,000 weekly downloads. Percy's @percy/cli reports approximately 95,000 weekly downloads, while Chromatic's package shows roughly 280,000. Despite being newer, Frontguard's zero-cost model and AI capabilities position it as the fastest-growing open-source alternative in the visual regression testing space.</p>
+<section id="pricing" aria-labelledby="pricing-heading">
+<h2 id="pricing-heading">Pricing — free CLI forever, cloud when you need a team</h2>
+<div class="pricing-grid">
+<div class="pricing-card">
+<h3>Free CLI — $0</h3>
+<p>MIT-licensed CLI, bring your own OpenAI or Anthropic key. Unlimited local screenshots, anti-flake consensus, GitHub Action + PR comment, git-orphan baselines, docker-compose self-host of the cloud.</p>
+</div>
+<div class="pricing-card">
+<h3>Pro — $29 per user / month</h3>
+<p>Everything in Free CLI, plus hosted team baselines, run history, Argos-style flake-score badges, GitHub App one-click baseline accept, spend-cap alerts at 80% / 95%, Slack and GitHub status notifications.</p>
+</div>
+<div class="pricing-card">
+<h3>Enterprise — custom annual</h3>
+<p>Everything in Pro, plus SAML SSO + SCIM provisioning, audit log + retention controls, on-prem deployment option, dedicated support + SLA, custom Git / CI integrations.</p>
+</div>
+</div>
 </section>
 
-<!-- Benchmarks -->
-<section id="benchmarks" aria-labelledby="benchmarks-heading">
-<h2 id="benchmarks-heading">Benchmark results: Frontguard performance data</h2>
-<p>We tested Frontguard against a production Next.js app with 8 routes. Tests ran across 3 viewports: desktop (1280px), tablet (768px), and mobile (375px). Here are the results:</p>
-<ul>
-<li><strong>Route discovery:</strong> 8 routes found in 0.3 seconds (zero configuration)</li>
-<li><strong>Screenshot capture:</strong> 24 screenshots in 3.2 seconds (0.13s per screenshot)</li>
-<li><strong>Diff analysis:</strong> Full comparison completed in 1.1 seconds</li>
-<li><strong>AI explanation:</strong> Root cause + fix suggestion in 2.4 seconds</li>
-<li><strong>Total pipeline:</strong> Under 7 seconds for the complete regression test</li>
-</ul>
-<p>Setup required zero configuration files. Frontguard auto-detected Next.js routes from the filesystem. No manual route mapping was needed.</p>
-</section>
-
-<!-- FAQ -->
 <section id="faq" aria-labelledby="faq-heading">
-<h2 id="faq-heading">Frequently Asked Questions</h2>
+<h2 id="faq-heading">Frequently asked questions</h2>
+<h3>How do I install Frontguard?</h3>
+<p>Run <code>npm install @frontguard/cli</code> to install the engine, then <code>npx frontguard init</code> to write a typed config and <code>npx frontguard run --url &lt;your URL&gt;</code> to do your first scan. The Playwright plugin is a thin wrapper: <code>npm install -D @frontguard/cli @frontguard/playwright</code>.</p>
 
-<h3>What is Frontguard?</h3>
-<p>Frontguard is a free, open-source visual regression testing tool for Playwright. It captures screenshots during CI runs and compares them to stored baselines. When changes are detected, AI explains what broke and suggests a fix. It is MIT licensed with no per-screenshot fees or usage limits.</p>
+<h3>How does Frontguard handle cross-OS rendering differences?</h3>
+<p>Playwright's own docs warn that local rendering varies by OS and hardware. Frontguard ships a pinned Docker renderer image (Chromium, Firefox, WebKit + system fonts) so baselines render byte-equivalently on macOS, Linux, and CI. Enable with <code>frontguard run --docker</code>.</p>
 
-<h3>How does Frontguard detect visual regressions?</h3>
-<p>Frontguard captures screenshots using Playwright's browser engines and compares them pixel-by-pixel against baselines. It takes three screenshots per checkpoint and uses majority consensus to filter flaky results. Genuine differences are analyzed by GPT-4o vision, which explains the root cause in plain English.</p>
+<h3>Can I self-host the cloud?</h3>
+<p>Yes. The cloud (Hono on Cloudflare Workers with D1 and R2) is MIT-licensed and runs locally via <code>docker-compose up</code> — miniflare for the Worker runtime, SQLite in place of D1, and a local-disk adapter in place of R2.</p>
 
-<h3>Which frameworks does Frontguard support?</h3>
-<p>Frontguard works with any framework Playwright can test. This includes React, Vue, Angular, Svelte, Next.js, Nuxt, Astro, and Remix. It operates at the browser level, so it is completely framework-agnostic. No special adapters or plugins are needed.</p>
+<h3>What environment variables does Frontguard read?</h3>
+<p>AI: <code>FRONTGUARD_OPENAI_KEY</code> or <code>FRONTGUARD_ANTHROPIC_KEY</code>. The Playwright plugin also accepts unprefixed <code>OPENAI_API_KEY</code> / <code>ANTHROPIC_API_KEY</code> when present. Cloud: <code>FRONTGUARD_API_URL</code> and <code>FRONTGUARD_API_KEY</code>. <code>frontguard doctor</code> reads exactly the same env names the runtime reads.</p>
 
-<h3>Is Frontguard free?</h3>
-<p>Yes, Frontguard is completely free and open source under the <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener noreferrer">MIT License</a>. There are no per-screenshot fees, no monthly limits, and no paid tiers. You run it in your own CI environment. The only optional cost is OpenAI API usage for AI analysis.</p>
+<h3>OpenAI or Anthropic — which should I use?</h3>
+<p>Either works. Frontguard sends the diff image, the DOM snapshot, console errors, and axe-core findings. Claude Sonnet is the default when both keys are present; GPT-4o is the fallback. Switch with <code>ai.provider</code> in <code>frontguard.config.ts</code>.</p>
 
-<h3>How do I set up Frontguard in my CI pipeline?</h3>
-<p>Setup takes three steps. Install the package with <code>npm install @frontguard/playwright</code>. Add <code>visualTest()</code> calls to your Playwright tests. Then run <code>npx playwright test</code> in your CI workflow. Frontguard works with GitHub Actions, GitLab CI, CircleCI, and Jenkins.</p>
+<h3>Does Frontguard work with Storybook?</h3>
+<p>Yes. <code>frontguard init</code> detects an existing Storybook (looks for <code>.storybook/main.ts</code>) and scaffolds a Storybook-aware config. The adapter walks the Storybook iframe, runs each story's <code>play()</code> function, and produces one screenshot per story × viewport.</p>
 
-<h3>How does Frontguard compare to Percy and Chromatic?</h3>
-<p>Frontguard is fully open source with no per-screenshot pricing. Unlike Percy and Chromatic, it includes AI analysis that explains why regressions happened. It also offers anti-flake consensus and auto-fix CSS suggestions. The trade-off is self-hosting instead of a managed cloud service.</p>
+<h3>Is there an MCP server for in-IDE agents?</h3>
+<p><code>@frontguard/mcp</code> exposes <code>list_regressions(pr_id)</code>, <code>get_suggested_fix(diff_id)</code>, <code>accept_baseline(diff_id)</code>, and <code>recent_runs(repo, branch)</code> to Claude Code, Cursor, Cline, and Copilot. Run as <code>npx @frontguard/mcp</code> and drop the snippet into your <code>mcp.json</code>.</p>
 
-<h3>Does Frontguard work with React, Vue, and Angular?</h3>
-<p>Yes, Frontguard works with React, Vue, Angular, and every other web framework. It operates through Playwright's browser automation and tests rendered output directly. No framework-specific plugins or adapters are needed. Add visual checkpoints with a single function call.</p>
-
-<h3>What viewport sizes does Frontguard test?</h3>
-<p>By default, Frontguard tests three viewports: 1280×800 for desktop, 768×1024 for tablet, and 375×812 for mobile. You can customize these in your <code>frontguard.config.ts</code> file or with CLI flags. Custom viewports help test specific devices or breakpoints.</p>
+<h3>What is the data retention policy for screenshots?</h3>
+<p>The CLI never sends screenshots anywhere except the AI provider you configured. On the hosted cloud, baselines and diff thumbnails are stored in R2 under your team scope; default retention is 30 days on Pro, configurable up to 1 year on Enterprise.</p>
 </section>
 
-<!-- Getting Started -->
-<section id="getting-started" aria-labelledby="getting-started-heading">
-<h2 id="getting-started-heading">Get started with Frontguard in 30 seconds</h2>
-<p>Frontguard offers two integration paths. A standalone CLI for quick audits, and a <strong>Playwright testing</strong> plugin for ongoing <strong>visual regression testing</strong> in CI. Both are available on <a href="https://www.npmjs.com/package/frontguard" target="_blank" rel="noopener noreferrer">npm</a>.</p>
-
-<h3>CLI Quick Start</h3>
-<p>The CLI lets you run visual tests against any URL without writing test code. Install globally, initialize a project, and run your first scan:</p>
-<pre><code>npm install -g frontguard
-frontguard init
-frontguard run --url http://localhost:3000</code></pre>
-<p>The <code>init</code> command creates a <code>frontguard.config.ts</code> file with sensible defaults. It sets three viewport sizes, Chromium browser, and a <code>.frontguard/</code> directory for baselines. The <code>run</code> command crawls the URL and captures screenshots at each viewport. It outputs a report to your terminal. See the <a href="https://docs.frontguard.dev/docs/cli" target="_blank" rel="noopener noreferrer">CLI documentation</a> for all options and flags.</p>
-
-<h3>Playwright Plugin</h3>
-<p>For teams already using Playwright, the plugin integrates directly into your test suite:</p>
-<pre><code>npm install @frontguard/playwright</code></pre>
-<pre><code>import { test, expect } from '@playwright/test';
-import { visualTest } from '@frontguard/playwright';
-
-test('homepage visual', async ({ page }) =&gt; {
-await page.goto('http://localhost:3000');
-const result = await visualTest(page, 'homepage');
-expect(result.passed).toBe(true);
-});</code></pre>
-<p>Read the full <a href="https://docs.frontguard.dev/docs/playwright" target="_blank" rel="noopener noreferrer">Playwright plugin guide</a> for advanced configuration, custom thresholds, and viewport overrides.</p>
-</section>
-
-<!-- Author Bio -->
-<section id="author" aria-labelledby="author-heading">
-<h2 id="author-heading">About the author</h2>
-<p><strong>Ravindra Kumar</strong> is a developer tools engineer with over 12 years of experience building open-source software. He is the creator of <a href="https://github.com/nicehash/android-mining">Android Mining</a>, contributed to <a href="https://nicehash.com">NiceHash</a>, and authored multiple testing and automation libraries. His work focuses on making complex developer workflows accessible through simple CLI tools.</p>
-<p>Follow Ravindra on <a href="https://github.com/ravidsrk">GitHub</a> and <a href="https://x.com/anthropicdev">X (Twitter)</a>. Frontguard is open source under the <a href="https://github.com/ravidsrk/frontguard/blob/main/LICENSE">MIT License</a>.</p>
-<p><em>Published: May 2026. Last reviewed and updated: May 2026.</em></p>
-</section>
-
-<!-- Final CTA -->
-<section aria-labelledby="final-cta-heading">
-<h2 id="final-cta-heading">Never find out about CSS bugs from your users again</h2>
-<p>Install Frontguard in 30 seconds. Catch the <strong>visual regression testing</strong> failures that pixel diffs miss. Get AI-powered explanations and CSS fix suggestions in your pull requests.</p>
-<p><a href="https://docs.frontguard.dev/docs/quick-start" class="cta">Install Frontguard Free</a></p>
-<p>No credit card required. Free forever under the MIT License. Open source on <a href="https://github.com/ravidsrk/frontguard" target="_blank" rel="noopener noreferrer">GitHub</a>.</p>
-</section>
 </main>
 
-<!-- Footer -->
 <footer role="contentinfo">
-<p><strong>frontguard</strong> — Visual regression testing for Playwright. Open source under the MIT License.</p>
-<nav aria-label="Product links">
-<h3>Product</h3>
+<p><strong>frontguard</strong> — AI-powered frontend visual regression testing for web teams. Open source under the MIT License.</p>
+<nav aria-label="Sitemap">
+<h3>Sitemap</h3>
 <ul>
-<li><a href="#features">Features</a></li>
-<li><a href="#how-it-works">How It Works</a></li>
-<li><a href="#comparison">Comparison</a></li>
-<li><a href="#faq">FAQ</a></li>
-<li><a href="https://docs.frontguard.dev" target="_blank" rel="noopener noreferrer">Docs</a></li>
+<li><a href="https://docs.frontguard.dev" target="_blank" rel="noopener noreferrer">Documentation</a></li>
+<li><a href="https://docs.frontguard.dev/docs/comparison/percy" target="_blank" rel="noopener noreferrer">vs Percy</a></li>
+<li><a href="https://docs.frontguard.dev/docs/comparison/chromatic" target="_blank" rel="noopener noreferrer">vs Chromatic</a></li>
+<li><a href="https://docs.frontguard.dev/docs/comparison/argos" target="_blank" rel="noopener noreferrer">vs Argos</a></li>
+<li><a href="https://docs.frontguard.dev/docs/migrate/backstopjs" target="_blank" rel="noopener noreferrer">Migrate from BackstopJS</a></li>
+<li><a href="https://docs.frontguard.dev/docs/migrate/lost-pixel" target="_blank" rel="noopener noreferrer">Migrate from Lost Pixel</a></li>
+<li><a href="https://github.com/ravidsrk/frontguard" target="_blank" rel="noopener noreferrer">GitHub repository</a></li>
+<li><a href="https://www.npmjs.com/package/@frontguard/cli" target="_blank" rel="noopener noreferrer">npm: @frontguard/cli</a></li>
 <li><a href="https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a></li>
-</ul>
-</nav>
-<nav aria-label="Resource links">
-<h3>Resources</h3>
-<ul>
-<li><a href="https://docs.frontguard.dev/docs/cli" target="_blank" rel="noopener noreferrer">CLI Reference</a></li>
-<li><a href="https://docs.frontguard.dev/docs/playwright" target="_blank" rel="noopener noreferrer">Playwright Plugin</a></li>
-<li><a href="https://docs.frontguard.dev/docs/ci-cd/github-actions" target="_blank" rel="noopener noreferrer">GitHub Actions</a></li>
-<li><a href="https://github.com/ravidsrk/frontguard" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-<li><a href="https://www.npmjs.com/package/frontguard" target="_blank" rel="noopener noreferrer">npm</a></li>
 <li><a href="https://github.com/ravidsrk/frontguard/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">Contributing</a></li>
-<li><a href="https://web.dev/articles/vitals" target="_blank" rel="noopener noreferrer">Web Vitals Guide</a></li>
-</ul>
-</nav>
-<nav aria-label="Legal links">
-<h3>Legal</h3>
-<ul>
 <li><a href="https://github.com/ravidsrk/frontguard/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a></li>
+<li><a href="https://github.com/ravidsrk/frontguard/blob/main/validation/results-v0.2.md" target="_blank" rel="noopener noreferrer">Validation results</a></li>
 </ul>
 </nav>
-<p>&copy; 2025 Frontguard. Open source under the MIT License.</p>
+<p>Built by <a href="https://github.com/ravidsrk" target="_blank" rel="noopener noreferrer">ravidsrk</a> · <a href="https://x.com/ravidsrk" target="_blank" rel="noopener noreferrer">@ravidsrk on X</a>.</p>
+<p class="source">No fabricated stats on this page — sources in <a href="https://github.com/ravidsrk/frontguard/blob/main/docs/research.md" target="_blank" rel="noopener noreferrer">docs/research.md</a>.</p>
 </footer>
 
 </div>
@@ -470,25 +392,18 @@ expect(result.passed).toBe(true);
 <noscript>
 <style>
 body { font-family: system-ui, sans-serif; color: #e2e8f0; background: #06080c; margin: 0; padding: 2rem; line-height: 1.7; }
-a { color: #f97316; } h2, h3 { color: #f1f5f9; } h2 { font-size: 2rem; }
+a { color: #22d3ee; } h2, h3 { color: #f1f5f9; }
 .wrap { max-width: 48rem; margin: 0 auto; }
 </style>
 <div class="wrap">
-<h2>Frontguard — Visual regression testing for Playwright</h2>
-<p>Your CSS broke the checkout page. Frontguard caught it. Visual regression testing that tells you what broke, why it broke, and how to fix it. Plugs into Playwright. Runs in CI. Free and open source.</p>
-
-              <img src="/og-image.png" alt="Frontguard visual regression testing dashboard showing a detected CSS regression with AI-powered fix suggestion" width="1200" height="630" loading="eager" style="width:100%;max-width:48rem;height:auto;border-radius:0.75rem;border:1px solid #1e293b;margin:1.5rem 0" />
-
-<p>This page requires JavaScript for the full interactive experience. Enable JavaScript or visit the links below:</p>
+<h2>Frontguard — AI-powered visual regression testing</h2>
+<p>This page uses React for the interactive layout. The non-JS view above already mirrors every section. Enable JavaScript for the full experience, or:</p>
 <ul>
 <li><a href="https://docs.frontguard.dev">Documentation</a></li>
-<li><a href="https://github.com/ravidsrk/frontguard">GitHub Repository</a></li>
-<li><a href="https://www.npmjs.com/package/frontguard">npm Package</a></li>
+<li><a href="https://github.com/ravidsrk/frontguard">GitHub repository</a></li>
+<li><a href="https://www.npmjs.com/package/@frontguard/cli">npm: @frontguard/cli</a></li>
 <li><a href="https://github.com/ravidsrk/frontguard/blob/main/LICENSE">MIT License</a></li>
 </ul>
-<h2>Getting Started</h2>
-<p>Install via CLI: <code>npm install -g frontguard && frontguard init</code></p>
-<p>Or as a Playwright plugin: <code>npm install @frontguard/playwright</code></p>
 </div>
 </noscript>
 

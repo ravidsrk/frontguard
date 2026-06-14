@@ -1,108 +1,189 @@
 import { useInView } from '../hooks/useInView';
 
-const features = [
-  {
-    eyebrow: 'AI analysis',
-    title: 'It tells you why, not where',
-    description:
-      'Instead of "pixels differ at coordinates 340,890," you get: "the submit button overflows on mobile because the new padding pushes it outside the flex container." AI vision reads the screenshot the way a senior engineer would — on your own OpenAI or Anthropic key.',
-  },
+interface FeatureSnippet {
+  filename: string;
+  lines: { text: string; tone?: 'add' | 'remove' | 'ai' | 'muted' | 'success' | 'danger' | 'cta' }[];
+}
+
+interface Feature {
+  eyebrow: string;
+  title: string;
+  description: string;
+  snippet: FeatureSnippet;
+}
+
+const features: Feature[] = [
   {
     eyebrow: 'Anti-flake consensus',
-    title: '3 screenshots, majority wins',
+    title: 'Three captures, majority wins.',
     description:
-      'Spinner mid-animation? Loading flicker? A blinking cursor in your hero? Frontguard takes three captures, keeps the consensus, drops the outlier. Flake noise stops drowning real regressions.',
+      'Each route is rendered three times. Spinners mid-animation, font flicker, blinking carets — anything that disagrees with itself is dropped before the diff is even computed. SSIM perceptual matching is the fallback when pixel-equality is too strict.',
+    snippet: {
+      filename: 'frontguard.config.ts',
+      lines: [
+        { text: 'export default defineConfig({' },
+        { text: '  antiFlakeRenders: 3,', tone: 'add' },
+        { text: '  consensus: "majority",', tone: 'add' },
+        { text: '  fallback: { ssim: 0.98 },', tone: 'muted' },
+        { text: '});' },
+      ],
+    },
   },
   {
-    eyebrow: 'Smart route discovery',
-    title: 'Point at a URL. It tests every page.',
+    eyebrow: 'AI classification',
+    title: 'Tells you why, not just where.',
     description:
-      'No config files. No route lists. No baseline directories to maintain. The crawler walks your sitemap, finds every reachable page, and builds the test matrix for you.',
+      'Surviving diffs go to GPT-4o / Claude Sonnet vision with the DOM, console errors and axe-core findings inline. The model returns a category, confidence score and explanation — on your own OpenAI or Anthropic key.',
+    snippet: {
+      filename: 'regression-report.md',
+      lines: [
+        { text: '/checkout @ 375px chromium — REGRESSION', tone: 'danger' },
+        { text: 'AI · category: layout · confidence: 0.91', tone: 'ai' },
+        { text: '  Submit button overflows the flex container', tone: 'ai' },
+        { text: '  because padding jumped 16→24px in', tone: 'ai' },
+        { text: '  Button.module.css:42.', tone: 'ai' },
+      ],
+    },
   },
   {
-    eyebrow: 'PR-native review',
-    title: 'Diffs render in the GitHub thread',
+    eyebrow: 'Sandbox-verified fixes',
+    title: "We don't ship a fix unless we tried it.",
     description:
-      'Every PR gets a comment with side-by-side visual diffs and the AI explanation inline. Approve or reject without leaving the review tab.',
+      'Every AI patch is applied in a local Playwright sandbox (or Daytona snapshot when configured), the page is re-rendered, and the suggestion only ships if the diff disappears. No "try this and see" patches in your PR.',
+    snippet: {
+      filename: 'Button.module.css',
+      lines: [
+        { text: '- padding: 24px;', tone: 'remove' },
+        { text: '+ padding: 16px;', tone: 'add' },
+        { text: '', tone: 'muted' },
+        { text: 'sandbox: ✔ re-render cleared the diff', tone: 'success' },
+      ],
+    },
   },
   {
-    eyebrow: 'Multi-browser',
-    title: 'Chromium, Firefox, WebKit — one command',
+    eyebrow: 'Plugin architecture',
+    title: '6 lifecycle hooks, real plugins included.',
     description:
-      'That Safari flexbox bug a customer found last quarter? It would have been caught at PR time. WebKit gets the same screenshot pipeline as Chromium.',
+      'onDiscover · onBeforeCapture · onAfterCapture · onBeforeDiff · onAfterDiff · onReport. Built-ins: axe-core accessibility, Figma compare, performance budgets, monitor, third-party-script drift detection.',
+    snippet: {
+      filename: 'plugins.ts',
+      lines: [
+        { text: "import { createAccessibilityPlugin }", tone: 'ai' },
+        { text: "  from '@frontguard/cli/plugins';", tone: 'ai' },
+        { text: '' },
+        { text: 'plugins: [', tone: 'muted' },
+        { text: '  createAccessibilityPlugin(),', tone: 'add' },
+        { text: ']', tone: 'muted' },
+      ],
+    },
   },
   {
-    eyebrow: 'Plugin system',
-    title: '6 lifecycle hooks for whatever you need',
+    eyebrow: 'CI-native',
+    title: 'GitHub Action + PR comment, no signup.',
     description:
-      'Compare production against Figma. Set performance budgets. Monitor live pages. Build your own with onBeforeCapture / onAfterDiff / onReport hooks.',
+      'Composite GitHub Action; baseline / current / diff thumbnails posted as a single update-in-place PR comment. Status check sets pass/fail. Works on GitLab CI, CircleCI, Jenkins via the same CLI.',
+    snippet: {
+      filename: '.github/workflows/visual.yml',
+      lines: [
+        { text: '- uses: ravidsrk/frontguard@v1', tone: 'cta' },
+        { text: '  with:', tone: 'muted' },
+        { text: '    url: ${{ steps.preview.outputs.url }}', tone: 'muted' },
+        { text: '  env:', tone: 'muted' },
+        { text: '    FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_KEY }}', tone: 'muted' },
+      ],
+    },
+  },
+  {
+    eyebrow: 'Self-hostable',
+    title: 'MIT. The cloud is optional.',
+    description:
+      'The CLI is fully self-contained: git-orphan baselines, local sandbox, your own AI key. The hosted cloud (D1 / R2 / Workers) adds team baselines, history and flake-score badges — and the same stack runs under docker-compose on your laptop.',
+    snippet: {
+      filename: 'docker-compose.yml',
+      lines: [
+        { text: 'services:', tone: 'muted' },
+        { text: '  cloud-api:', tone: 'add' },
+        { text: '    image: ghcr.io/ravidsrk/frontguard-cloud', tone: 'add' },
+        { text: '    ports: ["8787:8787"]', tone: 'muted' },
+      ],
+    },
   },
 ];
+
+const toneClass: Record<string, string> = {
+  add: 'text-[var(--color-success)]',
+  remove: 'text-[var(--color-danger)]',
+  ai: 'text-[var(--color-accent)]',
+  muted: 'text-[var(--color-text-muted)]',
+  success: 'text-[var(--color-success)]',
+  danger: 'text-[var(--color-danger)]',
+  cta: 'text-[var(--color-cta)]',
+};
+
+function Snippet({ snippet }: { snippet: FeatureSnippet }) {
+  return (
+    <div className="mt-6 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
+      <div className="border-b border-[var(--color-border)] px-3 py-1.5 font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-dim)]">
+        {snippet.filename}
+      </div>
+      <pre className="overflow-x-auto p-3 font-[family-name:var(--font-mono)] text-[11px] leading-relaxed">
+        <code>
+          {snippet.lines.map((line, i) => (
+            <div key={i} className={line.tone ? toneClass[line.tone] : 'text-[var(--color-text)]'}>
+              {line.text || ' '}
+            </div>
+          ))}
+        </code>
+      </pre>
+    </div>
+  );
+}
 
 export default function Features() {
   const { ref, inView } = useInView();
 
-  // Asymmetric bento layout: one prominent feature spanning 2 cols on desktop,
-  // five smaller features in alternating rows. No icon-card trios.
   return (
-    <section ref={ref} id="features" aria-labelledby="features-heading" className="border-t border-[var(--color-border)] py-24 lg:py-32">
+    <section
+      ref={ref}
+      id="features"
+      aria-labelledby="features-heading"
+      className="border-t border-[var(--color-border)] py-24 lg:py-32"
+    >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className={`mb-16 max-w-3xl ${inView ? 'animate-fade-up' : 'opacity-0'}`}>
+        <div className={`max-w-3xl ${inView ? 'animate-fade-up' : 'opacity-0'}`}>
+          <p className="font-[family-name:var(--font-mono)] text-xs uppercase tracking-wide text-[var(--color-text-dim)]">
+            What's in the box
+          </p>
           <h2
             id="features-heading"
-            className="font-[family-name:var(--font-display)] text-2xl font-bold leading-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl"
+            className="mt-3 font-[family-name:var(--font-display)] text-2xl font-bold leading-tight text-[var(--color-text)] [text-wrap:balance] sm:text-3xl md:text-4xl"
           >
-            Built for the problems{' '}
-            <span className="text-[var(--color-text-secondary)]">pixel diffs can{'\u2019'}t solve.</span>
+            Six features built for the problems{' '}
+            <span className="text-[var(--color-text-secondary)]">pixel diffs can{'’'}t solve.</span>
           </h2>
         </div>
 
-        <div className="grid gap-4 sm:gap-6 lg:grid-cols-3 lg:grid-rows-[auto_auto]">
-          {features.map((feature, i) => {
-            // First feature spans 2 columns (prominent), rest fill remaining slots
-            const isProminent = i === 0;
-            return (
-              <article
-                key={feature.title}
-                className={`flex flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-6 sm:p-8 transition-[border-color,background-color] hover:border-[var(--color-border-bright)] hover:bg-[var(--color-bg-card-hover)] ${
-                  isProminent ? 'lg:col-span-2 lg:row-span-1' : ''
-                } ${inView ? 'animate-fade-up' : 'opacity-0'}`}
-                style={{ animationDelay: `${100 + i * 80}ms` }}
-              >
-                <span className="font-[family-name:var(--font-mono)] text-xs uppercase tracking-wide text-[var(--color-accent)]">
-                  {feature.eyebrow}
-                </span>
-                <h3
-                  className={`mt-3 font-[family-name:var(--font-display)] font-semibold text-[var(--color-text)] [text-wrap:balance] ${
-                    isProminent ? 'text-xl sm:text-2xl' : 'text-lg'
-                  }`}
-                >
-                  {feature.title}
-                </h3>
-                <p
-                  className={`mt-3 leading-relaxed text-[var(--color-text-muted)] ${
-                    isProminent ? 'text-base' : 'text-sm'
-                  }`}
-                >
-                  {feature.description}
-                </p>
-                {isProminent ? (
-                  <div className="mt-6 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
-                    <div className="border-b border-[var(--color-border)] px-4 py-2 font-[family-name:var(--font-mono)] text-xs text-[var(--color-text-dim)]">
-                      regression-report.md
-                    </div>
-                    <pre className="overflow-x-auto whitespace-pre-wrap break-words p-4 font-[family-name:var(--font-mono)] text-xs sm:text-sm leading-relaxed">
-                      <code>
-                        <span className="text-[var(--color-danger)]">/pricing @ 1280px — REGRESSION (3.1% diff)</span>{'\n'}
-                        <span className="text-[var(--color-accent)]">  AI: The "Most popular" badge text dropped to{'\n'}       #94a3b8 on a #f1f5f9 card — contrast fell to{'\n'}       1.9:1, below the WCAG AA 4.5:1 threshold.</span>{'\n'}
-                        <span className="text-[var(--color-text-muted)]">  Suggested fix: restore badge color to #0f172a{'\n'}                   or darken the card background.</span>
-                      </code>
-                    </pre>
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
+        <div className="mt-12 grid gap-5 sm:mt-14 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {features.map((feature, i) => (
+            <article
+              key={feature.eyebrow}
+              className={`flex flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-6 transition-[border-color,background-color] hover:border-[var(--color-border-bright)] hover:bg-[var(--color-bg-card-hover)] ${inView ? 'animate-fade-up' : 'opacity-0'}`}
+              style={{ animationDelay: `${100 + i * 80}ms` }}
+            >
+              <span className="font-[family-name:var(--font-mono)] text-xs uppercase tracking-wide text-[var(--color-accent)]">
+                {feature.eyebrow}
+              </span>
+              <h3 className="mt-3 font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--color-text)] [text-wrap:balance]">
+                {feature.title}
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--color-text-secondary)]">
+                {feature.description}
+              </p>
+              <div className="mt-auto">
+                <Snippet snippet={feature.snippet} />
+              </div>
+            </article>
+          ))}
         </div>
       </div>
     </section>
