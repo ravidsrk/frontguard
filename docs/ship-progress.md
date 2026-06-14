@@ -11,8 +11,8 @@ Live status of the autonomous build that takes Frontguard from "stalled, almost 
 | Task | Title | Status | PR |
 |------|-------|--------|----|
 | T1 | Adversarial review of current state | in-flight | — |
-| T2 | Research the visual-regression-testing space | in-flight | — |
-| T3 | Product-completion plan (IN / ROADMAP / FIX) | pending T1+T2 | — |
+| T2 | Research the visual-regression-testing space | **done** | [#5](https://github.com/ravidsrk/frontguard/pull/5) → `cefd157` |
+| T3 | Product-completion plan (IN / ROADMAP / FIX) | pending T1 | — |
 | T4 | Repair + complete critical path | pending T3 | — |
 | T5 | Rebuild landing page per positioning | pending T3 | — |
 | T6..Tn | Build IN-scope areas to full depth | pending T3 | — |
@@ -21,12 +21,11 @@ Live status of the autonomous build that takes Frontguard from "stalled, almost 
 
 ## Done
 
-_(none yet)_
+- **T2** — `docs/research.md` (923 lines, 16 competitors fetched live, 18 must-have / 12 future split). PR #5 → squash-commit `cefd157` on main. Author `ravidsrk`, no trailers.
 
 ## In flight
 
 - T1 — adversarial review
-- T2 — research
 
 ## Notes
 
