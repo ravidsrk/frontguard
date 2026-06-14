@@ -25,6 +25,12 @@ import type {
   AccessibilityViolation,
 } from './types.js';
 import type { JudgeResult } from './types.js';
+
+// Re-export the public type surface so consumers can write
+// `import type { FrontguardConfig, ... } from '@frontguard/cli'`
+// against the package's main entry, matching the generated `init` config.
+export type * from './types.js';
+export type { PluginContext, FrontguardPlugin } from './plugins.js';
 import { discoverRoutes } from '../discovery/crawler.js';
 import { discoverRoutesFromFilesystem } from '../discovery/filesystem.js';
 import { smartFilter } from '../graph/filter.js';
@@ -127,6 +133,46 @@ const DEFAULT_URL_PATTERNS = [
   'http://127.0.0.1',
   'https://127.0.0.1',
 ];
+
+/**
+ * Thrown by the pipeline when the configured base URL cannot be reached
+ * (ECONNREFUSED, getaddrinfo ENOTFOUND, etc.). The CLI catches this and
+ * exits with a single actionable message instead of the
+ * one-per-viewport stack of identical connection errors that the render
+ * stage would otherwise produce.
+ */
+export class UnreachableBaseUrlError extends Error {
+  readonly baseUrl: string;
+  constructor(baseUrl: string, cause?: unknown) {
+    super(`Base URL ${baseUrl} is unreachable. Start your dev server, or pass --url <reachable-url>.`);
+    this.name = 'UnreachableBaseUrlError';
+    this.baseUrl = baseUrl;
+    if (cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = cause;
+    }
+  }
+}
+
+/**
+ * Returns true if `message` looks like a transport-layer failure that means
+ * "we never reached the host" — connection refused, DNS lookup failure,
+ * unreachable network, or a Playwright net::ERR_CONNECTION_* error. These
+ * are exactly the failures where falling back to `/` would just re-fail
+ * identically on every viewport.
+ */
+export function isUnreachableHostError(message: string): boolean {
+  if (!message) return false;
+  return (
+    /ECONNREFUSED/i.test(message) ||
+    /ENOTFOUND/i.test(message) ||
+    /ECONNRESET/i.test(message) ||
+    /EHOSTUNREACH/i.test(message) ||
+    /ENETUNREACH/i.test(message) ||
+    /net::ERR_CONNECTION_REFUSED/i.test(message) ||
+    /net::ERR_CONNECTION_RESET/i.test(message) ||
+    /net::ERR_NAME_NOT_RESOLVED/i.test(message)
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -318,6 +364,18 @@ export async function runPipeline(
     reporter.onStageComplete('discover', `Found ${routes.length} route(s)`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+
+    // If the base URL is unreachable, falling back to "/" only produces N
+    // more identical ECONNREFUSEDs — one per viewport — and a confusing
+    // stack-of-errors report. Bail with a single clear message instead.
+    if (isUnreachableHostError(msg)) {
+      reporter.onStageComplete(
+        'discover',
+        `Failed — ${config.baseUrl} is unreachable`,
+      );
+      throw new UnreachableBaseUrlError(config.baseUrl, err);
+    }
+
     logger.error(`Discovery failed: ${msg}`);
     reporter.onStageComplete('discover', `Failed — falling back to /`);
 
@@ -973,6 +1031,13 @@ export async function runJudgePipeline(
     reporter.onStageComplete('discover', `Found ${routes.length} route(s)`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (isUnreachableHostError(msg)) {
+      reporter.onStageComplete(
+        'discover',
+        `Failed — ${config.baseUrl} is unreachable`,
+      );
+      throw new UnreachableBaseUrlError(config.baseUrl, err);
+    }
     logger.error(`Discovery failed: ${msg}`);
     routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
     reporter.onStageComplete('discover', 'Failed — falling back to /');
