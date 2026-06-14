@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import GitHubStars from './GitHubStars';
 
 const navLinks = [
+  { label: 'How it works', href: '#how-it-works' },
   { label: 'Features', href: '#features' },
+  { label: 'Compare', href: '#comparison' },
+  { label: 'Pricing', href: '#pricing' },
   { label: 'Docs', href: 'https://docs.frontguard.dev' },
 ];
 
@@ -18,7 +21,6 @@ export default function Nav() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Focus management: move focus into mobile menu when opened
   useEffect(() => {
     if (mobileOpen && mobileMenuRef.current) {
       const firstLink = mobileMenuRef.current.querySelector('a');
@@ -26,7 +28,6 @@ export default function Nav() {
     }
   }, [mobileOpen]);
 
-  // Close mobile menu on Escape
   useEffect(() => {
     if (!mobileOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -43,7 +44,7 @@ export default function Nav() {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-[background-color,border-color] duration-300 ${
         scrolled
-          ? 'border-b border-[var(--color-border)] bg-[var(--color-bg)]/95'
+          ? 'border-b border-[var(--color-border)] bg-[var(--color-bg)]/95 backdrop-blur'
           : 'bg-transparent'
       }`}
     >
@@ -59,7 +60,7 @@ export default function Nav() {
         </a>
 
         {/* Desktop links */}
-        <div className="hidden items-center gap-6 md:flex">
+        <div className="hidden items-center gap-6 lg:flex">
           {navLinks.map((link) => (
             <a
               key={link.label}
@@ -72,18 +73,18 @@ export default function Nav() {
           ))}
           <GitHubStars />
           <a
-            href="#getting-started"
+            href="#install"
             className="touch-manipulation rounded-lg bg-[var(--color-cta)] px-4 py-2 text-sm font-semibold text-[var(--color-bg)] transition-colors hover:bg-[var(--color-cta-hover)]"
           >
             Install
           </a>
         </div>
 
-        {/* Mobile menu button — min 44x44 touch target */}
+        {/* Mobile menu button */}
         <button
           ref={menuButtonRef}
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="touch-manipulation flex h-11 w-11 items-center justify-center md:hidden"
+          className="touch-manipulation flex h-11 w-11 items-center justify-center lg:hidden"
           aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={mobileOpen}
           aria-controls="mobile-menu"
@@ -109,8 +110,8 @@ export default function Nav() {
       <div
         id="mobile-menu"
         ref={mobileMenuRef}
-        className={`md:hidden overflow-hidden transition-all duration-200 ease-out ${
-          mobileOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        className={`lg:hidden overflow-hidden transition-all duration-200 ease-out ${
+          mobileOpen ? 'max-h-[32rem] opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
         <div className="border-b border-[var(--color-border)] bg-[var(--color-bg)] px-4 pb-6 sm:px-6">
@@ -130,7 +131,7 @@ export default function Nav() {
               <GitHubStars className="w-full justify-center" />
             </div>
             <a
-              href="#getting-started"
+              href="#install"
               onClick={() => setMobileOpen(false)}
               className="touch-manipulation mt-2 inline-block rounded-lg bg-[var(--color-cta)] px-4 py-3 text-center text-sm font-semibold text-[var(--color-bg)] transition-colors hover:bg-[var(--color-cta-hover)]"
             >
