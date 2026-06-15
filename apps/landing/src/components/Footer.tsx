@@ -13,6 +13,7 @@ const footerColumns = [
       { label: 'CLI Reference', href: 'https://docs.frontguard.dev/docs/cli', external: true },
       { label: 'Playwright Plugin', href: 'https://docs.frontguard.dev/docs/playwright', external: true },
       { label: 'GitHub Actions', href: 'https://docs.frontguard.dev/docs/ci-cd/github-actions', external: true },
+      { label: 'Self-host', href: 'https://docs.frontguard.dev/docs/self-host', external: true },
       { label: 'GitHub', href: 'https://github.com/ravidsrk/frontguard', external: true },
       { label: 'Contributing', href: 'https://github.com/ravidsrk/frontguard/blob/main/CONTRIBUTING.md', external: true },
     ],
