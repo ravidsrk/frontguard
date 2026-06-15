@@ -21,13 +21,53 @@ export interface MonitorAlert {
 }
 
 /**
+ * Alert severity tiers, derived from how far diff exceeds threshold.
+ * - low: < 2× threshold (minor regression)
+ * - medium: 2–4× threshold
+ * - high: ≥ 4× threshold (major regression)
+ */
+export type AlertSeverity = 'low' | 'medium' | 'high';
+
+/** Maps (diff, threshold) to a severity tier. */
+export function alertSeverity(diffPercentage: number, threshold: number): AlertSeverity {
+  if (threshold <= 0) return diffPercentage >= 0.1 ? 'high' : diffPercentage >= 0.02 ? 'medium' : 'low';
+  const ratio = diffPercentage / threshold;
+  if (ratio >= 4) return 'high';
+  if (ratio >= 2) return 'medium';
+  return 'low';
+}
+
+/**
+ * Coarse-bins a diff percentage so the fingerprint changes only when the
+ * magnitude meaningfully changes (not on every tiny fluctuation). Buckets:
+ * 0=0%, 1=<1%, 2=1–5%, 3=5–10%, 4=10–25%, 5=≥25%.
+ */
+export function diffBucket(diffPercentage: number): number {
+  const pct = diffPercentage * 100;
+  if (pct <= 0) return 0;
+  if (pct < 1) return 1;
+  if (pct < 5) return 2;
+  if (pct < 10) return 3;
+  if (pct < 25) return 4;
+  return 5;
+}
+
+/**
  * Builds a stable fingerprint of a regression set, used to suppress duplicate
- * alerts. Only the affected route+viewport pairs matter — the diff percentage
- * fluctuates run-to-run, so it's excluded.
+ * alerts. Includes route+viewport plus per-alert severity and a coarse
+ * diff-percentage bucket (P2-4) so an escalating regression — same routes,
+ * worse magnitude — re-alerts instead of being swallowed as a duplicate.
+ *
+ * Bucketing (not the raw percentage) means tiny fluctuations still dedup:
+ * 6.1% → 6.4% stays in bucket 3, no re-alert. 6% → 12% crosses to bucket 4
+ * and *does* re-alert. Order-independent: alerts are sorted before joining.
  */
 export function alertFingerprint(alerts: MonitorAlert[]): string {
   return alerts
-    .map((a) => `${a.route}@${a.viewport}`)
+    .map(
+      (a) =>
+        `${a.route}@${a.viewport}:${alertSeverity(a.diffPercentage, a.threshold)}:${diffBucket(a.diffPercentage)}`,
+    )
     .sort()
     .join('|');
 }
@@ -177,6 +217,58 @@ export async function sendPagerDutyAlert(
     return { channel: 'pagerduty', ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}` };
   } catch (err) {
     return { channel: 'pagerduty', ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Sends a usage-cap warning email via Resend (Task 15.7). Triggered when a
+ * user's monthly run count crosses 80% or 95% of their plan limit. Never
+ * throws — failures are reported on the return value.
+ *
+ * The dashboard caller persists the highest tier already alerted so we never
+ * re-email the same tier in the same month.
+ */
+export async function sendUsageWarningEmail(
+  env: AlertEnv,
+  recipients: string[],
+  data: { plan: string; tier: 80 | 95; used: number; limit: number },
+  fetchImpl: typeof fetch = fetch,
+): Promise<AlertDeliveryResult> {
+  if (!env.RESEND_API_KEY) {
+    return { channel: 'email', ok: false, error: 'RESEND_API_KEY not configured' };
+  }
+  if (recipients.length === 0) {
+    return { channel: 'email', ok: false, error: 'No recipients' };
+  }
+  const pct = Math.round((data.used / data.limit) * 100);
+  const upgradeUrl = (env.PUBLIC_BASE_URL ?? 'https://frontguard.dev') + '/pricing';
+  const tone = data.tier === 95 ? 'critical' : 'warning';
+  const subject = `[Frontguard] ${pct}% of monthly runs used on the ${data.plan} plan`;
+  const html = `<h2>${pct}% of your monthly run quota is used</h2>
+<p>Your <strong>${escapeHtml(data.plan)}</strong> plan has used <strong>${data.used}</strong> of <strong>${data.limit}</strong> runs this month (${pct}%).</p>
+<p>${data.tier === 95
+    ? 'You are about to hit your monthly limit. Additional runs will be rejected once you reach 100%.'
+    : "You're approaching your monthly limit. Consider upgrading to avoid interruption."}
+</p>
+<p><a href="${escapeHtml(upgradeUrl)}">Upgrade your plan →</a></p>`;
+  try {
+    const res = await fetchImpl('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.ALERT_FROM_EMAIL ?? 'alerts@frontguard.dev',
+        to: recipients,
+        subject,
+        html,
+        tags: [{ name: 'kind', value: `usage-${tone}` }],
+      }),
+    });
+    return { channel: 'email', ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}` };
+  } catch (err) {
+    return { channel: 'email', ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
