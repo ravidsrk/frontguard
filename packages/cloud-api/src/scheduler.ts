@@ -21,7 +21,7 @@ import { getStore, type Bindings } from './db/factory.js';
 import type { Monitor, MonitorRun, MonitorRunStatus } from './db/monitors.js';
 import type { Store } from './db/store.js';
 import { currentMonth } from './db/store.js';
-import { processRun } from './processor.js';
+import { processRun, type ProcessorEnv } from './processor.js';
 import { dispatchAlertsWithState, type MonitorAlert, type AlertEnv } from './alerts/index.js';
 import { getPlan, hasFeature } from './billing/plans.js';
 import type { Run } from './types.js';
@@ -46,7 +46,7 @@ export interface MonitorExecution {
 const MAX_ATTEMPTS = 2;
 
 /** Executes a single check attempt against a monitor's URL. */
-async function attemptCheck(monitor: Monitor, now: Date): Promise<Run> {
+async function attemptCheck(monitor: Monitor, now: Date, env: ProcessorEnv): Promise<Run> {
   const run: Run = {
     id: crypto.randomUUID(),
     status: 'queued',
@@ -60,7 +60,7 @@ async function attemptCheck(monitor: Monitor, now: Date): Promise<Run> {
     results: null,
     reportUrl: null,
   };
-  await processRun(run);
+  await processRun(run, env);
   return run;
 }
 
@@ -84,7 +84,7 @@ export async function runMonitor(
   while (attempts < MAX_ATTEMPTS && !succeeded) {
     attempts++;
     try {
-      const run = await attemptCheck(monitor, now);
+      const run = await attemptCheck(monitor, now, env);
       alerts = (run.results ?? [])
         .filter((r) => r.status === 'regression' || r.diffPercentage > monitor.alertThreshold)
         .map((r) => ({

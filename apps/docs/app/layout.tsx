@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     default: 'Frontguard Docs',
   },
   description:
-    'Documentation for Frontguard — AI-powered visual regression testing.',
+    'AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

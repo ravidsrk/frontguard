@@ -1,4 +1,4 @@
 {
   "title": "Integrations",
-  "pages": ["netlify"]
+  "pages": ["mcp", "storybook", "netlify"]
 }

@@ -305,6 +305,35 @@ export interface FrontguardConfig {
   fixSandbox?: 'local' | 'daytona';
   /** Model-as-judge (zero-baseline) configuration (Task 8.4). */
   judge?: JudgeConfig;
+  /**
+   * Storybook integration. When set, routes are enumerated from the running
+   * Storybook server's `/index.json` (Storybook 8) or `/stories.json`
+   * (Storybook 7) and rendered via `/iframe.html?id=<story_id>&viewMode=story`,
+   * with the renderer awaiting each story's `play()` function before capture.
+   */
+  storybook?: StorybookIntegrationConfig;
+}
+
+/**
+ * Storybook integration configuration.
+ *
+ * See {@link discovery/storybook!StorybookConfig} for the full shape. This
+ * mirror is declared here so {@link FrontguardConfig} can be consumed
+ * without dragging the discovery module into every type-only import site.
+ */
+export interface StorybookIntegrationConfig {
+  /** Base URL of the running Storybook server (e.g. `http://localhost:6006`). */
+  url: string;
+  /**
+   * Optional include filter. Each entry is either a glob (`Button/*`),
+   * a story id (`button--primary`), or a story title prefix
+   * (`Forms/Input`). When omitted, all stories are tested.
+   */
+  stories?: string[];
+  /** Optional exclude filter — same matching rules as `stories`. */
+  exclude?: string[];
+  /** Optional fetch timeout for the index request, in milliseconds. */
+  fetchTimeoutMs?: number;
 }
 
 /**
@@ -344,7 +373,7 @@ export interface Route {
   /** Whether this route requires authentication. */
   auth?: boolean;
   /** How this route was discovered. */
-  discoveredVia?: 'crawl' | 'filesystem' | 'config' | 'sitemap';
+  discoveredVia?: 'crawl' | 'filesystem' | 'config' | 'sitemap' | 'storybook';
   /** Per-route pixel-diff threshold (fraction 0–1). Overrides global `threshold` when set. */
   threshold?: number;
   /** Per-route ignore rules, merged with global rules during comparison. */
