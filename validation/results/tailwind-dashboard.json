@@ -1,0 +1,21 @@
+{
+  "name": "tailwind-dashboard",
+  "repo": "shadcn-ui/next-template",
+  "category": "Tailwind dashboard",
+  "baseUrl": "http://localhost:3000",
+  "timestamp": "2026-06-15T10:10:47Z",
+  "aiEnabled": false,
+  "baselineRuns": [
+    { "route": "/", "url": "http://localhost:3000/", "result": {"url":"http://localhost:3000/","error":"frontguard run failed"} },
+    { "route": "/dashboard", "url": "http://localhost:3000/dashboard", "result": {"url":"http://localhost:3000/dashboard","error":"frontguard run failed"} },
+    { "route": "/dashboard/settings", "url": "http://localhost:3000/dashboard/settings", "result": {"url":"http://localhost:3000/dashboard/settings","error":"frontguard run failed"} },
+    { "route": "/dashboard/analytics", "url": "http://localhost:3000/dashboard/analytics", "result": {"url":"http://localhost:3000/dashboard/analytics","error":"frontguard run failed"} }
+  ]
+  ,
+  "recheckRuns": [
+    { "route": "/", "url": "http://localhost:3000/", "result": {"url":"http://localhost:3000/","error":"frontguard run failed"} },
+    { "route": "/dashboard", "url": "http://localhost:3000/dashboard", "result": {"url":"http://localhost:3000/dashboard","error":"frontguard run failed"} },
+    { "route": "/dashboard/settings", "url": "http://localhost:3000/dashboard/settings", "result": {"url":"http://localhost:3000/dashboard/settings","error":"frontguard run failed"} },
+    { "route": "/dashboard/analytics", "url": "http://localhost:3000/dashboard/analytics", "result": {"url":"http://localhost:3000/dashboard/analytics","error":"frontguard run failed"} }
+  ]
+}
