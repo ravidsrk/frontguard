@@ -43,6 +43,9 @@
  * the URL to test.
  *
  * Rules:
+ * - When `CONTEXT` is undefined, never run. Netlify always sets `CONTEXT`
+ *   during a real build, so a missing value means we are executing locally
+ *   (or inside another tool's harness) and must do nothing (P2-9).
  * - `deploy-preview` and `branch-deploy` always run (preview URLs).
  * - `production` only runs when `inputs.productionToo` is set.
  * - Prefers `DEPLOY_PRIME_URL`, falling back to `DEPLOY_URL`, then `URL`.
@@ -52,7 +55,10 @@
  * @returns {RunDecision}
  */
 export function decideRun(ctx, inputs = {}) {
-  const context = ctx.CONTEXT ?? 'deploy-preview';
+  if (!ctx.CONTEXT) {
+    return { run: false, reason: 'No Netlify CONTEXT set (not running inside a Netlify build)' };
+  }
+  const context = ctx.CONTEXT;
   const previewUrl = ctx.DEPLOY_PRIME_URL || ctx.DEPLOY_URL || ctx.URL;
 
   if (context === 'production' && !inputs.productionToo) {
@@ -118,6 +124,11 @@ export async function triggerRun(opts, fetchImpl = fetch) {
 /**
  * Polls a run until it reaches a terminal status or the timeout elapses.
  *
+ * Cloud-api `Run.status` is `queued | running | completed | failed`, so those
+ * are the terminal values we look for. `passed` and `error` are kept in the
+ * set for forward compatibility — the cloud API has used both labels at
+ * different times.
+ *
  * @param {Object} opts
  * @param {string} opts.apiUrl
  * @param {string} opts.apiKey
@@ -126,7 +137,7 @@ export async function triggerRun(opts, fetchImpl = fetch) {
  * @param {number} [opts.intervalMs]  Default 3000.
  * @param {typeof fetch} [fetchImpl]
  * @param {(ms: number) => Promise<void>} [sleepImpl]
- * @returns {Promise<{ status: string, results?: unknown, reportUrl?: string | null }>}
+ * @returns {Promise<{ status: string, results?: Array<{ status: string, route?: string, viewport?: number, diffPercentage?: number, classification?: string }> | null, reportUrl?: string | null }>}
  */
 export async function pollRun(opts, fetchImpl = fetch, sleepImpl = defaultSleep) {
   const timeoutMs = opts.timeoutMs ?? 120000;
@@ -190,9 +201,35 @@ export async function postPrComment(opts, fetchImpl = fetch) {
 }
 
 /**
+ * Counts results by category from a cloud-api `Run.results` array.
+ *
+ * Mirrors the cloud-api convention (see github-callback.ts:deriveOutcome):
+ *   - `regression` and `changed` are visual regressions (failure-worthy).
+ *   - `failed` would be a per-result error (treated as a failure too).
+ *   - `warning` is a soft warning, surfaced but not a failure.
+ *   - `passed` and `new_baseline` are clean outcomes.
+ *
+ * @param {Array<{ status?: string }> | null | undefined} results
+ * @returns {{ total: number, regressions: number, warnings: number, failed: number, passed: number }}
+ */
+export function summarizeResults(results) {
+  const summary = { total: 0, regressions: 0, warnings: 0, failed: 0, passed: 0 };
+  if (!Array.isArray(results)) return summary;
+  summary.total = results.length;
+  for (const r of results) {
+    const s = r && typeof r === 'object' ? r.status : undefined;
+    if (s === 'regression' || s === 'changed') summary.regressions += 1;
+    else if (s === 'warning') summary.warnings += 1;
+    else if (s === 'failed') summary.failed += 1;
+    else if (s === 'passed' || s === 'new_baseline') summary.passed += 1;
+  }
+  return summary;
+}
+
+/**
  * Renders a Markdown summary of a run for posting to a PR.
  *
- * @param {{ status: string, results?: any, reportUrl?: string | null }} run
+ * @param {{ status: string, results?: Array<{ status?: string, route?: string, viewport?: number, diffPercentage?: number }> | null, reportUrl?: string | null }} run
  * @param {string} previewUrl
  * @returns {string}
  */
@@ -206,10 +243,12 @@ export function renderSummary(run, previewUrl) {
     `**Preview:** ${previewUrl}`,
     `**Status:** \`${run.status}\``,
   ];
-  const r = run.results;
-  if (r && typeof r === 'object') {
-    if (typeof r.total === 'number') lines.push(`**Screenshots:** ${r.total}`);
-    if (typeof r.changed === 'number') lines.push(`**Changed:** ${r.changed}`);
+  const counts = summarizeResults(run.results);
+  if (counts.total > 0) {
+    lines.push(`**Screenshots:** ${counts.total}`);
+    if (counts.regressions > 0) lines.push(`**Regressions:** ${counts.regressions}`);
+    if (counts.warnings > 0) lines.push(`**Warnings:** ${counts.warnings}`);
+    if (counts.failed > 0) lines.push(`**Failed:** ${counts.failed}`);
   }
   if (run.reportUrl) lines.push('', `[View full report](${run.reportUrl})`);
   return lines.join('\n');
@@ -218,14 +257,22 @@ export function renderSummary(run, previewUrl) {
 /**
  * Determines whether a finished run represents a failure (for fail-build).
  *
- * @param {{ status: string, results?: any }} run
+ * Cloud-api wire shape (from packages/cloud-api/src/types.ts):
+ *   - top-level `status` ∈ `queued | running | completed | failed`
+ *   - per-result `status` ∈ `passed | regression | changed | warning |
+ *     new_baseline | failed` (failed is defensive; the API does not emit it
+ *     today but the type is widened so we don't ignore it if it appears).
+ *
+ * Failure conditions:
+ *   - top-level `failed` / `error` (cloud-api errored before producing results)
+ *   - `timeout` (we gave up polling — surface as failure so failBuild flags it)
+ *   - any individual result with `status: failed | regression | changed`
+ *
+ * @param {{ status: string, results?: Array<{ status?: string }> | null }} run
  * @returns {boolean}
  */
 export function isFailingRun(run) {
-  // A timed-out run never reached a verdict — treat it as a failure so a
-  // failBuild:true configuration fails the build instead of passing silently.
   if (run.status === 'failed' || run.status === 'error' || run.status === 'timeout') return true;
-  const r = run.results;
-  if (r && typeof r === 'object' && typeof r.changed === 'number') return r.changed > 0;
-  return false;
+  const counts = summarizeResults(run.results);
+  return counts.regressions > 0 || counts.failed > 0;
 }

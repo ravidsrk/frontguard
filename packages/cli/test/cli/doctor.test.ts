@@ -40,15 +40,25 @@ describe('doctor: checkNodeVersion', () => {
 });
 
 describe('doctor: checkAiKeys', () => {
-  it('passes when OpenAI key is present', () => {
-    const r = checkAiKeys({ OPENAI_API_KEY: 'sk-test' } as NodeJS.ProcessEnv);
+  it('passes when FRONTGUARD_OPENAI_KEY is present', () => {
+    const r = checkAiKeys({ FRONTGUARD_OPENAI_KEY: 'sk-test' } as NodeJS.ProcessEnv);
     expect(r.status).toBe('pass');
     expect(r.message).toContain('OpenAI');
   });
 
-  it('passes when Anthropic key is present', () => {
-    const r = checkAiKeys({ ANTHROPIC_API_KEY: 'x' } as NodeJS.ProcessEnv);
+  it('passes when FRONTGUARD_ANTHROPIC_KEY is present', () => {
+    const r = checkAiKeys({ FRONTGUARD_ANTHROPIC_KEY: 'x' } as NodeJS.ProcessEnv);
     expect(r.status).toBe('pass');
+    expect(r.message).toContain('Anthropic');
+  });
+
+  it('reports both providers when both keys are set', () => {
+    const r = checkAiKeys({
+      FRONTGUARD_OPENAI_KEY: 'sk-test',
+      FRONTGUARD_ANTHROPIC_KEY: 'x',
+    } as NodeJS.ProcessEnv);
+    expect(r.status).toBe('pass');
+    expect(r.message).toContain('OpenAI');
     expect(r.message).toContain('Anthropic');
   });
 
@@ -56,6 +66,19 @@ describe('doctor: checkAiKeys', () => {
     const r = checkAiKeys({} as NodeJS.ProcessEnv);
     expect(r.status).toBe('warn');
     expect(r.critical).toBe(false);
+  });
+
+  it('does NOT detect the unscoped OPENAI_API_KEY / ANTHROPIC_API_KEY vars', () => {
+    // The runtime (diff/ai-vision.ts) reads only FRONTGUARD_*_KEY — doctor must
+    // agree, otherwise it would falsely report "AI configured" for a run that
+    // will then start without AI.
+    const r = checkAiKeys({
+      OPENAI_API_KEY: 'sk-test',
+      ANTHROPIC_API_KEY: 'sk-test',
+    } as NodeJS.ProcessEnv);
+    expect(r.status).toBe('warn');
+    expect(r.fix).toContain('FRONTGUARD_OPENAI_KEY');
+    expect(r.fix).toContain('FRONTGUARD_ANTHROPIC_KEY');
   });
 });
 

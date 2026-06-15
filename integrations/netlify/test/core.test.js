@@ -7,7 +7,33 @@ import {
   postPrComment,
   renderSummary,
   isFailingRun,
+  summarizeResults,
 } from '../lib/core.js';
+
+// Sample cloud-api responses modelled on packages/cloud-api/src/types.ts.
+// `Run.status` is one of `queued | running | completed | failed`.
+// `RunResult.status` is one of `passed | regression | changed | warning |
+// new_baseline | failed`. These fixtures are reused across the tests below.
+const FIXTURE_PASSING = {
+  id: 'run_pass',
+  status: 'completed',
+  results: [
+    { route: '/', viewport: 1440, status: 'passed', diffPercentage: 0, timestamp: 't' },
+    { route: '/pricing', viewport: 1440, status: 'passed', diffPercentage: 0, timestamp: 't' },
+  ],
+  reportUrl: 'https://api.frontguard.dev/v1/reports/run_pass',
+};
+
+const FIXTURE_FAILING = {
+  id: 'run_fail',
+  status: 'completed',
+  results: [
+    { route: '/', viewport: 1440, status: 'passed', diffPercentage: 0, timestamp: 't' },
+    { route: '/pricing', viewport: 1440, status: 'regression', diffPercentage: 3.4, timestamp: 't' },
+    { route: '/about', viewport: 1440, status: 'warning', diffPercentage: 0.2, timestamp: 't' },
+  ],
+  reportUrl: 'https://api.frontguard.dev/v1/reports/run_fail',
+};
 
 describe('decideRun', () => {
   it('runs on deploy-preview with DEPLOY_PRIME_URL', () => {
@@ -43,6 +69,19 @@ describe('decideRun', () => {
       URL: 'https://prod',
     });
     expect(d.previewUrl).toBe('https://prime');
+  });
+
+  // P2-9 — CONTEXT is set by Netlify on every real build. Missing CONTEXT
+  // means the plugin is running inside a local build or another tool's
+  // harness and should not invoke cloud-api.
+  it('skips when CONTEXT is undefined (no Netlify build env)', () => {
+    const d = decideRun({ DEPLOY_PRIME_URL: 'https://p.netlify.app' });
+    expect(d.run).toBe(false);
+    expect(d.reason).toMatch(/CONTEXT/i);
+  });
+
+  it('skips when CONTEXT is the empty string', () => {
+    expect(decideRun({ CONTEXT: '', DEPLOY_PRIME_URL: 'https://p' }).run).toBe(false);
   });
 });
 
@@ -98,11 +137,14 @@ describe('pollRun', () => {
     let calls = 0;
     const fakeFetch = async () => {
       calls += 1;
-      const status = calls < 2 ? 'running' : 'passed';
-      return new Response(JSON.stringify({ status }), { status: 200 });
+      const status = calls < 2 ? 'running' : 'completed';
+      return new Response(
+        JSON.stringify({ status, results: FIXTURE_PASSING.results }),
+        { status: 200 },
+      );
     };
     const r = await pollRun({ apiUrl: 'https://api', apiKey: 'k', runId: 'r' }, fakeFetch, noSleep);
-    expect(r.status).toBe('passed');
+    expect(r.status).toBe('completed');
     expect(calls).toBe(2);
   });
 
@@ -132,48 +174,118 @@ describe('postPrComment', () => {
   });
 });
 
+describe('summarizeResults', () => {
+  it('counts regressions, warnings, failed, passed', () => {
+    const s = summarizeResults([
+      { status: 'passed' },
+      { status: 'regression' },
+      { status: 'changed' },
+      { status: 'warning' },
+      { status: 'failed' },
+      { status: 'new_baseline' },
+    ]);
+    expect(s.total).toBe(6);
+    expect(s.regressions).toBe(2); // regression + changed
+    expect(s.warnings).toBe(1);
+    expect(s.failed).toBe(1);
+    expect(s.passed).toBe(2); // passed + new_baseline
+  });
+
+  it('returns zeros for null/undefined results', () => {
+    expect(summarizeResults(null)).toEqual({ total: 0, regressions: 0, warnings: 0, failed: 0, passed: 0 });
+    expect(summarizeResults(undefined)).toEqual({ total: 0, regressions: 0, warnings: 0, failed: 0, passed: 0 });
+  });
+
+  it('returns zeros for non-array input (defensive)', () => {
+    expect(summarizeResults(/** @type {any} */ ({ changed: 3 })).regressions).toBe(0);
+  });
+});
+
 describe('renderSummary', () => {
-  it('renders a passing summary', () => {
-    const s = renderSummary({ status: 'passed', results: { total: 5, changed: 0 } }, 'https://p');
+  it('renders a passing summary from the real cloud-api shape', () => {
+    const s = renderSummary(FIXTURE_PASSING, 'https://p');
     expect(s).toContain('✅');
     expect(s).toContain('https://p');
-    expect(s).toContain('Screenshots:** 5');
+    expect(s).toContain('Screenshots:** 2');
+    expect(s).not.toContain('Regressions:');
   });
+
+  it('renders a failing summary with regression count', () => {
+    const s = renderSummary(FIXTURE_FAILING, 'https://p');
+    expect(s).toContain('❌');
+    expect(s).toContain('Screenshots:** 3');
+    expect(s).toContain('Regressions:** 1');
+    expect(s).toContain('Warnings:** 1');
+  });
+
   it('includes a report link when present', () => {
-    const s = renderSummary({ status: 'failed', reportUrl: 'https://report' }, 'https://p');
+    const s = renderSummary({ status: 'failed', reportUrl: 'https://report', results: null }, 'https://p');
     expect(s).toContain('❌');
     expect(s).toContain('https://report');
   });
-  // FIX N2: icon consistency — a completed run WITH regressions shows ❌.
-  it('shows ❌ for a completed run with regressions', () => {
-    const s = renderSummary({ status: 'completed', results: { total: 5, changed: 2 } }, 'https://p');
-    expect(s).toContain('❌');
-    expect(s).not.toContain('✅');
-  });
-  it('shows ✅ for a completed run with no regressions', () => {
-    const s = renderSummary({ status: 'completed', results: { total: 5, changed: 0 } }, 'https://p');
-    expect(s).toContain('✅');
-  });
+
   // FIX N1: a timed-out run shows ❌.
   it('shows ❌ for a timeout status', () => {
-    const s = renderSummary({ status: 'timeout' }, 'https://p');
+    const s = renderSummary({ status: 'timeout', results: null }, 'https://p');
     expect(s).toContain('❌');
   });
 });
 
 describe('isFailingRun', () => {
-  it('is true for failed/error', () => {
-    expect(isFailingRun({ status: 'failed' })).toBe(true);
-    expect(isFailingRun({ status: 'error' })).toBe(true);
+  it('is true when top-level status is failed', () => {
+    expect(isFailingRun({ status: 'failed', results: null })).toBe(true);
   });
+
+  it('is true when top-level status is error (legacy alias)', () => {
+    expect(isFailingRun({ status: 'error', results: null })).toBe(true);
+  });
+
   // FIX N1: a timed-out run must fail the build.
   it('is true for a timeout status', () => {
-    expect(isFailingRun({ status: 'timeout' })).toBe(true);
+    expect(isFailingRun({ status: 'timeout', results: null })).toBe(true);
   });
-  it('is true when changes detected', () => {
-    expect(isFailingRun({ status: 'completed', results: { changed: 3 } })).toBe(true);
+
+  it('is true when any per-result status is regression (real cloud-api shape)', () => {
+    expect(isFailingRun(FIXTURE_FAILING)).toBe(true);
   });
-  it('is false when passed with no changes', () => {
-    expect(isFailingRun({ status: 'passed', results: { changed: 0 } })).toBe(false);
+
+  it('is true when any per-result status is changed', () => {
+    expect(isFailingRun({
+      status: 'completed',
+      results: [{ route: '/', viewport: 1440, status: 'changed', diffPercentage: 1, timestamp: 't' }],
+    })).toBe(true);
+  });
+
+  it('is true when any per-result status is failed (defensive — widened type)', () => {
+    expect(isFailingRun({
+      status: 'completed',
+      results: [{ route: '/', viewport: 1440, status: 'failed', diffPercentage: 0, timestamp: 't' }],
+    })).toBe(true);
+  });
+
+  it('is false for the all-passed cloud-api response', () => {
+    expect(isFailingRun(FIXTURE_PASSING)).toBe(false);
+  });
+
+  it('is false when results is null (no results, no regressions)', () => {
+    expect(isFailingRun({ status: 'completed', results: null })).toBe(false);
+  });
+
+  it('is false for a results array with only passed + new_baseline + warning entries', () => {
+    expect(isFailingRun({
+      status: 'completed',
+      results: [
+        { route: '/', viewport: 1440, status: 'passed', diffPercentage: 0, timestamp: 't' },
+        { route: '/x', viewport: 1440, status: 'new_baseline', diffPercentage: 0, timestamp: 't' },
+        { route: '/y', viewport: 1440, status: 'warning', diffPercentage: 0.1, timestamp: 't' },
+      ],
+    })).toBe(false);
+  });
+
+  // P0-11 regression — old code read `run.results.changed`, which cloud-api
+  // never returns. That bug made every build green. This guards against it.
+  it('does NOT trust a non-array `results.changed` field (old buggy shape)', () => {
+    const fakeOldShape = { status: 'completed', results: /** @type {any} */ ({ changed: 5 }) };
+    expect(isFailingRun(fakeOldShape)).toBe(false);
   });
 });

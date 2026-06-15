@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseSlackEnvelope, parseSlashCommand, buildCommandResponse } from '../src/events.js';
+import {
+  parseSlackEnvelope,
+  parseSlashCommand,
+  buildCommandResponse,
+  decideCommand,
+  cleanSlackLink,
+} from '../src/events.js';
 
 describe('parseSlackEnvelope', () => {
   it('handles the url_verification handshake', () => {
@@ -46,6 +52,52 @@ describe('parseSlashCommand', () => {
   });
 });
 
+describe('cleanSlackLink', () => {
+  it('strips Slack auto-link wrappers', () => {
+    expect(cleanSlackLink('<https://example.com>')).toBe('https://example.com');
+    expect(cleanSlackLink('<https://example.com|example.com>')).toBe('https://example.com');
+    expect(cleanSlackLink('https://example.com')).toBe('https://example.com');
+  });
+});
+
+describe('decideCommand', () => {
+  const base = { command: '/frontguard', userId: 'U1', channelId: 'C1', responseUrl: '', teamId: 'T1' };
+
+  it('returns status with the cleaned URL when valid', () => {
+    expect(decideCommand({ ...base, text: 'status https://example.com' })).toEqual({
+      kind: 'status',
+      url: 'https://example.com',
+    });
+  });
+
+  it('unwraps Slack auto-linked URLs', () => {
+    expect(decideCommand({ ...base, text: 'status <https://example.com|example.com>' })).toEqual({
+      kind: 'status',
+      url: 'https://example.com',
+    });
+  });
+
+  it('rejects status with no URL', () => {
+    const d = decideCommand({ ...base, text: 'status' });
+    expect(d.kind).toBe('status_invalid');
+  });
+
+  it('rejects non-http(s) URLs', () => {
+    const d = decideCommand({ ...base, text: 'status javascript:alert(1)' });
+    expect(d.kind).toBe('status_invalid');
+  });
+
+  it('rejects garbage URLs', () => {
+    const d = decideCommand({ ...base, text: 'status http://' });
+    expect(d.kind).toBe('status_invalid');
+  });
+
+  it('falls through to help for unknown subcommands', () => {
+    expect(decideCommand({ ...base, text: '' })).toEqual({ kind: 'help' });
+    expect(decideCommand({ ...base, text: 'wat' })).toEqual({ kind: 'help' });
+  });
+});
+
 describe('buildCommandResponse', () => {
   const base = { command: '/frontguard', userId: 'U1', channelId: 'C1', responseUrl: '', teamId: 'T1' };
 
@@ -53,6 +105,11 @@ describe('buildCommandResponse', () => {
     const res = buildCommandResponse({ ...base, text: 'status https://example.com' }) as { text: string };
     expect(res.text).toContain('https://example.com');
     expect(res.text).toContain('Queued');
+  });
+
+  it('surfaces an error for invalid status input', () => {
+    const res = buildCommandResponse({ ...base, text: 'status javascript:alert(1)' }) as { text: string };
+    expect(res.text).toContain('http(s)');
   });
 
   it('shows help by default', () => {
