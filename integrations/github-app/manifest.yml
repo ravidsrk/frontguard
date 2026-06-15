@@ -1,6 +1,12 @@
-# Frontguard GitHub App manifest (Task 7.2)
+# Frontguard GitHub App manifest (Task 7.2 / IN-3b)
 # Used with the GitHub App manifest flow for one-click creation:
 #   https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest
+#
+# The `hook_attributes.url` below MUST match the public webhook URL of the
+# deployed Cloudflare Worker (see wrangler.toml). When self-hosting, replace
+# the value with your worker's URL — GitHub locks the webhook URL into the
+# app on creation; subsequent changes require updating the app via the
+# GitHub UI (App settings → Webhook URL).
 name: Frontguard
 url: https://frontguard.dev
 hook_attributes:
@@ -12,6 +18,11 @@ default_events:
   - check_run
   - installation
   - installation_repositories
+  # Vercel posts a commit_status to GitHub when a preview deployment finishes;
+  # subscribing here lets us pick up the preview URL automatically.
+  - status
+  # Netlify and Cloudflare Pages post deployment_status events; same use.
+  - deployment_status
 default_permissions:
   # Read PR metadata + head SHA.
   pull_requests: write
@@ -20,3 +31,7 @@ default_permissions:
   # Read repo contents (config detection) + open bootstrap PRs.
   contents: write
   metadata: read
+  # Subscribe to commit statuses (Vercel preview URLs).
+  statuses: read
+  # Subscribe to deployment_status events (Netlify, Cloudflare Pages).
+  deployments: read
