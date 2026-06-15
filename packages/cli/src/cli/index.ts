@@ -21,6 +21,7 @@ import {
   detectPackageManager,
 } from '../core/plugin-registry.js';
 import { runDoctor } from './doctor.js';
+import { maybeRunInDocker } from './run.js';
 import { getFrameworkInfo } from '../templates/index.js';
 import { generateGitHubActionsWorkflow } from '../templates/github-actions.js';
 import { sendTelemetry, isTelemetryEnabled, type TelemetryEvent } from '../utils/telemetry.js';
@@ -210,6 +211,14 @@ function formatFatalError(err: unknown): string {
 // ---------------------------------------------------------------------------
 
 export async function main(argv?: string[]): Promise<number> {
+  // --docker short-circuit: when present, re-execute the CLI inside the
+  // pinned render image and skip the entire local code path. Done before
+  // commander parses so we don't pay for config loading or plugin init.
+  const dockerExit = await maybeRunInDocker(argv ?? process.argv);
+  if (dockerExit !== null) {
+    return dockerExit;
+  }
+
   const program = new Command();
 
   program
@@ -254,6 +263,10 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--fix-sandbox <kind>', 'Sandbox for fix verification: local or daytona', 'local')
     .option('--mode <mode>', 'Run mode: compare (baseline diff) or judge (AI design eval, beta)', 'compare')
     .option('--experimental', 'Enable experimental features (required for --mode judge)')
+    .option(
+      '--docker',
+      'Run the renderer inside the pinned frontguard/render Docker image for deterministic cross-OS baselines',
+    )
     .action(async (opts) => {
       try {
         // Set log level
