@@ -4,13 +4,15 @@
 [![npm: @frontguard/cli](https://img.shields.io/npm/v/@frontguard/cli?label=%40frontguard%2Fcli)](https://www.npmjs.com/package/@frontguard/cli)
 [![npm: @frontguard/playwright](https://img.shields.io/npm/v/@frontguard/playwright?label=%40frontguard%2Fplaywright)](https://www.npmjs.com/package/@frontguard/playwright)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1000+-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-44_files-brightgreen)](./packages/cli/test)
 
-**AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.**
+**AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.**
 
 Backend has Datadog, Sentry, PagerDuty — a $20B+ monitoring ecosystem. Frontend gets... manual QA and hoping for the best. Frontguard changes that.
 
-> **1000+ tests** · **multi-browser** · **AI vision analysis** · **self-hostable** · **MIT**
+> **44 test files** · **multi-browser** · **AI vision analysis** · **self-hostable** · **MIT**
+>
+> _Numbers above are derived from source by [`scripts/stats.ts`](./scripts/stats.ts) (regenerated on every `npm run stats`). See [`scripts/stats.json`](./scripts/stats.json) for the canonical snapshot._
 
 <p align="center">
   <img src="./demo/frontguard-demo.gif" alt="Frontguard demo: init, doctor, run, AI classification" width="720"/><br/>
@@ -76,17 +78,19 @@ npx frontguard update-baselines
 
 ## How Frontguard Compares
 
-| | Frontguard | Percy | Chromatic | BackstopJS | Lost Pixel |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Open source | ✅ | ❌ | ◐ | ✅ | ◐ (archived) |
-| CLI-first | ✅ | ❌ | ❌ | ✅ | ✅ |
-| **AI change classification** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Anti-flake rendering | ✅ | ◐ | ◐ | ❌ | ❌ |
-| Self-hostable | ✅ | ❌ | ❌ | ✅ | ◐ |
-| Free tier | Forever (CLI) | Trial → $399/mo | Storybook hobby | Free | Dead |
-| Actively maintained | ✅ | ✅ | ✅ | ❌ (6yr) | ❌ |
+| | Frontguard | Percy | Chromatic | BackstopJS | Lost Pixel | Argos |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Open source | ✅ MIT | ❌ | ◐ | ✅ | ◐ (read-only) | ✅ MIT |
+| CLI-first | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| **AI change classification** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| AI fix verification | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Anti-flake rendering | ✅ | ◐ | ◐ | ❌ | ❌ | ◐ |
+| Self-hostable | ✅ | ❌ | ❌ | ✅ | ◐ | 🟡 |
+| Free tier | Forever (CLI) | Trial → $399/mo | Storybook hobby | Free | Sunset | Hobby + unlimited Playwright traces |
+| Pro entry | $29/mo (optional) | ~$399/mo | per-snapshot | n/a | n/a | $100/mo |
+| Actively maintained | ✅ | ✅ | ✅ | ❌ (6yr) | ❌ (Figma acqui-hire 2026-04-22) | ✅ |
 
-> Migrating? See the [BackstopJS](https://frontguard.dev/docs/guides/migrate-from-backstopjs) and [Lost Pixel](https://frontguard.dev/docs/guides/migrate-from-lost-pixel) guides.
+> Migrating? See the [BackstopJS](https://frontguard.dev/docs/guides/migrate-from-backstopjs), [Lost Pixel](https://frontguard.dev/docs/guides/migrate-from-lost-pixel), and [Argos](https://frontguard.dev/docs/comparisons/frontguard-vs-argos) guides. Comparisons: [Percy](https://frontguard.dev/docs/guides/frontguard-vs-percy) · [Chromatic](https://frontguard.dev/docs/guides/frontguard-vs-chromatic) · [Argos](https://frontguard.dev/docs/comparisons/frontguard-vs-argos).
 
 ## AI Classification Example
 
@@ -159,7 +163,7 @@ export default {
 ## CLI Output
 
 ```
- frontguard v0.1.0
+ frontguard
 
  🔍 Discovering routes... found 47 routes
  📊 12/47 routes affected by changed files

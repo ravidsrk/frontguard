@@ -4,6 +4,7 @@ description: Build custom Frontguard plugins using the lifecycle hook system.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
+import stats from '../../stats.json';
 
 # Custom Plugins
 
@@ -11,12 +12,14 @@ Frontguard ships with a plugin architecture that lets you extend every stage of 
 
 ## Built-in Plugins
 
-Frontguard includes 3 built-in plugins:
+Frontguard includes {stats.plugins} built-in plugins:
 
 | Plugin | Import | Description |
 |--------|--------|-------------|
 | **Figma** | `@frontguard/cli/plugins` | Design-to-code comparison via Figma API |
-| **Performance Budgets** | `@frontguard/cli/plugins` | Bundle size & Web Vitals (LCP/FID/CLS) |
+| **Performance Budgets** | `@frontguard/cli/plugins` | Bundle size & Web Vitals (LCP/CLS/TTFB) |
+| **Accessibility** | `@frontguard/cli/plugins` | axe-core audits (contrast, focus, alt text) |
+| **Third-Party Scripts** | `@frontguard/cli/plugins` | Detects drift in ad / analytics / widget origins |
 | **Monitor** | `@frontguard/cli/plugins` | Production visual monitoring with alerting |
 
 ```typescript title="Using a built-in plugin"
