@@ -11,7 +11,7 @@
  */
 
 import { Command } from 'commander';
-import { loadConfig, detectFramework, generateDefaultConfig } from '../core/config.js';
+import { loadConfig } from '../core/config.js';
 import { runPipeline, runJudgePipeline, updateBaselines } from '../core/pipeline.js';
 import {
   installPlugin,
@@ -21,9 +21,8 @@ import {
   detectPackageManager,
 } from '../core/plugin-registry.js';
 import { runDoctor } from './doctor.js';
+import { runInit } from './init.js';
 import { maybeRunInDocker } from './run.js';
-import { getFrameworkInfo } from '../templates/index.js';
-import { generateGitHubActionsWorkflow } from '../templates/github-actions.js';
 import { sendTelemetry, isTelemetryEnabled, type TelemetryEvent } from '../utils/telemetry.js';
 import { ConsoleReporter } from '../report/console.js';
 import { JSONReporter } from '../report/json.js';
@@ -38,8 +37,7 @@ import {
   formatHistoryTable,
 } from '../plugins/monitor.js';
 import type { FrontguardConfig, Reporter, BrowserEngine } from '../core/types.js';
-import { writeFileSync, readFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { writeFileSync } from 'node:fs';
 
 // Global error handlers
 process.on('unhandledRejection', (reason) => {
@@ -406,102 +404,24 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--format <format>', 'Config format: ts, js, json', 'ts')
     .option('-y, --yes', 'Skip prompts and use defaults (CI-friendly)')
     .option('--ci', 'Also generate a GitHub Actions workflow at .github/workflows/frontguard.yml')
+    .option('--storybook', 'Force-emit a Storybook-aware config (auto-detected when .storybook/main.* exists)')
+    .option('--no-storybook', 'Skip Storybook scaffolding even when .storybook/main.* is present')
+    .option('--storybook-url <url>', 'Storybook URL to scaffold against', 'http://localhost:6006')
     .action(async (opts) => {
       try {
-        const cwd = process.cwd();
-        const format = opts.format as 'ts' | 'js' | 'json';
-
-        // Detect framework
-        logger.info('Detecting framework…');
-        const framework = await detectFramework(cwd);
-        if (framework) {
-          logger.info(`Detected: ${framework}`);
-        } else {
-          logger.info('No specific framework detected — using defaults');
-        }
-
-        // Resolve framework metadata (port, dev command) for config + CI.
-        const fwInfo = getFrameworkInfo(framework);
-
-        // Determine file name
-        const extensions: Record<string, string> = {
-          ts: 'frontguard.config.ts',
-          js: 'frontguard.config.js',
-          json: 'frontguard.config.json',
-        };
-        const fileName = extensions[format] ?? 'frontguard.config.ts';
-        const filePath = join(cwd, fileName);
-
-        // Check if config already exists
-        if (existsSync(filePath)) {
-          logger.warn(`Config file already exists: ${fileName}`);
-          logger.info('Delete it first if you want to regenerate.');
-          exitCode = 1;
+        const result = runInit({
+          cwd: process.cwd(),
+          format: opts.format as 'ts' | 'js' | 'json',
+          yes: opts.yes as boolean | undefined,
+          ci: opts.ci as boolean | undefined,
+          storybook: opts.storybook as boolean | undefined,
+          noStorybook: opts.storybook === false ? true : undefined,
+          storybookUrl: opts.storybookUrl as string | undefined,
+        });
+        if (result.exitCode !== 0) {
+          exitCode = result.exitCode;
           return;
         }
-
-        // Generate config content (baseUrl derived from framework default port)
-        const content = generateDefaultConfig({
-          framework,
-          format,
-        });
-
-        writeFileSync(filePath, content, 'utf-8');
-        logger.info(`✅ Created ${fileName}`);
-
-        // Optionally generate a GitHub Actions workflow (--ci)
-        if (opts.ci) {
-          const workflowDir = join(cwd, '.github', 'workflows');
-          const workflowPath = join(workflowDir, 'frontguard.yml');
-          if (existsSync(workflowPath)) {
-            logger.warn('.github/workflows/frontguard.yml already exists — skipping');
-          } else {
-            mkdirSync(workflowDir, { recursive: true });
-            const workflow = generateGitHubActionsWorkflow({
-              devCommand: `npm run dev`,
-              port: fwInfo.defaultPort,
-            });
-            writeFileSync(workflowPath, workflow, 'utf-8');
-            logger.info('✅ Created .github/workflows/frontguard.yml');
-          }
-        }
-
-        // Update .gitignore
-        const gitignorePath = join(cwd, '.gitignore');
-        const entriesToAdd = ['auth.json', '.frontguard/', '.frontguard-debug/', 'frontguard-report/'];
-        let gitignoreContent = '';
-
-        if (existsSync(gitignorePath)) {
-          gitignoreContent = readFileSync(gitignorePath, 'utf-8');
-        }
-
-        const newEntries: string[] = [];
-        for (const entry of entriesToAdd) {
-          if (!gitignoreContent.includes(entry)) {
-            newEntries.push(entry);
-          }
-        }
-
-        if (newEntries.length > 0) {
-          const addition =
-            (gitignoreContent.endsWith('\n') || gitignoreContent === '' ? '' : '\n') +
-            '\n# Frontguard\n' +
-            newEntries.join('\n') +
-            '\n';
-          appendFileSync(gitignorePath, addition, 'utf-8');
-          logger.info(`Updated .gitignore with: ${newEntries.join(', ')}`);
-        }
-
-        // Print next steps
-        logger.info('');
-        logger.info('Next steps:');
-        logger.info(`  1. Edit ${fileName} to set your baseUrl and routes`);
-        logger.info('  2. Start your dev server (e.g. npm run dev)');
-        logger.info('  3. Run: npx frontguard run');
-        logger.info('');
-        logger.info('On first run, Frontguard will capture baseline screenshots.');
-        logger.info('On subsequent runs, it will compare against them and report changes.');
-
         await emitTelemetry({ command: 'init', version: VERSION });
       } catch (err) {
         logger.error(formatFatalError(err));

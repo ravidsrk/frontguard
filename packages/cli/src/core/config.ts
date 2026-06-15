@@ -216,6 +216,18 @@ export const configSchema = z.object({
 
   /** Sandbox backend for fix verification (default: 'local'). */
   fixSandbox: z.enum(['local', 'daytona']).optional(),
+
+  /** Storybook integration — enumerate routes from a running Storybook server. */
+  storybook: z
+    .object({
+      url: z
+        .string({ required_error: 'Config error at `storybook.url`: this field is required' })
+        .url('Config error at `storybook.url`: expected a valid URL'),
+      stories: z.array(z.string().min(1)).optional(),
+      exclude: z.array(z.string().min(1)).optional(),
+      fetchTimeoutMs: z.number().int().positive().optional(),
+    })
+    .optional(),
 });
 
 /** Inferred Zod output type — should match `FrontguardConfig`. */

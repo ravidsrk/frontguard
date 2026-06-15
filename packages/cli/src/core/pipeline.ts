@@ -33,6 +33,7 @@ export type * from './types.js';
 export type { PluginContext, FrontguardPlugin } from './plugins.js';
 import { discoverRoutes } from '../discovery/crawler.js';
 import { discoverRoutesFromFilesystem } from '../discovery/filesystem.js';
+import { discoverStorybookRoutesForConfig } from '../discovery/storybook.js';
 import { smartFilter } from '../graph/filter.js';
 import { renderPages } from '../render/playwright.js';
 import { compareScreenshot, createNewPageResult } from '../diff/pixel.js';
@@ -243,13 +244,29 @@ async function discoverAllRoutes(config: FrontguardConfig): Promise<Route[]> {
     return toRouteObjects(config.routes);
   }
 
-  // 2. Crawl if discover options are set
+  // 2. Storybook integration — enumerate stories from the running server.
+  //    When `storybook.url` is set we treat that URL as the effective
+  //    `baseUrl` for capture; the mutation lives in `runPipeline`'s caller
+  //    so the rest of the pipeline reads from `config.baseUrl` normally.
+  if (config.storybook?.url) {
+    const sb = await discoverStorybookRoutesForConfig(config);
+    if (sb && sb.routes.length > 0) {
+      // Re-point baseUrl so route paths like `/iframe.html?id=…` resolve
+      // against the Storybook server rather than the app under test.
+      config.baseUrl = sb.storybookUrl;
+      logger.info(`Storybook discovery returned ${sb.routes.length} route(s) (baseUrl → ${sb.storybookUrl})`);
+      return sb.routes;
+    }
+    logger.warn('Storybook configured but no stories were discovered — falling through to other strategies');
+  }
+
+  // 3. Crawl if discover options are set
   if (config.discover) {
     logger.info(`Crawling from ${config.discover.startUrl ?? '/'}…`);
     return discoverRoutes(config);
   }
 
-  // 3. Try filesystem, fall back to crawl from '/'
+  // 4. Try filesystem, fall back to crawl from '/'
   logger.info('No routes configured — attempting filesystem discovery…');
   const fsRoutes = discoverRoutesFromFilesystem(process.cwd());
   if (fsRoutes && fsRoutes.length > 0) {
@@ -257,7 +274,7 @@ async function discoverAllRoutes(config: FrontguardConfig): Promise<Route[]> {
     return fsRoutes;
   }
 
-  // 4. Fall back: crawl from baseUrl root
+  // 5. Fall back: crawl from baseUrl root
   logger.info('Filesystem discovery found nothing — crawling from /');
   const crawlConfig: FrontguardConfig = {
     ...config,
