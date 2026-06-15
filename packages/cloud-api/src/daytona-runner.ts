@@ -12,6 +12,8 @@ export interface RunRequest {
   threshold: number;
   ai?: { provider: string; model?: string };
   openaiKey?: string;
+  /** Daytona API key — Workers must pass it explicitly (no Node env). */
+  daytonaApiKey?: string;
 }
 
 /** A screenshot PNG downloaded from the sandbox, awaiting persistence. */
@@ -49,7 +51,10 @@ const FRONTGUARD_SNAPSHOT = 'frontguard-playwright-v1';
 // ---------------------------------------------------------------------------
 
 export async function executeInSandbox(request: RunRequest): Promise<RunResult> {
-  const daytona = new Daytona();
+  // The SDK falls back to a DAYTONA_API_KEY shell variable on Node, but
+  // Workers has no Node env — the caller must pass the key from the
+  // Worker env binding.
+  const daytona = new Daytona(request.daytonaApiKey ? { apiKey: request.daytonaApiKey } : undefined);
 
   // Try to create from pre-baked snapshot first, fall back to fresh image
   let sandbox;
@@ -106,7 +111,7 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
         120,
       );
       await sandbox.process.executeCommand(
-        'npm install -g frontguard@latest',
+        'npm install -g @frontguard/cli@latest',
         undefined,
         undefined,
         60,

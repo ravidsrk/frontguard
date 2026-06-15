@@ -9,21 +9,33 @@ import type { PendingScreenshot } from './storage/persist-screenshots.js';
  */
 export type ScreenshotSink = (screenshots: PendingScreenshot[]) => Promise<void>;
 
+/** Subset of the Worker env that `processRun` reads. */
+export interface ProcessorEnv {
+  DAYTONA_API_KEY?: string;
+}
+
 /**
  * Process a visual regression run.
  *
- * When DAYTONA_API_KEY is set, spins up an ephemeral Daytona sandbox
+ * When `env.DAYTONA_API_KEY` is set, spins up an ephemeral Daytona sandbox
  * with Playwright and runs real screenshots. Otherwise, falls back to
- * simulated results (for dev/testing).
+ * baseline-marker results (for dev/testing).
+ *
+ * Workers do not expose Node's env globals, so the secret is read from the
+ * Worker binding the caller passes in.
  *
  * If `onScreenshots` is supplied, any screenshots downloaded from the sandbox
  * are handed to it for persistence before the function resolves.
  */
-export async function processRun(run: Run, onScreenshots?: ScreenshotSink): Promise<void> {
+export async function processRun(
+  run: Run,
+  env: ProcessorEnv,
+  onScreenshots?: ScreenshotSink,
+): Promise<void> {
   run.status = 'running';
 
   try {
-    const hasDaytona = !!(process.env.DAYTONA_API_KEY);
+    const hasDaytona = !!env.DAYTONA_API_KEY;
 
     if (hasDaytona) {
       // Lazy-import to avoid loading @daytonaio/sdk when not needed
@@ -35,6 +47,7 @@ export async function processRun(run: Run, onScreenshots?: ScreenshotSink): Prom
         browsers: run.browsers,
         threshold: run.threshold,
         ai: run.ai ?? undefined,
+        daytonaApiKey: env.DAYTONA_API_KEY,
       });
 
       run.results = sandboxResult.results.map((r) => ({
@@ -61,7 +74,10 @@ export async function processRun(run: Run, onScreenshots?: ScreenshotSink): Prom
         run.reportHtml = generateReportHtml(run);
       }
     } else {
-      // Simulated results for dev/testing (no Daytona)
+      // No Daytona configured — emit a baseline-marker result per
+      // route×viewport so the CLI/dashboard can show the run completed.
+      // The actual diff comes from the sandbox path above; we never fake a
+      // diff percentage here.
       const results: RunResult[] = [];
       for (const route of run.routes) {
         for (const viewport of run.viewports) {

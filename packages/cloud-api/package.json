@@ -21,7 +21,8 @@
     "db:migrate": "wrangler d1 execute frontguard --file=src/db/schema.sql",
     "db:migrate:local": "wrangler d1 execute frontguard --local --file=src/db/schema.sql",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/"
   },
   "dependencies": {
     "@daytonaio/sdk": "^0.158.0",
@@ -32,8 +33,10 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.5.0",
     "better-sqlite3": "^11.10.0",
+    "eslint": "^10.1.0",
     "tsup": "^8",
     "tsx": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8.57.2"
   }
 }
