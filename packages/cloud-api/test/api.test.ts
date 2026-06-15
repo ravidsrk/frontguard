@@ -1,5 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+// Stub the daytona-runner before importing the app — pulling in the real
+// module loads the Daytona SDK (and transitively the `ws` package, which
+// isn't present in this Workers-targeted package). The Daytona-routing test
+// below drives this mock to assert the real diff path is wired up.
+const executeInSandbox = vi.fn();
+vi.mock('../src/daytona-runner.js', () => ({ executeInSandbox }));
+
 import { app } from '../src/index.js';
+
+const PKG_VERSION = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'),
+).version as string;
 
 /**
  * Helper — fire a request against the Hono app with a default Bearer token.
@@ -23,7 +38,17 @@ describe('GET /health', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.status).toBe('ok');
-    expect(body.version).toBe('0.1.0');
+  });
+
+  // P2-3: /health used to hardcode "0.1.0" while everything else shipped as
+  // 0.2.x — anyone polling the API saw stale-looking infra. Sourcing from
+  // package.json keeps the health endpoint aligned with the canonical version
+  // automatically.
+  it('reports the package.json version (P2-3)', async () => {
+    const res = await app.request('/health');
+    const body = await res.json();
+    expect(body.version).toBe(PKG_VERSION);
+    expect(body.version).not.toBe('0.1.0');
   });
 });
 
@@ -223,6 +248,58 @@ describe('DELETE /v1/runs/:id', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.deleted).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /v1/run — Daytona pipeline wiring (IN-2 / P0-6)
+// ---------------------------------------------------------------------------
+//
+// When the Worker env binds DAYTONA_API_KEY, the run must execute the real
+// sandbox pipeline — not the simulated path. The shim previously deployed
+// at app/src/index.js bypassed this entirely and produced Math.random()
+// diffs; this test guards the unified entry against the same regression.
+describe('POST /v1/run — Daytona binding routes to the real pipeline', () => {
+  it('hands a real diff result back when env.DAYTONA_API_KEY is set', async () => {
+    // Drive the top-level vi.mock — the real Daytona SDK is never loaded.
+    // The returned diff is intentionally non-zero and non-random; the old
+    // shim emitted +(Math.random() * 5).toFixed(2) for every comparison and
+    // this test would fail against that path.
+    executeInSandbox.mockReset();
+    executeInSandbox.mockResolvedValue({
+      results: [
+        { route: '/', viewport: 1440, browser: 'chromium', status: 'changed', diffPercentage: 4.21, classification: 'regression', timestamp: new Date().toISOString() },
+      ],
+      reportHtml: '<html>real</html>',
+      duration: 42,
+      screenshots: [],
+    });
+
+    const createRes = await app.request(
+      '/v1/run',
+      {
+        method: 'POST',
+        body: JSON.stringify({ url: 'https://example.com' }),
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer daytona-caller' },
+      },
+      { DAYTONA_API_KEY: 'dt_test_key' },
+    );
+    expect(createRes.status).toBe(202);
+    const { id } = await createRes.json();
+
+    // Give processRun a tick to finish.
+    await new Promise((r) => setTimeout(r, 50));
+
+    const getRes = await app.request(`/v1/runs/${id}`, {
+      headers: { Authorization: 'Bearer daytona-caller' },
+    });
+    const run = await getRes.json();
+    expect(run.status).toBe('completed');
+    expect(run.results).toHaveLength(1);
+    expect(run.results[0].diffPercentage).toBe(4.21);
+    expect(run.results[0].classification).toBe('regression');
+    expect(executeInSandbox).toHaveBeenCalledOnce();
+    expect(executeInSandbox.mock.calls[0]![0]).toMatchObject({ daytonaApiKey: 'dt_test_key' });
   });
 });
 

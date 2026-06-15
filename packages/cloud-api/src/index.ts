@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { z } from 'zod';
 import type { Run } from './types.js';
-import { processRun } from './processor.js';
+import { processRun, type ProcessorEnv } from './processor.js';
 import { emitRunTelemetry, runMetricsFromRun, type OtelEnv } from './otel/index.js';
 import { getStore, isProduction, type Bindings } from './db/factory.js';
 import { currentMonth, type Store } from './db/store.js';
@@ -21,6 +21,14 @@ import { billingRoutes } from './routes/billing.js';
 import { getPlan, checkLimit } from './billing/plans.js';
 import { runScheduledChecks } from './scheduler.js';
 import type { AlertEnv } from './alerts/index.js';
+import pkg from '../package.json';
+
+/**
+ * Canonical product version reported by `/health`. Sourced from package.json
+ * so it tracks every release automatically — previously this was hardcoded
+ * to "0.1.0" and drifted from the canonical 0.2.x line (P2-3).
+ */
+const PACKAGE_VERSION: string = (pkg as { version: string }).version;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -120,7 +128,7 @@ app.use('*', async (c, next) => {
 // ---------------------------------------------------------------------------
 // Health check (outside /v1/* — no auth required)
 // ---------------------------------------------------------------------------
-app.get('/health', (c) => c.json({ status: 'ok', version: '0.1.0' }));
+app.get('/health', (c) => c.json({ status: 'ok', version: PACKAGE_VERSION }));
 
 // ---------------------------------------------------------------------------
 // Auth + API-key management routes (mounted before the /v1 guard so the OAuth
@@ -307,8 +315,9 @@ app.post('/v1/run', async (c) => {
     persistedShots = await persistScreenshots(store, blobs, userId, runId, shots);
   };
 
-  // Process async — mutates `run`, then persists the final state.
-  processRun(run, onScreenshots)
+  // Process async — mutates `run`, then persists the final state. The env
+  // binding carries DAYTONA_API_KEY (Workers has no Node env).
+  processRun(run, (c.env ?? {}) as ProcessorEnv, onScreenshots)
     .catch((err: Error) => {
       run.status = 'failed';
       run.error = err.message;

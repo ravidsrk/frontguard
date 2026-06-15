@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/playwright:v1.48.0-jammy
 WORKDIR /app
 
 # Install frontguard globally
-RUN npm install -g frontguard@latest
+RUN npm install -g @frontguard/cli@latest
 
 # Pre-install all browser engines
 RUN npx playwright install --with-deps chromium firefox webkit

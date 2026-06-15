@@ -187,7 +187,7 @@ function resizeToMatch(buffer: Buffer, targetWidth: number, targetHeight: number
  *
  * @example
  * ```ts
- * import { createFigmaPlugin } from 'frontguard/plugins';
+ * import { createFigmaPlugin } from '@frontguard/cli/plugins';
  *
  * export default {
  *   plugins: [
