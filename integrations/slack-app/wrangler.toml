@@ -1,0 +1,25 @@
+name = "frontguard-slack-app"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Public host (set in the Cloudflare dashboard under Workers → Triggers, or
+# use the default `*.workers.dev` subdomain). The Slack app manifest URLs
+# must exactly match this host.
+[vars]
+SLACK_SCOPES = "chat:write,commands"
+FRONTGUARD_API_URL = "https://api.frontguard.dev"
+
+# KV — per-team Slack installs (bot token, scope, install timestamp).
+# Create with: `wrangler kv:namespace create SLACK_TEAMS`
+# then paste the returned `id` here.
+[[kv_namespaces]]
+binding = "SLACK_TEAMS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Secrets (set via `wrangler secret put <NAME>`):
+#   SLACK_SIGNING_SECRET     — verifies request signatures.
+#   SLACK_CLIENT_ID          — OAuth v2 client id.
+#   SLACK_CLIENT_SECRET      — OAuth v2 client secret.
+#   SLACK_REDIRECT_URI       — must match the manifest's redirect URL.
+#   FRONTGUARD_API_KEY       — server-side key the worker uses to submit runs.
