@@ -39,3 +39,7 @@ Thumbs.db
 .turbo/
 .vercel/
 .netlify/
+
+# Release artifacts (scripts/release.sh)
+.release-notes/
+*.tgz
