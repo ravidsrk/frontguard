@@ -221,6 +221,34 @@ export const configSchema = z.object({
 /** Inferred Zod output type — should match `FrontguardConfig`. */
 export type ConfigSchemaOutput = z.output<typeof configSchema>;
 
+/**
+ * User-facing config type — every field with a schema default is optional.
+ *
+ * This is the input shape `defineConfig` accepts: only `baseUrl` is required,
+ * and any field the user omits is filled in by the Zod schema at load time.
+ * Use it as the static type for `frontguard.config.ts`.
+ */
+export type UserFrontguardConfig = z.input<typeof configSchema>;
+
+/**
+ * Identity helper that gives `frontguard.config.ts` files static typing and
+ * IDE autocomplete without forcing the user to import the (more strict)
+ * `FrontguardConfig` interface.
+ *
+ * @example
+ * ```ts
+ * import { defineConfig } from '@frontguard/cli';
+ *
+ * export default defineConfig({
+ *   baseUrl: 'http://localhost:3000',
+ *   routes: ['/'],
+ * });
+ * ```
+ */
+export function defineConfig(config: UserFrontguardConfig): UserFrontguardConfig {
+  return config;
+}
+
 // ---------------------------------------------------------------------------
 // Config File Search
 // ---------------------------------------------------------------------------

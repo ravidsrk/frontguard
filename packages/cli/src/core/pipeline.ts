@@ -25,6 +25,13 @@ import type {
   AccessibilityViolation,
 } from './types.js';
 import type { JudgeResult } from './types.js';
+
+// Re-exports for consumers of the published library entry (`@frontguard/cli`).
+// Keep these alongside the pipeline so they survive bundling as the public API.
+export { defineConfig } from './config.js';
+export type { UserFrontguardConfig } from './config.js';
+export type { FrontguardConfig } from './types.js';
+
 import { discoverRoutes } from '../discovery/crawler.js';
 import { discoverRoutesFromFilesystem } from '../discovery/filesystem.js';
 import { smartFilter } from '../graph/filter.js';
