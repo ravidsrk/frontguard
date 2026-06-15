@@ -4,6 +4,7 @@ description: Build custom Frontguard plugins using the lifecycle hook system.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
+import stats from '../../stats.json';
 
 # Custom Plugins
 
@@ -11,21 +12,23 @@ Frontguard ships with a plugin architecture that lets you extend every stage of 
 
 ## Built-in Plugins
 
-Frontguard includes 3 built-in plugins:
+Frontguard includes {stats.plugins} built-in plugins:
 
 | Plugin | Import | Description |
 |--------|--------|-------------|
-| **Figma** | `frontguard/plugins` | Design-to-code comparison via Figma API |
-| **Performance Budgets** | `frontguard/plugins` | Bundle size & Web Vitals (LCP/FID/CLS) |
-| **Monitor** | `frontguard/plugins` | Production visual monitoring with alerting |
+| **Figma** | `@frontguard/cli/plugins` | Design-to-code comparison via Figma API |
+| **Performance Budgets** | `@frontguard/cli/plugins` | Bundle size & Web Vitals (LCP/CLS/TTFB) |
+| **Accessibility** | `@frontguard/cli/plugins` | axe-core audits (contrast, focus, alt text) |
+| **Third-Party Scripts** | `@frontguard/cli/plugins` | Detects drift in ad / analytics / widget origins |
+| **Monitor** | `@frontguard/cli/plugins` | Production visual monitoring with alerting |
 
 ```typescript title="Using a built-in plugin"
-import { figmaPlugin } from 'frontguard/plugins';
+import { createFigmaPlugin } from '@frontguard/cli/plugins';
 
 export default {
   // ...base config
   plugins: [
-    figmaPlugin({ fileKey: 'your-figma-file-key' }),
+    createFigmaPlugin({ fileKey: 'your-figma-file-key' }),
   ],
 };
 ```
@@ -122,7 +125,7 @@ If a hook returns `void` or `undefined`, the original value passes through uncha
 ## Example: Slack Notification Plugin
 
 ```typescript title="plugins/slack.ts"
-import type { FrontguardPlugin, RunResult, PluginContext } from 'frontguard';
+import type { FrontguardPlugin, RunResult, PluginContext } from '@frontguard/cli';
 
 export function slackPlugin(webhookUrl: string): FrontguardPlugin {
   return {
@@ -180,7 +183,7 @@ export default {
 ## Example: Route Filter Plugin
 
 ```typescript title="plugins/route-filter.ts"
-import type { FrontguardPlugin, Route, FrontguardConfig } from 'frontguard';
+import type { FrontguardPlugin, Route, FrontguardConfig } from '@frontguard/cli';
 
 export function routeFilterPlugin(patterns: string[]): FrontguardPlugin {
   return {
@@ -201,7 +204,7 @@ export function routeFilterPlugin(patterns: string[]): FrontguardPlugin {
 ## Example: Error Suppression Plugin
 
 ```typescript title="plugins/ignore-errors.ts"
-import type { FrontguardPlugin } from 'frontguard';
+import type { FrontguardPlugin } from '@frontguard/cli';
 
 export function ignoreTimeoutErrors(): FrontguardPlugin {
   return {
