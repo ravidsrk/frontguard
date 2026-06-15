@@ -1,0 +1,107 @@
+# Frontguard Cloud API — self-host docker compose (Task 16 / IN-12).
+#
+# Quick start (from packages/cloud-api/):
+#
+#     docker compose up --build
+#     curl http://localhost:8787/health
+#     # → { "status": "ok", "version": "..." }
+#
+# Optional HTTPS via Caddy — uncomment the `caddy` service block below and
+# point your DNS at the host. Caddy will auto-provision Let's Encrypt certs.
+
+services:
+  cloud-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: frontguard/cloud-api:self-host
+    container_name: frontguard-cloud-api
+    restart: unless-stopped
+    ports:
+      - "${FRONTGUARD_PORT:-8787}:8787"
+    environment:
+      # ----------------------------------------------------------------
+      # PUBLIC URLs — set these to whatever clients (browser, CLI, CI)
+      # actually use to reach this server. Defaults assume a local-only
+      # install on the loopback interface.
+      # ----------------------------------------------------------------
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8787}
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8787}
+
+      # ----------------------------------------------------------------
+      # OAuth — required if you want the dashboard at /dashboard.
+      # Create a GitHub OAuth App and paste the credentials here.
+      # ----------------------------------------------------------------
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:-change-me-in-production}
+
+      # ----------------------------------------------------------------
+      # Browser execution — Daytona sandboxes are how the cloud version
+      # spins up isolated browsers. Self-host can leave this blank and
+      # rely on the CLI running locally instead.
+      # ----------------------------------------------------------------
+      DAYTONA_API_KEY: ${DAYTONA_API_KEY:-}
+
+      # ----------------------------------------------------------------
+      # AI providers — diff captioning, baseline review summaries.
+      # All optional; the API degrades gracefully when absent.
+      # ----------------------------------------------------------------
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      # ----------------------------------------------------------------
+      # Email alerts — Resend; optional.
+      # ----------------------------------------------------------------
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      ALERT_FROM_EMAIL: ${ALERT_FROM_EMAIL:-alerts@example.com}
+
+      # ----------------------------------------------------------------
+      # Billing — Stripe; only needed if you want a paid tier on top of
+      # your self-host (most operators leave this off entirely).
+      # ----------------------------------------------------------------
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_PRICE_BUSINESS: ${STRIPE_PRICE_BUSINESS:-}
+
+      # ----------------------------------------------------------------
+      # OpenTelemetry — point at any OTLP/HTTP collector (e.g. Honeycomb,
+      # Grafana Cloud, an in-cluster Otel collector). Optional.
+      # ----------------------------------------------------------------
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+    volumes:
+      # Named volume — survives `docker compose down`. Contains the local
+      # SQLite database, R2-emulated blobs, and KV state.
+      - frontguard-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ---------------------------------------------------------------------
+  # OPTIONAL — HTTPS termination via Caddy. Uncomment + edit Caddyfile to
+  # serve at a real domain with auto-renewing Let's Encrypt certs.
+  #
+  # caddy:
+  #   image: caddy:2-alpine
+  #   container_name: frontguard-caddy
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy-data:/data
+  #     - caddy-config:/config
+  #   depends_on:
+  #     - cloud-api
+  # ---------------------------------------------------------------------
+
+volumes:
+  frontguard-data:
+  # caddy-data:
+  # caddy-config:

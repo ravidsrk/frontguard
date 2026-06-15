@@ -14,6 +14,8 @@
     "---Integrations---",
     "integrations",
     "---Comparisons---",
-    "comparisons"
+    "comparisons",
+    "---Deployment---",
+    "self-host"
   ]
 }

@@ -17,6 +17,8 @@ const footerColumns = [
       { label: 'GitHub Actions', href: 'https://docs.frontguard.dev/docs/ci-cd/github-actions', external: true },
       { label: 'Self-host', href: 'https://docs.frontguard.dev/docs/self-host', external: true },
       { label: 'MCP server', href: 'https://docs.frontguard.dev/docs/integrations/mcp', external: true },
+      { label: 'GitHub', href: 'https://github.com/ravidsrk/frontguard', external: true },
+      { label: 'Contributing', href: 'https://github.com/ravidsrk/frontguard/blob/main/CONTRIBUTING.md', external: true },
     ],
   },
   {
