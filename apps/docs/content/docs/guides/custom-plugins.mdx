@@ -125,7 +125,7 @@ If a hook returns `void` or `undefined`, the original value passes through uncha
 ## Example: Slack Notification Plugin
 
 ```typescript title="plugins/slack.ts"
-import type { FrontguardPlugin, RunResult, PluginContext } from 'frontguard';
+import type { FrontguardPlugin, RunResult, PluginContext } from '@frontguard/cli';
 
 export function slackPlugin(webhookUrl: string): FrontguardPlugin {
   return {
@@ -183,7 +183,7 @@ export default {
 ## Example: Route Filter Plugin
 
 ```typescript title="plugins/route-filter.ts"
-import type { FrontguardPlugin, Route, FrontguardConfig } from 'frontguard';
+import type { FrontguardPlugin, Route, FrontguardConfig } from '@frontguard/cli';
 
 export function routeFilterPlugin(patterns: string[]): FrontguardPlugin {
   return {
@@ -204,7 +204,7 @@ export function routeFilterPlugin(patterns: string[]): FrontguardPlugin {
 ## Example: Error Suppression Plugin
 
 ```typescript title="plugins/ignore-errors.ts"
-import type { FrontguardPlugin } from 'frontguard';
+import type { FrontguardPlugin } from '@frontguard/cli';
 
 export function ignoreTimeoutErrors(): FrontguardPlugin {
   return {

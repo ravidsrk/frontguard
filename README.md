@@ -14,11 +14,13 @@ Backend has Datadog, Sentry, PagerDuty — a $20B+ monitoring ecosystem. Fronten
 >
 > _Numbers above are derived from source by [`scripts/stats.ts`](./scripts/stats.ts) (regenerated on every `npm run stats`). See [`scripts/stats.json`](./scripts/stats.json) for the canonical snapshot._
 
-<!-- Demo: generate the GIF with `vhs demo/frontguard-demo.tape` → demo/frontguard-demo.gif -->
 <p align="center">
-  <em>📽️ Demo: <code>frontguard init</code> → <code>doctor</code> → <code>run</code> → AI classification.</em><br/>
-  See the <a href="./demo/frontguard-demo.tape">VHS tape script</a> — render the GIF locally with <code>vhs demo/frontguard-demo.tape</code>.
+  <img src="./demo/frontguard-demo.gif" alt="Frontguard demo: init, doctor, run, AI classification" width="720"/><br/>
+  <em>📽️ Demo: <code>frontguard init</code> → <code>doctor</code> → <code>run</code> → AI classification.</em>
 </p>
+
+<!-- To re-render the demo GIF: `vhs demo/frontguard-demo.tape` (requires `brew install vhs`). -->
+
 
 ## Why Frontguard?
 
