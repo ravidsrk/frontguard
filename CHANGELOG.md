@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Storybook integration** (CLI) — new `storybook: { url, stories?, exclude? }`
+  config block enumerates stories from a running Storybook (8.x via
+  `/index.json`, 7.x via `/stories.json`) and renders each via
+  `/iframe.html?id=<id>&viewMode=story`. The Playwright renderer is now
+  `play()`-aware: it polls `window.__STORYBOOK_PREVIEW__.storyRenders` for
+  `phase === 'completed'` (or the SB7 `storyRendered` channel event) before
+  capturing, so a story's post-interaction state is what ends up in the
+  baseline. Per-story overrides flow through `parameters.frontguard.{viewports,
+  threshold, ignore, skip}`. `frontguard init` auto-detects
+  `.storybook/main.*` and scaffolds a Storybook-aware config (use
+  `--no-storybook` to opt out, `--storybook` / `--storybook-url` to force).
+  Ships with a runnable Storybook 8 fixture at
+  `packages/cli/__fixtures__/storybook/` (two component stories, one with a
+  `play()` function), a 500-line integration doc at
+  `apps/docs/content/docs/integrations/storybook.mdx`, and dedicated test
+  suites for discovery + init scaffolding.
+
 - **OpenTelemetry export** (cloud-api) — run completions emit OTLP/HTTP metrics
   (`frontguard.runs`, `comparisons`, `regressions`, `warnings`, `run.duration`)
   to a configurable `OTEL_EXPORTER_OTLP_ENDPOINT`. Implemented as plain OTLP/HTTP
