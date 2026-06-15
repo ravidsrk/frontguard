@@ -37,17 +37,31 @@ The harness uses the shared metrics module (`src/diff/validation-metrics.ts`) to
 
 | Metric | Threshold | Status |
 |--------|-----------|--------|
-| Overall accuracy | ≥ 70% | ⏳ Pending live run |
-| False-positive rate | < 15% | ⏳ Pending live run |
+| Overall accuracy | ≥ 70% | ⏳ Harness run pending stable repo environment |
+| False-positive rate | < 15% | ⏳ Harness run pending stable repo environment |
 
-> **Note:** This document is the results template. Live numbers are populated by running the harness against the target repos with valid `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`. The metrics module and gate logic are fully implemented and unit-tested (`test/diff/validation-metrics.test.ts`); only the live API run is gated on credentials + browser availability in CI.
+## 2026-06-15 — Harness execution dry-run
+
+A first harness execution against the **shadcn-ui/next-template** target was attempted on 2026-06-15 in the v0.2 build. Result:
+
+- **Harness improvements landed:** patched `run-external.sh` to recover from `pnpm install --frozen-lockfile` failures (treat empty `node_modules` as install failure, retry with `--no-frozen-lockfile`/`--legacy-peer-deps`); added `validation/aggregate-results.mjs` to compute false-positive rate from two-pass (baseline + recheck) results; two-pass methodology now built into the script.
+- **All `frontguard run` invocations failed** for every route (4 baseline + 4 recheck), with `"error": "frontguard run failed"`. Captured artifact: `validation/results/tailwind-dashboard.json`. Root cause is downstream of the harness — the dev server for the cloned repo never came up under the unattended environment (Playwright cannot reach `http://localhost:3000`). The harness reported the failure honestly rather than swallowing it.
+- **No AI numbers measured.** With no successful renders, AI classification cannot be evaluated; `aiEnabled: false` reflects no `FRONTGUARD_OPENAI_KEY`/`FRONTGUARD_ANTHROPIC_KEY` in the run environment regardless.
+
+**What is required before AI-accuracy numbers can ship on the marketing site:**
+
+1. A run environment where each target repo's `devCommand` actually serves the documented routes on the documented port (or `--target-url` overridden to a pre-built deployment). Reproduce locally with `validation/run-external.sh --names tailwind-dashboard --keep-dev-server` to confirm.
+2. `FRONTGUARD_OPENAI_KEY` (or `FRONTGUARD_ANTHROPIC_KEY`) exported in the run env so the AI vision pipeline fires.
+3. Re-run the full five-repo harness, regenerate per-repo JSON in `validation/results/`, and re-run `node validation/aggregate-results.mjs` to populate the table below.
+
+**Until then,** the landing page does **not** advertise an accuracy number. The Validation section links here so any visitor can audit the methodology and current measurement status.
 
 ## Results
 
 *(Populated by the harness — example structure below.)*
 
 <!-- BEGIN GENERATED -->
-_No live run recorded yet. Run the harness to populate._
+_No successful runs yet. See "2026-06-15 — Harness execution dry-run" above for status._
 <!-- END GENERATED -->
 
 ## Prompt Tuning Log

@@ -110,17 +110,35 @@ run_repo() {
   pushd "${repo_dir}" >/dev/null
 
   # --- Install deps (auto-detect package manager from lockfile) ---
+  # Real-world repos have lockfiles tied to older toolchains, so we always
+  # log the failure and try a relaxed (non-frozen) install before giving up.
+  # Success is judged by node_modules being populated — pnpm's ignored-build
+  # warnings cause non-zero exit even when packages installed successfully.
   echo "  → installing dependencies"
-  local install_ok=1
+  local install_log="${WORK_DIR}/install.log"
+  install_try() { "$@" >>"${install_log}" 2>&1 || true; }
+
   if [[ -f "pnpm-lock.yaml" ]] && command -v pnpm >/dev/null 2>&1; then
-    pnpm install --frozen-lockfile >/dev/null 2>&1 || install_ok=0
+    install_try pnpm install --frozen-lockfile
+    if [[ ! -d node_modules ]] || [[ "$(ls node_modules 2>/dev/null | wc -l)" -lt 5 ]]; then
+      install_try pnpm install --no-frozen-lockfile
+    fi
   elif [[ -f "yarn.lock" ]] && command -v yarn >/dev/null 2>&1; then
-    yarn install --frozen-lockfile >/dev/null 2>&1 || install_ok=0
+    install_try yarn install --frozen-lockfile
+    if [[ ! -d node_modules ]] || [[ "$(ls node_modules 2>/dev/null | wc -l)" -lt 5 ]]; then
+      install_try yarn install
+    fi
   else
-    npm install --no-audit --no-fund >/dev/null 2>&1 || install_ok=0
+    install_try npm install --no-audit --no-fund
+    if [[ ! -d node_modules ]] || [[ "$(ls node_modules 2>/dev/null | wc -l)" -lt 5 ]]; then
+      install_try npm install --no-audit --no-fund --legacy-peer-deps
+    fi
   fi
-  if [[ "${install_ok}" -ne 1 ]]; then
+
+  if [[ ! -d node_modules ]] || [[ "$(ls node_modules 2>/dev/null | wc -l)" -lt 5 ]]; then
     echo "WARNING: dependency install failed for ${name} — skipping" >&2
+    echo "  ---- last 20 lines of install.log ----"
+    tail -n 20 "${install_log}" 2>/dev/null || true
     popd >/dev/null
     cleanup
     return 0
@@ -142,15 +160,50 @@ run_repo() {
   fi
 
   # --- Run Frontguard against each route ---
+  # Two-pass methodology for honest false-positive measurement:
+  #   pass 1 "baseline": fresh run, no baseline exists yet (routes are "new")
+  #   pass 2 "recheck":  re-run against unchanged code — any non-pass status
+  #                      is a pixel-only false positive.
   local out_file="${RESULTS_DIR}/${name}.json"
   local run_ok=1
   echo "  → running frontguard against ${url}"
 
-  # Build a space-separated list of full URLs from the routes array.
   local routes
   routes="$(echo "${routes_json}" | jq -r '.[]')"
 
-  # Run once per route, collecting individual outputs into a combined JSON file.
+  # Resolve the frontguard binary (prefer a globally-linked one for hermeticity).
+  local FG_BIN="frontguard"
+  if ! command -v frontguard >/dev/null 2>&1; then
+    FG_BIN="npx frontguard"
+  fi
+
+  run_one_pass() {
+    local pass_name="$1"
+    local pass_first=1
+    {
+      echo "  \"${pass_name}\": ["
+    } >>"${out_file}"
+    while IFS= read -r route; do
+      [[ -z "${route}" ]] && continue
+      local full_url="${url%/}${route}"
+      echo "    [${pass_name}] • ${full_url}"
+      local result
+      if result="$(${FG_BIN} run --url "${full_url}" --output json 2>>"${WORK_DIR}/frontguard.log")"; then
+        :
+      else
+        echo "WARNING: frontguard ${pass_name} run failed for ${full_url}" >&2
+        run_ok=0
+        result="{\"url\":\"${full_url}\",\"error\":\"frontguard run failed\"}"
+      fi
+      if [[ "${pass_first}" -eq 1 ]]; then pass_first=0; else echo "," >>"${out_file}"; fi
+      printf '    { "route": "%s", "url": "%s", "result": %s }' "${route}" "${full_url}" "${result}" >>"${out_file}"
+    done <<< "${routes}"
+    {
+      echo ""
+      echo "  ]"
+    } >>"${out_file}"
+  }
+
   {
     echo "{"
     echo "  \"name\": \"${name}\","
@@ -158,29 +211,14 @@ run_repo() {
     echo "  \"category\": \"${category}\","
     echo "  \"baseUrl\": \"${url}\","
     echo "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
-    echo "  \"runs\": ["
+    echo "  \"aiEnabled\": ${FRONTGUARD_AI_ENABLED:-false},"
   } >"${out_file}"
 
-  local first=1
-  while IFS= read -r route; do
-    [[ -z "${route}" ]] && continue
-    local full_url="${url%/}${route}"
-    echo "    • ${full_url}"
-    local result
-    if result="$(npx frontguard run --url "${full_url}" --output json 2>>"${WORK_DIR}/frontguard.log")"; then
-      :
-    else
-      echo "WARNING: frontguard run failed for ${full_url}" >&2
-      run_ok=0
-      result="{\"url\":\"${full_url}\",\"error\":\"frontguard run failed\"}"
-    fi
-    if [[ "${first}" -eq 1 ]]; then first=0; else echo "," >>"${out_file}"; fi
-    printf '    { "route": "%s", "url": "%s", "result": %s }' "${route}" "${full_url}" "${result}" >>"${out_file}"
-  done <<< "${routes}"
+  run_one_pass "baselineRuns"
+  echo "  ," >>"${out_file}"
+  run_one_pass "recheckRuns"
 
   {
-    echo ""
-    echo "  ]"
     echo "}"
   } >>"${out_file}"
 
