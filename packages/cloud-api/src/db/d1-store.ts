@@ -7,7 +7,15 @@
  * @module db/d1-store
  */
 
-import type { Store, User, ApiKeyRecord, ScreenshotRecord, UsageRecord } from './store.js';
+import type {
+  Store,
+  User,
+  ApiKeyRecord,
+  ScreenshotRecord,
+  UsageRecord,
+  UsageAlertState,
+  ScreenshotDecision,
+} from './store.js';
 import type { Monitor, MonitorRun, MonitorRunStatus, MonitorAlertState } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
 import type {
@@ -20,6 +28,8 @@ import type {
   TeamActivity,
   TeamUsage,
 } from './teams.js';
+import type { IgnoreMask } from './masks.js';
+import type { RunAttachment, AttachmentKind } from './attachments.js';
 import type { Run } from '../types.js';
 
 /** Minimal D1 typings (avoids depending on @cloudflare/workers-types). */
@@ -260,6 +270,122 @@ export class D1Store implements Store {
           screenshotsCount: Number(row.screenshots_count ?? 0),
         }
       : { userId, month, runsCount: 0, screenshotsCount: 0 };
+  }
+  async getUsageAlertState(userId: string, month: string): Promise<UsageAlertState | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM usage_alert_state WHERE user_id = ? AND month = ?`)
+      .bind(userId, month)
+      .first<Record<string, unknown>>();
+    if (!row) return null;
+    const tier = Number(row.last_tier ?? 0);
+    return {
+      userId,
+      month,
+      lastTier: (tier === 80 || tier === 95 ? tier : 0) as 0 | 80 | 95,
+      lastAlertAt: row.last_alert_at != null ? String(row.last_alert_at) : undefined,
+    };
+  }
+  async setUsageAlertState(state: UsageAlertState): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO usage_alert_state (user_id, month, last_tier, last_alert_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(user_id, month) DO UPDATE SET
+           last_tier = excluded.last_tier,
+           last_alert_at = excluded.last_alert_at`,
+      )
+      .bind(state.userId, state.month, state.lastTier, state.lastAlertAt ?? null)
+      .run();
+  }
+
+  // Masks --------------------------------------------------------------------
+  async createMask(m: IgnoreMask): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO masks (id, user_id, route, viewport, x, y, width, height, label, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(m.id, m.userId, m.route, m.viewport, m.x, m.y, m.width, m.height, m.label ?? null, m.createdAt)
+      .run();
+  }
+  async listMasks(userId: string): Promise<IgnoreMask[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM masks WHERE user_id = ? ORDER BY created_at DESC`)
+      .bind(userId)
+      .all<Record<string, unknown>>();
+    return results.map(maskFromRow);
+  }
+  async listMasksForTarget(userId: string, route: string, viewport: number): Promise<IgnoreMask[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT * FROM masks WHERE user_id = ? AND route = ? AND viewport = ? ORDER BY created_at DESC`,
+      )
+      .bind(userId, route, viewport)
+      .all<Record<string, unknown>>();
+    return results.map(maskFromRow);
+  }
+  async deleteMask(id: string, userId: string): Promise<boolean> {
+    const res = await this.db
+      .prepare(`DELETE FROM masks WHERE id = ? AND user_id = ?`)
+      .bind(id, userId)
+      .run();
+    return (res.meta?.changes ?? 0) > 0;
+  }
+
+  // Attachments --------------------------------------------------------------
+  async addAttachment(att: RunAttachment): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO run_attachments (id, run_id, kind, name, r2_key, content_type, size_bytes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        att.id,
+        att.runId,
+        att.kind,
+        att.name,
+        att.r2Key,
+        att.contentType ?? null,
+        att.sizeBytes ?? null,
+        att.createdAt,
+      )
+      .run();
+  }
+  async listAttachments(runId: string): Promise<RunAttachment[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM run_attachments WHERE run_id = ? ORDER BY created_at`)
+      .bind(runId)
+      .all<Record<string, unknown>>();
+    return results.map(attachmentFromRow);
+  }
+  async getAttachment(id: string): Promise<RunAttachment | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM run_attachments WHERE id = ?`)
+      .bind(id)
+      .first<Record<string, unknown>>();
+    return row ? attachmentFromRow(row) : null;
+  }
+  async deleteAttachment(id: string): Promise<boolean> {
+    const res = await this.db.prepare(`DELETE FROM run_attachments WHERE id = ?`).bind(id).run();
+    return (res.meta?.changes ?? 0) > 0;
+  }
+
+  // Screenshot decisions -----------------------------------------------------
+  async addScreenshotDecision(d: ScreenshotDecision): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO screenshot_decisions (id, screenshot_id, run_id, user_id, decision, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(d.id, d.screenshotId, d.runId, d.userId, d.decision, d.createdAt)
+      .run();
+  }
+  async listScreenshotDecisions(runId: string): Promise<ScreenshotDecision[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM screenshot_decisions WHERE run_id = ? ORDER BY created_at DESC`)
+      .bind(runId)
+      .all<Record<string, unknown>>();
+    return results.map(decisionFromRow);
   }
 
   // Monitors -----------------------------------------------------------------
@@ -754,6 +880,45 @@ function apiKeyFromRow(row: Record<string, unknown>): ApiKeyRecord {
     name: String(row.name),
     createdAt: String(row.created_at),
     lastUsedAt: row.last_used_at != null ? String(row.last_used_at) : undefined,
+  };
+}
+
+function maskFromRow(row: Record<string, unknown>): IgnoreMask {
+  return {
+    id: String(row.id),
+    userId: String(row.user_id),
+    route: String(row.route),
+    viewport: Number(row.viewport),
+    x: Number(row.x),
+    y: Number(row.y),
+    width: Number(row.width),
+    height: Number(row.height),
+    label: row.label != null ? String(row.label) : undefined,
+    createdAt: String(row.created_at),
+  };
+}
+
+function decisionFromRow(row: Record<string, unknown>): ScreenshotDecision {
+  return {
+    id: String(row.id),
+    screenshotId: String(row.screenshot_id),
+    runId: String(row.run_id),
+    userId: String(row.user_id),
+    decision: String(row.decision) as ScreenshotDecision['decision'],
+    createdAt: String(row.created_at),
+  };
+}
+
+function attachmentFromRow(row: Record<string, unknown>): RunAttachment {
+  return {
+    id: String(row.id),
+    runId: String(row.run_id),
+    kind: String(row.kind) as AttachmentKind,
+    name: String(row.name),
+    r2Key: String(row.r2_key),
+    contentType: row.content_type != null ? String(row.content_type) : undefined,
+    sizeBytes: row.size_bytes != null ? Number(row.size_bytes) : undefined,
+    createdAt: String(row.created_at),
   };
 }
 

@@ -9,6 +9,8 @@ import {
   dispatchAlerts,
   dispatchAlertsWithState,
   alertFingerprint,
+  alertSeverity,
+  diffBucket,
   type MonitorAlert,
 } from '../src/alerts/index.js';
 import { InMemoryStore } from '../src/db/store.js';
@@ -166,18 +168,65 @@ describe('dispatchAlerts', () => {
   });
 });
 
+describe('alertSeverity', () => {
+  it('tiers by ratio of diff to threshold', () => {
+    expect(alertSeverity(0.05, 0.05)).toBe('low'); // 1×
+    expect(alertSeverity(0.12, 0.05)).toBe('medium'); // 2.4×
+    expect(alertSeverity(0.25, 0.05)).toBe('high'); // 5×
+  });
+  it('handles zero threshold without dividing by zero', () => {
+    expect(alertSeverity(0.5, 0)).toBe('high');
+    expect(alertSeverity(0.03, 0)).toBe('medium');
+    expect(alertSeverity(0.001, 0)).toBe('low');
+  });
+});
+
+describe('diffBucket', () => {
+  it('bins diff percentages coarsely so tiny noise dedups', () => {
+    expect(diffBucket(0)).toBe(0);
+    expect(diffBucket(0.005)).toBe(1); // 0.5%
+    expect(diffBucket(0.03)).toBe(2); // 3%
+    expect(diffBucket(0.08)).toBe(3); // 8%
+    expect(diffBucket(0.15)).toBe(4); // 15%
+    expect(diffBucket(0.5)).toBe(5); // 50%
+  });
+});
+
 describe('alertFingerprint', () => {
-  it('is stable regardless of order and ignores diff percentage', () => {
+  it('is order-independent', () => {
     const a: MonitorAlert[] = [
       { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.2, threshold: 0.05 },
       { url: 'u', route: '/b', viewport: 375, diffPercentage: 0.3, threshold: 0.05 },
     ];
     const b: MonitorAlert[] = [
-      { url: 'u', route: '/b', viewport: 375, diffPercentage: 0.9, threshold: 0.05 },
-      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.1, threshold: 0.05 },
+      { url: 'u', route: '/b', viewport: 375, diffPercentage: 0.3, threshold: 0.05 },
+      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.2, threshold: 0.05 },
     ];
     expect(alertFingerprint(a)).toBe(alertFingerprint(b));
   });
+
+  it('dedups within the same severity + bucket band (small fluctuations)', () => {
+    // Both 6.1% and 6.4% land in bucket 3 (5–10%) with same severity tier.
+    const a: MonitorAlert[] = [
+      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.061, threshold: 0.05 },
+    ];
+    const b: MonitorAlert[] = [
+      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.064, threshold: 0.05 },
+    ];
+    expect(alertFingerprint(a)).toBe(alertFingerprint(b));
+  });
+
+  it('changes when severity escalates (P2-4: escalating regressions re-alert)', () => {
+    // Same routes, but 6% → 30% pushes from medium to high + crosses buckets.
+    const low: MonitorAlert[] = [
+      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.06, threshold: 0.05 },
+    ];
+    const high: MonitorAlert[] = [
+      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.3, threshold: 0.05 },
+    ];
+    expect(alertFingerprint(low)).not.toBe(alertFingerprint(high));
+  });
+
   it('differs for different route sets', () => {
     const a: MonitorAlert[] = [{ url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.2, threshold: 0.05 }];
     const b: MonitorAlert[] = [{ url: 'u', route: '/c', viewport: 1440, diffPercentage: 0.2, threshold: 0.05 }];
@@ -224,6 +273,20 @@ describe('dispatchAlertsWithState (dedup + snooze)', () => {
     ];
     const res = await dispatchAlertsWithState({}, store, mon, changed, now, okFetch);
     expect(res.reason).toBe('sent');
+  });
+
+  it('re-alerts on escalating severity for the same routes (P2-4)', async () => {
+    const store = new InMemoryStore();
+    const now = new Date('2026-01-01T12:00:00Z');
+    const small: MonitorAlert[] = [
+      { url: 'https://x.com', route: '/', viewport: 1440, diffPercentage: 0.06, threshold: 0.05 },
+    ];
+    const huge: MonitorAlert[] = [
+      { url: 'https://x.com', route: '/', viewport: 1440, diffPercentage: 0.5, threshold: 0.05 },
+    ];
+    expect((await dispatchAlertsWithState({}, store, mon, small, now, okFetch)).reason).toBe('sent');
+    // Same routes, but escalated severity — must re-alert.
+    expect((await dispatchAlertsWithState({}, store, mon, huge, now, okFetch)).reason).toBe('sent');
   });
 
   it('suppresses while snoozed, resumes after snooze expires', async () => {

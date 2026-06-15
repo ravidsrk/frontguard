@@ -9,8 +9,35 @@
  */
 
 import type { Monitor, MonitorRun } from '../db/monitors.js';
-import type { ScreenshotRecord } from '../db/store.js';
+import type { ScreenshotRecord, ScreenshotDecision } from '../db/store.js';
+import type { IgnoreMask } from '../db/masks.js';
+import type { RunAttachment } from '../db/attachments.js';
+import { attachmentLabel } from '../db/attachments.js';
 import type { Run } from '../types.js';
+import { flakeScore, renderFlakeBadge } from './flake.js';
+
+/** Slugifies a route path the same way screenshotKey() does. */
+function routeSlug(route: string): string {
+  return route.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'root';
+}
+
+/**
+ * Stable group key for a screenshot's (route, viewport, browser) triple.
+ * The diff viewer uses this to pair a diff with its baseline/current siblings.
+ */
+export function screenshotGroupKey(s: Pick<ScreenshotRecord, 'route' | 'viewport' | 'browser'>): string {
+  return `${routeSlug(s.route)}|${s.viewport}|${s.browser}`;
+}
+
+/** Spend-cap header data for the dashboard. */
+export interface SpendCap {
+  /** Current month's run count. */
+  runs: number;
+  /** Plan's monthly run limit (null = unlimited). */
+  runsLimit: number | null;
+  /** Plan display name (Free, Pro, Business). */
+  planName: string;
+}
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -68,6 +95,78 @@ const SHARED_STYLES = `
   .group { margin-bottom:24px; }
   .login { max-width:420px; margin:80px auto; text-align:center; }
   .login .btn { margin-top:20px; font-size:15px; padding:10px 20px; }
+
+  /* --- Flake badge (Task 15.2) ----------------------------------------- */
+  .flake { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .flake-dot { width:6px; height:6px; border-radius:50%; }
+  .flake-green { background:rgba(63,185,80,.12); color:#3fb950; }
+  .flake-green .flake-dot { background:#3fb950; }
+  .flake-yellow { background:rgba(210,153,34,.15); color:#e3b341; }
+  .flake-yellow .flake-dot { background:#e3b341; }
+  .flake-red { background:rgba(248,81,73,.15); color:#ff7b72; }
+  .flake-red .flake-dot { background:#ff7b72; }
+
+  /* --- Spend-cap header bar (Task 15.7) -------------------------------- */
+  .spend { display:flex; align-items:center; gap:10px; padding:6px 12px; border:1px solid var(--border); border-radius:8px; font-size:12px; }
+  .spend .label { color:var(--muted); }
+  .spend .bar { width:120px; height:6px; background:#21262d; border-radius:3px; overflow:hidden; }
+  .spend .fill { height:100%; background:#3fb950; transition:width .2s; }
+  .spend.warn .fill { background:#e3b341; }
+  .spend.crit .fill { background:#ff7b72; }
+  .spend.crit { border-color:rgba(248,81,73,.4); }
+  .spend strong { color:var(--text); font-weight:700; font-variant-numeric:tabular-nums; }
+
+  /* --- History page filters (Task 15.1) -------------------------------- */
+  .filters { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 20px; }
+  .filters .chip { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:14px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-size:12px; text-decoration:none; }
+  .filters .chip.active { border-color:var(--accent); color:var(--accent); }
+  .filters select { width:auto; padding:4px 8px; font-size:12px; }
+  th a, th a:visited { color:var(--muted); text-decoration:none; }
+  th a.sorted { color:var(--accent); }
+
+  /* --- Diff viewer (Task 15.3) ----------------------------------------- */
+  .viewer-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:16px; padding:10px 14px; background:var(--panel); border:1px solid var(--border); border-radius:8px; }
+  .viewer-toolbar .spacer { flex:1; }
+  .viewer-toolbar kbd { background:#21262d; border:1px solid var(--border); border-radius:4px; padding:1px 6px; font-size:11px; font-family:ui-monospace,monospace; color:var(--muted); }
+  .viewer-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px; }
+  .viewer-cell { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px; position:relative; }
+  .viewer-cell .cap { color:var(--muted); font-size:12px; text-transform:uppercase; margin-bottom:8px; letter-spacing:.04em; }
+  .viewer-cell img { width:100%; display:block; border-radius:4px; background:#000; }
+  .viewer-cell .ph { color:var(--muted); text-align:center; padding:40px 12px; border:1px dashed var(--border); border-radius:4px; }
+  .viewer-stage { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:16px; position:relative; min-height:400px; }
+  .viewer-stage .stage-inner { position:relative; display:inline-block; max-width:100%; }
+  .viewer-stage img { display:block; max-width:100%; }
+  .viewer-stage .layer { position:absolute; inset:0; pointer-events:none; }
+  .viewer-stage .layer.diff-overlay { mix-blend-mode:screen; opacity:.85; }
+  .viewer-stage .layer.heatmap { filter:hue-rotate(180deg) saturate(2.5) contrast(1.5); opacity:.85; }
+  .viewer-stage .mask { position:absolute; background:rgba(88,166,255,.18); border:2px dashed #58a6ff; box-sizing:border-box; }
+  .viewer-stage.painting { cursor:crosshair; }
+  .viewer-stage.painting .layer { pointer-events:auto; }
+  .nav-arrows { display:flex; gap:8px; align-items:center; }
+  .nav-arrows a, .nav-arrows .disabled { padding:4px 10px; border:1px solid var(--border); border-radius:6px; font-size:12px; color:var(--accent); text-decoration:none; }
+  .nav-arrows .disabled { color:var(--muted); opacity:.5; pointer-events:none; }
+
+  /* --- Bulk approve (Task 15.4) ---------------------------------------- */
+  .bulk-bar { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--panel); border:1px solid var(--border); border-radius:8px; margin-bottom:16px; }
+  .bulk-bar .count { font-weight:700; }
+  .bulk-bar .actions { margin-left:auto; }
+  .group .group-head { display:flex; align-items:center; gap:10px; margin:24px 0 8px; }
+  .group .group-head h2 { margin:0; }
+  .group .group-head input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); margin:0; }
+  .group .group-decision { font-size:12px; padding:2px 8px; border-radius:10px; }
+  .group .group-decision.accepted { background:rgba(63,185,80,.15); color:#3fb950; }
+  .group .group-decision.rejected { background:rgba(248,81,73,.15); color:#ff7b72; }
+
+  /* --- Attachments + masks settings (Tasks 15.5/15.6) ----------------- */
+  ul.attachments { list-style:none; padding:0; margin:0; background:var(--panel); border:1px solid var(--border); border-radius:8px; }
+  ul.attachments li { display:flex; gap:12px; align-items:center; padding:10px 14px; border-bottom:1px solid var(--border); font-size:13px; }
+  ul.attachments li:last-child { border-bottom:none; }
+  ul.attachments .kind { color:var(--muted); min-width:90px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  ul.attachments .size { color:var(--muted); font-size:12px; margin-left:auto; }
+  .mask-thumb { display:flex; gap:12px; align-items:center; padding:10px 14px; border-bottom:1px solid var(--border); }
+  .mask-thumb .swatch { width:48px; height:32px; border:2px dashed #58a6ff; background:rgba(88,166,255,.18); border-radius:4px; flex-shrink:0; }
+  .mask-thumb .meta { flex:1; font-size:13px; }
+  .mask-thumb .meta .where { color:var(--muted); font-size:12px; }
 `;
 
 /** Renders the standard dark-theme document shell. */
@@ -113,6 +212,28 @@ export function relativeTime(iso: string | undefined, now = new Date()): string 
 }
 
 /**
+ * Renders the spend-cap progress chip shown in the dashboard header (Task 15.7).
+ * Returns an empty string when the plan is unlimited. Colour transitions:
+ * green < 80%, yellow 80–94%, red ≥ 95%.
+ */
+export function renderSpendChip(cap?: SpendCap): string {
+  if (!cap || cap.runsLimit == null) {
+    return cap?.planName
+      ? `<div class="spend"><span class="label">Plan:</span><strong>${escapeHtml(cap.planName)}</strong><span class="label">Unlimited</span></div>`
+      : '';
+  }
+  const ratio = cap.runsLimit > 0 ? Math.min(1, cap.runs / cap.runsLimit) : 0;
+  const pct = Math.round(ratio * 100);
+  const tier = pct >= 95 ? 'crit' : pct >= 80 ? 'warn' : '';
+  return `<div class="spend ${tier}" title="${cap.runs} of ${cap.runsLimit} runs used on the ${escapeHtml(cap.planName)} plan">
+    <span class="label">${escapeHtml(cap.planName)} usage</span>
+    <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+    <strong>${cap.runs}/${cap.runsLimit}</strong>
+    <span class="label">(${pct}%)</span>
+  </div>`;
+}
+
+/**
  * Renders the dashboard page. When `sessioned` is true, interactive CRUD forms
  * and per-row controls are included (browser dashboard at `/dashboard`); when
  * false the page is read-only (back-compat `/v1/dashboard`).
@@ -121,19 +242,23 @@ export function relativeTime(iso: string | undefined, now = new Date()): string 
  * @param recentRuns  - Recent runs (for the activity feed).
  * @param now         - Current time (injectable for tests).
  * @param sessioned   - Whether to render interactive CRUD controls.
+ * @param flakeByMonitor - Optional per-monitor stability score (0–100).
+ * @param spend       - Optional spend-cap info for the header bar.
  */
 export function renderDashboard(
   monitors: Monitor[],
   recentRuns: Run[],
   now = new Date(),
   sessioned = false,
+  flakeByMonitor: Record<string, number> = {},
+  spend?: SpendCap,
 ): string {
   const passing = monitors.filter((m) => m.lastStatus === 'passed').length;
   const failing = monitors.filter((m) => m.lastStatus === 'regression').length;
   const enabled = monitors.filter((m) => m.enabled).length;
 
   const actionsCol = sessioned ? '<th>Actions</th>' : '';
-  const colspan = sessioned ? 7 : 6;
+  const colspan = sessioned ? 8 : 7;
 
   const monitorRows = monitors.length
     ? monitors
@@ -147,12 +272,14 @@ export function renderDashboard(
           <form class="inline" method="post" action="/dashboard/monitors/${escapeHtml(m.id)}/delete"><button type="submit" class="danger">Delete</button></form>
         </div></td>`
             : '';
+          const flake = renderFlakeBadge(flakeByMonitor[m.id] ?? 100);
           return `<tr>
         <td>
           ${nameCell}
           <div class="murl">${escapeHtml(m.url)}</div>
         </td>
         <td>${statusBadge(m.lastStatus)}</td>
+        <td>${flake}</td>
         <td>${m.routes.length} route${m.routes.length !== 1 ? 's' : ''}</td>
         <td>${m.intervalMinutes}m</td>
         <td>${relativeTime(m.lastRunAt, now)}</td>
@@ -178,7 +305,11 @@ export function renderDashboard(
     : '<li class="empty">No recent runs.</li>';
 
   const createForm = sessioned ? renderCreateForm() : '';
-  const headerExtra = sessioned ? '<a href="/auth/github?redirect=/dashboard">Account</a>' : '';
+  const spendChip = sessioned ? renderSpendChip(spend) : '';
+  const settingsLink = sessioned ? '<a href="/dashboard/settings/masks">Masks</a>' : '';
+  const headerExtra = sessioned
+    ? `${spendChip}${settingsLink}<a href="/auth/github?redirect=/dashboard">Account</a>`
+    : '';
 
   const inner = `<header><h1>🛡 Frontguard Monitoring</h1>${headerExtra}</header>
 <div class="wrap">
@@ -190,7 +321,7 @@ export function renderDashboard(
   </div>
 
   <table>
-    <thead><tr><th>Monitor</th><th>Status</th><th>Routes</th><th>Interval</th><th>Last run</th><th>State</th>${actionsCol}</tr></thead>
+    <thead><tr><th>Monitor</th><th>Status</th><th>Stability</th><th>Routes</th><th>Interval</th><th>Last run</th><th>State</th>${actionsCol}</tr></thead>
     <tbody>${monitorRows}</tbody>
   </table>
 ${createForm}
@@ -263,6 +394,8 @@ export function renderMonitorDetail(monitor: Monitor, runs: MonitorRun[], now = 
   const id = escapeHtml(monitor.id);
   const slack = escapeHtml(monitor.alerts?.slack ?? '');
   const emails = escapeHtml((monitor.alerts?.email ?? []).join(', '));
+  const score = flakeScore(runs);
+  const badge = renderFlakeBadge(score);
 
   const timeline = runs.length
     ? runs
@@ -286,7 +419,8 @@ export function renderMonitorDetail(monitor: Monitor, runs: MonitorRun[], now = 
   <div class="card">
     <div class="mname">${escapeHtml(monitor.name)}</div>
     <div class="murl">${escapeHtml(monitor.url)}</div>
-    <p>${statusBadge(monitor.lastStatus)} · ${monitor.routes.length} route(s) · every ${monitor.intervalMinutes}m · ${monitor.enabled ? 'Enabled' : 'Disabled'}</p>
+    <p>${statusBadge(monitor.lastStatus)} · ${badge} · ${monitor.routes.length} route(s) · every ${monitor.intervalMinutes}m · ${monitor.enabled ? 'Enabled' : 'Disabled'}</p>
+    <p><a class="btn" href="/dashboard/monitors/${id}/history">View 30-run history →</a></p>
   </div>
 
   <h2>Alert configuration</h2>
@@ -321,20 +455,39 @@ export function renderMonitorDetail(monitor: Monitor, runs: MonitorRun[], now = 
 }
 
 /**
- * Renders the screenshot comparison page for a run, grouping screenshots by
- * route + viewport and showing baseline | current | diff side by side.
+ * Renders the screenshot comparison page for a run. Groups screenshots by
+ * route + viewport + browser; each group shows baseline | current | diff
+ * side by side. When `sessioned` is true the page becomes interactive: each
+ * group has a select checkbox feeding a sticky "Accept N baselines" bulk
+ * action, and the diff thumbnail links to the full-screen diff viewer.
+ *
  * Image `src` URLs point at the session-authed `/dashboard/screenshots/...`
  * route (not the `/v1` guard).
  *
  * @param runId       - The run id.
  * @param screenshots - Screenshot metadata for the run.
+ * @param opts        - Optional interactive features.
  */
-export function renderScreenshotComparison(runId: string, screenshots: ScreenshotRecord[]): string {
+export function renderScreenshotComparison(
+  runId: string,
+  screenshots: ScreenshotRecord[],
+  opts: {
+    sessioned?: boolean;
+    decisions?: ScreenshotDecision[];
+    attachments?: RunAttachment[];
+  } = {},
+): string {
   const rid = escapeHtml(runId);
-  // Group by `route|viewport`.
+  const sessioned = !!opts.sessioned;
+  const decisions = opts.decisions ?? [];
+  const decisionByShot = new Map<string, ScreenshotDecision>();
+  for (const d of decisions) decisionByShot.set(d.screenshotId, d);
+
+  // Group by `route|viewport|browser` so each (route, viewport, browser)
+  // triple gets a self-contained baseline/current/diff trio.
   const groups = new Map<string, ScreenshotRecord[]>();
   for (const s of screenshots) {
-    const key = `${s.route}|${s.viewport}`;
+    const key = screenshotGroupKey(s);
     const list = groups.get(key) ?? [];
     list.push(s);
     groups.set(key, list);
@@ -343,28 +496,537 @@ export function renderScreenshotComparison(runId: string, screenshots: Screensho
   const groupsHtml = groups.size
     ? [...groups.entries()]
         .map(([key, shots]) => {
-          const [route, viewport] = key.split('|');
+          const [routeSlugged, viewportStr, browser] = key.split('|');
+          const diffShot = shots.find((s) => s.type === 'diff');
+          const anyShot = shots[0];
+          const route = anyShot.route;
+          const decision = diffShot ? decisionByShot.get(diffShot.id) : undefined;
+
           const cols = (['baseline', 'current', 'diff'] as const)
             .map((type) => {
               const shot = shots.find((s) => s.type === type);
-              const img = shot
-                ? `<img alt="${escapeHtml(type)}" src="/dashboard/screenshots/${rid}/${escapeHtml(shot.id)}/raw"/>`
-                : '<div class="murl">— none —</div>';
+              if (!shot) return `<div class="shot"><div class="cap">${type}</div><div class="murl">— none —</div></div>`;
+              const img = `<img alt="${escapeHtml(type)}" src="/dashboard/screenshots/${rid}/${escapeHtml(shot.id)}/raw"/>`;
+              if (type === 'diff' && sessioned) {
+                return `<div class="shot"><div class="cap">${type}</div><a href="/dashboard/runs/${rid}/diffs/${escapeHtml(shot.id)}">${img}</a></div>`;
+              }
               return `<div class="shot"><div class="cap">${type}</div>${img}</div>`;
             })
             .join('\n');
-          return `<div class="group">
-        <h2>${escapeHtml(route)} @ ${escapeHtml(viewport)}px</h2>
+
+          const checkbox =
+            sessioned && diffShot
+              ? `<input type="checkbox" class="diff-select" name="diff_ids" value="${escapeHtml(diffShot.id)}" form="bulk-approve-form" aria-label="Select for bulk approve"/>`
+              : '';
+          const decisionLabel = decision
+            ? `<span class="group-decision ${escapeHtml(decision.decision)}">${decision.decision}</span>`
+            : '';
+          const viewerLink =
+            sessioned && diffShot
+              ? `<a class="btn" href="/dashboard/runs/${rid}/diffs/${escapeHtml(diffShot.id)}">Open diff viewer</a>`
+              : '';
+
+          return `<div class="group" data-key="${escapeHtml(routeSlugged)}-${escapeHtml(viewportStr)}">
+        <div class="group-head">
+          ${checkbox}
+          <h2>${escapeHtml(route)} @ ${escapeHtml(viewportStr)}px${browser ? ' · ' + escapeHtml(browser) : ''}</h2>
+          ${decisionLabel}
+          <span class="spacer" style="flex:1"></span>
+          ${viewerLink}
+        </div>
         <div class="shots">${cols}</div>
       </div>`;
         })
         .join('\n')
     : '<p class="empty">No screenshots captured for this run.</p>';
 
+  const diffShots = screenshots.filter((s) => s.type === 'diff');
+  const bulkBar =
+    sessioned && diffShots.length
+      ? `<form id="bulk-approve-form" class="bulk-bar" method="post" action="/dashboard/runs/${rid}/approve" onsubmit="return confirmBulkApprove(event)">
+    <span class="count" id="bulk-count">0 selected</span>
+    <span class="label">Select diffs above and click Accept to promote those baselines.</span>
+    <div class="actions">
+      <button type="button" id="select-all" class="btn">Select all</button>
+      <button type="submit" class="primary">Accept selected baselines</button>
+    </div>
+  </form>`
+      : '';
+
+  const attachmentsLink =
+    sessioned && opts.attachments?.length
+      ? `<p><a class="btn" href="/dashboard/runs/${rid}/attachments">View ${opts.attachments.length} attachment${opts.attachments.length === 1 ? '' : 's'} →</a></p>`
+      : '';
+
+  const bulkScript = sessioned
+    ? `<script>
+(function(){
+  function updateCount(){
+    var n = document.querySelectorAll('.diff-select:checked').length;
+    var el = document.getElementById('bulk-count');
+    if (el) el.textContent = n + ' selected';
+  }
+  document.addEventListener('change', function(e){
+    if (e.target && e.target.classList && e.target.classList.contains('diff-select')) updateCount();
+  });
+  var sa = document.getElementById('select-all');
+  if (sa) sa.addEventListener('click', function(){
+    var boxes = document.querySelectorAll('.diff-select');
+    var allOn = Array.prototype.every.call(boxes, function(b){ return b.checked; });
+    boxes.forEach(function(b){ b.checked = !allOn; });
+    updateCount();
+  });
+  window.confirmBulkApprove = function(e){
+    var n = document.querySelectorAll('.diff-select:checked').length;
+    if (n === 0) { e.preventDefault(); alert('Select at least one diff to accept.'); return false; }
+    return confirm('Accept ' + n + ' baseline' + (n === 1 ? '' : 's') + '?');
+  };
+})();
+</script>`
+    : '';
+
   const inner = `<header><h1>🛡 Screenshot comparison</h1><a href="/dashboard">← Dashboard</a></header>
 <div class="wrap">
   <p class="murl">Run <code>${rid}</code></p>
+  ${attachmentsLink}
+  ${bulkBar}
   ${groupsHtml}
+  ${bulkScript}
 </div>`;
   return page('Frontguard — Screenshots', inner);
+}
+
+// ---------------------------------------------------------------------------
+// Per-monitor history view (Task 15.1)
+// ---------------------------------------------------------------------------
+
+/** Filter parameters for the history view. */
+export interface HistoryFilters {
+  status?: 'all' | 'passed' | 'regression' | 'error';
+  attempts?: 'all' | 'first-try' | 'retried';
+  sort?: 'newest' | 'oldest';
+}
+
+/**
+ * Renders the 30-run history page for a monitor. Each row shows status,
+ * stability score, attempts, and a link to the run. Filterable by status +
+ * retry state; sortable newest/oldest.
+ *
+ * Filtering and sorting happen in the renderer so the route can pass the raw
+ * run list — keeps the store API simple.
+ */
+export function renderMonitorHistory(
+  monitor: Monitor,
+  runs: MonitorRun[],
+  filters: HistoryFilters = {},
+  now = new Date(),
+): string {
+  const status = filters.status ?? 'all';
+  const attempts = filters.attempts ?? 'all';
+  const sort = filters.sort ?? 'newest';
+  const id = escapeHtml(monitor.id);
+
+  let filtered = runs.slice();
+  if (status !== 'all') filtered = filtered.filter((r) => r.status === status);
+  if (attempts === 'first-try') filtered = filtered.filter((r) => r.attempts === 1);
+  if (attempts === 'retried') filtered = filtered.filter((r) => r.attempts > 1);
+
+  filtered.sort((a, b) => {
+    const t = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    return sort === 'newest' ? -t : t;
+  });
+
+  const score = flakeScore(runs);
+  const badge = renderFlakeBadge(score);
+
+  function chipLink(group: 'status' | 'attempts', value: string, label: string): string {
+    const active = (group === 'status' ? status : attempts) === value;
+    const params = new URLSearchParams();
+    params.set('status', group === 'status' ? value : status);
+    params.set('attempts', group === 'attempts' ? value : attempts);
+    params.set('sort', sort);
+    return `<a class="chip${active ? ' active' : ''}" href="?${params.toString()}">${escapeHtml(label)}</a>`;
+  }
+  function sortLink(value: 'newest' | 'oldest', label: string): string {
+    const params = new URLSearchParams();
+    params.set('status', status);
+    params.set('attempts', attempts);
+    params.set('sort', value);
+    const active = sort === value;
+    return `<a class="${active ? 'sorted' : ''}" href="?${params.toString()}">${escapeHtml(label)}</a>`;
+  }
+
+  const rowsHtml = filtered.length
+    ? filtered
+        .map((r) => {
+          const link = `<a href="/dashboard/runs/${escapeHtml(r.id)}">View →</a>`;
+          return `<tr>
+        <td>${relativeTime(r.createdAt, now)}</td>
+        <td>${runStatusBadge(r.status)}</td>
+        <td>${r.regressionsCount}</td>
+        <td>${r.attempts}${r.attempts > 1 ? ' <span class="badge warn" style="font-size:10px">retried</span>' : ''}</td>
+        <td>${link}</td>
+      </tr>`;
+        })
+        .join('\n')
+    : '<tr><td colspan="5" class="empty">No runs match the current filters.</td></tr>';
+
+  const inner = `<header><h1>🛡 ${escapeHtml(monitor.name)} — history</h1><a href="/dashboard/monitors/${id}">← Monitor</a></header>
+<div class="wrap">
+  <div class="card">
+    <div class="mname">${escapeHtml(monitor.name)}</div>
+    <div class="murl">${escapeHtml(monitor.url)}</div>
+    <p>Stability across last ${runs.length} run${runs.length === 1 ? '' : 's'}: ${badge}</p>
+  </div>
+
+  <div class="filters">
+    <span class="label" style="color:var(--muted);align-self:center;margin-right:4px">Status:</span>
+    ${chipLink('status', 'all', 'All')}
+    ${chipLink('status', 'passed', 'Passed')}
+    ${chipLink('status', 'regression', 'Regression')}
+    ${chipLink('status', 'error', 'Error')}
+    <span class="label" style="color:var(--muted);align-self:center;margin:0 4px 0 12px">Attempts:</span>
+    ${chipLink('attempts', 'all', 'All')}
+    ${chipLink('attempts', 'first-try', 'First try')}
+    ${chipLink('attempts', 'retried', 'Retried')}
+  </div>
+
+  <table>
+    <thead><tr>
+      <th>${sortLink('newest', 'When ↓')} / ${sortLink('oldest', '↑')}</th>
+      <th>Status</th>
+      <th>Regressions</th>
+      <th>Attempts</th>
+      <th></th>
+    </tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+</div>`;
+  return page(`Frontguard — ${monitor.name} history`, inner);
+}
+
+// ---------------------------------------------------------------------------
+// Diff viewer (Task 15.3)
+// ---------------------------------------------------------------------------
+
+/** A neighbour diff used for prev/next navigation in the viewer. */
+export interface DiffNeighbour {
+  id: string;
+  route: string;
+  viewport: number;
+}
+
+/** Inputs for the diff viewer page. */
+export interface DiffViewerData {
+  runId: string;
+  diff: ScreenshotRecord;
+  baseline?: ScreenshotRecord;
+  current?: ScreenshotRecord;
+  prev?: DiffNeighbour;
+  next?: DiffNeighbour;
+  masks: IgnoreMask[];
+}
+
+/**
+ * Renders the full-screen diff viewer with overlay/heatmap toggle, drag-paint
+ * mask creation, and keyboard shortcuts (A/R/I/←/→). All routes are POSTed
+ * by the inline script using fetch so the page doesn't full-reload between
+ * actions.
+ */
+export function renderDiffViewer(data: DiffViewerData): string {
+  const rid = escapeHtml(data.runId);
+  const did = escapeHtml(data.diff.id);
+  const route = escapeHtml(data.diff.route);
+  const viewport = data.diff.viewport;
+  const browser = escapeHtml(data.diff.browser);
+  const currentUrl = data.current ? `/dashboard/screenshots/${rid}/${escapeHtml(data.current.id)}/raw` : '';
+  const baselineUrl = data.baseline ? `/dashboard/screenshots/${rid}/${escapeHtml(data.baseline.id)}/raw` : '';
+  const diffUrl = `/dashboard/screenshots/${rid}/${did}/raw`;
+
+  const prevLink = data.prev
+    ? `<a href="/dashboard/runs/${rid}/diffs/${escapeHtml(data.prev.id)}" title="Previous (←)">← Prev</a>`
+    : '<span class="disabled" title="No previous diff">← Prev</span>';
+  const nextLink = data.next
+    ? `<a href="/dashboard/runs/${rid}/diffs/${escapeHtml(data.next.id)}" title="Next (→)">Next →</a>`
+    : '<span class="disabled" title="No next diff">Next →</span>';
+
+  const masksJson = JSON.stringify(
+    data.masks.map((m) => ({ id: m.id, x: m.x, y: m.y, width: m.width, height: m.height, label: m.label ?? '' })),
+  );
+
+  const inner = `<header><h1>🛡 Diff viewer</h1><a href="/dashboard/runs/${rid}">← Run</a></header>
+<div class="wrap">
+  <div class="viewer-toolbar">
+    <strong>${route}</strong>
+    <span class="murl">@ ${viewport}px · ${browser}</span>
+    <span class="spacer"></span>
+    <div class="nav-arrows">${prevLink}${nextLink}</div>
+    <span class="spacer" style="flex:0 0 16px"></span>
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:0">
+      <input type="radio" name="mode" value="overlay" checked style="width:auto;margin:0"/> Overlay
+    </label>
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:0">
+      <input type="radio" name="mode" value="heatmap" style="width:auto;margin:0"/> Heatmap
+    </label>
+    <span class="spacer" style="flex:0 0 16px"></span>
+    <button type="button" id="approve" title="Accept this baseline (A)">Accept <kbd>A</kbd></button>
+    <button type="button" id="reject" class="danger" title="Reject this diff (R)">Reject <kbd>R</kbd></button>
+    <button type="button" id="paint" title="Paint ignore region (I)">Ignore region <kbd>I</kbd></button>
+  </div>
+
+  <div class="viewer-grid">
+    <div class="viewer-cell">
+      <div class="cap">Baseline</div>
+      ${data.baseline ? `<img alt="baseline" src="${baselineUrl}"/>` : '<div class="ph">No baseline</div>'}
+    </div>
+    <div class="viewer-cell">
+      <div class="cap">Current</div>
+      ${data.current ? `<img alt="current" src="${currentUrl}"/>` : '<div class="ph">No current</div>'}
+    </div>
+    <div class="viewer-cell">
+      <div class="cap">Diff</div>
+      <img alt="diff" src="${diffUrl}"/>
+    </div>
+  </div>
+
+  <div class="viewer-stage" id="stage">
+    <div class="stage-inner" id="stage-inner">
+      ${data.current ? `<img id="base-img" alt="current" src="${currentUrl}"/>` : `<img id="base-img" alt="diff" src="${diffUrl}"/>`}
+      <img id="diff-overlay" class="layer diff-overlay" alt="diff overlay" src="${diffUrl}"/>
+      <div id="mask-layer" class="layer" style="pointer-events:none"></div>
+    </div>
+  </div>
+
+  <p class="murl" style="margin-top:12px">
+    Shortcuts: <kbd>A</kbd> accept · <kbd>R</kbd> reject · <kbd>I</kbd> paint mask · <kbd>←</kbd>/<kbd>→</kbd> prev/next.
+  </p>
+</div>
+
+<script>
+(function(){
+  var runId = ${JSON.stringify(data.runId)};
+  var diffId = ${JSON.stringify(data.diff.id)};
+  var route = ${JSON.stringify(data.diff.route)};
+  var viewport = ${JSON.stringify(data.diff.viewport)};
+  var prevHref = ${data.prev ? JSON.stringify(`/dashboard/runs/${data.runId}/diffs/${data.prev.id}`) : 'null'};
+  var nextHref = ${data.next ? JSON.stringify(`/dashboard/runs/${data.runId}/diffs/${data.next.id}`) : 'null'};
+  var existingMasks = ${masksJson};
+
+  var stage = document.getElementById('stage');
+  var inner = document.getElementById('stage-inner');
+  var overlay = document.getElementById('diff-overlay');
+  var maskLayer = document.getElementById('mask-layer');
+  var baseImg = document.getElementById('base-img');
+
+  function syncSize(){
+    if (!baseImg || !maskLayer) return;
+    maskLayer.style.width = baseImg.clientWidth + 'px';
+    maskLayer.style.height = baseImg.clientHeight + 'px';
+  }
+  if (baseImg) baseImg.addEventListener('load', function(){ syncSize(); renderMasks(); });
+  window.addEventListener('resize', function(){ syncSize(); renderMasks(); });
+
+  function imgScale(){
+    if (!baseImg) return 1;
+    return baseImg.naturalWidth ? baseImg.clientWidth / baseImg.naturalWidth : 1;
+  }
+
+  function renderMasks(){
+    if (!maskLayer) return;
+    var scale = imgScale();
+    maskLayer.innerHTML = '';
+    existingMasks.forEach(function(m){
+      var d = document.createElement('div');
+      d.className = 'mask';
+      d.style.left = (m.x * scale) + 'px';
+      d.style.top = (m.y * scale) + 'px';
+      d.style.width = (m.width * scale) + 'px';
+      d.style.height = (m.height * scale) + 'px';
+      if (m.label) d.title = m.label;
+      maskLayer.appendChild(d);
+    });
+  }
+
+  // Mode toggle: overlay vs heatmap.
+  document.querySelectorAll('input[name=mode]').forEach(function(r){
+    r.addEventListener('change', function(){
+      if (!overlay) return;
+      overlay.classList.remove('diff-overlay', 'heatmap');
+      overlay.classList.add('layer');
+      overlay.classList.add(r.value === 'heatmap' ? 'heatmap' : 'diff-overlay');
+    });
+  });
+
+  // Painting state.
+  var painting = false, startX = 0, startY = 0, dragRect = null;
+  function enterPaintMode(){
+    painting = true;
+    stage.classList.add('painting');
+    maskLayer.style.pointerEvents = 'auto';
+  }
+  function exitPaintMode(){
+    painting = false;
+    stage.classList.remove('painting');
+    maskLayer.style.pointerEvents = 'none';
+    if (dragRect && dragRect.parentNode) dragRect.parentNode.removeChild(dragRect);
+    dragRect = null;
+  }
+
+  document.getElementById('paint').addEventListener('click', function(){
+    if (painting) exitPaintMode(); else enterPaintMode();
+  });
+
+  if (maskLayer) {
+    maskLayer.addEventListener('mousedown', function(e){
+      if (!painting) return;
+      var rect = maskLayer.getBoundingClientRect();
+      startX = e.clientX - rect.left;
+      startY = e.clientY - rect.top;
+      dragRect = document.createElement('div');
+      dragRect.className = 'mask';
+      dragRect.style.left = startX + 'px';
+      dragRect.style.top = startY + 'px';
+      dragRect.style.width = '0px';
+      dragRect.style.height = '0px';
+      maskLayer.appendChild(dragRect);
+      e.preventDefault();
+    });
+    maskLayer.addEventListener('mousemove', function(e){
+      if (!painting || !dragRect) return;
+      var rect = maskLayer.getBoundingClientRect();
+      var x = e.clientX - rect.left, y = e.clientY - rect.top;
+      var l = Math.min(startX, x), t = Math.min(startY, y);
+      var w = Math.abs(x - startX), h = Math.abs(y - startY);
+      dragRect.style.left = l + 'px';
+      dragRect.style.top = t + 'px';
+      dragRect.style.width = w + 'px';
+      dragRect.style.height = h + 'px';
+    });
+    maskLayer.addEventListener('mouseup', function(e){
+      if (!painting || !dragRect) return;
+      var w = parseInt(dragRect.style.width, 10) || 0;
+      var h = parseInt(dragRect.style.height, 10) || 0;
+      if (w < 6 || h < 6) { exitPaintMode(); return; }
+      var scale = imgScale() || 1;
+      var l = parseInt(dragRect.style.left, 10) || 0;
+      var t = parseInt(dragRect.style.top, 10) || 0;
+      var body = new URLSearchParams({
+        route: route,
+        viewport: String(viewport),
+        x: String(Math.round(l / scale)),
+        y: String(Math.round(t / scale)),
+        width: String(Math.round(w / scale)),
+        height: String(Math.round(h / scale)),
+      });
+      fetch('/dashboard/masks', { method: 'POST', body: body, credentials: 'same-origin' })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){
+          if (j && j.mask) {
+            existingMasks.push(j.mask);
+            renderMasks();
+          }
+        })
+        .finally(function(){ exitPaintMode(); });
+    });
+  }
+
+  function post(path){
+    return fetch(path, { method: 'POST', credentials: 'same-origin' });
+  }
+  function approve(){
+    post('/dashboard/runs/' + encodeURIComponent(runId) + '/diffs/' + encodeURIComponent(diffId) + '/accept')
+      .then(function(){ if (nextHref) location.href = nextHref; else location.href = '/dashboard/runs/' + encodeURIComponent(runId); });
+  }
+  function reject(){
+    post('/dashboard/runs/' + encodeURIComponent(runId) + '/diffs/' + encodeURIComponent(diffId) + '/reject')
+      .then(function(){ if (nextHref) location.href = nextHref; else location.href = '/dashboard/runs/' + encodeURIComponent(runId); });
+  }
+  document.getElementById('approve').addEventListener('click', approve);
+  document.getElementById('reject').addEventListener('click', reject);
+
+  document.addEventListener('keydown', function(e){
+    if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+    if (e.key === 'a' || e.key === 'A') approve();
+    else if (e.key === 'r' || e.key === 'R') reject();
+    else if (e.key === 'i' || e.key === 'I') { e.preventDefault(); if (painting) exitPaintMode(); else enterPaintMode(); }
+    else if (e.key === 'ArrowLeft' && prevHref) location.href = prevHref;
+    else if (e.key === 'ArrowRight' && nextHref) location.href = nextHref;
+    else if (e.key === 'Escape' && painting) exitPaintMode();
+  });
+
+  syncSize();
+  renderMasks();
+})();
+</script>`;
+
+  return page(`Frontguard — Diff ${data.diff.route} @ ${data.diff.viewport}`, inner);
+}
+
+// ---------------------------------------------------------------------------
+// Masks settings page (Task 15.5)
+// ---------------------------------------------------------------------------
+
+/** Renders the saved-masks settings page. */
+export function renderMasksSettings(masks: IgnoreMask[], now = new Date()): string {
+  const rows = masks.length
+    ? masks
+        .map((m) => {
+          return `<div class="mask-thumb">
+        <div class="swatch" style="width:${Math.min(80, m.width / 6)}px;height:${Math.min(40, m.height / 6)}px"></div>
+        <div class="meta">
+          <div><strong>${m.width}×${m.height}px</strong> at (${m.x}, ${m.y})${m.label ? ' — ' + escapeHtml(m.label) : ''}</div>
+          <div class="where">${escapeHtml(m.route)} @ ${m.viewport}px · added ${relativeTime(m.createdAt, now)}</div>
+        </div>
+        <form class="inline" method="post" action="/dashboard/settings/masks/${escapeHtml(m.id)}/delete">
+          <button type="submit" class="danger">Delete</button>
+        </form>
+      </div>`;
+        })
+        .join('\n')
+    : '<p class="empty">No saved masks. Paint one from the diff viewer (press <kbd>I</kbd>).</p>';
+
+  const inner = `<header><h1>🛡 Ignore regions</h1><a href="/dashboard">← Dashboard</a></header>
+<div class="wrap">
+  <p class="murl">Masks tell visual diffs to skip a rectangle on a given route + viewport (e.g. live timestamps, ads). Painted in the diff viewer.</p>
+  <div class="card" style="padding:0">
+    ${rows}
+  </div>
+</div>`;
+  return page('Frontguard — Masks', inner);
+}
+
+// ---------------------------------------------------------------------------
+// Attachments list page (Task 15.6)
+// ---------------------------------------------------------------------------
+
+/** Renders a downloadable list of run attachments. */
+export function renderRunAttachments(runId: string, attachments: RunAttachment[]): string {
+  const rid = escapeHtml(runId);
+  const items = attachments.length
+    ? attachments
+        .map((a) => {
+          const sz = a.sizeBytes ? formatBytes(a.sizeBytes) : '';
+          return `<li>
+        <span class="kind">${escapeHtml(attachmentLabel(a.kind))}</span>
+        <a href="/dashboard/runs/${rid}/attachments/${escapeHtml(a.id)}/download">${escapeHtml(a.name)}</a>
+        <span class="size">${sz}</span>
+      </li>`;
+        })
+        .join('\n')
+    : '<li class="empty" style="justify-content:center">No attachments for this run.</li>';
+
+  const inner = `<header><h1>🛡 Attachments</h1><a href="/dashboard/runs/${rid}">← Run</a></header>
+<div class="wrap">
+  <p class="murl">Run <code>${rid}</code> · traces, DOM snapshots, console logs, and any other artifacts captured during the run.</p>
+  <ul class="attachments">${items}</ul>
+</div>`;
+  return page('Frontguard — Run attachments', inner);
+}
+
+/** Human-readable byte size. */
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
