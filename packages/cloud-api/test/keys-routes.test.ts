@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { app } from '../src/index.js';
 import { resetMemoryStore } from '../src/db/factory.js';
+import { hashKey } from '../src/auth/keys.js';
+import { migrate } from '../src/db/migrate.js';
+import { createSqliteD1 } from './helpers/sqlite-d1.js';
 
 const auth = (token = 'tok-user-a') => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });
 
@@ -58,6 +61,45 @@ describe('/auth/github (not configured in dev)', () => {
   it('callback returns 501 without config', async () => {
     const res = await app.request('/auth/github/callback?code=x');
     expect(res.status).toBe(501);
+  });
+});
+
+// IN-2 / P0-6 auth hardening: the legacy app/src/index.js shim accepted any
+// Bearer token ≥10 chars. Now that the Hono entry is what deploys, any
+// unknown token in production mode (D1 binding present) must 401, while a
+// hashed-and-stored key returns 200.
+describe('production auth — bearer tokens are validated against the store', () => {
+  it('rejects a bogus 11-char Bearer with 401 even though the shim used to accept it', async () => {
+    const { db, raw } = createSqliteD1();
+    await migrate(db);
+
+    const bogus = 'bogus-token'; // 11 chars — used to slip past the shim.
+    const res = await app.request('/v1/usage', {
+      headers: { Authorization: `Bearer ${bogus}` },
+    }, { DB: db });
+    expect(res.status).toBe(401);
+    raw.close();
+  });
+
+  it('accepts a hashed-and-stored key', async () => {
+    const { db, raw } = createSqliteD1();
+    await migrate(db);
+
+    // Seed a user + a real key hash so the production path resolves.
+    const plaintext = 'fg_realkey_abcdef0123456789';
+    const keyHash = await hashKey(plaintext);
+    await db.prepare('INSERT INTO users (id, plan, created_at) VALUES (?, ?, ?)')
+      .bind('u1', 'free', new Date().toISOString())
+      .run();
+    await db.prepare('INSERT INTO api_keys (key_hash, user_id, name, created_at) VALUES (?, ?, ?, ?)')
+      .bind(keyHash, 'u1', 'CI', new Date().toISOString())
+      .run();
+
+    const res = await app.request('/v1/usage', {
+      headers: { Authorization: `Bearer ${plaintext}` },
+    }, { DB: db });
+    expect(res.status).toBe(200);
+    raw.close();
   });
 });
 
