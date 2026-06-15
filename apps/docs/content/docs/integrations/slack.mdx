@@ -71,7 +71,7 @@ Two key Slack mechanics make this work without a Slack-side queue:
 
 The app is in the [Slack App Directory](https://slack.com/apps) — search for
 **Frontguard** or click the install button on
-<https://frontguard.dev/integrations/slack>. Slack will:
+[frontguard.dev/integrations/slack](https://frontguard.dev/integrations/slack). Slack will:
 
 1. Show the requested scopes (`chat:write`, `commands`).
 2. Redirect you to the Frontguard worker's OAuth callback.
@@ -181,7 +181,7 @@ and ships with its own `wrangler.toml`. Steps:
    wrangler secret put FRONTGUARD_API_KEY
    ```
 4. Edit `manifest.yml` so every URL points at your host.
-5. Create the Slack app at <https://api.slack.com/apps> → "From an app
+5. Create the Slack app at [api.slack.com/apps](https://api.slack.com/apps) → "From an app
    manifest" → paste the YAML.
 6. `wrangler deploy`.
 7. From your workspace, install the app via Slack's UI; the worker will
@@ -263,7 +263,7 @@ The OAuth handshake succeeded, but `SLACK_TEAMS` is not bound in
   channel (planned — needs a per-channel routing config).
 
 If any of these are blocking you, open an issue at
-<https://github.com/ravidsrk/frontguard/issues> with the use case.
+[github.com/ravidsrk/frontguard/issues](https://github.com/ravidsrk/frontguard/issues) with the use case.
 
 ## Related
 
