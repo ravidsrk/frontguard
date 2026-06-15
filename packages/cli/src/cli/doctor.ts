@@ -203,11 +203,15 @@ export async function checkConfig(cwd: string = process.cwd()): Promise<CheckRes
 /**
  * Checks whether AI provider keys are present in the environment.
  * Advisory only — Frontguard runs pixel/SSIM diffing without AI.
+ *
+ * Reads the same `FRONTGUARD_OPENAI_KEY` / `FRONTGUARD_ANTHROPIC_KEY` env vars
+ * the runtime consumes in `diff/ai-vision.ts`, so doctor and the run pipeline
+ * never disagree about whether AI is configured.
  */
 export function checkAiKeys(env: NodeJS.ProcessEnv = process.env): CheckResult {
   const present: string[] = [];
-  if (env.OPENAI_API_KEY) present.push('OpenAI');
-  if (env.ANTHROPIC_API_KEY) present.push('Anthropic');
+  if (env.FRONTGUARD_OPENAI_KEY) present.push('OpenAI');
+  if (env.FRONTGUARD_ANTHROPIC_KEY) present.push('Anthropic');
 
   if (present.length > 0) {
     return {
@@ -222,7 +226,7 @@ export function checkAiKeys(env: NodeJS.ProcessEnv = process.env): CheckResult {
     name: 'AI provider keys',
     status: 'warn',
     message: 'no AI keys found (AI classification disabled)',
-    fix: 'Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable AI analysis.',
+    fix: 'Set FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY to enable AI analysis.',
     critical: false,
   };
 }

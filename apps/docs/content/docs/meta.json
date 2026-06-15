@@ -8,8 +8,14 @@
     "---Reference---",
     "cli",
     "playwright",
+    "---Integrations---",
+    "integrations",
     "---Guides---",
     "ci-cd",
-    "guides"
+    "guides",
+    "---Integrations---",
+    "integrations",
+    "---Comparisons---",
+    "comparisons"
   ]
 }

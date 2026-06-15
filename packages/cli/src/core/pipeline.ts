@@ -25,8 +25,15 @@ import type {
   AccessibilityViolation,
 } from './types.js';
 import type { JudgeResult } from './types.js';
+
+// Re-export the public type surface so consumers can write
+// `import type { FrontguardConfig, ... } from '@frontguard/cli'`
+// against the package's main entry, matching the generated `init` config.
+export type * from './types.js';
+export type { PluginContext, FrontguardPlugin } from './plugins.js';
 import { discoverRoutes } from '../discovery/crawler.js';
 import { discoverRoutesFromFilesystem } from '../discovery/filesystem.js';
+import { discoverStorybookRoutesForConfig } from '../discovery/storybook.js';
 import { smartFilter } from '../graph/filter.js';
 import { renderPages } from '../render/playwright.js';
 import { compareScreenshot, createNewPageResult } from '../diff/pixel.js';
@@ -128,6 +135,46 @@ const DEFAULT_URL_PATTERNS = [
   'https://127.0.0.1',
 ];
 
+/**
+ * Thrown by the pipeline when the configured base URL cannot be reached
+ * (ECONNREFUSED, getaddrinfo ENOTFOUND, etc.). The CLI catches this and
+ * exits with a single actionable message instead of the
+ * one-per-viewport stack of identical connection errors that the render
+ * stage would otherwise produce.
+ */
+export class UnreachableBaseUrlError extends Error {
+  readonly baseUrl: string;
+  constructor(baseUrl: string, cause?: unknown) {
+    super(`Base URL ${baseUrl} is unreachable. Start your dev server, or pass --url <reachable-url>.`);
+    this.name = 'UnreachableBaseUrlError';
+    this.baseUrl = baseUrl;
+    if (cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = cause;
+    }
+  }
+}
+
+/**
+ * Returns true if `message` looks like a transport-layer failure that means
+ * "we never reached the host" — connection refused, DNS lookup failure,
+ * unreachable network, or a Playwright net::ERR_CONNECTION_* error. These
+ * are exactly the failures where falling back to `/` would just re-fail
+ * identically on every viewport.
+ */
+export function isUnreachableHostError(message: string): boolean {
+  if (!message) return false;
+  return (
+    /ECONNREFUSED/i.test(message) ||
+    /ENOTFOUND/i.test(message) ||
+    /ECONNRESET/i.test(message) ||
+    /EHOSTUNREACH/i.test(message) ||
+    /ENETUNREACH/i.test(message) ||
+    /net::ERR_CONNECTION_REFUSED/i.test(message) ||
+    /net::ERR_CONNECTION_RESET/i.test(message) ||
+    /net::ERR_NAME_NOT_RESOLVED/i.test(message)
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -197,13 +244,29 @@ async function discoverAllRoutes(config: FrontguardConfig): Promise<Route[]> {
     return toRouteObjects(config.routes);
   }
 
-  // 2. Crawl if discover options are set
+  // 2. Storybook integration — enumerate stories from the running server.
+  //    When `storybook.url` is set we treat that URL as the effective
+  //    `baseUrl` for capture; the mutation lives in `runPipeline`'s caller
+  //    so the rest of the pipeline reads from `config.baseUrl` normally.
+  if (config.storybook?.url) {
+    const sb = await discoverStorybookRoutesForConfig(config);
+    if (sb && sb.routes.length > 0) {
+      // Re-point baseUrl so route paths like `/iframe.html?id=…` resolve
+      // against the Storybook server rather than the app under test.
+      config.baseUrl = sb.storybookUrl;
+      logger.info(`Storybook discovery returned ${sb.routes.length} route(s) (baseUrl → ${sb.storybookUrl})`);
+      return sb.routes;
+    }
+    logger.warn('Storybook configured but no stories were discovered — falling through to other strategies');
+  }
+
+  // 3. Crawl if discover options are set
   if (config.discover) {
     logger.info(`Crawling from ${config.discover.startUrl ?? '/'}…`);
     return discoverRoutes(config);
   }
 
-  // 3. Try filesystem, fall back to crawl from '/'
+  // 4. Try filesystem, fall back to crawl from '/'
   logger.info('No routes configured — attempting filesystem discovery…');
   const fsRoutes = discoverRoutesFromFilesystem(process.cwd());
   if (fsRoutes && fsRoutes.length > 0) {
@@ -211,7 +274,7 @@ async function discoverAllRoutes(config: FrontguardConfig): Promise<Route[]> {
     return fsRoutes;
   }
 
-  // 4. Fall back: crawl from baseUrl root
+  // 5. Fall back: crawl from baseUrl root
   logger.info('Filesystem discovery found nothing — crawling from /');
   const crawlConfig: FrontguardConfig = {
     ...config,
@@ -318,6 +381,18 @@ export async function runPipeline(
     reporter.onStageComplete('discover', `Found ${routes.length} route(s)`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+
+    // If the base URL is unreachable, falling back to "/" only produces N
+    // more identical ECONNREFUSEDs — one per viewport — and a confusing
+    // stack-of-errors report. Bail with a single clear message instead.
+    if (isUnreachableHostError(msg)) {
+      reporter.onStageComplete(
+        'discover',
+        `Failed — ${config.baseUrl} is unreachable`,
+      );
+      throw new UnreachableBaseUrlError(config.baseUrl, err);
+    }
+
     logger.error(`Discovery failed: ${msg}`);
     reporter.onStageComplete('discover', `Failed — falling back to /`);
 
@@ -973,6 +1048,13 @@ export async function runJudgePipeline(
     reporter.onStageComplete('discover', `Found ${routes.length} route(s)`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (isUnreachableHostError(msg)) {
+      reporter.onStageComplete(
+        'discover',
+        `Failed — ${config.baseUrl} is unreachable`,
+      );
+      throw new UnreachableBaseUrlError(config.baseUrl, err);
+    }
     logger.error(`Discovery failed: ${msg}`);
     routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
     reporter.onStageComplete('discover', 'Failed — falling back to /');
