@@ -86,7 +86,7 @@ jobs:
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
           # Optional — enable AI classification by adding these secrets:
-          # OPENAI_API_KEY: \${{ secrets.OPENAI_API_KEY }}
-          # ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+          # FRONTGUARD_OPENAI_KEY: \${{ secrets.FRONTGUARD_OPENAI_KEY }}
+          # FRONTGUARD_ANTHROPIC_KEY: \${{ secrets.FRONTGUARD_ANTHROPIC_KEY }}
 `;
 }

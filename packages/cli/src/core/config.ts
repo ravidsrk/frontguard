@@ -533,7 +533,7 @@ export function generateDefaultConfig(options: GenerateConfigOptions = {}): stri
   // JS / TS format
   const exportKeyword = format === 'ts' ? 'export default' : 'module.exports =';
   const typeAnnotation = format === 'ts'
-    ? "import type { FrontguardConfig } from 'frontguard';\n\n"
+    ? "import type { FrontguardConfig } from '@frontguard/cli';\n\n"
     : '';
   const satisfies = format === 'ts' ? ' satisfies FrontguardConfig' : '';
 
