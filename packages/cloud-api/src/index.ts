@@ -19,6 +19,7 @@ import { teamRoutes } from './routes/teams.js';
 import { can } from './db/teams.js';
 import { billingRoutes } from './routes/billing.js';
 import { getPlan, checkLimit } from './billing/plans.js';
+import { evaluateSpendCap } from './billing/spend-cap.js';
 import { runScheduledChecks } from './scheduler.js';
 import type { AlertEnv } from './alerts/index.js';
 import pkg from '../package.json';
@@ -294,6 +295,17 @@ app.post('/v1/run', async (c) => {
 
   await store.createRun(run, userId);
   await store.incrementUsage(userId, currentMonth(), 1, 0);
+
+  // Spend-cap check (Task 15.7): fire an 80%/95% warning email once per tier.
+  // Best-effort — failures must never block the run submission.
+  try {
+    const u = await store.getUser(userId);
+    if (u) {
+      await evaluateSpendCap(c.env ?? {}, store, u, plan, currentMonth());
+    }
+  } catch (err) {
+    console.warn('[spend-cap] evaluation failed', err);
+  }
 
   // Record project run submission to the team activity feed.
   if (data.projectId && projectTeamId) {
