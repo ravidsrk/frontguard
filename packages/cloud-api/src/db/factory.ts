@@ -32,6 +32,13 @@ export interface Bindings {
   GITHUB_APP_URL?: string;
   /** Shared bearer secret presented to the GitHub App completion callback. */
   FRONTGUARD_CALLBACK_SECRET?: string;
+  /**
+   * Daytona API key — when set, runs execute in an ephemeral Daytona sandbox
+   * via {@link ../processor.processRun}; when unset, the processor emits a
+   * baseline-marker result. Workers has no Node env globals, so this binding
+   * is the only source of truth.
+   */
+  DAYTONA_API_KEY?: string;
 }
 
 /**

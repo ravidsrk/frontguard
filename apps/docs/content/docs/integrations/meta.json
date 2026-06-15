@@ -1,4 +1,4 @@
 {
   "title": "Integrations",
-  "pages": ["vercel"]
+  "pages": ["mcp", "storybook", "netlify", "slack", "vercel"]
 }
