@@ -26,9 +26,10 @@ import type {
 } from './types.js';
 import type { JudgeResult } from './types.js';
 
-// Re-export the public type surface so consumers can write
-// `import type { FrontguardConfig, ... } from '@frontguard/cli'`
-// against the package's main entry, matching the generated `init` config.
+// Re-exports for consumers of the published library entry (`@frontguard/cli`).
+// Keep these alongside the pipeline so they survive bundling as the public API.
+export { defineConfig } from './config.js';
+export type { UserFrontguardConfig } from './config.js';
 export type * from './types.js';
 export type { PluginContext, FrontguardPlugin } from './plugins.js';
 import { discoverRoutes } from '../discovery/crawler.js';

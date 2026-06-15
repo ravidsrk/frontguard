@@ -32,6 +32,14 @@ import {
   getRepoConfig,
   bootstrapConfigPr,
 } from './github-api.js';
+import {
+  inferPreviewUrl,
+  previewUrlFromCommitStatus,
+  previewUrlFromDeploymentStatus,
+  type CommitStatusEvent,
+  type DeploymentStatusEvent,
+  type InferredPreviewUrl,
+} from './preview-url.js';
 
 export interface GitHubAppEnv {
   GITHUB_WEBHOOK_SECRET?: string;
@@ -44,6 +52,57 @@ export interface GitHubAppEnv {
    * when calling the run-completion callback. Required to complete check runs.
    */
   FRONTGUARD_CALLBACK_SECRET?: string;
+  /**
+   * Optional URL template used when no provider (Vercel/Netlify/Cloudflare)
+   * event has been observed yet for the PR's head commit. Supports the
+   * `{owner}`, `{repo}`, `{prNumber}`, `{commitSha}`, `{commitShortSha}`,
+   * and `{branch}` placeholders.
+   */
+  FRONTGUARD_PREVIEW_URL_TEMPLATE?: string;
+}
+
+/**
+ * In-memory cache of provider-observed preview URLs keyed by `<owner>/<repo>@<sha>`.
+ *
+ * The cache is best-effort: it gives the GitHub App "memory" within a single
+ * worker instance so that a `pull_request` event arriving after the
+ * `deployment_status` event for the same commit can pick up the real preview
+ * URL. Cold workers fall back to the configured template.
+ *
+ * @internal
+ */
+const previewUrlCache = new Map<string, InferredPreviewUrl>();
+
+/** Builds the cache key used for preview URLs. */
+function previewCacheKey(owner: string, repo: string, sha: string): string {
+  return `${owner}/${repo}@${sha}`;
+}
+
+/**
+ * Records a provider-observed preview URL for later lookup by the PR handler.
+ * Exported for tests; callers within the handler reach for the closure helper.
+ */
+export function rememberPreviewUrl(
+  owner: string,
+  repo: string,
+  sha: string,
+  preview: InferredPreviewUrl,
+): void {
+  previewUrlCache.set(previewCacheKey(owner, repo, sha), preview);
+}
+
+/** Look up a previously-observed preview URL. */
+export function recallPreviewUrl(
+  owner: string,
+  repo: string,
+  sha: string,
+): InferredPreviewUrl | null {
+  return previewUrlCache.get(previewCacheKey(owner, repo, sha)) ?? null;
+}
+
+/** Test-only: wipes the cache between runs. */
+export function clearPreviewUrlCache(): void {
+  previewUrlCache.clear();
 }
 
 /** Constant-time string comparison to avoid leaking secrets via timing. */
@@ -125,6 +184,48 @@ export function createGitHubApp() {
       return c.json({ handled: true, bootstrapped: true, opened, skipped });
     }
 
+    // ── Vercel commit_status events → cache preview URL ─────────────────────
+    if (event === 'status') {
+      let statusEvent: CommitStatusEvent;
+      try {
+        statusEvent = JSON.parse(raw) as CommitStatusEvent;
+      } catch {
+        return c.json({ error: 'Invalid JSON' }, 400);
+      }
+      const preview = previewUrlFromCommitStatus(statusEvent);
+      if (preview && statusEvent.repository) {
+        rememberPreviewUrl(
+          statusEvent.repository.owner.login,
+          statusEvent.repository.name,
+          statusEvent.sha,
+          preview,
+        );
+        return c.json({ handled: true, cached: true, source: preview.source, url: preview.url });
+      }
+      return c.json({ handled: true, cached: false, reason: 'No preview URL detected' });
+    }
+
+    // ── Netlify / Cloudflare deployment_status → cache preview URL ──────────
+    if (event === 'deployment_status') {
+      let depEvent: DeploymentStatusEvent;
+      try {
+        depEvent = JSON.parse(raw) as DeploymentStatusEvent;
+      } catch {
+        return c.json({ error: 'Invalid JSON' }, 400);
+      }
+      const preview = previewUrlFromDeploymentStatus(depEvent);
+      if (preview && depEvent.repository) {
+        rememberPreviewUrl(
+          depEvent.repository.owner.login,
+          depEvent.repository.name,
+          depEvent.deployment.sha,
+          preview,
+        );
+        return c.json({ handled: true, cached: true, source: preview.source, url: preview.url });
+      }
+      return c.json({ handled: true, cached: false, reason: 'No preview URL detected' });
+    }
+
     if (event !== 'pull_request') {
       return c.json({ handled: false, reason: `Unhandled event: ${event}` });
     }
@@ -168,6 +269,31 @@ export function createGitHubApp() {
       }
     }
 
+    // Resolve the preview URL to test. Priority:
+    //   1. Provider-observed URL (Vercel / Netlify / Cloudflare).
+    //   2. User-supplied template via FRONTGUARD_PREVIEW_URL_TEMPLATE.
+    //   3. null — we explicitly do NOT fall back to `pull_request.html_url`
+    //      (which points at github.com, not the deployed preview) since that
+    //      makes Frontguard test the PR page rather than the app.
+    const observed = recallPreviewUrl(decision.owner!, decision.repo!, decision.commitSha!);
+    const inferred = inferPreviewUrl({
+      event: payload,
+      template: env.FRONTGUARD_PREVIEW_URL_TEMPLATE,
+      observed,
+    });
+
+    if (!inferred) {
+      return c.json({
+        handled: true,
+        triggered: false,
+        reason:
+          'No preview URL available yet — waiting for a Vercel/Netlify/Cloudflare ' +
+          'deployment_status or configure FRONTGUARD_PREVIEW_URL_TEMPLATE.',
+        checkRunId,
+        config: repoConfig?.path ?? null,
+      });
+    }
+
     // Trigger the Frontguard run via the Cloud API.
     if (env.FRONTGUARD_API_URL && env.FRONTGUARD_API_KEY) {
       try {
@@ -178,7 +304,8 @@ export function createGitHubApp() {
             Authorization: `Bearer ${env.FRONTGUARD_API_KEY}`,
           },
           body: JSON.stringify({
-            url: payload.pull_request.html_url,
+            url: inferred.url,
+            previewSource: inferred.source,
             github: {
               owner: decision.owner,
               repo: decision.repo,
@@ -196,6 +323,8 @@ export function createGitHubApp() {
           triggered: true,
           runId: data.id,
           checkRunId,
+          previewUrl: inferred.url,
+          previewSource: inferred.source,
           config: repoConfig?.path ?? null,
         });
       } catch (err) {
@@ -211,6 +340,8 @@ export function createGitHubApp() {
       triggered: false,
       reason: 'Frontguard API not configured',
       checkRunId,
+      previewUrl: inferred.url,
+      previewSource: inferred.source,
       config: repoConfig?.path ?? null,
     });
   });
