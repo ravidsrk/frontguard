@@ -1,0 +1,128 @@
+---
+title: Fix-verification sandbox
+description: How Frontguard verifies that AI-suggested fixes actually work — and how to choose between the local and Daytona sandboxes.
+---
+
+# Fix-verification sandbox
+
+When Frontguard's AI proposes a fix for a regression, it doesn't stop at
+"here's a CSS patch." The CLI applies the patch in an isolated sandbox,
+re-renders the page, and re-runs the diff against the baseline. **Only fixes
+that close the diff are surfaced as accepted suggestions.** This is the
+moat: every "Frontguard suggests …" line in the PR comment has already been
+proven to work, in a render environment byte-equivalent to the one the
+baseline was captured in.
+
+There are two sandbox backends. Both implement the same `Sandbox`
+interface from `packages/cli/src/sandbox/types.ts`; the renderer doesn't
+care which one is active.
+
+## Local sandbox (default — no config required)
+
+The local sandbox is a Playwright browser instance the CLI starts on the
+host machine. It injects the candidate CSS patch via Playwright's
+`addStyleTag()`, captures a screenshot, and runs the diff.
+
+- **When it's used:** by default, whenever AI is enabled. No flags or
+  environment variables required.
+- **Pros:** zero external dependencies, runs on a developer laptop, no
+  per-render cost.
+- **Cons:** rendering varies by host OS / font stack / Chromium build. A
+  fix that closes the diff on macOS may still produce a small residual
+  diff on Linux CI because the underlying fonts antialias differently —
+  this is the same cross-OS pain Playwright's built-in visual testing
+  surfaces. Use [cross-OS rendering with Docker](./cross-os-rendering)
+  to neutralise it.
+
+## Daytona sandbox (recommended for cloud-side runs)
+
+The Daytona sandbox runs the same rendering pipeline inside a Daytona
+ephemeral workspace built from the `frontguard-playwright-v1` snapshot.
+The snapshot is the same Docker image documented under
+[cross-OS rendering](./cross-os-rendering) — Chromium, Firefox and WebKit
+pinned to the Playwright version this CLI ships, plus Liberation / DejaVu
+/ Noto fonts so glyph rendering is byte-equivalent to the cloud-side
+baseline.
+
+- **When it's used:** when `DAYTONA_API_KEY` is set in the environment and
+  the `sandbox.kind: 'daytona'` config option is selected, or when the
+  cloud-api (`packages/cloud-api/src/daytona-runner.ts`) submits a run.
+- **Pros:** byte-equivalent across every machine that runs Frontguard —
+  the same fix decision happens locally and in CI. No "works on my
+  laptop" debugging.
+- **Cons:** non-trivial setup (Daytona account, snapshot publish, API
+  key), and a per-run latency hit while the workspace is provisioned.
+
+### How the snapshot is built
+
+`scripts/build-daytona-snapshot.ts` orchestrates the build:
+
+```bash
+DAYTONA_API_KEY=… npx tsx scripts/build-daytona-snapshot.ts
+```
+
+What the script does:
+
+1. Runs `docker build -t frontguard/render packages/cli/docker/` to
+   smoke-test the base image (skippable with `--skip-docker-build`).
+2. Calls into the Daytona API to register the image as a snapshot named
+   `frontguard-playwright-v1`.
+3. Prints the snapshot version tag (use it to roll back).
+
+No `DAYTONA_API_KEY` set? The script still runs the Docker smoke test
+and exits 0 with copy-pasteable instructions for the manual publish step.
+Safe to invoke from CI without a key.
+
+### The render binary
+
+Inside the snapshot, the sandbox shells to `frontguard-render` — a thin
+CLI wrapper around the same Playwright render pipeline used by
+`frontguard run`. The binary is installed alongside `frontguard` when you
+`npm install -g @frontguard/cli`.
+
+```text
+frontguard-render --url <url> --viewport <w>x<h> --browser <chromium|firefox|webkit>
+                  [--inject-css-file <path>] [--out <path>] [--encoding binary|base64]
+```
+
+The Daytona runner pipes the rendered PNG back over the shell, which is
+why `--encoding base64` exists (binary mode is fine for local piping but
+loses bytes through `cat` over Daytona's exec channel).
+
+## Switching backends
+
+In `frontguard.config.ts`:
+
+```ts
+import { defineConfig } from '@frontguard/cli';
+
+export default defineConfig({
+  sandbox: {
+    kind: 'daytona', // or 'local' (default)
+  },
+});
+```
+
+Or via the cloud-api: each team's settings page exposes a sandbox
+selector; cloud-side runs honour the team's choice.
+
+## Failure semantics
+
+- **Local sandbox unavailable** (no Playwright install): the AI fix flow
+  reports `suggestedFix.applicable = false` and the PR comment notes the
+  patch wasn't verified. Run `npx playwright install` to enable.
+- **Daytona configured but `DAYTONA_API_KEY` missing:** the sandbox
+  initialiser throws, and the AI fix orchestrator catches and falls back
+  to the local sandbox with a warning. Verification still happens; just
+  in a host-OS-dependent renderer.
+- **Daytona snapshot not yet published:** the workspace-creation call
+  returns a 404. The script in `scripts/build-daytona-snapshot.ts` is
+  what publishes it; document the snapshot version in
+  `validation/repos.json` so the cloud-api pins a specific one.
+
+## See also
+
+- [Cross-OS rendering](./cross-os-rendering) — the Docker image the
+  Daytona snapshot is built from.
+- [Cloud API](./cloud-api) — the runner that submits cloud-side fixes
+  through the Daytona sandbox.

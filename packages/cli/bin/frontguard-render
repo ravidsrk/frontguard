@@ -1,0 +1,22 @@
+#!/usr/bin/env node
+/**
+ * Thin shim for the `frontguard-render` binary.
+ *
+ * The real implementation lives in `src/cli/render.ts` and is bundled by tsup
+ * to `dist/cli/render.js`. This shim is what `npm install` symlinks onto PATH
+ * (via the `bin` field in package.json), so it has to exist as a plain JS file
+ * at a stable path. It just resolves the bundled module relative to itself and
+ * calls into it.
+ */
+
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const distEntry = pathToFileURL(join(here, '..', 'dist', 'cli', 'render.js')).href;
+
+const { renderCli } = await import(distEntry);
+
+const code = await renderCli(process.argv);
+process.exit(code);

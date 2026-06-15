@@ -38,6 +38,18 @@ export default defineConfig([
     external: EXTERNAL,
     banner: { js: '#!/usr/bin/env node' },
   },
+  // frontguard-render — thin renderer bin (imported by ./bin/frontguard-render
+  // and shelled to by sandbox/daytona.ts inside the Daytona snapshot).
+  {
+    entry: { 'cli/render': 'src/cli/render.ts' },
+    format: ['esm'],
+    target: 'node18',
+    dts: true,
+    clean: false,
+    splitting: false,
+    sourcemap: true,
+    external: EXTERNAL,
+  },
   // Library entries — no shebang
   {
     entry: {

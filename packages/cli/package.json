@@ -4,7 +4,8 @@
   "description": "AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.",
   "type": "module",
   "bin": {
-    "frontguard": "./dist/cli/index.js"
+    "frontguard": "./dist/cli/index.js",
+    "frontguard-render": "./bin/frontguard-render"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -43,8 +44,10 @@
   },
   "files": [
     "dist",
+    "bin",
     "action.yml",
     "Dockerfile",
+    "docker",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
