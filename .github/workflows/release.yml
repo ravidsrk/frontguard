@@ -1,0 +1,73 @@
+name: Release
+
+# Triggered on version tags (e.g. v0.2.0, v1.2.3).
+# The single workflow that ships Frontguard:
+#   1. installs and builds everything
+#   2. runs scripts/release.sh --dry-run as a final sanity check
+#   3. runs scripts/release.sh with NPM_TOKEN to publish the public npm packages
+#   4. emits the marketplace submission checklist as a workflow summary
+#
+# Marketplace listings (GitHub App, Vercel, Netlify, Slack) require human
+# approval / owner credentials and are NOT submitted by this workflow — see
+# docs/distribution.mdx for the submission steps.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run without publishing (validation only)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write # required for npm provenance (--provenance)
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq shellcheck
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Shellcheck release script
+        run: shellcheck scripts/release.sh
+
+      - name: Dry-run release (sanity check)
+        run: ./scripts/release.sh --dry-run
+
+      - name: Publish to npm
+        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run == 'false' }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: ./scripts/release.sh --only-npm
+
+      - name: Marketplace checklist
+        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run == 'false' }}
+        run: |
+          {
+            echo '## Marketplace submission checklist'
+            echo ''
+            echo 'npm publish is complete. The following surfaces still need manual submission:'
+            echo ''
+            echo '- [ ] **GitHub Marketplace** — https://github.com/marketplace/new (manifest: `integrations/github-app/manifest.yml`)'
+            echo '- [ ] **Vercel Marketplace** — https://vercel.com/dashboard/integrations/console (config: `integrations/vercel/frontguard.config.ts`)'
+            echo '- [ ] **Netlify Build Plugins** — https://app.netlify.com/integrations/build-plugins (manifest: `integrations/netlify/manifest.yml`)'
+            echo '- [ ] **Slack App Directory** — https://api.slack.com/apps (manifest: `integrations/slack-app/manifest.yml`)'
+            echo ''
+            echo 'See `docs/distribution.mdx` for the full submission playbook.'
+          } >> "$GITHUB_STEP_SUMMARY"

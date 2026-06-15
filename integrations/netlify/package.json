@@ -4,11 +4,9 @@
   "private": false,
   "description": "Frontguard build plugin for Netlify — run visual regression on every deploy preview",
   "license": "MIT",
+  "author": "Ravindra Kumar <ravidsrk@gmail.com>",
   "type": "module",
   "main": "index.js",
-  "publishConfig": {
-    "access": "public"
-  },
   "files": [
     "index.js",
     "lib/",
@@ -18,7 +16,7 @@
   "homepage": "https://frontguard.dev/docs/integrations/netlify",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ravidsrk/frontguard.git",
+    "url": "git+https://github.com/ravidsrk/frontguard.git",
     "directory": "integrations/netlify"
   },
   "bugs": {
@@ -33,6 +31,10 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "test": "vitest run",
