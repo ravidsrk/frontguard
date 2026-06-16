@@ -81,6 +81,11 @@ function summarize(repo) {
   const recheckPositives = recheckCounts.regression + recheckCounts.warning;
   const fpRate = recheckTotal > 0 ? recheckPositives / recheckTotal : null;
 
+  // The repo "booted" if Frontguard rendered ANY real diff in either pass —
+  // pure error/synthetic entries don't count, since they signal the dev
+  // server never came up or the CLI crashed before rendering.
+  const recheckReal = recheckCounts.pass + recheckCounts.regression + recheckCounts.warning + recheckCounts.new;
+  const baselineReal = baselineCounts.pass + baselineCounts.regression + baselineCounts.warning + baselineCounts.new;
   return {
     name: repo.name,
     repo: repo.repo,
@@ -90,7 +95,7 @@ function summarize(repo) {
     recheckTotal,
     recheckPositives,
     fpRate,
-    bootSucceeded: baseline.length > 0,
+    bootSucceeded: recheckReal + baselineReal > 0,
   };
 }
 
@@ -102,6 +107,26 @@ function loadSkipNotes() {
   }
 }
 
+function loadReposManifest() {
+  try {
+    return JSON.parse(readFileSync(join(__dirname, 'repos.json'), 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function deriveSkippedFromManifest(presentRepoNames) {
+  const manifest = loadReposManifest();
+  const skipNotes = loadSkipNotes() ?? { reasons: {} };
+  return manifest
+    .filter((m) => !presentRepoNames.has(m.name))
+    .map((m) => ({
+      name: m.name,
+      category: m.category,
+      reason: skipNotes.reasons?.[m.name] ?? 'no results JSON written (clone / install / dev-server failure — see harness log)',
+    }));
+}
+
 function aggregate() {
   const results = loadResults().filter((r) => !r.parseError && r.name && r.name !== 'skip-notes');
   const summaries = results.map(summarize);
@@ -110,8 +135,8 @@ function aggregate() {
   const totalFP = summaries.reduce((s, r) => s + r.recheckPositives, 0);
   const overallFPRate = totalRoutes > 0 ? totalFP / totalRoutes : null;
   const reposBooted = summaries.filter((s) => s.bootSucceeded).length;
-  const skipNotes = loadSkipNotes();
-  const skipped = skipNotes?.skipped ?? [];
+  const present = new Set(summaries.map((s) => s.name));
+  const skipped = deriveSkippedFromManifest(present);
   const totalRepos = summaries.length + skipped.length;
 
   return {
@@ -172,10 +197,51 @@ function renderMarkdown(a) {
   return lines.join('\n');
 }
 
+function buildLandingPayload(a, runDate, cliVersion) {
+  // Compact shape consumed by apps/landing/src/components/Validation.tsx —
+  // pre-computed so the marketing build has no runtime dependency on the
+  // raw per-repo JSONs.
+  const repoEntries = a.summaries.map((s) => ({
+    name: s.name,
+    category: s.category,
+    bootSucceeded: s.bootSucceeded,
+    recheckPass: s.recheckCounts.pass,
+    recheckFalsePositive: s.recheckCounts.regression + s.recheckCounts.warning,
+    recheckError: s.recheckCounts.error,
+    pixelFalsePositiveRate: s.fpRate,
+  }));
+  for (const sk of a.skipped) {
+    repoEntries.push({
+      name: sk.name,
+      category: sk.category ?? '—',
+      bootSucceeded: false,
+      recheckPass: 0,
+      recheckFalsePositive: 0,
+      recheckError: 0,
+      pixelFalsePositiveRate: null,
+      skipReason: sk.reason,
+    });
+  }
+  return {
+    runDate,
+    cliVersion,
+    aiEnabled: process.env.FRONTGUARD_AI_ENABLED === 'true',
+    aggregate: a.aggregate,
+    repos: repoEntries,
+  };
+}
+
 const args = process.argv.slice(2);
 const data = aggregate();
 if (args.includes('--json')) {
   process.stdout.write(JSON.stringify(data, null, 2) + '\n');
+} else if (args.includes('--landing')) {
+  const idx = args.indexOf('--run-date');
+  const runDate = idx >= 0 ? args[idx + 1] : new Date().toISOString().slice(0, 10);
+  const cidx = args.indexOf('--cli-version');
+  const cliVersion = cidx >= 0 ? args[cidx + 1] : '0.2.0';
+  const payload = buildLandingPayload(data, runDate, cliVersion);
+  process.stdout.write(JSON.stringify(payload, null, 2) + '\n');
 } else {
   process.stdout.write(renderMarkdown(data) + '\n');
 }

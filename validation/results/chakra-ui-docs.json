@@ -1,23 +1,25 @@
 {
-  "name": "tailwind-dashboard",
-  "repo": "shadcn-ui/next-template",
-  "category": "Tailwind dashboard",
+  "name": "chakra-ui-docs",
+  "repo": "chakra-ui/chakra-ui-docs",
+  "category": "component library docs",
   "baseUrl": "http://localhost:3000",
-  "timestamp": "2026-06-16T10:05:59Z",
+  "timestamp": "2026-06-16T10:07:09Z",
   "aiEnabled": false,
   "baselineRuns": [
     { "route": "/", "url": "http://localhost:3000/", "result": {"note":"--update-baselines emits no JSON"} },
-    { "route": "/dashboard", "url": "http://localhost:3000/dashboard", "result": {"note":"--update-baselines emits no JSON"} },
-    { "route": "/dashboard/settings", "url": "http://localhost:3000/dashboard/settings", "result": {"note":"--update-baselines emits no JSON"} },
-    { "route": "/dashboard/analytics", "url": "http://localhost:3000/dashboard/analytics", "result": {"note":"--update-baselines emits no JSON"} }
+    { "route": "/docs/components/button", "url": "http://localhost:3000/docs/components/button", "result": {"note":"--update-baselines emits no JSON"} },
+    { "route": "/docs/components/modal", "url": "http://localhost:3000/docs/components/modal", "result": {"note":"--update-baselines emits no JSON"} },
+    { "route": "/getting-started", "url": "http://localhost:3000/getting-started", "result": {"note":"--update-baselines emits no JSON"} }
   ]
   ,
   "recheckRuns": [
     { "route": "/", "url": "http://localhost:3000/", "result": {"url":"http://localhost:3000/","error":"frontguard run failed"} },
-    { "route": "/dashboard", "url": "http://localhost:3000/dashboard", "result": {
+    { "route": "/docs/components/button", "url": "http://localhost:3000/docs/components/button", "result": {"url":"http://localhost:3000/docs/components/button","error":"frontguard run failed"} },
+    { "route": "/docs/components/modal", "url": "http://localhost:3000/docs/components/modal", "result": {"url":"http://localhost:3000/docs/components/modal","error":"frontguard run failed"} },
+    { "route": "/getting-started", "url": "http://localhost:3000/getting-started", "result": {
   "summary": {
-    "total": 6,
-    "passed": 6,
+    "total": 21,
+    "passed": 21,
     "regressions": 0,
     "warnings": 0,
     "newPages": 0,
@@ -25,12 +27,144 @@
   },
   "timing": {
     "discovery": 1,
-    "render": 1846,
-    "compare": 1488,
+    "render": 15799,
+    "compare": 2521,
     "ai": 0,
-    "total": 3359
+    "total": 18349
   },
   "diffs": [
+    {
+      "route": "/404",
+      "label": "/404",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/404",
+      "label": "/404",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/404",
+      "label": "/404",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/blog",
+      "label": "/blog",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/blog",
+      "label": "/blog",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/blog",
+      "label": "/blog",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/showcase",
+      "label": "/community/showcase",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/showcase",
+      "label": "/community/showcase",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/showcase",
+      "label": "/community/showcase",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/team",
+      "label": "/community/team",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/team",
+      "label": "/community/team",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/team",
+      "label": "/community/team",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
     {
       "route": "/",
       "label": "Home",
@@ -65,8 +199,8 @@
       "hasDiffImage": false
     },
     {
-      "route": "/page",
-      "label": "/page",
+      "route": "/resources",
+      "label": "/resources",
       "viewport": 375,
       "browser": "chromium",
       "status": "pass",
@@ -76,8 +210,8 @@
       "hasDiffImage": false
     },
     {
-      "route": "/page",
-      "label": "/page",
+      "route": "/resources",
+      "label": "/resources",
       "viewport": 768,
       "browser": "chromium",
       "status": "pass",
@@ -87,8 +221,41 @@
       "hasDiffImage": false
     },
     {
-      "route": "/page",
-      "label": "/page",
+      "route": "/resources",
+      "label": "/resources",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/search",
+      "label": "/search",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/search",
+      "label": "/search",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/search",
+      "label": "/search",
       "viewport": 1440,
       "browser": "chromium",
       "status": "pass",
@@ -99,203 +266,7 @@
     }
   ],
   "config": {
-    "baseUrl": "http://localhost:3000/dashboard",
-    "viewports": [
-      375,
-      768,
-      1440
-    ],
-    "browsers": [
-      "chromium"
-    ],
-    "threshold": 0.1,
-    "outputDir": "./frontguard-report"
-  }
-} },
-    { "route": "/dashboard/settings", "url": "http://localhost:3000/dashboard/settings", "result": {
-  "summary": {
-    "total": 6,
-    "passed": 6,
-    "regressions": 0,
-    "warnings": 0,
-    "newPages": 0,
-    "errors": 0
-  },
-  "timing": {
-    "discovery": 1,
-    "render": 1853,
-    "compare": 1376,
-    "ai": 0,
-    "total": 3258
-  },
-  "diffs": [
-    {
-      "route": "/",
-      "label": "Home",
-      "viewport": 375,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    },
-    {
-      "route": "/",
-      "label": "Home",
-      "viewport": 768,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    },
-    {
-      "route": "/",
-      "label": "Home",
-      "viewport": 1440,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    },
-    {
-      "route": "/page",
-      "label": "/page",
-      "viewport": 375,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    },
-    {
-      "route": "/page",
-      "label": "/page",
-      "viewport": 768,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    },
-    {
-      "route": "/page",
-      "label": "/page",
-      "viewport": 1440,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    }
-  ],
-  "config": {
-    "baseUrl": "http://localhost:3000/dashboard/settings",
-    "viewports": [
-      375,
-      768,
-      1440
-    ],
-    "browsers": [
-      "chromium"
-    ],
-    "threshold": 0.1,
-    "outputDir": "./frontguard-report"
-  }
-} },
-    { "route": "/dashboard/analytics", "url": "http://localhost:3000/dashboard/analytics", "result": {
-  "summary": {
-    "total": 6,
-    "passed": 6,
-    "regressions": 0,
-    "warnings": 0,
-    "newPages": 0,
-    "errors": 0
-  },
-  "timing": {
-    "discovery": 1,
-    "render": 1837,
-    "compare": 1584,
-    "ai": 0,
-    "total": 3448
-  },
-  "diffs": [
-    {
-      "route": "/",
-      "label": "Home",
-      "viewport": 375,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    },
-    {
-      "route": "/",
-      "label": "Home",
-      "viewport": 768,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    },
-    {
-      "route": "/",
-      "label": "Home",
-      "viewport": 1440,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    },
-    {
-      "route": "/page",
-      "label": "/page",
-      "viewport": 375,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    },
-    {
-      "route": "/page",
-      "label": "/page",
-      "viewport": 768,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    },
-    {
-      "route": "/page",
-      "label": "/page",
-      "viewport": 1440,
-      "browser": "chromium",
-      "status": "pass",
-      "diffPercentage": 0,
-      "hasBaselineImage": false,
-      "hasCurrentImage": false,
-      "hasDiffImage": false
-    }
-  ],
-  "config": {
-    "baseUrl": "http://localhost:3000/dashboard/analytics",
+    "baseUrl": "http://localhost:3000/getting-started",
     "viewports": [
       375,
       768,
