@@ -29,6 +29,7 @@ VERSION_FILE="$ROOT_DIR/VERSION"
 NPM_PACKAGES=(
   "packages/cli:@frontguard/cli"
   "packages/playwright:@frontguard/playwright"
+  "packages/mcp:@frontguard/mcp"
   "packages/create-frontguard-plugin:create-frontguard-plugin"
   "integrations/netlify:@frontguard/netlify-plugin"
 )
