@@ -179,6 +179,15 @@ if [ "$DRY_RUN" -eq 0 ]; then
   trap 'rm -f "$HOME/.npmrc.frontguard-release"' EXIT
 fi
 
+# Provenance signing only works when the publish runs inside a recognised
+# CI provider (GitHub Actions / GitLab CI / CircleCI / Buildkite). When run
+# locally we must opt out explicitly, otherwise npm refuses to publish any
+# package whose package.json declares `publishConfig.provenance: true`.
+PUBLISH_FLAGS=(--access public)
+if [ -z "${CI:-}" ] && [ -z "${GITHUB_ACTIONS:-}" ]; then
+  PUBLISH_FLAGS+=(--provenance=false)
+fi
+
 for entry in "${NPM_PACKAGES[@]}"; do
   pkg_path="${entry%%:*}"
   pkg_name="${entry##*:}"
@@ -194,7 +203,7 @@ for entry in "${NPM_PACKAGES[@]}"; do
 
   (
     cd "$ROOT_DIR/$pkg_path"
-    run npm publish --access public
+    run npm publish "${PUBLISH_FLAGS[@]}"
   )
   ok "$pkg_name@$VERSION published"
 done
