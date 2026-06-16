@@ -71,10 +71,12 @@ fi
 
 mkdir -p "${RESULTS_DIR}"
 
-# Wait for a URL to respond (up to ~60s). Returns 0 on success, 1 on timeout.
+# Wait for a URL to respond (up to ~120s). Returns 0 on success, 1 on timeout.
+# Real-world frontends (Nextra monorepo, contentlayer-backed sites) take
+# substantially longer than 60s to compile the first time.
 wait_for_url() {
   local url="$1"
-  local retries=60
+  local retries=120
   echo "  → waiting for ${url}"
   while (( retries > 0 )); do
     if curl -sSf -o /dev/null --max-time 3 "${url}" 2>/dev/null; then
@@ -108,6 +110,44 @@ run_repo() {
   fi
 
   pushd "${repo_dir}" >/dev/null
+
+  # Identify the harness as the git author so post-install commits don't error
+  # on missing user.name / user.email, and disable pnpm's pre-run deps check
+  # (pnpm 11 re-runs `pnpm install` before `pnpm dev` and exits non-zero on
+  # ignored-build warnings, which we already tolerate).
+  git config user.email "validation@frontguard.dev"
+  git config user.name "Frontguard Validation"
+  {
+    echo "verify-deps-before-run=false"
+    echo "auto-install-peers=true"
+    echo "strict-peer-dependencies=false"
+  } >.npmrc
+  # Pin the package.json toggle too — some pnpm versions only honor it there,
+  # and pre-approve every plausible native dep so pnpm 11's ignored-build
+  # policy doesn't fail the install with [ERR_PNPM_IGNORED_BUILDS].
+  if [[ -f package.json ]] && command -v node >/dev/null 2>&1; then
+    node -e '
+      const fs=require("fs");
+      const p=JSON.parse(fs.readFileSync("package.json","utf8"));
+      p.pnpm = p.pnpm || {};
+      p.pnpm.verifyDepsBeforeRun = "warn";
+      p.pnpm.onlyBuiltDependencies = [
+        "@prisma/client","@prisma/engines","prisma",
+        "contentlayer","esbuild","sharp","protobufjs",
+        "core-js","es5-ext","unrs-resolver","puppeteer",
+        "playwright","@swc/core","@biomejs/biome","cypress",
+        "deasync","node-gyp","node-sass","fsevents","keytar",
+        "@parcel/watcher","cpu-features","ssh2","msgpackr-extract",
+        "level","leveldown","sqlite3","better-sqlite3","node-pty",
+        "websocket-driver","grpc","@grpc/grpc-js","mongodb-client-encryption",
+        "@vercel/speed-insights","@swc/wasm","msgpackr"
+      ];
+      fs.writeFileSync("package.json", JSON.stringify(p, null, 2));
+    ' >/dev/null 2>&1 || true
+  fi
+  # Belt-and-suspenders env override; pnpm 11 also honors NPM_CONFIG_*.
+  export NPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false
+  export PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false
 
   # --- Install deps (auto-detect package manager from lockfile) ---
   # Real-world repos have lockfiles tied to older toolchains, so we always
@@ -144,6 +184,14 @@ run_repo() {
     return 0
   fi
 
+  # Frontguard's GitOrphanStorage refuses to write baselines if the working
+  # tree is dirty (install populates node_modules and may touch the lockfile).
+  # Commit everything into the shallow clone as one "install state" snapshot
+  # so subsequent frontguard runs can manage the baseline orphan branch.
+  echo "  → snapshotting install state for baseline storage"
+  git add -A >/dev/null 2>&1 || true
+  git commit -m "validation: install state" --allow-empty --no-verify >/dev/null 2>&1 || true
+
   # --- Start dev server in background ---
   echo "  → starting dev server: ${devCommand}"
   # shellcheck disable=SC2086
@@ -179,6 +227,11 @@ run_repo() {
 
   run_one_pass() {
     local pass_name="$1"
+    # baselineRuns establishes baselines (--update-baselines), recheckRuns is the
+    # green re-compare against unchanged code. Anything non-pass in recheck is a
+    # pixel-only false positive.
+    local extra_flag=""
+    [[ "${pass_name}" == "baselineRuns" ]] && extra_flag="--update-baselines"
     local pass_first=1
     {
       echo "  \"${pass_name}\": ["
@@ -188,12 +241,17 @@ run_repo() {
       local full_url="${url%/}${route}"
       echo "    [${pass_name}] • ${full_url}"
       local result
-      if result="$(${FG_BIN} run --url "${full_url}" --output json 2>>"${WORK_DIR}/frontguard.log")"; then
+      if result="$(${FG_BIN} run --url "${full_url}" ${extra_flag} --output json 2>>"${WORK_DIR}/frontguard.log")"; then
         :
       else
         echo "WARNING: frontguard ${pass_name} run failed for ${full_url}" >&2
         run_ok=0
         result="{\"url\":\"${full_url}\",\"error\":\"frontguard run failed\"}"
+      fi
+      # --update-baselines exits 0 with no stdout — substitute a placeholder so
+      # the per-repo JSON stays parseable.
+      if [[ -z "${result// /}" ]]; then
+        result="{\"url\":\"${full_url}\",\"note\":\"no JSON emitted (likely --update-baselines run)\"}"
       fi
       if [[ "${pass_first}" -eq 1 ]]; then pass_first=0; else echo "," >>"${out_file}"; fi
       printf '    { "route": "%s", "url": "%s", "result": %s }' "${route}" "${full_url}" "${result}" >>"${out_file}"
