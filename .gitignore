@@ -43,3 +43,8 @@ Thumbs.db
 # Release artifacts (scripts/release.sh)
 .release-notes/
 *.tgz
+
+# build artifacts under apps/demo
+apps/demo/next-env.d.ts
+apps/demo/out/
+apps/demo/tsconfig.json
