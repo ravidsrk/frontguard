@@ -61,6 +61,22 @@ export class DaytonaSandbox implements Sandbox {
   private daytona: { create: (opts: unknown) => Promise<unknown>; remove: (s: unknown) => Promise<void> } | null = null;
 
   async create(): Promise<void> {
+    // Validate config BEFORE attempting the SDK import. Otherwise a missing
+    // transitive dep (`ws`, etc.) masks the real reason — "you forgot to set
+    // DAYTONA_API_KEY" — behind a confusing module-resolution error.
+    if (!process.env.DAYTONA_API_KEY) {
+      // The caller (verifyFix) catches this and surfaces the message verbatim.
+      // Phrasing is deliberate: it tells the user *why* this came up (fix
+      // verification needed the Daytona path), what to do (set the env var),
+      // and that nothing is broken in the meantime (local sandbox keeps
+      // working). The CLI flag is `--fix-sandbox=local|daytona`.
+      throw new Error(
+        'Daytona fix verification unconfigured: DAYTONA_API_KEY is not set. ' +
+          'Falling back to local sandbox. Set DAYTONA_API_KEY or run with ' +
+          '--fix-sandbox=local to suppress this warning.',
+      );
+    }
+
     let mod: typeof import('@daytonaio/sdk');
     try {
       mod = await import('@daytonaio/sdk');
@@ -68,9 +84,6 @@ export class DaytonaSandbox implements Sandbox {
       throw new Error(
         'Daytona sandbox requires "@daytonaio/sdk". Install it or use the local sandbox.',
       );
-    }
-    if (!process.env.DAYTONA_API_KEY) {
-      throw new Error('DAYTONA_API_KEY is not set — cannot create a Daytona sandbox.');
     }
 
     const Daytona = mod.Daytona as unknown as new () => {
