@@ -98,3 +98,21 @@ describe('DaytonaSandbox.screenshot — injection safety', () => {
     await expect(sb.screenshot(validParams)).rejects.toThrow(/not created/i);
   });
 });
+
+describe('DaytonaSandbox.create — configuration errors', () => {
+  it('surfaces a clear "fall back to local sandbox" message when DAYTONA_API_KEY is unset', async () => {
+    const prev = process.env.DAYTONA_API_KEY;
+    delete process.env.DAYTONA_API_KEY;
+    try {
+      const sb = new DaytonaSandbox();
+      // The wording is verbatim what verify-fix surfaces, and what the docs
+      // page on sandboxes calls out. Don't loosen this assertion without
+      // updating apps/docs/content/docs/guides/sandbox.mdx.
+      await expect(sb.create()).rejects.toThrow(/Daytona fix verification unconfigured/i);
+      await expect(sb.create()).rejects.toThrow(/Falling back to local sandbox/i);
+      await expect(sb.create()).rejects.toThrow(/DAYTONA_API_KEY/);
+    } finally {
+      if (prev !== undefined) process.env.DAYTONA_API_KEY = prev;
+    }
+  });
+});

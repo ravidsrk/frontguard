@@ -94,17 +94,25 @@ loses bytes through `cat` over Daytona's exec channel).
 In `frontguard.config.ts`:
 
 ```ts
-import { defineConfig } from '@frontguard/cli';
-
-export default defineConfig({
-  sandbox: {
-    kind: 'daytona', // or 'local' (default)
-  },
-});
+export default {
+  baseUrl: 'http://localhost:3000',
+  ai: { provider: 'openai', model: 'gpt-4o' },
+  generateFixes: true,
+  verifyFixes: true,
+  fixSandbox: 'daytona', // 'local' (default) | 'daytona'
+};
 ```
 
-Or via the cloud-api: each team's settings page exposes a sandbox
-selector; cloud-side runs honour the team's choice.
+Or from the CLI without editing the config — useful for running `local`
+on PRs and `daytona` only on the protected branch:
+
+```bash
+frontguard run --verify-fixes --fix-sandbox=daytona
+frontguard run --verify-fixes --fix-sandbox=local
+```
+
+The cloud-api honours each team's stored choice; cloud-side runs go
+through Daytona by default.
 
 ## Failure semantics
 
@@ -112,9 +120,17 @@ selector; cloud-side runs honour the team's choice.
   reports `suggestedFix.applicable = false` and the PR comment notes the
   patch wasn't verified. Run `npx playwright install` to enable.
 - **Daytona configured but `DAYTONA_API_KEY` missing:** the sandbox
-  initialiser throws, and the AI fix orchestrator catches and falls back
-  to the local sandbox with a warning. Verification still happens; just
-  in a host-OS-dependent renderer.
+  initialiser throws the exact message:
+
+  ```text
+  Daytona fix verification unconfigured: DAYTONA_API_KEY is not set.
+  Falling back to local sandbox.
+  ```
+
+  `verifyFix()` catches it, logs a warning, and transparently swaps in
+  the local sandbox so verification still happens — just in a
+  host-OS-dependent renderer. Set `DAYTONA_API_KEY` (or pass
+  `--fix-sandbox=local` explicitly) to suppress the warning.
 - **Daytona snapshot not yet published:** the workspace-creation call
   returns a 404. The script in `scripts/build-daytona-snapshot.ts` is
   what publishes it; document the snapshot version in
