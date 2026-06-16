@@ -1,0 +1,8 @@
+{
+  "_comment": "Documented reasons for repos the harness can't reach end-to-end. Used by aggregate-results.mjs when no per-repo JSON was written.",
+  "reasons": {
+    "medusa-storefront": "requires a running Medusa backend and NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY — not provisioned in this harness run",
+    "taxonomy": "next 13.3.2-canary dev server failed to load config under Node 22; contentlayer dev succeeded but next dev crashed",
+    "nextra-docs": "monorepo's root `pnpm dev` builds every package but does not bind a dev server on :3000 within the 120 s timeout"
+  }
+}
