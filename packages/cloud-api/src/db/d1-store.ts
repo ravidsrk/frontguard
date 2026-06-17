@@ -70,6 +70,11 @@ function runConfig(run: Run): string {
     threshold: run.threshold,
     ai: run.ai,
     reportUrl: run.reportUrl,
+    // CI linkage (owner/repo/prNumber/commitSha). Folded into the config blob
+    // rather than dedicated columns so no schema migration is required. The MCP
+    // `list_regressions` / `recent_runs` tools filter on this, so dropping it
+    // here is what left them returning empty in production (mcp-1).
+    github: run.github,
   });
 }
 
@@ -93,6 +98,7 @@ function rowToRun(row: RunRow): Run {
     baselinesApproved: row.baselines_approved === 1,
     projectId: row.project_id ?? undefined,
     error: row.error ?? undefined,
+    github: cfg.github ?? undefined,
   };
 }
 
