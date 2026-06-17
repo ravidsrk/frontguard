@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #0d0c0b; }
+  ::selection { background: #e8862e; color: #0d0c0b; }
+  .fg-navlink:hover { color: #f5f1ea !important; }
+  .fg-link:hover { color: #f5f1ea !important; }
+  .fg-btn-primary, .fg-btn-ghost { white-space: nowrap; }
+  .fg-btn-primary:hover { background: #f59b45 !important; }
+  .fg-btn-ghost:hover { border-color: #54493f !important; background: #1f1c19 !important; }
+  .fg-cmp-row:hover { background: #161412 !important; }
+  .fg-vs:hover { border-color: #54493f !important; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: #2a2622; }
+</style>
+</helmet>
+
+<div style="background: #0d0c0b; color: #b8b0a6; font-family: 'Space Grotesk', sans-serif; min-height: 100vh;">
+
+  <!-- nav -->
+  <nav style="position: sticky; top: 0; z-index: 50; background: rgba(13,12,11,0.82); backdrop-filter: blur(12px); border-bottom: 1px solid #211e1b;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 0 28px; height: 64px; display: flex; align-items: center; justify-content: space-between;">
+      <a href="Landing.dc.html" class="fg-link" style="display: flex; align-items: center; gap: 11px; text-decoration: none; color: #f5f1ea;">
+        <span style="position: relative; width: 22px; height: 26px; display: inline-block;">
+          <span style="position: absolute; inset: 0; background: #e8862e; clip-path: polygon(0% 0%, 100% 0%, 100% 62%, 50% 100%, 0% 62%);"></span>
+          <span style="position: absolute; top: 0; bottom: 0; left: 50%; width: 1.5px; transform: translateX(-50%); background: #0d0c0b; clip-path: polygon(0% 0%, 100% 0%, 100% 62%, 50% 100%, 0% 62%);"></span>
+        </span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; letter-spacing: -0.02em; color: #f5f1ea;">frontguard</span>
+      </a>
+      <div style="display: flex; align-items: center; gap: 28px; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+        <a href="Docs.dc.html" class="fg-navlink" style="color: #b8b0a6; text-decoration: none;">docs</a>
+        <a href="Pricing.dc.html" class="fg-navlink" style="color: #b8b0a6; text-decoration: none;">pricing</a>
+        <a href="Comparisons.dc.html" class="fg-navlink" style="color: #f5f1ea; text-decoration: none;">compare</a>
+        <a href="Changelog.dc.html" class="fg-navlink" style="color: #b8b0a6; text-decoration: none;">changelog</a>
+        <a href="https://github.com/ravidsrk/frontguard" class="fg-btn-primary" style="background: #e8862e; color: #0d0c0b; font-weight: 700; padding: 9px 16px; text-decoration: none; transition: background .18s ease;">★ Star</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- header -->
+  <header style="max-width: 1200px; margin: 0 auto; padding: 76px 28px 44px; text-align: center;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #e8862e; letter-spacing: 0.08em; margin-bottom: 16px;">// HOW IT COMPARES</div>
+    <h1 style="font-size: 52px; line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;">Frontguard vs. everyone else.</h1>
+    <p style="font-size: 18px; line-height: 1.55; color: #b8b0a6; margin: 0 auto; max-width: 600px;">Visual testing tools all take a screenshot and diff it. Only Frontguard explains <em style="color: #f5f1ea; font-style: normal;">why</em> something changed, verifies a fix, and stays open source and self-hostable.</p>
+  </header>
+
+  <!-- the alternatives strip -->
+  <section style="max-width: 1200px; margin: 0 auto; padding: 0 28px 12px;">
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+      <sc-for list="{{ alternatives }}" as="alt" hint-placeholder-count="4">
+        <div style="border: 1px solid #2a2622; background: #131210; padding: 16px 18px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #d8d0c5; margin-bottom: 6px;">{{ alt.name }}</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: {{ alt.color }};">{{ alt.status }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- big matrix -->
+  <section style="max-width: 1200px; margin: 0 auto; padding: 8px 28px 40px;">
+    <div style="border: 1px solid #2a2622; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 860px;">
+        <thead>
+          <tr style="background: #161412;">
+            <th style="text-align: left; padding: 18px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #7c746b; font-weight: 500; letter-spacing: 0.04em; position: sticky; left: 0; background: #161412;">CAPABILITY</th>
+            <th style="padding: 18px 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #e8862e; font-weight: 700;">Frontguard</th>
+            <th style="padding: 18px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8c847a; font-weight: 500;">Percy</th>
+            <th style="padding: 18px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8c847a; font-weight: 500;">Chromatic</th>
+            <th style="padding: 18px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8c847a; font-weight: 500;">BackstopJS</th>
+            <th style="padding: 18px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8c847a; font-weight: 500;">Lost Pixel</th>
+            <th style="padding: 18px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8c847a; font-weight: 500;">Argos</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{ matrix }}" as="row" hint-placeholder-count="9">
+            <tr class="fg-cmp-row" style="border-top: 1px solid #211e1b; transition: background .18s ease;">
+              <td style="padding: 15px 18px; color: #d8d0c5; font-weight: {{ row.weight }};">{{ row.cap }}</td>
+              <td style="text-align: center; padding: 15px 12px; color: {{ row.c0 }}; font-family: 'JetBrains Mono', monospace; font-weight: 700;">{{ row.v0 }}</td>
+              <td style="text-align: center; padding: 15px 12px; color: {{ row.c1 }}; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">{{ row.v1 }}</td>
+              <td style="text-align: center; padding: 15px 12px; color: {{ row.c2 }}; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">{{ row.v2 }}</td>
+              <td style="text-align: center; padding: 15px 12px; color: {{ row.c3 }}; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">{{ row.v3 }}</td>
+              <td style="text-align: center; padding: 15px 12px; color: {{ row.c4 }}; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">{{ row.v4 }}</td>
+              <td style="text-align: center; padding: 15px 12px; color: {{ row.c5 }}; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">{{ row.v5 }}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+    <div style="display: flex; gap: 22px; flex-wrap: wrap; margin-top: 16px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #6b645c;">
+      <span><span style="color: #4fb477;">✓</span> full support</span>
+      <span><span style="color: #e8862e;">◐</span> partial / limited</span>
+      <span><span style="color: #6b645c;">✕</span> not available</span>
+    </div>
+  </section>
+
+  <!-- head to head cards -->
+  <section style="max-width: 1200px; margin: 0 auto; padding: 56px 28px;">
+    <h2 style="font-size: 32px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 8px;">Head to head</h2>
+    <p style="font-size: 16px; color: #b8b0a6; margin: 0 0 36px;">The honest version — what each tool is genuinely good at, and where Frontguard pulls ahead.</p>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px;">
+      <sc-for list="{{ versus }}" as="v" hint-placeholder-count="4">
+        <div class="fg-vs" style="border: 1px solid #2a2622; background: #131210; padding: 28px 26px; transition: border-color .15s ease;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #e8862e; font-weight: 700;">frontguard</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #564f48;">vs</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #d8d0c5;">{{ v.name }}</span>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8c847a; letter-spacing: 0.04em; margin-bottom: 7px;">{{ v.name }} IS GOOD AT</div>
+            <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #b8b0a6;">{{ v.their }}</p>
+          </div>
+          <div style="margin-bottom: 20px;">
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #e8862e; letter-spacing: 0.04em; margin-bottom: 7px;">WHERE FRONTGUARD WINS</div>
+            <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #d8d0c5;">{{ v.ours }}</p>
+          </div>
+          <a href="{{ v.href }}" class="fg-link" style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #8c847a; text-decoration: none;">{{ v.cta }} →</a>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- migration -->
+  <section style="border-top: 1px solid #211e1b; background: #100f0e;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 64px 28px;">
+      <div style="display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 48px; align-items: center;">
+        <div>
+          <h2 style="font-size: 30px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;">Switching is a config file, not a rewrite.</h2>
+          <p style="font-size: 15.5px; line-height: 1.6; color: #b8b0a6; margin: 0;">Frontguard reads your app by URL — no test files to port, no proprietary snapshot format. Point it at your dev server and you have baselines in one run. Migration guides walk through the rest.</p>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <sc-for list="{{ migrations }}" as="m" hint-placeholder-count="4">
+            <a href="{{ m.href }}" class="fg-vs" style="border: 1px solid #2a2622; background: #131210; padding: 18px 20px; text-decoration: none; transition: border-color .15s ease;">
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #564f48; margin-bottom: 6px;">MIGRATE FROM</div>
+              <div style="font-size: 16px; color: #f5f1ea; font-weight: 600;">{{ m.name }}</div>
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #e8862e; margin-top: 8px;">Read guide →</div>
+            </a>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section style="border-top: 1px solid #211e1b;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 80px 28px; text-align: center;">
+      <h2 style="font-size: 40px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;">See the difference yourself.</h2>
+      <p style="font-size: 17px; color: #b8b0a6; margin: 0 auto 30px; max-width: 440px; line-height: 1.55;">Install the CLI and run your first AI-explained visual check in two minutes.</p>
+      <div style="display: flex; gap: 14px; justify-content: center;">
+        <a href="Docs.dc.html" class="fg-btn-primary" style="background: #e8862e; color: #0d0c0b; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 14px 26px; text-decoration: none; transition: background .18s ease;">Get started →</a>
+        <a href="Pricing.dc.html" class="fg-btn-ghost" style="border: 1px solid #322d28; color: #f5f1ea; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 14px; padding: 14px 26px; text-decoration: none; transition: all .18s ease;">View pricing</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- footer -->
+  <footer style="border-top: 1px solid #211e1b; background: #0d0c0b;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 32px 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #564f48;">© 2026 Frontguard · MIT License</span>
+      <div style="display: flex; gap: 22px; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
+        <a href="Docs.dc.html" class="fg-link" style="color: #6b645c; text-decoration: none;">Docs</a>
+        <a href="Pricing.dc.html" class="fg-link" style="color: #6b645c; text-decoration: none;">Pricing</a>
+        <a href="https://github.com/ravidsrk/frontguard" class="fg-link" style="color: #6b645c; text-decoration: none;">GitHub</a>
+      </div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1200, &quot;height&quot;: 1500}}">
+class Component extends DCLogic {
+  renderVals() {
+    const Y = '#4fb477', P = '#e8862e', N = '#6b645c', ink = '#a89f94', fgc = '#4fb477';
+    const cell = (v) => {
+      if (v === '✓') return Y;
+      if (v === '◐') return P;
+      if (v === '✕') return N;
+      return ink;
+    };
+    const R = (cap, vals, weight) => {
+      const o = { cap, weight: weight || '400' };
+      ['0','1','2','3','4','5'].forEach((k, i) => { o['v' + k] = vals[i]; o['c' + k] = (i === 0 && (vals[i] === '✓')) ? fgc : cell(vals[i]); });
+      return o;
+    };
+    return {
+      alternatives: [
+        { name: 'Percy', status: '↗ $399/mo pricing cliff', color: '#e8862e' },
+        { name: 'Chromatic', status: '◐ Storybook-locked', color: '#e8862e' },
+        { name: 'BackstopJS', status: '✕ unmaintained', color: '#e5484d' },
+        { name: 'Lost Pixel', status: '✕ archived', color: '#e5484d' },
+      ],
+      matrix: [
+        R('Open source', ['✓ MIT', '✕', '◐', '✓', '◐', '✓ MIT'], '600'),
+        R('CLI-first', ['✓', '✕', '✕', '✓', '✓', '✓']),
+        R('AI change classification', ['✓', '✕', '✕', '✕', '✕', '✕'], '600'),
+        R('AI fix verification', ['✓', '✕', '✕', '✕', '✕', '✕'], '600'),
+        R('Anti-flake rendering', ['✓', '◐', '◐', '✕', '✕', '◐']),
+        R('Self-hostable', ['✓', '✕', '✕', '✓', '◐', '◐']),
+        R('Free tier', ['Forever', 'Trial', 'Hobby', 'Free', '✕', 'Hobby']),
+        R('Pro entry', ['$29/mo', '~$399/mo', 'per-snap', 'n/a', 'n/a', '$100/mo']),
+        R('Actively maintained', ['✓', '✓', '✓', '✕ 6yr', '✕', '✓']),
+      ],
+      versus: [
+        { name: 'Percy', their: 'Polished hosted dashboard, broad framework SDKs, and mature review workflows backed by BrowserStack.', ours: 'CLI-first and free forever — no per-screenshot billing that punishes a growing suite. Plus AI explanations, not just a red diff to triage by hand.', href: 'Docs.dc.html', cta: 'Migration guide' },
+        { name: 'Chromatic', their: 'Best-in-class for Storybook component testing, with TurboSnap and a tight Storybook publish flow.', ours: 'Tests the real app at real URLs, not just isolated stories — and classifies regression vs. intentional so review queues stay short. Storybook capture is supported too.', href: 'Docs.dc.html', cta: 'Migration guide' },
+        { name: 'BackstopJS', their: 'A free, self-hosted classic — simple, scriptable, no vendor at all.', ours: 'Same self-hosted freedom, but with zero-config route discovery, anti-flake rendering, AI analysis, and active maintenance (BackstopJS has been quiet for years).', href: 'Docs.dc.html', cta: 'Migration guide' },
+        { name: 'Lost Pixel / Argos', their: 'Modern, developer-friendly OSS-leaning tools with good CI ergonomics and Playwright trace support.', ours: 'The only one with AI change classification and verified fixes — and a flat, screenshot-count-independent price with full self-hosting.', href: 'Docs.dc.html', cta: 'Read comparison' },
+      ],
+      migrations: [
+        { name: 'BackstopJS', href: 'Docs.dc.html' },
+        { name: 'Lost Pixel', href: 'Docs.dc.html' },
+        { name: 'Percy', href: 'Docs.dc.html' },
+        { name: 'Chromatic', href: 'Docs.dc.html' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
