@@ -12,14 +12,17 @@ import {
   resetMemoryScreenshotStore,
   getMemoryScreenshotStore,
 } from '../src/storage/screenshots.js';
-import { createSessionCookie, DEV_SESSION_SECRET } from '../src/auth/session.js';
+import {
+  createSessionCookie,
+  INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD,
+} from '../src/auth/session.js';
 import type { Monitor, MonitorRun } from '../src/db/monitors.js';
 import type { Run } from '../src/types.js';
 import type { ScreenshotRecord } from '../src/db/store.js';
 
 /** Builds a valid fg_session Cookie header for the given userId. */
 async function sessionHeader(userId: string): Promise<{ Cookie: string }> {
-  const value = await createSessionCookie(userId, DEV_SESSION_SECRET);
+  const value = await createSessionCookie(userId, INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD);
   return { Cookie: `fg_session=${value}` };
 }
 

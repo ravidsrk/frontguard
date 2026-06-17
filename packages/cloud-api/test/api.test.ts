@@ -11,6 +11,7 @@ const executeInSandbox = vi.fn();
 vi.mock('../src/daytona-runner.js', () => ({ executeInSandbox }));
 
 import { app } from '../src/index.js';
+import { createSqliteD1 } from './helpers/sqlite-d1.js';
 
 const PKG_VERSION = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'),
@@ -334,5 +335,49 @@ describe('POST /v1/baselines/:runId/approve', () => {
     const getRes = await request(`/v1/runs/${id}`);
     const run = await getRes.json();
     expect(run.baselinesApproved).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dashboard fail-closed guard (sec-1, cloud-4)
+// ---------------------------------------------------------------------------
+//
+// In production (a real D1 `DB` binding present) the dashboard MUST refuse to
+// serve unless `DASHBOARD_SESSION_SECRET` is configured with a real >= 32-char
+// value. Otherwise cookies would be signed with the insecure fallback that
+// ships in published source — a forge-any-user's-session vulnerability.
+describe('GET /dashboard — production session-secret fail-closed', () => {
+  // A real D1 binding makes isProduction(env) → true.
+  const prodEnv = (secret?: string) => ({
+    DB: createSqliteD1().db,
+    ...(secret ? { DASHBOARD_SESSION_SECRET: secret } : {}),
+  });
+  const STRONG_SECRET = 'a'.repeat(40);
+
+  it('returns 503 with the configured message when the secret is missing in prod', async () => {
+    const res = await app.request('/dashboard', {}, prodEnv());
+    expect(res.status).toBe(503);
+    expect(await res.text()).toBe('Dashboard not configured (DASHBOARD_SESSION_SECRET missing)');
+  });
+
+  it('returns 503 when the secret is set but shorter than 32 chars in prod', async () => {
+    const res = await app.request('/dashboard', {}, prodEnv('too-short-secret'));
+    expect(res.status).toBe(503);
+  });
+
+  it('fails closed on dashboard sub-paths too (POST /dashboard/monitors)', async () => {
+    const res = await app.request('/dashboard/monitors', { method: 'POST' }, prodEnv());
+    expect(res.status).toBe(503);
+  });
+
+  it('serves the dashboard (login page) in prod when a strong secret is set', async () => {
+    const res = await app.request('/dashboard', {}, prodEnv(STRONG_SECRET));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/html');
+  });
+
+  it('serves the dashboard in dev (no D1 binding) without any secret configured', async () => {
+    const res = await app.request('/dashboard');
+    expect(res.status).toBe(200);
   });
 });
