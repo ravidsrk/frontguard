@@ -67,7 +67,6 @@ const TIERS: Tier[] = [
     features: [
       'Hosted dashboard & report history',
       'Managed baseline storage (R2)',
-      'Production monitoring scheduler',
       'Slack & PagerDuty alerts',
       'Cross-OS reference rendering',
       'Priority support',
@@ -112,7 +111,7 @@ const MATRIX: CmpRow[] = [
     capability: 'Managed baseline storage',
     cells: [text('Git', 'ink'), text('R2', 'amber'), text('R2', 'amber')],
   },
-  { capability: 'Production monitoring scheduler', cells: [text('CLI', 'ink'), yes, yes] },
+  { capability: 'Production monitoring scheduler', cells: [text('CLI', 'ink'), dash, yes] },
   { capability: 'Slack / PagerDuty alerts', cells: [text('Webhook', 'ink'), yes, yes] },
   { capability: 'Teams, roles & approvals', cells: [dash, dash, yes] },
   { capability: 'SSO & audit log', cells: [dash, dash, yes] },

@@ -47,7 +47,7 @@ export const dashboardRoutes = new Hono<{ Bindings: Bindings; Variables: Variabl
 dashboardRoutes.get('/', async (c) => {
   const store = c.get('store');
   const userId = c.get('userId');
-  const [monitors, runs] = await Promise.all([store.listMonitors(userId), store.listRuns(userId, 10)]);
+  const [monitors, runs] = await Promise.all([store.listMonitors(userId), store.listRuns(userId, { limit: 10 })]);
   return c.html(renderDashboard(monitors, runs));
 });
 
@@ -92,7 +92,7 @@ sessionDashboardRoutes.get('/', async (c) => {
   const store = getStore(c.env);
   const [monitors, runs, spend] = await Promise.all([
     store.listMonitors(userId),
-    store.listRuns(userId, 10),
+    store.listRuns(userId, { limit: 10 }),
     spendCapFor(store, userId),
   ]);
   const flakes = await flakeMap(store, monitors);

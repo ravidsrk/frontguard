@@ -15,8 +15,11 @@
     "integrations",
     "---Comparisons---",
     "comparisons",
-    "---Deployment---",
+    "---Deployment & Sandboxing---",
     "self-host",
+    "sandbox",
+    "cross-os-rendering",
+    "distribution",
     "---Trust---",
     "results"
   ]

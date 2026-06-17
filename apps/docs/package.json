@@ -17,6 +17,7 @@
     "build": "next build",
     "start": "next start",
     "check:doc-links": "node scripts/check-doc-links.mjs"
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "fumadocs-core": "^16.7.9",

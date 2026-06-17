@@ -114,6 +114,22 @@ describe.runIf(built)('SSG output (post-build)', () => {
     }
   });
 
+  it('no built route ships an AggregateRating block (dist-11 regression guard)', () => {
+    // The SoftwareApplication JSON-LD must advertise offers only — never a
+    // review-rating block — until validation/results-v0.2.md has measured
+    // numbers from real users. A 4.8/36 AggregateRating once shipped to
+    // frontguard.dev on a 0-star repo; this guard fails the build if any route
+    // re-introduces one, since dist/ is exactly what the CDN serves.
+    for (const { file } of ROUTES) {
+      const html = readFileSync(join(dist, file), 'utf8');
+      expect(html, `${file}: must not advertise AggregateRating`).not.toMatch(
+        /"@type"\s*:\s*"AggregateRating"/,
+      );
+      expect(html, `${file}: must not advertise ratingValue`).not.toMatch(/"ratingValue"/);
+      expect(html, `${file}: must not advertise ratingCount`).not.toMatch(/"ratingCount"/);
+    }
+  });
+
   it('ships FAQPage JSON-LD only on /pricing (once), not on non-FAQ routes', () => {
     const faqCount = (file: string) =>
       (readFileSync(join(dist, file), 'utf8').match(/"@type":\s*"FAQPage"/g) ?? []).length;

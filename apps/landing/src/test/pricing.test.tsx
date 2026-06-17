@@ -1,3 +1,7 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen, within } from './test-utils';
 import { afterEach, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -132,5 +136,114 @@ describe('/pricing', () => {
 
     expect(await screen.findByText('copied ✓')).toBeInTheDocument();
     expect(writeText).toHaveBeenCalledWith('npm install @frontguard/cli');
+  });
+});
+
+/**
+ * Guards claim-5: every gated feature bullet rendered on a pricing tier card
+ * MUST resolve to `hasFeature(plan, key) === true` for that tier's plan id.
+ *
+ * The source of truth for plan gating is packages/cloud-api/src/billing/plans.ts.
+ * apps/landing does not depend on @frontguard/cloud-api, so rather than import
+ * the module we read its source from disk and extract the two boolean flags per
+ * plan — the test therefore tracks the REAL gating and cannot drift from a copy.
+ *
+ * FEATURE_KEYS maps each bullet string to the hasFeature() key it promises
+ * (null = not plan-gated, skipped). If a new bullet is added to the page, the
+ * first test below fails until the mapping is updated — forcing a deliberate
+ * choice about whether the new claim is actually granted by the plan.
+ */
+describe('pricing feature claims map to hasFeature()', () => {
+  const plansSource = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), '../../../../packages/cloud-api/src/billing/plans.ts'),
+    'utf8',
+  );
+
+  type PlanId = 'free' | 'pro' | 'business';
+  type FeatureKey = 'productionMonitoring' | 'ssoSaml';
+
+  /** Extract the productionMonitoring/ssoSaml flags for a plan straight from plans.ts. */
+  function planFlags(id: PlanId): Record<FeatureKey, boolean> {
+    const m = plansSource.match(
+      new RegExp(`id:\\s*'${id}'[\\s\\S]*?productionMonitoring:\\s*(true|false)[\\s\\S]*?ssoSaml:\\s*(true|false)`),
+    );
+    if (!m) throw new Error(`plans.ts: could not parse limits for plan '${id}'`);
+    return { productionMonitoring: m[1] === 'true', ssoSaml: m[2] === 'true' };
+  }
+
+  /** Mirror of packages/cloud-api hasFeature(), reading the on-disk flags. */
+  function hasFeature(id: PlanId, key: FeatureKey): boolean {
+    return planFlags(id)[key];
+  }
+
+  /** Each pricing tier card label -> the billing plan id it sells. */
+  const TIER_PLAN: Record<string, PlanId> = {
+    'OPEN SOURCE': 'free',
+    PRO: 'pro',
+    TEAM: 'business',
+  };
+
+  /** Bullet string -> the gated hasFeature() key it requires (null = not gated). */
+  const FEATURE_KEYS: Record<string, FeatureKey | null> = {
+    'Production monitoring scheduler': 'productionMonitoring',
+    'SSO & dedicated support': 'ssoSaml',
+    // Bullets that are not plan-gated map to null and are skipped.
+    'Unlimited screenshots & routes': null,
+    'Multi-browser & multi-viewport': null,
+    'AI analysis (bring your own key)': null,
+    'AI fix generation + sandbox verification': null,
+    'Git-native baselines': null,
+    'GitHub Action + PR comments': null,
+    'All 5 plugins, self-hostable': null,
+    'Hosted dashboard & report history': null,
+    'Managed baseline storage (R2)': null,
+    'Slack & PagerDuty alerts': null,
+    'Cross-OS reference rendering': null,
+    'Priority support': null,
+    'Teams, roles & invitations': null,
+    'Baseline approval workflows': null,
+    'Activity feed & audit log': null,
+    'Usage metering & seat billing': null,
+    'OpenTelemetry metrics export': null,
+  };
+
+  /** Read the rendered feature bullets for a tier card, by its label. */
+  function bulletsFor(tierName: string): string[] {
+    const card = screen.getByText(tierName, { exact: true }).parentElement!;
+    return within(card)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent!.replace('✓', '').replace(/\s+/g, ' ').trim());
+  }
+
+  it('parses real productionMonitoring/ssoSaml gating from plans.ts (pro is gated, business is not)', () => {
+    expect(hasFeature('pro', 'productionMonitoring')).toBe(false);
+    expect(hasFeature('business', 'productionMonitoring')).toBe(true);
+    expect(hasFeature('business', 'ssoSaml')).toBe(true);
+  });
+
+  it('declares every rendered pricing bullet in the FEATURE_KEYS mapping', () => {
+    renderPricing();
+    for (const tierName of Object.keys(TIER_PLAN)) {
+      for (const bullet of bulletsFor(tierName)) {
+        expect(
+          Object.keys(FEATURE_KEYS),
+          `pricing bullet "${bullet}" (${tierName}) is unmapped — add it to FEATURE_KEYS (key or null)`,
+        ).toContain(bullet);
+      }
+    }
+  });
+
+  it('only advertises a gated capability on a tier whose plan grants it', () => {
+    renderPricing();
+    for (const [tierName, planId] of Object.entries(TIER_PLAN)) {
+      for (const bullet of bulletsFor(tierName)) {
+        const key = FEATURE_KEYS[bullet];
+        if (!key) continue;
+        expect(
+          hasFeature(planId, key),
+          `${tierName} (plan "${planId}") advertises "${bullet}" but hasFeature(${planId}, ${key}) is false in plans.ts`,
+        ).toBe(true);
+      }
+    }
   });
 });

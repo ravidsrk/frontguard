@@ -97,7 +97,7 @@ describe('InMemoryStore — runs', () => {
     b.createdAt = '2026-02-01T00:00:00Z';
     await store.createRun(a, 'u1');
     await store.createRun(b, 'u1');
-    const list = await store.listRuns('u1', 1);
+    const list = await store.listRuns('u1', { limit: 1 });
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe('b');
   });
