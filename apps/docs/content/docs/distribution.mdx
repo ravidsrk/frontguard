@@ -41,8 +41,8 @@ a **composite Action** (no install required, drop into any workflow).
 
 | Surface | Status | Install |
 |---------|--------|---------|
-| Frontguard GitHub App | **Coming soon** — [follow the listing](https://github.com/apps/frontguard) | One-click app install |
-| Frontguard composite Action | Available via `@frontguard/cli` | `uses: frontguard/frontguard-action@v0` |
+| Frontguard GitHub App | **Coming soon** | One-click app install |
+| Frontguard composite Action | Available via `@frontguard/cli` | `uses: ravidsrk/frontguard@v0` |
 
 Action manifest: [`packages/cli/action.yml`](https://github.com/ravidsrk/frontguard/blob/main/packages/cli/action.yml).
 App manifest: [`integrations/github-app/manifest.yml`](https://github.com/ravidsrk/frontguard/blob/main/integrations/github-app/manifest.yml).
@@ -50,9 +50,8 @@ App manifest: [`integrations/github-app/manifest.yml`](https://github.com/ravids
 ### Composite Action usage
 
 ```yaml
-- uses: frontguard/frontguard-action@v0
+- uses: ravidsrk/frontguard@v0
   with:
-    api-key: ${{ secrets.FRONTGUARD_API_KEY }}
     routes: '/,/pricing,/docs'
 ```
 
@@ -64,7 +63,7 @@ the originating PR.
 
 | Status |  |
 |---|---|
-| Marketplace listing | **Coming soon** — track [vercel.com/integrations/frontguard](https://vercel.com/integrations) |
+| Marketplace listing | **Coming soon** |
 | Manual install | Available now via [integration manifest](https://github.com/ravidsrk/frontguard/blob/main/integrations/vercel) |
 
 ### Install via Vercel CLI
