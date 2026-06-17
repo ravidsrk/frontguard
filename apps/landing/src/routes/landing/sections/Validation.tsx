@@ -30,7 +30,7 @@ export function Validation() {
   ];
 
   return (
-    <section className="mx-auto max-w-[1200px] px-7 pt-5 pb-[84px]">
+    <section id="validation" className="mx-auto max-w-[1200px] scroll-mt-20 px-7 pt-5 pb-[84px]">
       <SectionHeader
         kicker="// VALIDATION"
         kickerTone="amber"

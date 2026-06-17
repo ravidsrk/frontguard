@@ -19,8 +19,9 @@ export function ProblemStrip() {
 
   return (
     <section
+      id="problem"
       aria-labelledby="problem-heading"
-      className="border-y border-border-faint bg-surface-alt"
+      className="scroll-mt-20 border-y border-border-faint bg-surface-alt"
     >
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 items-center gap-12 px-7 py-14 lg:grid-cols-[1.1fr_1fr]">
         <div>
