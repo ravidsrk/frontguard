@@ -159,36 +159,41 @@
 </head>
 <body>
 <div id="root">
-<!-- Static HTML fallback for search engine crawlers. Mirrors the React tree
-     section-by-section (hero / problem / how it works / features /
-     comparison / quick start / validation / pricing / FAQ / footer)
-     so crawlers and React see the same product. React replaces this on
-     mount. No fabricated stats, no invented citations, no fake review block. -->
+<!-- Static no-JS mirror of the homepage (SSG replaces this with the prerendered
+     React tree at build time; this is the dev-time + belt-and-suspenders fallback).
+     Mirrors the new IA section-by-section: hero / problem / how it works /
+     features / comparison summary / install / validation / honest / CTA / footer.
+     Pricing and the full FAQ moved to /pricing; the full 11-row comparison moved to
+     /comparisons — both are linked, not duplicated. No fabricated stats, no invented
+     citations, no fake review block. -->
 <style>
-.seo-fallback { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #cbd5e1; background: #06080c; margin: 0; padding: 0; line-height: 1.7; }
-.seo-fallback a { color: #22d3ee; text-decoration: underline; text-underline-offset: 2px; }
-.seo-fallback h1, .seo-fallback h2, .seo-fallback h3 { font-family: 'Outfit', system-ui, sans-serif; color: #f1f5f9; line-height: 1.2; }
-.seo-fallback h1 { font-size: 2.25rem; font-weight: 800; margin: 0 0 1rem; }
-.seo-fallback h2 { font-size: 1.5rem; font-weight: 700; margin: 2.5rem 0 0.75rem; }
-.seo-fallback h3 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: #e2e8f0; }
-.seo-fallback p, .seo-fallback li { color: #94a3b8; }
-.seo-fallback strong { color: #e2e8f0; }
-.seo-fallback .wrap { max-width: 56rem; margin: 0 auto; padding: 2rem 1.5rem; }
-.seo-fallback nav.top ul { list-style: none; display: flex; flex-wrap: wrap; gap: 1.25rem; padding: 0; margin: 0 0 2rem; }
-.seo-fallback section { padding: 1.5rem 0; border-top: 1px solid #1e293b; }
+/* Brand-matched no-JS mirror of the homepage: warm near-black canvas, single
+   amber accent, Space Grotesk + JetBrains Mono, sharp corners (radius 0). */
+.seo-fallback { font-family: 'Space Grotesk', system-ui, sans-serif; color: #b8b0a6; background: #0d0c0b; margin: 0; padding: 0; line-height: 1.7; }
+.seo-fallback a { color: #e8862e; text-decoration: none; }
+.seo-fallback a:hover { text-decoration: underline; text-underline-offset: 2px; }
+.seo-fallback h1, .seo-fallback h2, .seo-fallback h3 { font-family: 'Space Grotesk', system-ui, sans-serif; color: #f5f1ea; line-height: 1.1; letter-spacing: -0.02em; }
+.seo-fallback h1 { font-size: 2.5rem; font-weight: 700; margin: 0 0 1rem; letter-spacing: -0.035em; }
+.seo-fallback h2 { font-size: 1.6rem; font-weight: 700; margin: 2.5rem 0 0.75rem; }
+.seo-fallback h3 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: #f5f1ea; }
+.seo-fallback p, .seo-fallback li { color: #b8b0a6; }
+.seo-fallback strong { color: #f5f1ea; }
+.seo-fallback .wrap { max-width: 60rem; margin: 0 auto; padding: 2rem 1.75rem; }
+.seo-fallback nav.top ul { list-style: none; display: flex; flex-wrap: wrap; gap: 1.25rem; padding: 0; margin: 0 0 2rem; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+.seo-fallback section { padding: 1.75rem 0; border-top: 1px solid #211e1b; }
 .seo-fallback section:first-of-type { border-top: 0; padding-top: 0; }
-.seo-fallback pre, .seo-fallback code { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #e2e8f0; }
-.seo-fallback pre { background: #0f172a; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
-.seo-fallback footer { border-top: 1px solid #1e293b; margin-top: 2rem; padding-top: 2rem; }
-.seo-fallback .cta { display: inline-block; background: #f97316; color: #06080c; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; text-decoration: none; margin-right: 0.75rem; }
-.seo-fallback .cta-secondary { display: inline-block; border: 1px solid #334155; padding: 0.75rem 1.5rem; border-radius: 0.5rem; color: #e2e8f0; text-decoration: none; }
+.seo-fallback pre, .seo-fallback code { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #e6e0d6; }
+.seo-fallback pre { background: #131210; padding: 1rem; border: 1px solid #2a2622; overflow-x: auto; }
+.seo-fallback footer { border-top: 1px solid #211e1b; margin-top: 2rem; padding-top: 2rem; }
+.seo-fallback .cta { display: inline-block; background: #e8862e; color: #0d0c0b; padding: 0.75rem 1.5rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; text-decoration: none; margin-right: 0.75rem; }
+.seo-fallback .cta-secondary { display: inline-block; border: 1px solid #322d28; padding: 0.75rem 1.5rem; color: #f5f1ea; font-family: 'JetBrains Mono', monospace; text-decoration: none; }
 .seo-fallback table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.9rem; }
-.seo-fallback th, .seo-fallback td { border: 1px solid #1e293b; padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
-.seo-fallback th { background: #0f172a; color: #f1f5f9; }
+.seo-fallback th, .seo-fallback td { border: 1px solid #211e1b; padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
+.seo-fallback th { background: #161412; color: #f5f1ea; }
 .seo-fallback .pricing-grid { display: grid; gap: 1rem; grid-template-columns: 1fr; margin: 1rem 0; }
-.seo-fallback .pricing-card { border: 1px solid #1e293b; border-radius: 0.5rem; padding: 1rem; }
+.seo-fallback .pricing-card { border: 1px solid #2a2622; padding: 1rem; }
 .seo-fallback .pricing-card h3 { margin-top: 0; }
-.seo-fallback .source { color: #64748b; font-size: 0.8rem; }
+.seo-fallback .source { color: #6b645c; font-size: 0.8rem; }
 </style>
 <div class="seo-fallback">
 <div class="wrap">
@@ -201,9 +206,10 @@
 <li><a href="#features">Features</a></li>
 <li><a href="#comparison">Compare</a></li>
 <li><a href="#install">Install</a></li>
-<li><a href="#pricing">Pricing</a></li>
-<li><a href="#faq">FAQ</a></li>
-<li><a href="https://docs.frontguard.dev" target="_blank" rel="noopener noreferrer">Docs</a></li>
+<li><a href="/docs">Docs</a></li>
+<li><a href="/pricing">Pricing</a></li>
+<li><a href="/comparisons">Full comparison</a></li>
+<li><a href="/changelog">Changelog</a></li>
 <li><a href="https://github.com/ravidsrk/frontguard" target="_blank" rel="noopener noreferrer">GitHub</a></li>
 </ul>
 </nav>
@@ -212,10 +218,10 @@
 <main>
 
 <section aria-labelledby="hero-heading">
-<p><strong>Open source · MIT · BYO AI key</strong></p>
-<h1 id="hero-heading">Visual bugs ship past every other test. Frontguard catches them.</h1>
-<p><strong>AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.</strong></p>
-<p>Anti-flake consensus, AI classification, sandbox-verified fixes. Runs in your CI on your own OpenAI or Anthropic key — screenshots never touch a Frontguard server.</p>
+<p><strong>Open source · MIT · self-hostable</strong></p>
+<h1 id="hero-heading">Catch the regression, not the noise.</h1>
+<p><strong>Teams add visual regression tests — then mute the channel they post to, because ~40% of failures aren't real bugs.</strong></p>
+<p>Frontguard uses AI vision to label every diff a regression, an intentional change, or content — so a red run means something again. It runs in your CI on your own OpenAI or Anthropic key; screenshots never touch a server we run.</p>
 <p>
 <a href="#install" class="cta">Install</a>
 <a href="#demo" class="cta-secondary">See it work</a>
@@ -232,6 +238,7 @@
 <p>Chromatic's Free tier is Chrome-only and excludes accessibility, TurboSnap, and UI Review; the next step is Starter at $179/month. Argos's published comparison puts 100K snapshots at $510/mo on Argos vs $8,999/mo on Percy. <span class="source">Source: chromatic.com/pricing · argos-ci.com/pricing.</span></p>
 </section>
 
+<span id="demo" aria-hidden="true"></span>
 <section id="how-it-works" aria-labelledby="how-it-works-heading">
 <h2 id="how-it-works-heading">How Frontguard works — Detect, Understand, Fix</h2>
 <h3>Detect — anti-flake consensus + SSIM</h3>
@@ -261,6 +268,7 @@
 <section id="comparison" aria-labelledby="comparison-heading">
 <h2 id="comparison-heading">Vs Percy / Chromatic / Argos</h2>
 <p>Every cell describes documented competitor behaviour from each vendor's pricing page, docs, or 2026 release notes. Full sources in <a href="https://github.com/ravidsrk/frontguard/blob/main/docs/research.md" target="_blank" rel="noopener noreferrer">docs/research.md</a>.</p>
+<p>This is a 9-row pricing-and-capability summary across four vendors. The complete 11-capability matrix across all six tools — adding BackstopJS and Lost Pixel — lives on the <a href="/comparisons">full comparison page</a>.</p>
 <table>
 <thead>
 <tr><th>Feature</th><th>Frontguard</th><th>Percy</th><th>Chromatic</th><th>Argos</th></tr>
@@ -305,58 +313,48 @@ test('checkout @ 375px', async ({ page }) =&gt; {
   env:
     FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}</code></pre>
-<p>Full reference in the <a href="https://docs.frontguard.dev" target="_blank" rel="noopener noreferrer">documentation</a>.</p>
+<p>Full reference in the <a href="/docs">documentation</a>.</p>
 </section>
 
 <section id="validation" aria-labelledby="validation-heading">
-<h2 id="validation-heading">Validation results coming soon</h2>
-<p>Frontguard's AI classifier is validated against real diffs from five open-source repos: shadcn-ui taxonomy, shadcn-ui next-template, chakra-ui-docs, medusajs storefront, and shuding nextra. We publish the measured accuracy, false-positive rate, and per-category breakdown — and gate the launch on accuracy &ge; 70% and FPR &lt; 15%.</p>
-<p>No accuracy number ships on this page until that run lands. Live harness: <a href="https://github.com/ravidsrk/frontguard/blob/main/validation/results-v0.2.md" target="_blank" rel="noopener noreferrer">validation/results-v0.2.md</a>.</p>
+<h2 id="validation-heading">Validated on real, live repositories</h2>
+<p>We run Frontguard against live open-source apps and publish exactly what the harness measured — including the repos it couldn't boot. In the latest run (CLI 0.2.0, 2026-06-16): 2 of 5 repositories booted end-to-end, 43 routes were re-rendered and re-checked, and the pixel-diff false-positive rate was 0%. AI classification was disabled in that run, so no accuracy figure is published yet.</p>
+<p>We gate the launch on accuracy &ge; 70% and a false-positive rate below 15%. Full results: <a href="https://github.com/ravidsrk/frontguard/blob/main/validation/results-v0.2.md" target="_blank" rel="noopener noreferrer">validation/results-v0.2.md</a>; methodology: <a href="https://github.com/ravidsrk/frontguard/blob/main/validation/README.md" target="_blank" rel="noopener noreferrer">validation/README.md</a>.</p>
 </section>
 
 <section id="pricing" aria-labelledby="pricing-heading">
-<h2 id="pricing-heading">Pricing — free CLI forever, cloud when you need a team</h2>
-<div class="pricing-grid">
-<div class="pricing-card">
-<h3>Free CLI — $0</h3>
-<p>MIT-licensed CLI, bring your own OpenAI or Anthropic key. Unlimited local screenshots, anti-flake consensus, GitHub Action + PR comment, git-orphan baselines, docker-compose self-host of the cloud.</p>
-</div>
-<div class="pricing-card">
-<h3>Pro — $29 per user / month</h3>
-<p>Everything in Free CLI, plus hosted team baselines, run history, Argos-style flake-score badges, GitHub App one-click baseline accept, spend-cap alerts at 80% / 95%, Slack and GitHub status notifications.</p>
-</div>
-<div class="pricing-card">
-<h3>Enterprise — custom annual</h3>
-<p>Everything in Pro, plus SAML SSO + SCIM provisioning, audit log + retention controls, on-prem deployment option, dedicated support + SLA, custom Git / CI integrations.</p>
-</div>
-</div>
+<h2 id="pricing-heading">Pricing lives on its own page</h2>
+<p>The CLI is free forever — MIT-licensed, bring your own OpenAI or Anthropic key, unlimited local screenshots. Pro adds hosted team baselines, run history, and flake-score badges at $29 per user / month; Team/Enterprise adds SSO, audit logs, and an on-prem option. See the full tiers, the compare-plans matrix, and the FAQ on the <a href="/pricing">pricing page</a>.</p>
 </section>
 
 <section id="faq" aria-labelledby="faq-heading">
-<h2 id="faq-heading">Frequently asked questions</h2>
+<h2 id="faq-heading">Common questions</h2>
 <h3>How do I install Frontguard?</h3>
 <p>Run <code>npm install @frontguard/cli</code> to install the engine, then <code>npx frontguard init</code> to write a typed config and <code>npx frontguard run --url &lt;your URL&gt;</code> to do your first scan. The Playwright plugin is a thin wrapper: <code>npm install -D @frontguard/cli @frontguard/playwright</code>.</p>
-
-<h3>How does Frontguard handle cross-OS rendering differences?</h3>
-<p>Playwright's own docs warn that local rendering varies by OS and hardware. Frontguard ships a pinned Docker renderer image (Chromium, Firefox, WebKit + system fonts) so baselines render byte-equivalently on macOS, Linux, and CI. Enable with <code>frontguard run --docker</code>.</p>
 
 <h3>Can I self-host the cloud?</h3>
 <p>Yes. The cloud (Hono on Cloudflare Workers with D1 and R2) is MIT-licensed and runs locally via <code>docker-compose up</code> — miniflare for the Worker runtime, SQLite in place of D1, and a local-disk adapter in place of R2.</p>
 
-<h3>What environment variables does Frontguard read?</h3>
-<p>AI: <code>FRONTGUARD_OPENAI_KEY</code> or <code>FRONTGUARD_ANTHROPIC_KEY</code>. The Playwright plugin also accepts unprefixed <code>OPENAI_API_KEY</code> / <code>ANTHROPIC_API_KEY</code> when present. Cloud: <code>FRONTGUARD_API_URL</code> and <code>FRONTGUARD_API_KEY</code>. <code>frontguard doctor</code> reads exactly the same env names the runtime reads.</p>
-
 <h3>OpenAI or Anthropic — which should I use?</h3>
 <p>Either works. Frontguard sends the diff image, the DOM snapshot, console errors, and axe-core findings. Claude Sonnet is the default when both keys are present; GPT-4o is the fallback. Switch with <code>ai.provider</code> in <code>frontguard.config.ts</code>.</p>
 
-<h3>Does Frontguard work with Storybook?</h3>
-<p>Yes. <code>frontguard init</code> detects an existing Storybook (looks for <code>.storybook/main.ts</code>) and scaffolds a Storybook-aware config. The adapter walks the Storybook iframe, runs each story's <code>play()</code> function, and produces one screenshot per story × viewport.</p>
+<p>The full FAQ — cross-OS rendering, environment variables, Storybook, the MCP server, and screenshot retention — moved with pricing. <a href="/pricing#faq">All eight questions are answered on the pricing page</a>.</p>
+</section>
 
-<h3>Is there an MCP server for in-IDE agents?</h3>
-<p><code>@frontguard/mcp</code> exposes <code>list_regressions(pr_id)</code>, <code>get_suggested_fix(diff_id)</code>, <code>accept_baseline(diff_id)</code>, and <code>recent_runs(repo, branch)</code> to Claude Code, Cursor, Cline, and Copilot. Run as <code>npx @frontguard/mcp</code> and drop the snippet into your <code>mcp.json</code>.</p>
+<section aria-labelledby="honest-heading">
+<h2 id="honest-heading">We'll tell you what it isn't</h2>
+<p><strong>You bring the key.</strong> AI runs on your own OpenAI or Anthropic key; the anti-flake gate keeps ~90% of pages away from the model, so the bill stays small and your screenshots never touch a server we run.</p>
+<p><strong>You stay in the loop.</strong> Frontguard never silently auto-approves — every classification and every fix is yours to accept or reject.</p>
+<p><strong>Numbers, not claims.</strong> It's young. We validate against real, live repositories and publish real false-positive rates rather than asserting accuracy.</p>
+</section>
 
-<h3>What is the data retention policy for screenshots?</h3>
-<p>The CLI never sends screenshots anywhere except the AI provider you configured. On the hosted cloud, baselines and diff thumbnails are stored in R2 under your team scope; default retention is 30 days on Pro, configurable up to 1 year on Enterprise.</p>
+<section aria-labelledby="cta-heading">
+<h2 id="cta-heading">Ship with confidence</h2>
+<p>Free forever. No per-screenshot pricing cliff, no dashboard lock-in. Install it and run your first check in two minutes.</p>
+<p>
+<a href="/docs" class="cta">Read the docs</a>
+<a href="https://github.com/ravidsrk/frontguard" class="cta-secondary" target="_blank" rel="noopener noreferrer">★ Star on GitHub</a>
+</p>
 </section>
 
 </main>
@@ -366,15 +364,15 @@ test('checkout @ 375px', async ({ page }) =&gt; {
 <nav aria-label="Sitemap">
 <h3>Sitemap</h3>
 <ul>
-<li><a href="https://docs.frontguard.dev" target="_blank" rel="noopener noreferrer">Documentation</a></li>
-<li><a href="https://docs.frontguard.dev/docs/comparison/percy" target="_blank" rel="noopener noreferrer">vs Percy</a></li>
-<li><a href="https://docs.frontguard.dev/docs/comparison/chromatic" target="_blank" rel="noopener noreferrer">vs Chromatic</a></li>
-<li><a href="https://docs.frontguard.dev/docs/comparison/argos" target="_blank" rel="noopener noreferrer">vs Argos</a></li>
+<li><a href="/docs">Documentation</a></li>
+<li><a href="/pricing">Pricing</a></li>
+<li><a href="/comparisons">Full comparison (Percy, Chromatic, BackstopJS, Lost Pixel, Argos)</a></li>
+<li><a href="/changelog">Changelog</a></li>
+<li><a href="/brand">Brand</a></li>
 <li><a href="https://docs.frontguard.dev/docs/migrate/backstopjs" target="_blank" rel="noopener noreferrer">Migrate from BackstopJS</a></li>
 <li><a href="https://docs.frontguard.dev/docs/migrate/lost-pixel" target="_blank" rel="noopener noreferrer">Migrate from Lost Pixel</a></li>
 <li><a href="https://github.com/ravidsrk/frontguard" target="_blank" rel="noopener noreferrer">GitHub repository</a></li>
 <li><a href="https://www.npmjs.com/package/@frontguard/cli" target="_blank" rel="noopener noreferrer">npm: @frontguard/cli</a></li>
-<li><a href="https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a></li>
 <li><a href="https://github.com/ravidsrk/frontguard/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">Contributing</a></li>
 <li><a href="https://github.com/ravidsrk/frontguard/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a></li>
 <li><a href="https://github.com/ravidsrk/frontguard/blob/main/validation/results-v0.2.md" target="_blank" rel="noopener noreferrer">Validation results</a></li>
@@ -390,8 +388,8 @@ test('checkout @ 375px', async ({ page }) =&gt; {
 
 <noscript>
 <style>
-body { font-family: system-ui, sans-serif; color: #e2e8f0; background: #06080c; margin: 0; padding: 2rem; line-height: 1.7; }
-a { color: #22d3ee; } h2, h3 { color: #f1f5f9; }
+body { font-family: 'Space Grotesk', system-ui, sans-serif; color: #f5f1ea; background: #0d0c0b; margin: 0; padding: 2rem; line-height: 1.7; }
+a { color: #e8862e; } h2, h3 { color: #f5f1ea; }
 .wrap { max-width: 48rem; margin: 0 auto; }
 </style>
 <div class="wrap">
