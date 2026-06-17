@@ -9,6 +9,7 @@ interface State {
   hasError: boolean;
 }
 
+/** App-level error boundary. Restyled to the new design tokens. */
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -25,21 +26,26 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      return this.props.fallback ?? (
-        <div className="min-h-screen bg-gray-950 flex items-center justify-center p-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-white mb-2">Something went wrong</h1>
-            <p className="text-gray-400 mb-4">Please refresh the page to try again.</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-cyan-500 text-black font-medium rounded-lg hover:bg-cyan-400 transition-colors"
-            >
-              Refresh Page
-            </button>
+      return (
+        this.props.fallback ?? (
+          <div className="flex min-h-screen items-center justify-center bg-canvas p-8">
+            <div className="text-center">
+              <h1 className="font-sans text-[24px] font-bold text-ink-hi">Something went wrong</h1>
+              <p className="mt-2 text-[15px] text-ink-mid">Please refresh the page to try again.</p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="mt-5 bg-amber px-5 py-2.5 font-mono text-[13px] font-medium text-canvas transition-colors hover:bg-amber-hover cursor-pointer"
+              >
+                Refresh page
+              </button>
+            </div>
           </div>
-        </div>
+        )
       );
     }
     return this.props.children;
   }
 }
+
+export default ErrorBoundary;
