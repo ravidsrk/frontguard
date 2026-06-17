@@ -353,7 +353,7 @@ jobs:
         run: npx wait-on http://localhost:6006
 
       - name: Frontguard
-        run: npx -p @frontguard/cli frontguard run --baseline-strategy git --ai
+        run: npx -p @frontguard/cli frontguard run
         env:
           # Optional: AI classification + auto-fix suggestions
           FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -502,6 +502,8 @@ Use it as a working reference whenever your own project's setup misbehaves.
 - [Quick Start](../quick-start) — the 90-second tour of `frontguard run`,
   PR comments, and baselines.
 - [CLI reference](../cli) — every flag the CLI accepts, including
-  `--ai`, `--verify-fixes`, and `--baseline-strategy`.
+  `--verify-fixes`. AI analysis and baseline strategy are enabled in
+  `frontguard.config.ts` (plus the relevant API-key env vars), not via
+  CLI flags.
 - [CI/CD recipes](../ci-cd) — patterns for GitHub Actions, GitLab CI, and
   Vercel preview integration.
