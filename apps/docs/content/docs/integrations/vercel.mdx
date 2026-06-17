@@ -48,17 +48,26 @@ in the repo.
 
 ## Install
 
-1. Go to the [Frontguard integration page on Vercel
-   Marketplace](https://vercel.com/integrations/frontguard).
+<Callout type="warn">
+  The Vercel Marketplace listing and the post-install callback
+  (`/api/install`) are both **in review** — the one-click flow below works
+  once the listing is approved. To run Frontguard against Vercel previews
+  **today**, use the GitHub Actions or CLI path from [Where to find
+  Frontguard](/docs/distribution) instead; both are available now.
+</Callout>
+
+Once the listing is live, installation is one-click:
+
+1. Open the Frontguard integration page on the Vercel Marketplace.
 2. Click **Add Integration**.
 3. Choose the team or personal scope you want the integration installed on.
 4. Pick the projects (or "all current and future projects") you want
    Frontguard to monitor. **This is the consent boundary** — only projects
    you select here will be allowed to have their deployment URLs (custom
    domains included) accepted by Frontguard.
-5. Vercel sends you to `https://frontguard.dev/api/install?code=…`. We
-   exchange the code for an access token, create your Frontguard team if it
-   doesn't exist, and send you on to the post-install screen.
+5. Vercel sends you to the Frontguard post-install callback, which exchanges
+   the code for an access token, creates your Frontguard team if it doesn't
+   exist, and sends you on to the post-install screen.
 6. Add three env vars to each project (Vercel → Project → Settings →
    Environment Variables):
 
@@ -267,11 +276,10 @@ isn't present. Set it on the deployment and redeploy.
 ### Run was triggered but no PR comment appeared
 
 The Frontguard Cloud API posts PR comments through the GitHub App you
-authorized when you connected your workspace. Visit
-[Settings → Integrations → GitHub](https://frontguard.dev/settings/integrations)
-to confirm the App is installed on the repo. If the deployment came from a
-non-GitHub provider, the run will appear in the dashboard but no comment
-will be posted yet.
+authorized when you connected your workspace. In the Frontguard dashboard,
+open **Settings → Integrations → GitHub** to confirm the App is installed on
+the repo. If the deployment came from a non-GitHub provider, the run will
+appear in the dashboard but no comment will be posted yet.
 
 ### Production deployment was skipped — was that on purpose?
 
