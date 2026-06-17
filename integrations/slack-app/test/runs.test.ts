@@ -175,19 +175,28 @@ describe('pollRunUntilTerminal', () => {
 });
 
 describe('summarizeRun + buildFollowUpResponse', () => {
+  // Real cloud-api wire shape: each result carries a `status` string
+  // (`passed | regression | changed | warning | new_baseline | failed`), NOT a
+  // boolean flag. Mirrors integrations/netlify/test/core.test.js FIXTURE_FAILING
+  // and the canonical RunResult in packages/cloud-api/src/types.ts:30.
   const completed: CloudRunStatus = {
     id: 'r',
     status: 'completed',
     url: 'https://example.com',
     reportUrl: 'https://frontguard.dev/r/r',
-    results: [{ regression: true }, { warning: true }, {}],
+    results: [
+      { route: '/', viewport: 1440, status: 'passed', diffPercentage: 0, timestamp: 't' },
+      { route: '/pricing', viewport: 1440, status: 'regression', diffPercentage: 3.4, timestamp: 't' },
+      { route: '/about', viewport: 1440, status: 'changed', diffPercentage: 1.1, timestamp: 't' },
+      { route: '/blog', viewport: 1440, status: 'warning', diffPercentage: 0.2, timestamp: 't' },
+    ],
   };
 
-  it('counts regressions and warnings', () => {
+  it('counts regressions and warnings from per-result status', () => {
     expect(summarizeRun(completed, 'https://fallback')).toEqual({
       url: 'https://example.com',
-      total: 3,
-      regressions: 1,
+      total: 4,
+      regressions: 2, // regression + changed
       warnings: 1,
       reportUrl: 'https://frontguard.dev/r/r',
     });
@@ -196,9 +205,60 @@ describe('summarizeRun + buildFollowUpResponse', () => {
   it('builds an in-channel response for a completed run', () => {
     const body = buildFollowUpResponse(completed, 'https://fallback');
     expect(body.response_type).toBe('in_channel');
-    expect(body.text).toContain('1 visual regression');
+    expect(body.text).toContain('2 visual regression');
     expect(body.replace_original).toBe(false);
     expect(Array.isArray(body.blocks)).toBe(true);
+  });
+
+  // Regression test for [int-1]: the Slack app previously typed `results` as
+  // `Array<{ regression?: boolean; warning?: boolean }>` and counted those
+  // booleans, which never exist on the wire. The real cloud-api emits per-result
+  // `status` strings, so every completed run reported "No visual regressions"
+  // regardless of outcome. This fixture mirrors the dossier's Evidence repro:
+  // a run with `status: 'regression'`/`'changed'` alongside `'passed'`.
+  it('[int-1] reports a regression when results carry status regression/changed', () => {
+    const run: CloudRunStatus = {
+      id: 'r',
+      status: 'completed',
+      url: 'https://example.com',
+      results: [
+        { route: '/', viewport: 1440, status: 'passed', diffPercentage: 0, timestamp: 't' },
+        { route: '/pricing', viewport: 1440, status: 'regression', diffPercentage: 4.2, timestamp: 't' },
+        { route: '/about', viewport: 1440, status: 'changed', diffPercentage: 1.0, timestamp: 't' },
+      ],
+    };
+    const summary = summarizeRun(run, 'https://fallback');
+    expect(summary.regressions).toBeGreaterThanOrEqual(1);
+    expect(summary.regressions).toBe(2); // regression + changed
+    const body = buildFollowUpResponse(run, 'https://fallback');
+    expect(body.text).toContain('visual regression');
+    expect(body.text).not.toContain('No visual regressions');
+  });
+
+  it('[int-1] folds a per-result failed status into regressions', () => {
+    const run: CloudRunStatus = {
+      id: 'r',
+      status: 'completed',
+      url: 'https://example.com',
+      results: [{ route: '/', viewport: 1440, status: 'failed', diffPercentage: 0, timestamp: 't' }],
+    };
+    expect(summarizeRun(run, 'https://fallback').regressions).toBe(1);
+  });
+
+  it('[int-1] reports a clean run only for passed/new_baseline statuses', () => {
+    const run: CloudRunStatus = {
+      id: 'r',
+      status: 'completed',
+      url: 'https://example.com',
+      results: [
+        { route: '/', viewport: 1440, status: 'passed', diffPercentage: 0, timestamp: 't' },
+        { route: '/x', viewport: 1440, status: 'new_baseline', diffPercentage: 0, timestamp: 't' },
+      ],
+    };
+    const summary = summarizeRun(run, 'https://fallback');
+    expect(summary.regressions).toBe(0);
+    expect(summary.warnings).toBe(0);
+    expect(buildFollowUpResponse(run, 'https://fallback').text).toContain('No visual regressions');
   });
 
   it('builds a failure message for a failed run', () => {
