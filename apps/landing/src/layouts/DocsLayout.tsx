@@ -17,8 +17,13 @@ export function DocsLayout() {
       <div className="mx-auto grid max-w-[1400px] grid-cols-1 lg:grid-cols-[256px_minmax(0,1fr)]">
         <aside
           aria-label="Docs navigation"
-          hidden={!sidebarOpen}
-          className="border-b border-border-faint px-7 py-6 lg:!block lg:border-b-0 lg:border-r"
+          className={[
+            // Mobile: a drawer toggled by the top-bar hamburger. Desktop: always
+            // shown. Uses class-based show/hide (not the `hidden` attribute) so
+            // the `lg:block` override actually wins under Tailwind v4.
+            sidebarOpen ? 'block' : 'hidden',
+            'border-b border-border-faint px-7 py-6 lg:block lg:border-b-0 lg:border-r',
+          ].join(' ')}
         >
           <nav className="flex flex-col gap-6">
             {DOCS_NAV.map((group) => (
