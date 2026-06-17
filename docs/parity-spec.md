@@ -50,19 +50,21 @@ Routing shape: a `BrowserRouter` in `main.tsx`, a route table in `App.tsx` mappi
 
 ### 1.4 Per-route SEO and the no-JS floor
 
-The floor requires strong SEO (title/description/canonical/OG/Twitter/JSON-LD) and a static no-JS fallback. A client-rendered SPA would regress that for the five new routes. Decisions:
+The floor requires strong SEO (title/description/canonical/OG/Twitter/JSON-LD) and a static no-JS fallback. A pure client-rendered SPA would regress that for the five new routes, so it is not an option. Decisions:
 
-- Per-route head tags: use React 19 native document metadata (render `<title>`, `<meta>`, `<link rel="canonical">` inside each page component; React 19 hoists them to `<head>`). No `react-helmet` dependency.
-- Crawler/no-JS parity for all routes: add build-time prerendering so each route emits static HTML. Recommended: `vite-react-ssg` (built for react-router + Vite SSG) evaluated in T-FOUNDATION. If prerender is deferred, the homepage keeps its existing rich `#root` static fallback (floor preserved) and the new routes are CSR with React 19 metadata; this SEO tradeoff for the new routes must be recorded, not silent. Recommendation: do the prerender so `/pricing`, `/comparisons`, `/changelog`, `/brand`, `/docs` are crawlable at parity with `/`.
-- SPA deep-link serving: Cloudflare Pages must serve `index.html` for unknown deep paths so `/pricing` etc. resolve on hard refresh. Add a `public/_redirects` (`/*  /index.html  200`) or rely on Pages SPA fallback; the existing `404.html` is reskinned but the SPA fallback is the primary mechanism. (With SSG, real per-route HTML exists and this is only a backstop.)
+- Build-time static HTML for all six routes is mandatory (hard requirement, not optional). The build MUST prerender `/`, `/pricing`, `/comparisons`, `/changelog`, `/brand`, and `/docs` to real static HTML files at build time, so every route is crawlable and renders without JS at parity with the homepage's existing static `#root` fallback (floor items 4, 15, 16, 17, 20). There is no CSR-only fallback path; a route that ships without prerendered HTML is a build failure, not a recorded tradeoff.
+- SSG approach: use `vite-react-ssg` (build-time static site generation for react-router + Vite). T-FOUNDATION installs and wires it so the build (`vite-react-ssg build`) emits one static HTML document per route into `apps/landing/dist` (e.g. `dist/index.html`, `dist/pricing/index.html`, `dist/comparisons/index.html`, `dist/changelog/index.html`, `dist/brand/index.html`, `dist/docs/index.html`, plus the `/docs/:page` sub-pages prerendered from the ordered docs page list). The routes are enumerated for the SSG `includedRoutes` so none is missed.
+- Per-route head tags: use React 19 native document metadata (render `<title>`, `<meta>`, `<link rel="canonical">` inside each page component; React 19 hoists them to `<head>`), captured into each prerendered HTML by the SSG pass. No `react-helmet` dependency.
+- SPA deep-link serving: even with per-route static HTML, add a `public/_redirects` (`/*  /index.html  200`) as a backstop for unknown deep paths; the reskinned `404.html` covers genuine misses. With SSG the real per-route HTML is what crawlers and no-JS visitors get; the SPA fallback is only a safety net.
 
 ### 1.5 Build, deploy, and green-build contract (unchanged floor)
 
 These must stay green and are a hard requirement (floor items 19-20):
 
-- `apps/landing`: `npm run build` (`tsc -b && vite build`, strict TS), `npm run lint` (`eslint .`), plus the new `npm test` (section 2.5).
+- `apps/landing`: `npm run build` (now `tsc -b && vite-react-ssg build`, strict TS), `npm run lint` (`eslint .`), plus the new `npm test` (section 2.5).
+- Static-HTML output is part of the green-build contract: `npm run build` MUST emit a real prerendered HTML file for every one of the six routes under `apps/landing/dist` (1.4). A build that produces only `dist/index.html` (SPA shell) for the new routes is a failed build. This is verifiable in CI by asserting the per-route `dist/**/index.html` files exist and contain rendered content (section 2.5 / t-seo-assets).
 - Root: `npm run dev:landing`, `npm run build:landing`, and `npm test` (which now picks up the landing's new `test` script via `--workspaces --if-present`).
-- Deploy: Cloudflare Pages from `apps/landing/dist` (`.github/workflows/deploy-landing.yml`), branch `main`. `fly.toml` stays legacy/unused.
+- Deploy: Cloudflare Pages from `apps/landing/dist` (`.github/workflows/deploy-landing.yml`), branch `main`. The deployed `dist` carries per-route static HTML, so deep links and crawlers hit real documents. `fly.toml` stays legacy/unused.
 
 ## 2. T-FOUNDATION
 
@@ -158,10 +160,11 @@ Per-task tests in screen tasks build on this harness (section 5 acceptance crite
 ### 2.6 Routing scaffold, responsive system, a11y baseline
 
 - Routing scaffold: install react-router-dom, add `BrowserRouter` in `main.tsx` (keeping `StrictMode` + `ErrorBoundary` wrap), build the route table + the two layouts (marketing shell, docs shell) in `App.tsx`, and create stub page components for all six routes so screen tasks edit only their own file. Preserve the skip link and `<main id="main-content">`.
+- SSG wiring (mandatory, 1.4): install `vite-react-ssg`, switch the build entry to its router (`ViteReactSSG` over the same react-router route table) and the build script to `tsc -b && vite-react-ssg build`, and enumerate all six routes (plus the `/docs/:page` set) in the SSG `includedRoutes` so the build emits real static HTML per route. The scaffold proves it by emitting a prerendered `dist/<route>/index.html` for each stubbed route before any screen task runs.
 - Responsive system (the design is desktop-fixed with zero `@media`; the build owns responsive): define the canonical breakpoints and collapse rules once as shared utilities/components so every page applies them consistently. Rules (from the extract, mobile-first Tailwind v4): nav collapses to a hamburger below ~768px (Star button stays visible); hero `1fr 1fr` stacks below ~900px (terminal under copy); `repeat(3,1fr)` grids go 3->2->1; `repeat(6,1fr)` pipeline and `repeat(5,1fr)` plugins wrap to 2-3 then 1; tables get `overflow-x:auto` or stack to cards on mobile; the Docs three-column shell becomes a drawer sidebar + hidden TOC with full-width content on mobile; hero h1 fluid-scales from 58px toward ~32-36px on mobile.
 - A11y baseline (floor item 14): skip-to-content link, amber `*:focus-visible` outline, ARIA on nav/tabs/accordions/comparison caption, alt text on imagery, and `prefers-reduced-motion` honored. The reduced-motion media query must neutralize the new `fg-blink`/`fg-pulse`/`fg-scan` animations too.
 
-T-FOUNDATION done = tokens + theme + kit + brand mark + fonts + favicon/OG regen + router scaffold + responsive utils + a11y baseline + green `npm test` (sample) + green `tsc -b` + green `eslint .`.
+T-FOUNDATION done = tokens + theme + kit + brand mark + fonts + favicon/OG regen + router scaffold + `vite-react-ssg` wired and emitting a real prerendered `dist/<route>/index.html` for all six route stubs (verified to contain rendered markup, not an empty SPA shell) + responsive utils + a11y baseline + green `npm test` (sample) + green `tsc -b` + green `eslint .`.
 
 ## 3. Parity matrix
 
@@ -177,7 +180,7 @@ Treatment legend: REDESIGN = design covers an existing floor capability, rebuild
 | Problem (3 failure-mode cards)           | REDESIGN           | `/` Problem strip                              | Design problem strip = statement + 2x2 stat grid; fold the 3 sourced failure modes' substance in; keep source citations |
 | HowItWorks (Detect/Understand/Fix)       | REDESIGN           | `/` Three pillars                              | Same Detect/Understand/Fix pillars in new card style                                            |
 | Features (6 cards)                       | REDESIGN+GAP-FILL  | `/` Features grid                              | Design grid = 9 cells; old = 6. Carry all old 6 substance + design's extras; keep code-snippet flavor |
-| Comparison (11 rows x Percy/Chromatic/Argos) | REDESIGN+GAP-FILL | `/` comparison (summary) + `/comparisons` (full) | Design landing table = 5-col/7-row; `/comparisons` = 7-col/9-row. Restore the floor's 11-row depth on `/comparisons` (add "PR comment with thumbnail triplet", "Enterprise SSO/SAML", "MCP server"); landing keeps a summary |
+| Comparison (11 rows x Percy/Chromatic/Argos) | REDESIGN+GAP-FILL | `/` comparison (summary) + `/comparisons` (full) | All 11 floor rows must survive on `/comparisons` (6-col design matrix). 5 floor rows map onto design rows (rename/merge), 6 floor rows have no design equivalent and are GAP-FILLED as added rows. Exact 11-row mapping and the per-row content test in §5 `t-comparisons`. Landing keeps a 5-column summary that links to `/comparisons`. |
 | QuickStart / Install (3 tabs, copy)      | REDESIGN           | `/` Two-ways-in + install rows                 | Design = "Standalone CLI" + "Playwright-native" cards + `CopyCommand` rows; preserve the GitHub-Action third path (fold into two-ways-in or a third card) + tab-grade keyboard a11y + clipboard + execCommand fallback |
 | Validation (4 stats + 5-repo table)      | GAP-FILL           | `/` Validation section                         | Design is silent on Validation; design-and-build it in the new language; keep the harness-wired numbers and methodology links exactly |
 | Pricing (3 tiers)                        | REDESIGN           | `/pricing` tiers (+ landing pricing CTA)       | Free CLI / Pro / Team; design Pro `featured` "MOST POPULAR"; keep CTAs (install anchor, external signup, mailto) + rel hygiene; pricing leaves the landing page (recorded, 4.2) |
@@ -195,7 +198,7 @@ Treatment legend: REDESIGN = design covers an existing floor capability, rebuild
 | SoftwareApplication JSON-LD                        | REDESIGN  | T-FOUNDATION head                   | Keep offers ($0 / $29), no fabricated ratings                                            |
 | FAQPage JSON-LD (8 Qs)                             | REDESIGN+GAP-FILL | `/pricing` (with the FAQ UI) | Move with the FAQ; reconcile to stay aligned in substance with on-page answers; fix the stale "mirror verbatim" comment |
 | Static no-JS `#root` fallback (homepage)          | REDESIGN  | T-LANDING (index.html `#root`)      | Reskin the homepage static mirror; reconcile the 9-vs-11 comparison rows and condensed-FAQ gaps |
-| Per-route crawlability                             | NEW       | T-FOUNDATION (SSG) + T-SEO-ASSETS   | Prerender the five new routes (1.4); otherwise record the CSR tradeoff                   |
+| Per-route static HTML / crawlability               | NEW (mandatory) | T-FOUNDATION (vite-react-ssg) + T-SEO-ASSETS | Build MUST emit real prerendered HTML for ALL SIX routes (1.4); no CSR-only fallback; missing per-route HTML is a build failure (floor items 4,15,16,17,20) |
 | `robots.txt` / `sitemap.xml` / `llms.txt` / `llms-full.txt` / `404.html` | REDESIGN+GAP-FILL | T-SEO-ASSETS | Add the new routes to sitemap + llms; reskin `404.html`; keep all served at root |
 | Validation numbers wired to harness               | GAP-FILL  | T-LANDING (Validation)              | Keep the `validation/aggregate-results.mjs --landing` regeneration path; never fabricate |
 | Green build/lint/test + Cloudflare deploy         | REDESIGN  | T-FOUNDATION + every task           | Floor items 19-20; add `npm test` to the contract                                       |
@@ -230,12 +233,12 @@ These are the deliberate deviations where design and floor disagreed. Frozen.
 1. Single page -> six routes. `apps/landing` becomes a multi-page react-router-dom site (1.2-1.3).
 2. Pricing and FAQ leave the Landing page. The design's Landing has no pricing or FAQ section; both live on `/pricing`. Consequence: the floor's `#pricing` and `#faq` in-page anchors become `/pricing` and `/pricing#faq`. Backward-compat for old inbound hash links (`frontguard.dev/#pricing`, `/#faq`): add a small hash-redirect shim on `/` that maps legacy hashes to the new routes. Recorded; not silent. The Landing keeps a pricing CTA/link, not a full pricing grid.
 3. `#comparison` -> `/comparisons`. The full comparison is a standalone page; the Landing keeps a 5-column summary table that links to it. Old `/#comparison` hash gets the same redirect shim.
-4. Comparison depth. Restore the floor's 11 rows on `/comparisons` (design shows 9). Add the missing "PR comment with thumbnail triplet", "Enterprise SSO/SAML", and "MCP server" rows. The competitor set expands to include Argos (design's 7th column) on `/comparisons`; the Landing summary keeps the 5-column set.
+4. Comparison depth. All 11 floor rows survive on `/comparisons`. The design's matrix has 9 capability rows and 6 vendor columns (Frontguard, Percy, Chromatic, BackstopJS, Lost Pixel, Argos); the floor has 11 rows and 4 vendor columns (Frontguard, Percy, Chromatic, Argos). Reconciliation: 5 floor rows map onto design rows (rename/merge), and 6 floor rows have no design equivalent and are GAP-FILLED as additional rows on the `/comparisons` matrix. The exact 11-row mapping is enumerated in §5 `t-comparisons`. The vendor columns are the design's 6 (adding BackstopJS and Lost Pixel to the floor's 4); GAP-FILL rows populate all 6 columns, preserving the floor's content for Frontguard/Percy/Chromatic/Argos and filling BackstopJS/Lost Pixel from `docs/research.md` (or an honest ✕/n/a where genuinely unsupported). The Landing summary keeps a 5-column subset (Frontguard + Percy/Chromatic/BackstopJS/Lost Pixel per the design's landing table) and links to the full page.
 5. FAQ depth. Carry all 8 floor questions on `/pricing` (design shows 5). Keep the FAQPage JSON-LD aligned in substance and fix the stale source comment that claims verbatim mirroring (it is a paraphrase today).
 6. Docs duality. Build the design's Docs page in `apps/landing` at `/docs` as the new-brand docs surface; keep `apps/docs` (Fumadocs) live as the deep technical reference (section 6).
 7. Demo asset. The design hero uses a CSS terminal mock, not `frontguard-demo.gif`. Keep the GIF available (docs/README) and keep the floor's GIF-with-terminal-fallback option behind the hero if the team wants the GIF; default to the design's CSS mock. The `#demo` anchor stays.
 8. Brand raster assets. Regenerate favicon / apple-touch / OG / `logo-*` from the amber shield (old cyan mark retired). Recorded in T-FOUNDATION.
-9. Per-route SEO via prerender. Recommended `vite-react-ssg`; if deferred, new routes are CSR (homepage keeps its static fallback) and the tradeoff is recorded (1.4).
+9. Per-route static HTML is mandatory. The build prerenders all six routes to real static HTML via `vite-react-ssg` (1.4). There is no CSR-only fallback option: every route ships crawlable static HTML at parity with the homepage's existing static fallback. A route without prerendered HTML is a build failure.
 10. Validation stays. Design is silent; it is GAP-FILLED onto `/` with its real harness wiring intact (no fabricated numbers).
 
 ## 5. Build task list (ordered, with acceptance criteria)
@@ -256,11 +259,11 @@ Per-item acceptance criteria below = design fidelity (cite source page) + functi
 
 - Fidelity: tokens, type scale, spacing, radius-0, shadows, motion, brand mark, lockups, and fonts match `docs/design-extract.md` sections "Color/Typography/Spacing/Radius/Motion/Iconography" and the Brand page (`Brand.dc.html`).
 - Parity: preserves the build/lint contract (floor 19), the a11y baseline + `prefers-reduced-motion` (floor 14), `ErrorBoundary` + `useInView` ported (floor 12-13), and re-points nav/footer links to routes without losing any (floor 1-2).
-- Tests: `npm test` green with the sample smoke test rendering the `Logo` mark; kit primitives (`Button`, `Badge`, `CopyCommand`, `StatusGlyph`) have render/variant tests.
+- Tests: `npm test` green with the sample smoke test rendering the `Logo` mark; kit primitives (`Button`, `Badge`, `CopyCommand`, `StatusGlyph`) have render/variant tests. Plus a build-output test: after `npm run build`, assert that `apps/landing/dist/index.html`, `dist/pricing/index.html`, `dist/comparisons/index.html`, `dist/changelog/index.html`, `dist/brand/index.html`, and `dist/docs/index.html` all exist and each contains rendered route markup (a route-specific string), not just an empty `<div id="root"></div>` shell.
 - States: kit components expose hover/disabled/active/`featured` variants; `CopyCommand` toggles "copied ✓" (1600ms); reduced-motion neutralizes `fg-blink`/`fg-pulse`/`fg-scan`.
 - Responsive: breakpoint utilities + collapse rules (2.6) defined and unit-coverable; nav hamburger threshold ~768px.
 - A11y: skip link, amber `*:focus-visible`, ARIA scaffolding in `Nav`, regenerated favicon/OG.
-- Done when: `tsc -b`, `eslint .`, and `npm test` all pass; all six route stubs render; brand mark + fonts visibly applied.
+- Done when: `tsc -b`, `eslint .`, and `npm test` all pass; `vite-react-ssg` is wired and `npm run build` emits a real prerendered `dist/<route>/index.html` for ALL SIX routes, each verified to contain rendered markup (not an empty SPA shell); all six route stubs render; brand mark + fonts visibly applied.
 
 ### t-landing (parallel wave) — `/`
 
@@ -283,8 +286,38 @@ Per-item acceptance criteria below = design fidelity (cite source page) + functi
 ### t-comparisons (parallel wave) — `/comparisons`
 
 - Fidelity: hero (h1 52px), alternatives strip (`repeat(4,1fr)`: Percy/Chromatic/BackstopJS/Lost Pixel), 7-col matrix (CAPABILITY + Frontguard + Percy + Chromatic + BackstopJS + Lost Pixel + Argos) with the legend (✓ green / ◐ amber / ✕ grey), head-to-head `.fg-vs` cards, migration row (`0.8fr 1.2fr`), CTA, per `Comparisons.dc.html` / `renders/comparisons.png`.
-- Parity: absorbs floor Comparison at full depth (decision 4): all 11 rows incl. "PR comment with thumbnail triplet", "Enterprise SSO/SAML", "MCP server"; Frontguard column highlighted; sources traceable to `docs/research.md`.
-- Tests: matrix row count (>=11) + per-cell color mapping; vs-card hover; legend present.
+- Parity (no floor row may be dropped): this page absorbs the floor's full comparison at full depth. The floor's `Comparison.tsx` has exactly these 11 capability rows (verbatim labels, from `docs/old-product-inventory.md` / `apps/landing/src/components/Comparison.tsx`), over vendors Frontguard, Percy, Chromatic, Argos:
+
+  1. Free tier
+  2. Paid entry tier
+  3. Snapshot overage
+  4. AI diff explanation
+  5. Sandbox-verified fixes
+  6. Self-host
+  7. Storybook integration
+  8. MCP server for in-IDE agents
+  9. PR comment with thumbnail triplet
+  10. Cross-OS render normalisation
+  11. Enterprise SSO/SAML
+
+  The design's `/comparisons` matrix has 9 capability rows (Open source, CLI-first, AI change classification, AI fix verification, Anti-flake rendering, Self-hostable, Free tier, Pro entry, Actively maintained) over 6 vendors (Frontguard, Percy, Chromatic, BackstopJS, Lost Pixel, Argos). Complete row-by-row mapping from each floor row to the built matrix (rename/merge/keep), so none is lost:
+
+  | # | Floor row (old)                  | Built `/comparisons` row            | Disposition | Where it lives                                                   |
+  |---|----------------------------------|-------------------------------------|-------------|-----------------------------------------------------------------|
+  | 1 | Free tier                        | Free tier                           | KEEP        | design row (same label)                                         |
+  | 2 | Paid entry tier                  | Pro entry                           | RENAME      | design row "Pro entry" carries the floor's paid-entry content   |
+  | 3 | Snapshot overage                 | Snapshot overage                    | GAP-FILL    | added row (no design equivalent)                               |
+  | 4 | AI diff explanation              | AI change classification            | RENAME/MERGE| design row; cell keeps "plain-English category + confidence + cause" |
+  | 5 | Sandbox-verified fixes           | AI fix verification                 | RENAME      | design row carries the floor's sandbox-verified-fix content     |
+  | 6 | Self-host                        | Self-hostable                       | RENAME      | design row "Self-hostable"                                      |
+  | 7 | Storybook integration            | Storybook integration               | GAP-FILL    | added row (no design equivalent)                               |
+  | 8 | MCP server for in-IDE agents     | MCP server for in-IDE agents        | GAP-FILL    | added row (no design equivalent)                               |
+  | 9 | PR comment with thumbnail triplet| PR comment with thumbnail triplet   | GAP-FILL    | added row (no design equivalent)                               |
+  | 10| Cross-OS render normalisation    | Cross-OS render normalisation       | GAP-FILL    | added row; distinct from the design-native "Anti-flake rendering" row (consensus != OS-pinning), so it is NOT merged into it |
+  | 11| Enterprise SSO/SAML              | Enterprise SSO/SAML                 | GAP-FILL    | added row (no design equivalent)                               |
+
+  Result: 5 floor rows map onto design rows; 6 floor rows are GAP-FILLED as added rows. The four design-native rows with no floor origin (Open source, CLI-first, Anti-flake rendering, Actively maintained) are also kept, giving a 15-row matrix. GAP-FILL rows populate all 6 vendor columns: the floor's content is preserved for Frontguard/Percy/Chromatic/Argos and the BackstopJS/Lost Pixel cells are filled from `docs/research.md` (or an honest ✕/n/a where genuinely unsupported). Frontguard column highlighted; sources traceable to `docs/research.md`.
+- Tests: assert EACH of the 11 floor capabilities is present in the rendered matrix by content/label (one assertion per row using the labels above, or the renamed target where renamed — e.g. "Paid entry"/"Pro entry", "AI change classification", "AI fix verification", "Self-hostable"), NOT merely `rowCount >= 11`. Also: every GAP-FILL row renders all 6 vendor cells; the design-native rows render; per-cell color mapping (✓ green / ◐ amber / ✕ grey); vs-card hover; legend present.
 - States: vs-card hover border; matrix horizontal scroll on mobile; row hover highlight.
 - Responsive: alternatives 4->2->1; matrix scroll/stack; vs-cards 2->1.
 - A11y: table `<caption class="sr-only">`, scope on header cells, legend readable by SR.
@@ -319,8 +352,8 @@ Per-item acceptance criteria below = design fidelity (cite source page) + functi
 ### t-seo-assets (serial finalize) — `public/*` + cross-route SEO
 
 - Fidelity: reskin `404.html` to the new tokens/brand mark.
-- Parity: add all six routes to `sitemap.xml` (with `lastmod`) and to `llms.txt` / `llms-full.txt`; keep `robots.txt` pointing at the sitemap; verify per-route React 19 metadata (title/desc/canonical/OG) on all five new routes; confirm SoftwareApplication JSON-LD (head) and FAQPage JSON-LD (`/pricing`) are present and truthful; verify the prerender/SSG output (or record the CSR tradeoff) so `/pricing`, `/comparisons`, `/changelog`, `/brand`, `/docs` are crawlable; confirm the homepage `#root` fallback (owned by t-landing) is consistent. Floor items 15-17.
-- Tests: a build-output check (or unit test of the metadata components) asserting each route emits a unique title + canonical; sitemap contains all routes.
+- Parity: add all six routes to `sitemap.xml` (with `lastmod`) and to `llms.txt` / `llms-full.txt`; keep `robots.txt` pointing at the sitemap; verify per-route React 19 metadata (title/desc/canonical/OG) on all five new routes; confirm SoftwareApplication JSON-LD (head) and FAQPage JSON-LD (`/pricing`) are present and truthful; verify the `vite-react-ssg` prerender output so all six routes ship real crawlable static HTML (mandatory, 1.4 — there is no CSR-only fallback); confirm the homepage `#root` fallback (owned by t-landing) is consistent. Floor items 4, 15, 16, 17, 20.
+- Tests (hard, build-output, not just metadata components): after `npm run build`, assert that each of `dist/index.html`, `dist/pricing/index.html`, `dist/comparisons/index.html`, `dist/changelog/index.html`, `dist/brand/index.html`, `dist/docs/index.html` (and the `/docs/:page` sub-pages) EXISTS as a real file and contains rendered route-specific markup (a route-unique string in the prerendered body, not an empty `<div id="root"></div>` shell) plus a unique `<title>` and `<link rel="canonical">`. A missing or shell-only per-route HTML file fails this task. Also assert `sitemap.xml` and `llms.txt` contain all six routes.
 - States: n/a (static assets) beyond 404 render.
 - Responsive: 404 page responsive.
 - A11y: 404 page has a heading + home link, focus-visible.
