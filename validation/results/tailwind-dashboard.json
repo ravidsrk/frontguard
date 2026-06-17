@@ -3,13 +3,13 @@
   "repo": "shadcn-ui/next-template",
   "category": "Tailwind dashboard",
   "baseUrl": "http://localhost:3000",
-  "timestamp": "2026-06-16T10:05:59Z",
+  "timestamp": "2026-06-17T15:36:15Z",
   "aiEnabled": false,
   "baselineRuns": [
-    { "route": "/", "url": "http://localhost:3000/", "result": {"note":"--update-baselines emits no JSON"} },
-    { "route": "/dashboard", "url": "http://localhost:3000/dashboard", "result": {"note":"--update-baselines emits no JSON"} },
-    { "route": "/dashboard/settings", "url": "http://localhost:3000/dashboard/settings", "result": {"note":"--update-baselines emits no JSON"} },
-    { "route": "/dashboard/analytics", "url": "http://localhost:3000/dashboard/analytics", "result": {"note":"--update-baselines emits no JSON"} }
+    { "route": "/", "url": "http://localhost:3000/", "result": {"url":"http://localhost:3000/","note":"no JSON emitted (likely --update-baselines run)"} },
+    { "route": "/dashboard", "url": "http://localhost:3000/dashboard", "result": {"url":"http://localhost:3000/dashboard","note":"no JSON emitted (likely --update-baselines run)"} },
+    { "route": "/dashboard/settings", "url": "http://localhost:3000/dashboard/settings", "result": {"url":"http://localhost:3000/dashboard/settings","note":"no JSON emitted (likely --update-baselines run)"} },
+    { "route": "/dashboard/analytics", "url": "http://localhost:3000/dashboard/analytics", "result": {"url":"http://localhost:3000/dashboard/analytics","note":"no JSON emitted (likely --update-baselines run)"} }
   ]
   ,
   "recheckRuns": [
@@ -25,10 +25,10 @@
   },
   "timing": {
     "discovery": 1,
-    "render": 1846,
-    "compare": 1488,
+    "render": 1868,
+    "compare": 1809,
     "ai": 0,
-    "total": 3359
+    "total": 3708
   },
   "diffs": [
     {
@@ -123,10 +123,10 @@
   },
   "timing": {
     "discovery": 1,
-    "render": 1853,
-    "compare": 1376,
+    "render": 1881,
+    "compare": 1907,
     "ai": 0,
-    "total": 3258
+    "total": 3818
   },
   "diffs": [
     {
@@ -221,10 +221,10 @@
   },
   "timing": {
     "discovery": 1,
-    "render": 1837,
-    "compare": 1584,
+    "render": 1860,
+    "compare": 1749,
     "ai": 0,
-    "total": 3448
+    "total": 3639
   },
   "diffs": [
     {

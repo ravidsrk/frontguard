@@ -9,6 +9,11 @@
  * Pixel-only metric we can honestly measure:
  *   false_positive_rate = (recheck routes with status != 'pass') / (recheck routes total)
  *
+ * Post-val-5: pixel-only FP is now measured with the byte-identical fast path
+ * disabled (FRONTGUARD_DISABLE_BYTE_COMPARE=1) and a fresh dev-server per pass,
+ * so non-zero diffPercentage values are expected — see results-v0.2.md. No
+ * arithmetic change here: recheckCounts already handles warning/regression.
+ *
  * Anti-flake hit rate, AI classification accuracy, and TP/FN counts require
  * either deliberate regression seeding or AI keys; we mark those as N/A
  * when the data isn't there and explain why in the methodology.

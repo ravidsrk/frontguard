@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { compareScreenshot, createNewPageResult } from '../../src/diff/pixel.js';
 import { createTestPng } from '../fixtures/helpers.js';
 import type { ScreenshotResult } from '../../src/core/types.js';
@@ -108,6 +108,39 @@ describe('compareScreenshot', () => {
     expect(result.route.path).toBe('/checkout');
     expect(result.viewport).toBe(375);
     expect(result.browser).toBe('firefox');
+  });
+});
+
+describe('FRONTGUARD_DISABLE_BYTE_COMPARE escape hatch (val-5)', () => {
+  const ORIG = process.env.FRONTGUARD_DISABLE_BYTE_COMPARE;
+  afterEach(() => {
+    if (ORIG === undefined) delete process.env.FRONTGUARD_DISABLE_BYTE_COMPARE;
+    else process.env.FRONTGUARD_DISABLE_BYTE_COMPARE = ORIG;
+  });
+
+  it('default: byte-identical PNGs short-circuit to pass with 0% diff', () => {
+    delete process.env.FRONTGUARD_DISABLE_BYTE_COMPARE;
+    const png = createTestPng(20, 20, 255, 255, 255);
+    const result = compareScreenshot(makeScreenshot(png), Buffer.from(png), 0.1);
+
+    expect(result.status).toBe('pass');
+    expect(result.diffPercentage).toBe(0);
+    // Fast-path signature: the diff overlay is never materialized.
+    expect(result.diffImage).toBeUndefined();
+  });
+
+  it('FRONTGUARD_DISABLE_BYTE_COMPARE=1: byte-identical PNGs go through pixelmatch', () => {
+    process.env.FRONTGUARD_DISABLE_BYTE_COMPARE = '1';
+    const png = createTestPng(20, 20, 255, 255, 255);
+    const result = compareScreenshot(makeScreenshot(png), Buffer.from(png), 0.1);
+
+    // pixelmatch on identical decoded PNGs still computes a 0% diff, but the
+    // slow path is taken — assert via the side-channel that the diffImage buffer
+    // is materialized (the fast path leaves it undefined).
+    expect(result.status).toBe('pass');
+    expect(result.diffPercentage).toBe(0);
+    expect(result.diffImage).toBeDefined();
+    expect(result.diffImage).toBeInstanceOf(Buffer);
   });
 });
 
