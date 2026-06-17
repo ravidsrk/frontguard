@@ -16,6 +16,52 @@ import type { BaselineStorage, BaselineManifest, BrowserEngine } from '../core/t
 import { logger } from '../utils/logger.js';
 
 /**
+ * Buffer ceiling for every git child process (install-2).
+ *
+ * Node's `execFileSync` defaults to a 1 MiB stdout/stderr buffer. When the
+ * orphan-baseline worktree checks out a tree that tracks a large directory
+ * (most commonly a committed `node_modules/`), `git rm -rf .` and the worktree
+ * checkout emit one line per file — tens of thousands of lines, well past 1 MiB —
+ * and the spawn dies with a cryptic `spawnSync git ENOBUFS`. Reading a large
+ * baseline PNG via `git show` can also exceed 1 MiB. 64 MiB removes both cliffs.
+ */
+const GIT_MAX_BUFFER = 64 * 1024 * 1024;
+
+/**
+ * Builds a user-facing message for a failed git spawn (install-2).
+ *
+ * ENOBUFS almost always means a huge tracked directory (typically `node_modules/`)
+ * was checked out into the baseline worktree, so name that cause explicitly and
+ * point at the fix instead of surfacing the raw `spawnSync git ENOBUFS` string.
+ */
+export function gitSpawnErrorMessage(
+  command: string,
+  err: unknown,
+  cwd: string
+): string {
+  const e = err as NodeJS.ErrnoException;
+  const raw = err instanceof Error ? e.message : String(err);
+  const isEnobufs = e?.code === 'ENOBUFS' || /ENOBUFS/.test(raw);
+  if (isEnobufs) {
+    let hasNodeModules = false;
+    try {
+      hasNodeModules = existsSync(join(cwd, 'node_modules'));
+    } catch {
+      // Best-effort detection only.
+    }
+    const cause = hasNodeModules
+      ? 'a tracked node_modules/ directory was checked out into the baseline worktree'
+      : 'a very large tracked directory was checked out into the baseline worktree';
+    return (
+      `git ${command} produced more output than git could buffer — ${cause}. ` +
+      'Add "node_modules/" to your .gitignore, untrack it with ' +
+      '"git rm -r --cached node_modules", then commit and retry.'
+    );
+  }
+  return `git ${command} failed: ${raw}`;
+}
+
+/**
  * Converts a route path to a safe filesystem path for baseline storage.
  *
  * - Strips leading slashes and normalises path traversal attempts
@@ -89,10 +135,10 @@ export class GitOrphanStorage implements BaselineStorage {
         cwd,
         encoding: 'utf-8',
         timeout: 30_000,
+        maxBuffer: GIT_MAX_BUFFER,
       }).trim();
     } catch (err: unknown) {
-      const message = err instanceof Error ? (err as NodeJS.ErrnoException).message : String(err);
-      throw new Error(`git ${args[0]} failed: ${message}`);
+      throw new Error(gitSpawnErrorMessage(args[0] ?? 'command', err, cwd));
     }
   }
 
@@ -104,6 +150,7 @@ export class GitOrphanStorage implements BaselineStorage {
     return execFileSync('git', args, {
       cwd: this.repoDir,
       timeout: 30_000,
+      maxBuffer: GIT_MAX_BUFFER,
     });
   }
 
@@ -116,6 +163,7 @@ export class GitOrphanStorage implements BaselineStorage {
         cwd: this.repoDir,
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 10_000,
+        maxBuffer: GIT_MAX_BUFFER,
       });
       return true;
     } catch {
@@ -132,6 +180,7 @@ export class GitOrphanStorage implements BaselineStorage {
         cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 10_000,
+        maxBuffer: GIT_MAX_BUFFER,
       });
       return true;
     } catch {
