@@ -15,7 +15,8 @@
   "scripts": {
     "dev": "next dev --turbopack --port 3001",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "check:doc-links": "node scripts/check-doc-links.mjs"
   },
   "dependencies": {
     "fumadocs-core": "^16.7.9",
