@@ -36,6 +36,16 @@ docker manifest inspect frontguard/render:v0.2.0  # expect a valid manifest
 
 ---
 
+## OPS — Redeploy frontguard.dev (ship the AggregateRating-free index.html)
+
+**Unblocks:** dist-11 (full closure; the source HTML and an SSG regression guard already shipped)
+
+**Context:** `apps/landing/index.html` on `main` is already AggregateRating-free
+(offers-only SoftwareApplication JSON-LD), and `apps/landing/src/test/ssg-output.test.ts`
+now fails the build if any built route re-introduces an `AggregateRating` /
+`ratingValue` / `ratingCount` block. But the live deployment is stale and still
+serves the old `4.8/36` rating on a 0-star repo. The regression test cannot push
+bytes to the CDN — a redeploy of the built `apps/landing/dist/` is required.
 ## OPS — Deploy cloud-api Worker (C7 data-model fixes)
 
 **Unblocks:** cloud-1, cloud-9, mcp-1, mcp-2, mcp-7, mcp-9 (full closure — the
@@ -44,6 +54,10 @@ code is merged; the live API only serves the fixes after a deploy)
 **Action:**
 
 ```bash
+# Build and redeploy the landing site (whatever ships apps/landing/dist/ —
+# Cloudflare Pages / Fly.io / Netlify per the project's deploy config).
+cd apps/landing && npm run build
+# then trigger the landing-site deploy for the freshly built dist/
 # from packages/cloud-api
 wrangler deploy
 ```
