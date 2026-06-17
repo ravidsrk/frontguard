@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from './test-utils';
 import { Component as Brand } from '../routes/brand';
 import { NEUTRALS, STATUSES, VOICE, SAY, DONT } from '../routes/brand/content';
 import { STATUS_GLYPH, STATUS_COLOR_CLASS } from '../components/ui/status';

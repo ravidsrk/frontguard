@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from './test-utils';
 import { MemoryRouter } from 'react-router-dom';
 import { Component as Changelog } from '../routes/changelog';
 import { RELEASES } from '../routes/changelog/releases';
