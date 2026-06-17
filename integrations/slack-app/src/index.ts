@@ -46,6 +46,7 @@ export {
   isAllowedRunUrl,
   type CloudRunResponse,
   type CloudRunStatus,
+  type CloudRunResult,
   type SubmitRunOptions,
 } from './runs.js';
 
