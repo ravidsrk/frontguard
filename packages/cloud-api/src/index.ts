@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 import type { Run } from './types.js';
 import { processRun, type ProcessorEnv } from './processor.js';
+import type { BaselineRestore, BaselineBucket } from './daytona-runner.js';
 import { emitRunTelemetry, runMetricsFromRun, type OtelEnv } from './otel/index.js';
 import { getStore, isProduction, type Bindings } from './db/factory.js';
 import { currentMonth, type Store } from './db/store.js';
@@ -340,9 +341,36 @@ app.post('/v1/run', async (c) => {
     persistedShots = await persistScreenshots(store, blobs, userId, runId, shots);
   };
 
+  // Resolve the project's prior approved baselines so the sandbox can detect
+  // regressions instead of always emitting new_baseline (cloud-1). The route
+  // metadata lives in D1 (the R2 key slug is lossy), so we read it from the
+  // baseline run's screenshot records. Only when a project scope and an R2
+  // binding both exist; otherwise the run proceeds baseline-free.
+  let baselineRestore: BaselineRestore | undefined;
+  const screenshotsBucket = c.env?.SCREENSHOTS as BaselineBucket | undefined;
+  if (run.projectId && screenshotsBucket) {
+    const baselineRun = await store.getProjectBaseline(run.projectId);
+    if (baselineRun) {
+      const baselineShots = (await store.listScreenshots(baselineRun.id)).filter(
+        (s) => s.type === 'baseline',
+      );
+      if (baselineShots.length > 0) {
+        baselineRestore = {
+          bucket: screenshotsBucket,
+          baselines: baselineShots.map((s) => ({
+            route: s.route,
+            viewport: s.viewport,
+            browser: s.browser,
+            r2Key: s.r2Key,
+          })),
+        };
+      }
+    }
+  }
+
   // Process async — mutates `run`, then persists the final state. The env
   // binding carries DAYTONA_API_KEY (Workers has no Node env).
-  processRun(run, (c.env ?? {}) as ProcessorEnv, onScreenshots)
+  processRun(run, (c.env ?? {}) as ProcessorEnv, onScreenshots, baselineRestore)
     .catch((err: Error) => {
       run.status = 'failed';
       run.error = err.message;
