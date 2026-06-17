@@ -103,11 +103,31 @@ Named type scale (Brand page specimen):
 | BODY / 16    | 16px | Space Grotesk | running paragraph copy                   |
 | MONO / 13    | 13px | JetBrains Mono| `$ npx frontguard run --url localhost:3000` |
 
-Full size ramp used across pages (px): 58 (Landing hero h1), 54 (Pricing/Comparisons/Changelog hero h1), 52 (display), 44 (CTA h2, pricing price number), 38 (section h2), 36 (sub-section h2), 30 (compare/FAQ h2), 24 (problem statement), 22 (large card h3), 21 (pillar h3), 18 (lead paragraph), 17 (CTA paragraph), 16.5/16 (body, feature card h3), 15.5/15/14.5/14 (secondary body and list), 13.5/13 (small body, code), 12.5/12 (mono labels, terminal), 11 (tiny uppercase mono labels), 10.5 (badge).
+The table above is the Brand page's nominal specimen; the DISPLAY/52 token is the Brand page's own large heading, not the Landing hero. The live page heroes are larger and differ per page. Exact authored heading values, verified against the source CSS (every page's `<h1>`/`<h2>`):
 
-Weights: 700 for all display/headings and the wordmark; 600 for card h3; 500 for emphasized mono labels and ghost buttons; 400 for body and most mono.
+| heading                          | size | line-height | weight | letter-spacing |
+|----------------------------------|------|-------------|--------|----------------|
+| Landing hero h1                  | 58px | 1.02        | 700    | -0.035em       |
+| Pricing hero h1                  | 54px | 1.04        | 700    | -0.035em       |
+| Brand hero h1                    | 52px | 1.0         | 700    | -0.04em        |
+| Comparisons hero h1              | 52px | 1.04        | 700    | -0.035em       |
+| Changelog hero h1                | 48px | 1.04        | 700    | -0.035em       |
+| Docs page h1                     | 42px | 1.05        | 700    | -0.035em       |
+| Landing CTA h2                   | 44px | default     | 700    | -0.035em       |
+| Pricing / Comparisons CTA h2     | 40px | default     | 700    | -0.035em       |
+| Landing section h2               | 38px (36px on two: "Kills the #1 pain", "One file") | default | 700 | -0.03em |
+| Comparisons "Head to head" h2    | 32px | default     | 700    | -0.03em        |
+| Pricing / Comparisons sub h2     | 30px | default     | 700    | -0.03em        |
+| Docs section h2                  | 24px (26px on some: "The pipeline", "frontguard run/monitor") | default | 600 | -0.02em |
+| Changelog release title h2       | 24px | default     | 600    | -0.02em        |
 
-Letter-spacing: -0.035em on the largest hero h1, -0.03em on section h2, -0.02em on the wordmark, -0.01em on mid headings, and positive tracking +0.04em / +0.06em / +0.08em on uppercase mono labels. Line-height: ~1.02-1.04 on hero, 1.45-1.6 on body, ~1.55 default.
+Note the pricing tier price number is also 44px (weight 700, -0.03em).
+
+Full size ramp used across pages (px): 58 (Landing hero), 54 (Pricing hero), 52 (Brand and Comparisons hero, Brand DISPLAY token), 48 (Changelog hero), 44 (Landing CTA h2, pricing price), 42 (Docs page h1), 40 (Pricing/Comparisons CTA h2), 38 (Landing section h2), 36 (two Landing sub-section h2), 32 (Comparisons "Head to head"), 30 (Pricing/Comparisons sub h2), 26 (some Docs h2), 24 (Docs/Changelog h2, problem statement), 22 (large card h3), 21 (pillar h3), 18 (lead paragraph), 17 (CTA paragraph), 16.5/16 (body, feature card h3), 15.5/15/14.5/14 (secondary body and list), 13.5/13 (small body, code), 12.5/12 (mono labels, terminal), 11/10.5 (tiny uppercase mono labels, badge).
+
+Weights: 700 for hero and section h2 headings and the wordmark; 600 for Docs/Changelog h2 and card h3; 500 for emphasized mono labels and ghost buttons; 400 for body and most mono.
+
+Letter-spacing: -0.035em on the page hero h1s and the two big CTA h2 (Brand hero is -0.04em), -0.03em on section h2, -0.02em on the wordmark and the smaller Docs/Changelog h2, -0.01em on mid headings, and positive tracking +0.04em / +0.06em / +0.08em on uppercase mono labels. Line-height on headings: Landing hero 1.02, Pricing/Comparisons/Changelog hero 1.04, Docs h1 1.05, Brand h1 1.0; body 1.45-1.6, default ~1.55.
 
 Body defaults: `font-family:'Space Grotesk',sans-serif; color:#b8b0a6; background:#0d0c0b`. Headings recolor to `#f5f1ea`.
 
@@ -115,7 +135,7 @@ Body defaults: `font-family:'Space Grotesk',sans-serif; color:#b8b0a6; backgroun
 
 No CSS variables; spacing is literal px. Observed scale (px): 6, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32, 36, 40, 44, 48, 52, 56, 64, 72, 84, 88, 90. It is effectively a 4px base with common steps at 8/12/16/20/24/28/32. Section vertical rhythm is ~84px top padding on Landing content sections; hero is 88px; CTA bands 90px.
 
-Containers: `max-width:1200px; margin:0 auto; padding:0 28px` is the standard wrapper (28px horizontal gutter). Narrower wrappers: 1100px (comparison tables), 1080px (Brand page), 900px / 800px (Docs prose width, Pricing FAQ). Docs uses a fixed three-column app shell: `grid-template-columns: 256px minmax(0,1fr) 224px` (sidebar / content / TOC).
+Containers: `max-width:1200px; margin:0 auto; padding:0 28px` is the standard wrapper (28px horizontal gutter). Narrower wrappers: 1100px (Pricing compare-plans matrix), 1080px (Brand page), 900px (Pricing FAQ), 860px (Changelog timeline). Docs is the exception: a 1400px canvas with a fixed three-column app shell `grid-template-columns: 256px minmax(0,1fr) 224px` (sidebar / content / TOC).
 
 Common grid patterns (all fixed, no fluid breakpoints):
 
@@ -125,10 +145,12 @@ Common grid patterns (all fixed, no fluid breakpoints):
 | `repeat(3, 1fr)`              | three pillars, features grid, honest cards, tiers |
 | `repeat(6, 1fr)`              | pipeline (6 stages), Brand neutral swatches      |
 | `repeat(5, 1fr)`              | plugins row                                      |
-| `1.6fr 1fr 1fr 1fr`           | pricing comparison matrix (cap + 3 plans)        |
-| 6-col table                   | comparisons matrix (cap + Frontguard + 4 rivals) |
+| `repeat(4, 1fr)`              | comparisons alternatives strip                   |
+| `1.6fr 1fr 1fr 1fr`           | pricing compare-plans matrix (cap + 3 plans)     |
+| 7-col table                   | comparisons matrix (cap + Frontguard + Percy + Chromatic + BackstopJS + Lost Pixel + Argos) |
+| `0.8fr 1.2fr`                 | comparisons migration row                        |
 | `256px minmax(0,1fr) 224px`   | Docs app shell                                   |
-| `220px 1fr 110px`             | changelog timeline row (version meta / content)  |
+| `168px 1fr`                   | changelog timeline row (sticky version meta / content), gap 0, 860px container |
 
 Card grid gaps: 20px between cards; 1px gap with a `#211e1b` background to fake hairline dividers between grid cells (problem stats, features grid).
 
@@ -240,7 +262,23 @@ States: install copy button -> "copied ✓"; FAQ card hover; horizontal scroll o
 
 Canvas 1200x1500. Landing nav.
 
-Sections: hero "Frontguard vs. everyone else." with lead about validating against real repos. Alternatives strip (`renderVals.alternatives`): Percy ("↗ $399/mo pricing cliff"), Chromatic ("◐ Storybook-locked"), BackstopJS ("✕ unmaintained", red), Lost Pixel ("✕ archived", red). Big matrix (6 columns: capability + Frontguard + Percy + Chromatic + BackstopJS + Lost Pixel, `renderVals.matrix`, 9 rows) with a cell color helper (✓ green, ◐ amber, ✕ grey, Frontguard's own ✓ in green); rows include Open source, CLI-first, AI change classification, AI fix verification, Anti-flake rendering, Self-hostable, Free tier, Pro entry price, Actively maintained. Head-to-head cards (`renderVals.versus`, 4 cards: Percy, Chromatic, BackstopJS, Lost Pixel/Argos) each with "their strength" vs "ours" and a migration-guide link; cards are `.fg-vs` (hover border). Migration row (`renderVals.migrations`: BackstopJS, Lost Pixel, Percy, Chromatic). CTA "See the difference yourself." Footer.
+Hero h1 is 52px (1.04 / 700 / -0.035em), not the same as the Landing/Pricing hero.
+
+Sections: hero "Frontguard vs. everyone else." with lead about validating against real repos. Alternatives strip (`renderVals.alternatives`, `repeat(4,1fr)`): Percy ("↗ $399/mo pricing cliff"), Chromatic ("◐ Storybook-locked"), BackstopJS ("✕ unmaintained", red), Lost Pixel ("✕ archived", red). Big matrix: a 7-column `<table>` with header row CAPABILITY + Frontguard + Percy + Chromatic + BackstopJS + Lost Pixel + Argos (six competitor/own columns bound to `row.v0`..`row.v5`, where v0 is Frontguard). `renderVals.matrix`, 9 rows. Cell legend printed below the table: ✓ full support, ◐ partial / limited, ✕ not available; the helper colors ✓ green `#4fb477`, ◐ amber `#e8862e`, ✕ grey `#6b645c`, other text `#a89f94`, and Frontguard's own ✓ (v0) green. The 9 rows, with values in column order [Frontguard, Percy, Chromatic, BackstopJS, Lost Pixel, Argos]:
+
+| capability                | Frontguard | Percy     | Chromatic | BackstopJS | Lost Pixel | Argos    |
+|---------------------------|------------|-----------|-----------|------------|------------|----------|
+| Open source               | ✓ MIT      | ✕         | ◐         | ✓          | ◐          | ✓ MIT    |
+| CLI-first                 | ✓          | ✕         | ✕         | ✓          | ✓          | ✓        |
+| AI change classification  | ✓          | ✕         | ✕         | ✕          | ✕          | ✕        |
+| AI fix verification       | ✓          | ✕         | ✕         | ✕          | ✕          | ✕        |
+| Anti-flake rendering      | ✓          | ◐         | ◐         | ✕          | ✕          | ◐        |
+| Self-hostable             | ✓          | ✕         | ✕         | ✓          | ◐          | ◐        |
+| Free tier                 | Forever    | Trial     | Hobby     | Free       | ✕          | Hobby    |
+| Pro entry                 | $29/mo     | ~$399/mo  | per-snap  | n/a        | n/a        | $100/mo  |
+| Actively maintained       | ✓          | ✓         | ✓         | ✕ 6yr      | ✕          | ✓        |
+
+Head-to-head cards (`renderVals.versus`, `1fr 1fr` grid, 4 cards: Percy, Chromatic, BackstopJS, Lost Pixel/Argos) each with "their strength" vs "ours" and a migration/comparison link; cards are `.fg-vs` (hover border). Migration row (`0.8fr 1.2fr`, `renderVals.migrations`: BackstopJS, Lost Pixel, Percy, Chromatic). CTA "See the difference yourself." Footer.
 
 States: vs-card hover; table horizontal scroll on mobile.
 
@@ -248,7 +286,9 @@ States: vs-card hover; table horizontal scroll on mobile.
 
 Canvas 1200x1800. Landing nav.
 
-Sections: hero "What's new in Frontguard". Timeline (`renderVals.releases`, 3 entries) where each row is `version meta (left) / content (right)`:
+Hero h1 is 48px (1.04 / 700 / -0.035em), the smallest of the page heroes.
+
+Sections: hero "What's new in Frontguard". Timeline: an 860px-max-width section (`padding: 16px 28px 100px`) wrapping `renderVals.releases` (3 entries). Each release is a two-column grid `grid-template-columns: 168px 1fr` with `gap: 0` and a top hairline `border-top: 1px solid #211e1b`. Left column (168px) is the version meta, `position: sticky; top: 88px`: version number (JetBrains Mono 18px / 700, colored per release), a status tag chip (10.5px, tinted border+bg), and the date (12px `#6b645c`). Right column (1fr) is the content: release title h2 (24px / 600 / -0.02em), summary, then change groups; each change item is a nested `14px 1fr` grid (bullet + text). The three entries, `version meta (left) / content (right)`:
 
 - Unreleased ("on main", amber "IN PROGRESS" tag): title "Storybook, OpenTelemetry & a native Slack app", ADDED group (Storybook integration, OpenTelemetry export, native Slack app, run-over-run perf regressions, accessibility-aware AI).
 - 0.2.0 (2026-06-03, green "LATEST RELEASE"): "The 'earn trust' release", ADDED (doctor, monitor, AI fix generation + sandbox verification, fix-pattern database, a11y + perf plugins, cloud platform, teams & billing, integrations) and CHANGED (docs to Fumadocs, reporters).
