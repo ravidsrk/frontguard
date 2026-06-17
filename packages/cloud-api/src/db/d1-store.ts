@@ -15,6 +15,7 @@ import type {
   UsageRecord,
   UsageAlertState,
   ScreenshotDecision,
+  ListRunsOptions,
 } from './store.js';
 import type { Monitor, MonitorRun, MonitorRunStatus, MonitorAlertState } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
@@ -70,6 +71,11 @@ function runConfig(run: Run): string {
     threshold: run.threshold,
     ai: run.ai,
     reportUrl: run.reportUrl,
+    // CI linkage (owner/repo/prNumber/commitSha). Folded into the config blob
+    // rather than dedicated columns so no schema migration is required. The MCP
+    // `list_regressions` / `recent_runs` tools filter on this, so dropping it
+    // here is what left them returning empty in production (mcp-1).
+    github: run.github,
   });
 }
 
@@ -93,6 +99,7 @@ function rowToRun(row: RunRow): Run {
     baselinesApproved: row.baselines_approved === 1,
     projectId: row.project_id ?? undefined,
     error: row.error ?? undefined,
+    github: cfg.github ?? undefined,
   };
 }
 
@@ -183,10 +190,31 @@ export class D1Store implements Store {
     const row = await this.db.prepare(`SELECT user_id FROM runs WHERE id = ?`).bind(id).first<{ user_id: string }>();
     return row?.user_id ?? null;
   }
-  async listRuns(userId: string, limit = 50): Promise<Run[]> {
+  async listRuns(userId: string, opts: ListRunsOptions = {}): Promise<Run[]> {
+    const { limit = 50, teamIds = [], includeOwn = true } = opts;
+    const clauses: string[] = [];
+    const binds: unknown[] = [];
+    if (includeOwn) {
+      clauses.push('user_id = ?');
+      binds.push(userId);
+    }
+    if (teamIds.length > 0) {
+      // Runs are scoped to a team via their project. Expand the team list into
+      // positional placeholders (D1 has no array binding).
+      const placeholders = teamIds.map(() => '?').join(', ');
+      clauses.push(
+        `project_id IN (SELECT id FROM team_projects WHERE team_id IN (${placeholders}))`,
+      );
+      binds.push(...teamIds);
+    }
+    // Nothing to scope to (e.g. explicit team-only with an empty team set).
+    if (clauses.length === 0) return [];
+    binds.push(limit);
     const { results } = await this.db
-      .prepare(`SELECT * FROM runs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`)
-      .bind(userId, limit)
+      .prepare(
+        `SELECT * FROM runs WHERE ${clauses.join(' OR ')} ORDER BY created_at DESC LIMIT ?`,
+      )
+      .bind(...binds)
       .all<RunRow>();
     return results.map(rowToRun);
   }

@@ -15,9 +15,6 @@
     "github-actions",
     "---Migration---",
     "migrate-from-backstopjs",
-    "migrate-from-lost-pixel",
-    "---Comparisons---",
-    "frontguard-vs-percy",
-    "frontguard-vs-chromatic"
+    "migrate-from-lost-pixel"
   ]
 }

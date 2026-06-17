@@ -1,8 +1,35 @@
 import { Daytona } from '@daytonaio/sdk';
+import type { SuggestedFix } from './types.js';
+import { orphanBaselinePath } from './storage/screenshots.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/** Minimal R2 surface {@link restoreBaselines} needs to fetch baseline bytes. */
+export interface BaselineBucket {
+  get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
+}
+
+/** A single prior baseline screenshot to restore into the sandbox. */
+export interface BaselineToRestore {
+  route: string;
+  viewport: number;
+  browser: string;
+  /** R2 object key holding the baseline PNG bytes. */
+  r2Key: string;
+}
+
+/**
+ * Prior baselines to seed into the sandbox before `frontguard run`. The caller
+ * (the `/v1/run` handler) resolves the project's approved-baseline run and its
+ * screenshot records — the route metadata lives in D1, not recoverable from the
+ * R2 key slug — and hands them here with the R2 bucket to read the bytes from.
+ */
+export interface BaselineRestore {
+  bucket: BaselineBucket;
+  baselines: BaselineToRestore[];
+}
 
 export interface RunRequest {
   url: string;
@@ -14,6 +41,13 @@ export interface RunRequest {
   openaiKey?: string;
   /** Daytona API key — Workers must pass it explicitly (no Node env). */
   daytonaApiKey?: string;
+  /**
+   * Prior baselines to restore before the run (cloud-1). When absent (first run
+   * for a project, or no R2 binding), the run proceeds with no baselines and
+   * every screenshot is a new baseline — the previous, regression-blind
+   * behaviour.
+   */
+  baselineRestore?: BaselineRestore;
 }
 
 /** A screenshot PNG downloaded from the sandbox, awaiting persistence. */
@@ -34,6 +68,8 @@ export interface RunResult {
     classification?: string;
     explanation?: string;
     timestamp: string;
+    /** AI-generated fix emitted by the CLI report, when present. */
+    suggestedFix?: SuggestedFix;
   }>;
   reportHtml: string;
   duration: number;
@@ -131,17 +167,32 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
     const configPath = `${homeDir}/frontguard.config.json`;
     const outputDir = `${homeDir}/output`;
 
+    // Restore prior baselines from R2 into the sandbox and seed them into the
+    // CLI's git orphan branch BEFORE the run, so regressions can be detected
+    // instead of every screenshot being a new baseline (cloud-1). Best-effort:
+    // any failure degrades to the prior new-baseline behaviour, never breaks
+    // the run.
+    try {
+      const restored = await restoreBaselines(sandbox, request.baselineRestore, homeDir);
+      if (restored > 0) {
+        await seedBaselineOrphanBranch(sandbox, homeDir);
+      }
+    } catch {
+      // Restore is advisory; proceed without baselines.
+    }
+
     // Write config to sandbox filesystem
     await sandbox.fs.uploadFile(
       Buffer.from(JSON.stringify(config, null, 2)),
       configPath,
     );
 
-    // Run frontguard inside the sandbox
+    // Run frontguard inside the sandbox. cwd is pinned to homeDir so the CLI's
+    // GitOrphanStorage(process.cwd()) resolves the repo we seeded above.
     const startTime = Date.now();
     const execResult = await sandbox.process.executeCommand(
       `frontguard run --config ${configPath} --reporter json --reporter html --output ${outputDir}`,
-      undefined,
+      homeDir,
       undefined,
       300, // 5 min max
     );
@@ -183,6 +234,77 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
       // Sandbox may already be deleted via ephemeral + autoDeleteInterval
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Baseline restore (cloud-1)
+// ---------------------------------------------------------------------------
+
+/** Minimal sandbox surface {@link restoreBaselines} uploads through. */
+interface BaselineUploadSandbox {
+  fs: { uploadFile(content: Buffer | Uint8Array, remotePath: string): Promise<unknown> };
+}
+
+/** Minimal sandbox surface {@link seedBaselineOrphanBranch} runs commands on. */
+interface BaselineExecSandbox {
+  process: {
+    executeCommand(
+      command: string,
+      cwd?: string,
+      env?: Record<string, string>,
+      timeout?: number,
+    ): Promise<unknown>;
+  };
+}
+
+/**
+ * Download each prior baseline PNG from R2 and upload it into the sandbox at
+ * the CLI's git-orphan baseline path (`baselines/<route>/<viewport>/<browser>.png`).
+ * Exported for testing. Best-effort: a missing bucket or empty list yields zero
+ * uploads and never throws. Returns the number of baselines staged.
+ */
+export async function restoreBaselines(
+  sandbox: BaselineUploadSandbox,
+  restore: BaselineRestore | undefined,
+  workDir: string,
+): Promise<number> {
+  if (!restore || !restore.bucket || restore.baselines.length === 0) return 0;
+  let count = 0;
+  for (const b of restore.baselines) {
+    try {
+      const obj = await restore.bucket.get(b.r2Key);
+      if (!obj) continue;
+      const bytes = Buffer.from(await obj.arrayBuffer());
+      const remotePath = `${workDir}/${orphanBaselinePath(b.route, b.viewport, b.browser)}`;
+      await sandbox.fs.uploadFile(bytes, remotePath);
+      count++;
+    } catch {
+      // Skip a baseline we couldn't fetch or upload — the run still proceeds.
+    }
+  }
+  return count;
+}
+
+/**
+ * Commit the staged `baselines/` tree into the `frontguard-baselines` orphan
+ * branch the CLI reads from. Runs in {@link workDir}; identity is set inline so
+ * a fresh sandbox with no git config can still commit.
+ */
+async function seedBaselineOrphanBranch(
+  sandbox: BaselineExecSandbox,
+  workDir: string,
+): Promise<void> {
+  const git = (args: string) =>
+    sandbox.process.executeCommand(
+      `git -c user.email=ci@frontguard.local -c user.name="Frontguard CI" ${args}`,
+      workDir,
+      undefined,
+      60,
+    );
+  await git('init -q');
+  await git('checkout -q --orphan frontguard-baselines');
+  await git('add -A');
+  await git('commit -q -m "Restore baselines"');
 }
 
 // ---------------------------------------------------------------------------

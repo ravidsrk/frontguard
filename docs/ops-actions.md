@@ -46,6 +46,10 @@ now fails the build if any built route re-introduces an `AggregateRating` /
 `ratingValue` / `ratingCount` block. But the live deployment is stale and still
 serves the old `4.8/36` rating on a 0-star repo. The regression test cannot push
 bytes to the CDN — a redeploy of the built `apps/landing/dist/` is required.
+## OPS — Deploy cloud-api Worker (C7 data-model fixes)
+
+**Unblocks:** cloud-1, cloud-9, mcp-1, mcp-2, mcp-7, mcp-9 (full closure — the
+code is merged; the live API only serves the fixes after a deploy)
 
 **Action:**
 
@@ -54,14 +58,47 @@ bytes to the CDN — a redeploy of the built `apps/landing/dist/` is required.
 # Cloudflare Pages / Fly.io / Netlify per the project's deploy config).
 cd apps/landing && npm run build
 # then trigger the landing-site deploy for the freshly built dist/
+# from packages/cloud-api
+wrangler deploy
 ```
 
 **Verification:**
 
 ```bash
-curl -s https://frontguard.dev/ | grep -E 'AggregateRating|ratingValue|ratingCount' || echo "clean"
-# expect: clean
+# /health and the report footer now track package.json (cloud-9)
+curl -s https://api.frontguard.dev/health   # expect {"status":"ok","version":"0.2.0"}
 ```
+
+No D1 migration is required for C7: `run.github` (mcp-1) and `suggestedFix`
+(mcp-2) were folded into the existing `runs.config` / `runs.results` JSON blobs
+(Option B), so the schema is unchanged.
+
+**Owner:** ravidsrk
+
+**Date queued:** 2026-06-17
+
+---
+
+## OPS — Verify cloud-1 baseline restore against live Daytona
+
+**Unblocks:** cloud-1 (end-to-end confidence; the data-plane restore + orphan
+seeding are unit-tested, but the sandbox git flow cannot run in CI)
+
+**Context:** The runner now restores a project's prior approved baselines from
+R2 into the sandbox and seeds them into the `frontguard-baselines` git orphan
+branch before `frontguard run`, so regressions are detectable instead of every
+screenshot being a new baseline. The restore is best-effort: if the git seeding
+fails in a real sandbox it degrades to the prior new-baseline behaviour rather
+than breaking the run. This needs one live confirmation.
+
+**Action:**
+
+1. With `DAYTONA_API_KEY` and the `SCREENSHOTS` R2 binding configured, submit a
+   run under a project that already has an approved baseline run.
+2. Confirm the run reports `regression`/`changed` results (not all
+   `new_baseline`) when the target visibly differs from the baseline.
+3. Confirm the sandbox snapshot image has `git` available (the orphan seeding
+   shells out to it).
 
 **Owner:** ravidsrk
 

@@ -77,6 +77,20 @@ export interface UsageRecord {
   screenshotsCount: number;
 }
 
+/** Options for {@link Store.listRuns}. */
+export interface ListRunsOptions {
+  /** Cap on the number of runs returned (default 50). */
+  limit?: number;
+  /**
+   * Also include runs whose `projectId` belongs to one of these teams. Lets a
+   * personal key see the runs a CI service account submitted under a shared
+   * team, instead of only the key owner's own runs (mcp-7).
+   */
+  teamIds?: string[];
+  /** Include the caller's own runs (user_id match). Default true. */
+  includeOwn?: boolean;
+}
+
 /**
  * Tracks the highest spend-cap warning tier already emailed per (user, month).
  * Tiers: 0 = none, 80 = 80%-warning sent, 95 = 95%-warning sent. We never
@@ -110,7 +124,7 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
   createRun(run: Run, userId: string): Promise<void>;
   getRun(id: string): Promise<Run | null>;
   getRunOwner(id: string): Promise<string | null>;
-  listRuns(userId: string, limit?: number): Promise<Run[]>;
+  listRuns(userId: string, opts?: ListRunsOptions): Promise<Run[]>;
   updateRun(id: string, patch: Partial<Run>): Promise<void>;
   deleteRun(id: string, userId: string): Promise<boolean>;
 
@@ -203,10 +217,19 @@ export class InMemoryStore implements Store {
   async getRunOwner(id: string): Promise<string | null> {
     return this.runs.get(id)?.userId ?? null;
   }
-  async listRuns(userId: string, limit = 50): Promise<Run[]> {
+  async listRuns(userId: string, opts: ListRunsOptions = {}): Promise<Run[]> {
+    const { limit = 50, teamIds = [], includeOwn = true } = opts;
+    const teamSet = new Set(teamIds);
+    const teamProjectIds = new Set(
+      [...this.projects.values()].filter((p) => teamSet.has(p.teamId)).map((p) => p.id),
+    );
     return [...this.runs.values()]
-      .filter((r) => r.userId === userId)
-      .map((r) => r.run)
+      .filter(
+        (entry) =>
+          (includeOwn && entry.userId === userId) ||
+          (entry.run.projectId != null && teamProjectIds.has(entry.run.projectId)),
+      )
+      .map((entry) => entry.run)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, limit);
   }
