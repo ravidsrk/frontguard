@@ -57,6 +57,10 @@ export async function processRun(
         diffPercentage: r.diffPercentage,
         classification: r.classification,
         timestamp: r.timestamp || new Date().toISOString(),
+        // Carry the AI-generated fix through to D1 (results is a JSON blob) so
+        // the MCP `get_suggested_fix` tool can return it instead of a canned
+        // null (mcp-2).
+        ...(r.suggestedFix ? { suggestedFix: r.suggestedFix } : {}),
       }));
       run.completedAt = new Date().toISOString();
 
