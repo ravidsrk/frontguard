@@ -48,3 +48,7 @@ Thumbs.db
 apps/demo/next-env.d.ts
 apps/demo/out/
 apps/demo/tsconfig.json
+
+# Mogra workspace metadata
+.mogra/
+.mogra
