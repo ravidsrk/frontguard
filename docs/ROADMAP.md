@@ -1,13 +1,18 @@
 # Frontguard Roadmap
 
-*Last updated: June 2026. Based on competitive research across 10 competitors, developer pain point analysis from Reddit/HN/GitHub, technology trend analysis, and GTM playbook research. Full research available internally (see project documentation).*
+*Last updated: 2026-06-17 (v0.2.0 ship). Anchored to [`docs/research.md`](./research.md) (mid-2026 competitive landscape, 16 competitors fetched live) and [`docs/product-completion-plan.md`](./product-completion-plan.md) (the frozen v0.2 boundary).*
 
-> **Status note (June 2026):** This document was reconciled against the actual
-> codebase. The engine and platform shipped well ahead of the original plan —
-> most of what earlier drafts listed as "v0.2, not started" is now built, tested,
-> and documented. The honest remaining work is **distribution** (demo, launch,
-> real-world validation) and a handful of **external-account integrations**, not
-> core engineering.
+> **Status note (2026-06-17):** **v0.2.0 has shipped.** Tag `v0.2.0` points at
+> `2cd1614`; five npm packages live (`@frontguard/cli`, `@frontguard/playwright`,
+> `@frontguard/mcp`, `@frontguard/netlify-plugin`, `create-frontguard-plugin`).
+> Engineering bar: 1,392 tests across nine workspaces all green; landing + docs
+> both build clean; `wrangler deploy --dry-run` produces a unified Hono Workers
+> bundle. First real-world validation run on 2026-06-16 reported **0.0%
+> pixel-only false positives** across 43 recheck routes (well inside the
+> `<15%` launch gate); AI-accuracy gate still pending a provider key in the
+> harness env. See [`docs/launch-readiness.md`](./launch-readiness.md) for the
+> full go/no-go + the three operational follow-ups (DNS to Cloudflare,
+> four marketplace submissions, post-DNS `wrangler deploy`).
 
 ---
 

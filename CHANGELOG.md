@@ -7,8 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Nothing yet — open an issue or PR to land the first 0.3 work._
+
+## [0.2.0] - 2026-06-17
+
+The "ship it in public" release. Everything around the engine — install path,
+AI loop, cloud, four integrations, MCP server, Storybook support, Docker
+cross-OS rendering, self-host story, validation harness — is now built to full
+depth, tested, and published. Five npm packages went live at 0.2.0
+(`@frontguard/cli`, `@frontguard/playwright`, `@frontguard/mcp`,
+`@frontguard/netlify-plugin`, `create-frontguard-plugin`). Twenty PRs of
+engineering work landed between 2026-06-14 and 2026-06-17 — full punch list
+in [`docs/launch-readiness.md`](./docs/launch-readiness.md).
+
 ### Added
 
+- **`@frontguard/mcp` — MCP server for in-IDE agents.** New workspace
+  published as `@frontguard/mcp`. Four tools (`list_regressions`,
+  `get_suggested_fix`, `accept_baseline`, `recent_runs`) over an stdio MCP
+  transport. Per-editor `mcp.json` snippets for Claude Code, Cursor, Copilot
+  in `apps/docs/content/docs/integrations/mcp.mdx`.
 - **Storybook integration** (CLI) — new `storybook: { url, stories?, exclude? }`
   config block enumerates stories from a running Storybook (8.x via
   `/index.json`, 7.x via `/stories.json`) and renders each via
@@ -22,33 +40,144 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--no-storybook` to opt out, `--storybook` / `--storybook-url` to force).
   Ships with a runnable Storybook 8 fixture at
   `packages/cli/__fixtures__/storybook/` (two component stories, one with a
-  `play()` function), a 500-line integration doc at
-  `apps/docs/content/docs/integrations/storybook.mdx`, and dedicated test
-  suites for discovery + init scaffolding.
-
+  `play()` function) and a 500-line integration doc at
+  `apps/docs/content/docs/integrations/storybook.mdx`.
+- **Dockerised renderer for cross-OS byte-equivalent baselines** — pinned
+  Chromium / Firefox / WebKit image at `packages/cli/docker/` + a
+  `--docker` CLI flag + 274-line `apps/docs/content/docs/cross-os-rendering.mdx`.
+  Solves the #1 reason teams abandon Playwright's built-in visual testing
+  (host-OS rendering drift).
+- **Daytona fix-verification snapshot** — `scripts/build-daytona-snapshot.ts`
+  publishes the `frontguard-playwright-v1` Daytona snapshot built on the
+  Docker image above, and `frontguard-render` is now a real bin shipped with
+  `@frontguard/cli` that the sandbox shells to. `verifyFix` falls back to
+  the local sandbox transparently when `DAYTONA_API_KEY` is unset.
 - **OpenTelemetry export** (cloud-api) — run completions emit OTLP/HTTP metrics
   (`frontguard.runs`, `comparisons`, `regressions`, `warnings`, `run.duration`)
-  to a configurable `OTEL_EXPORTER_OTLP_ENDPOINT`. Implemented as plain OTLP/HTTP
-  over `fetch` (no `@opentelemetry/*` SDK) so it runs on Cloudflare Workers;
-  no-op when unset, best-effort so it never breaks a run.
-- **Native Slack app** (`integrations/slack-app`) — a Hono handler with Slack
-  signing-secret verification (+ replay guard), the `url_verification` handshake,
-  the `/frontguard` slash command, OAuth v2 install, and `chat.postMessage`
-  result posting. Ships with a Slack app manifest.
+  to a configurable `OTEL_EXPORTER_OTLP_ENDPOINT`. Implemented as plain
+  OTLP/HTTP over `fetch` (no `@opentelemetry/*` SDK) so it runs on Cloudflare
+  Workers; no-op when unset, best-effort so it never breaks a run.
+- **Native Slack app** (`integrations/slack-app`) — OAuth v2 install persists
+  per-team bot tokens in Cloudflare Workers KV (no more "real deployment
+  persists tokens" stub). `/frontguard status <url>` actually enqueues a run
+  against the cloud-api and posts the result in-channel via `response_url`
+  when complete. Slack manifest points at `slack.frontguard.dev`.
+- **Real GitHub App preview-URL detection** — listens for `commit_status`
+  (Vercel) and `deployment_status` (Netlify / Cloudflare Pages) events,
+  forwards the actual preview deploy URL to the cloud-api instead of
+  `pull_request.html_url`. Bootstrap PR config now imports from
+  `@frontguard/cli`. CI examples reference the `@v1`-tagged action.
+- **Vercel integration accepts custom-domain previews** — `*.vercel.app` lock
+  removed; any preview hostname for a project the user has authorised via
+  Vercel OAuth is accepted. SSRF defences (private/loopback/link-local/
+  cloud-metadata IPs) are always on. `manifest.yml` ready for Vercel
+  Integration Marketplace.
 - **Run-over-run performance regressions** — the perf-budgets plugin can now
-  persist each run's metrics (`trackRegressions`) and flag any metric (LCP, CLS,
-  TTFB, page weight) that degraded beyond `regressionThreshold` since the last
-  run. Regressions surface on `RunResult.perf[].regressions`, inline with the
-  visual diff and in a summary table across console/HTML/PR reports.
-- **Accessibility-aware AI analysis** — when the accessibility plugin is active,
-  axe-core violations for a route × viewport are fused into the AI analysis
-  prompt so the model can correlate a visual change with a known a11y issue
-  (e.g. a contrast regression that is also a visual change).
+  persist each run's metrics (`trackRegressions`) and flag any metric (LCP,
+  CLS, TTFB, page weight) that degraded beyond `regressionThreshold` since
+  the last run. Regressions surface on `RunResult.perf[].regressions`, inline
+  with the visual diff and in a summary table across console/HTML/PR reports.
+- **Accessibility-aware AI analysis** — when the accessibility plugin is
+  active, axe-core violations for a route × viewport are fused into the AI
+  analysis prompt so the model can correlate a visual change with a known
+  a11y issue.
+- **Cloud dashboard polish** — per-monitor history view with sortable/
+  filterable timeline; Argos-style flake-score badge (0–100); side-by-side
+  baseline / current / diff viewer with pixel-overlay ↔ heatmap toggle and
+  `A`/`R`/`I`/`←/→` keyboard shortcuts; bulk-approve gesture; drag-paint
+  ignore-region masks; R2-backed trace / DOM / console attachments per
+  regression; spend-cap header bar with 80% / 95% Resend alerts (idempotent
+  per tier per month).
+- **Self-host story** — multi-stage `packages/cloud-api/Dockerfile` +
+  `docker-compose.yml` (Miniflare for Workers + SQLite for D1 +
+  local-disk for R2); 472-line `apps/docs/content/docs/self-host.mdx`
+  covering Fly.io / AWS / GCP / k8s recipes, HTTPS via Traefik, trade-offs
+  vs hosted, privacy / data flows.
+- **`scripts/release.sh` release orchestrator** — single source of truth for
+  the release flow. Idempotent, `--dry-run` safe (no `NPM_TOKEN` required),
+  forces scoped packages public after publish (overrides org defaults that
+  silently restrict), emits the marketplace submission checklist as part of
+  the run. `.github/workflows/release.yml` runs it on `v*` tag push with
+  provenance signing in CI.
+- **`vs Argos` comparison + Lost Pixel sunset migration** — 495-line
+  `apps/docs/content/docs/comparisons/frontguard-vs-argos.mdx` sourced from
+  the v0.2 competitive research (no-AI positioning, MIT licence, cost
+  comparison at 5K / 35K / 100K snapshots, migration recipe). Lost Pixel
+  migration guide rewritten for the 2026-04-22 Figma acqui-hire reality.
 
-## [0.2.0] - 2026-06-03
+### Changed
 
-The "earn trust" release. The core engine is joined by an AI auto-fix moat, a
-cloud platform, production monitoring, and a full integration surface.
+- **Cloud-api unified.** The deployed `Math.random()` diff shim
+  (`app/src/index.js`) is gone. The Hono source-of-truth at
+  `packages/cloud-api/src/` is the only entry; Workers env bindings replace
+  every `process.env` / `process.on`. `wrangler.toml` declares
+  `api.frontguard.dev/*` so the worker binds the moment the domain moves to
+  Cloudflare. `/health` sources its version from `package.json` (no more
+  hardcoded `0.1.0`). Stripe webhook now refuses all events when
+  `STRIPE_WEBHOOK_SECRET` is unset (returns 503) and verifies signatures
+  when set — previously any unauthenticated POST could flip any team to
+  `business`.
+- **Single canonical npm package name everywhere.** `@frontguard/cli` is
+  the published CLI; every install snippet (landing, docs, CI templates,
+  generated `init` config, GitHub Action, Daytona snapshot builder, Netlify
+  plugin README) now references it. Nine+ places previously referenced a
+  non-existent bare `frontguard`.
+- **Single env-var convention** — `FRONTGUARD_OPENAI_KEY` /
+  `FRONTGUARD_ANTHROPIC_KEY`. Doctor and the runtime agree; CI templates
+  emit the same. Previously the doctor checked `OPENAI_API_KEY` /
+  `ANTHROPIC_API_KEY` while `ai-vision.ts` read `FRONTGUARD_*_KEY`, so
+  "AI configured" and "AI disabled" were both lying half the time.
+- **Landing rebuilt** — positioning-led hero with inline live demo GIF,
+  Problem / How-it-works / Features / vs Percy & Chromatic & Argos /
+  QuickStart (3 tabs, all `@frontguard/cli`) / Validation / Pricing / 8Q FAQ
+  / Footer. Stripped every fabricated stat (87%/94% accuracy,
+  `aggregateRating`, "2,000 weekly downloads", made-up author bio,
+  `@anthropicdev` X handle, `© 2025`).
+- **Docs reconciled.** Every "N tests / N source files / N KB bundle"
+  number now sources from `scripts/stats.ts` at build time (no more frozen
+  numbers in prose). Canonical positioning sentence — "AI-powered frontend
+  visual regression testing for web teams — detect, understand, and fix
+  visual bugs before they ship to production." — appears verbatim in
+  README + docs index + landing hero. Every plugin guide imports from
+  `@frontguard/cli/plugins` with real export names.
+
+### Fixed
+
+- **Pipeline bails with one clear error when the base URL is unreachable.**
+  Previously discovery would fail with ECONNREFUSED, fall back to `/`, and
+  render anyway — producing four stacked ECONNREFUSEDs per run. Now bails
+  with one clear `UnreachableBaseUrlError` and exit code 2.
+- **Generated `init` config TypeScript-compiles on first build.** The
+  generated `frontguard.config.ts` previously imported
+  `FrontguardConfig` from a bare `frontguard` package that doesn't exist;
+  now imports from `@frontguard/cli`.
+- **Netlify plugin actually detects failing runs.** Previously inspected
+  `run.results.changed` (a field the cloud-api never returns) so every
+  build was marked green. Now reads the real shape
+  (`run.results[].status === 'failed' | 'regression' | 'changed'`).
+- **Demo GIF rendered.** The README/landing demo GIF is now a clean
+  recording showing 7 green doctor checks, real `init` output, and a full
+  `run` with AI classification + sandbox-verified fix. Previous GIF was
+  unrendered ("the tape exists, the GIF doesn't") and the landing fell
+  back to a static terminal mock.
+
+### Validation
+
+- **First real harness run on 2026-06-16** against 5 OSS targets. 2 booted
+  end-to-end (tailwind-dashboard, chakra-ui-docs) with 43 recheck routes
+  measured: **0 pixel-only false positives → 0.0% FP rate**, well inside
+  the `< 15%` launch gate. 3 honest skip reasons documented in
+  `validation/results/skip-notes.json`. AI accuracy still gated on an AI
+  provider key being present in the run env. Methodology +
+  reproduction recipe in [`validation/results-v0.2.md`](./validation/results-v0.2.md).
+
+## [0.2.0-rc] - 2026-06-03
+
+The "earn trust" release-candidate cut. Never published to npm; folded into
+the 2026-06-17 `0.2.0` ship above. The work introduced in this draft:
+
+- The core engine joined by an AI auto-fix moat, a cloud platform,
+  production monitoring, and a full integration surface.
 
 ### Added
 

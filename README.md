@@ -21,12 +21,23 @@ Backend has Datadog, Sentry, PagerDuty — a $20B+ monitoring ecosystem. Fronten
 
 <!-- To re-render the demo GIF: `vhs demo/frontguard-demo.tape` (requires `brew install vhs`). -->
 
+> ### 🚀 0.2.0 is live
+>
+> Five packages just shipped to npm: [`@frontguard/cli`](https://www.npmjs.com/package/@frontguard/cli), [`@frontguard/playwright`](https://www.npmjs.com/package/@frontguard/playwright), [`@frontguard/mcp`](https://www.npmjs.com/package/@frontguard/mcp), [`@frontguard/netlify-plugin`](https://www.npmjs.com/package/@frontguard/netlify-plugin), [`create-frontguard-plugin`](https://www.npmjs.com/package/create-frontguard-plugin). Full release notes in [CHANGELOG.md](./CHANGELOG.md#020---2026-06-17); go/no-go in [`docs/launch-readiness.md`](./docs/launch-readiness.md); first validation run results in [`validation/results-v0.2.md`](./validation/results-v0.2.md) (**0.0% pixel-only false positives** on 43 recheck routes).
+
+## Built in the open
+
+Every line of Frontguard is MIT-licensed and lives in this repo. The CLI, the AI vision pipeline, the cloud-api (Cloudflare Workers + D1 + R2), the four integrations (Slack / GitHub / Vercel / Netlify), the MCP server, the Dockerised cross-OS renderer, and the self-host docker-compose are all here. The 21 PRs that built v0.2.0 are all on `main` — you can read the [adversarial review](./docs/adversarial-review.md) we audited the prior state against, the [competitive research](./docs/research.md) that anchored the boundary, and the [product-completion plan](./docs/product-completion-plan.md) that defined what "complete" meant. Nothing is hidden behind a "request a demo."
+
+If you'd rather not run your own AI keys, the cloud is opt-in. If you'd rather not use the cloud, the CLI is free forever. If you'd rather run the whole stack on your own machines, [`docs/self-host.mdx`](./apps/docs/content/docs/self-host.mdx) is the recipe.
 
 ## Why Frontguard?
 
 - **🧠 AI-powered analysis** — Doesn't just say "pixels differ." It classifies the change (regression vs intentional vs content update), explains *why*, and suggests a fix. This kills the #1 pain of visual testing: false positives.
 - **🎯 Anti-flake rendering** — Multi-render consensus eliminates the flaky-screenshot noise that makes teams disable their visual suites.
-- **🔓 Open-source & self-hostable** — CLI-first, free forever. No per-screenshot pricing cliff, no dashboard lock-in, BYO AI key.
+- **🤖 In-IDE agents via MCP** — [`@frontguard/mcp`](https://www.npmjs.com/package/@frontguard/mcp) exposes "what regressed on this PR" and "give me the suggested fix for diff N" to Claude Code / Cursor / Copilot.
+- **🐳 Cross-OS byte-equivalent baselines** — pinned Docker renderer so a fix that closes the diff on macOS closes it on Linux CI too. No more 428-day flake debugging.
+- **🔓 Open-source & self-hostable** — CLI-first, free forever. No per-screenshot pricing cliff, no dashboard lock-in, BYO AI key. [`docs/self-host.mdx`](./apps/docs/content/docs/self-host.mdx) is a one-command recipe.
 
 ## What It Does
 
@@ -236,11 +247,25 @@ Each stage is independent with error boundaries — one page failing doesn't kil
 
 See [`docs/`](./docs/) for:
 - [Product deep-dive](./docs/PRODUCT.md) — Architecture decisions and design rationale
-- [Research](./docs/research/) — Market data, technical feasibility, competitive landscape
+- [Launch readiness (v0.2.0)](./docs/launch-readiness.md) — Go/no-go for the 2026-06-17 release, 20-PR punch list, residual risks
+- [Adversarial review](./docs/adversarial-review.md) — The audit we held v0.2.0 to
+- [Product-completion plan](./docs/product-completion-plan.md) — The frozen IN / ROADMAP / FIX boundary
+- [Research](./docs/research.md) — Mid-2026 competitive landscape (16 competitors fetched live)
+- [Validation results](./validation/results-v0.2.md) — Real harness run, real numbers
 
 ## Roadmap
 
 See [ROADMAP.md](./docs/ROADMAP.md) for the full milestone history and upcoming plans.
+
+## Releasing
+
+The release flow is documented and reproducible — no hidden steps.
+
+1. Tag a version: `git tag -a v0.X.Y -m "..."` and `git push origin v0.X.Y`.
+2. [`.github/workflows/release.yml`](./.github/workflows/release.yml) runs on the tag push: `scripts/release.sh --dry-run` first as a sanity check, then real publish with `NPM_TOKEN` from repo secrets (provenance signing in CI). Marketplace submissions emit as a workflow summary.
+3. [`scripts/release.sh`](./scripts/release.sh) is the single source of truth. Run it locally with `--dry-run` for any audit — `npm pack --dry-run` per package, manifest checks, no state mutated.
+
+Idempotent: already-published versions are skipped automatically. Scoped packages are forced `public` after publish so org defaults can't silently restrict them.
 
 ## Environment Variables
 
