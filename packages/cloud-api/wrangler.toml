@@ -40,6 +40,14 @@ PUBLIC_BASE_URL = "https://api.frontguard.dev"
 #   GITHUB_CLIENT_ID
 #   GITHUB_CLIENT_SECRET
 #   DAYTONA_API_KEY
+#   DASHBOARD_SESSION_SECRET  (REQUIRED in production — signs the `fg_session`
+#                              dashboard cookie. Must be a high-entropy value of
+#                              at least 32 chars, e.g.
+#                              `openssl rand -base64 32`. Set it with
+#                              `wrangler secret put DASHBOARD_SESSION_SECRET`.
+#                              If unset, every /dashboard route fails closed with
+#                              HTTP 503 — see sec-1, cloud-4. NEVER reuse the
+#                              dev fallback constant from src/auth/session.ts.)
 #   RESEND_API_KEY     (email alerts, Task 6.2)
 #   ALERT_FROM_EMAIL   (email alerts, Task 6.2)
 #   STRIPE_SECRET_KEY      (billing, Task 8.2)
