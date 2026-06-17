@@ -4,6 +4,15 @@
  * Uses pixelmatch for perceptual diffing and pngjs for PNG encode/decode.
  * Handles dimension mismatches, corrupt buffers, and identical-image fast paths.
  *
+ * ## Environment variables
+ *
+ * - `FRONTGUARD_DISABLE_BYTE_COMPARE=1` — opt-in escape hatch that skips the
+ *   byte-identical fast path so every comparison runs through the full
+ *   pixelmatch / SSIM pipeline. Used by the validation harness to measure the
+ *   diff engine against Chromium's own PNG-encoder noise (an honest
+ *   false-positive number) instead of short-circuiting on byte equality.
+ *   Off by default; customer runs keep the fast path. See `validation/results-v0.2.md`.
+ *
  * @module diff/pixel
  */
 
@@ -28,6 +37,11 @@ export interface SSIMOptions {
 /**
  * Compare a current screenshot against its baseline image.
  *
+ * Byte-identical buffers short-circuit to a zero-diff `pass` unless
+ * `FRONTGUARD_DISABLE_BYTE_COMPARE=1` is set in the environment, in which case
+ * even byte-identical images are decoded and run through pixelmatch (used by the
+ * validation harness — see the module-level docs and `validation/results-v0.2.md`).
+ *
  * @param current      - The freshly captured screenshot
  * @param baseline     - Raw PNG buffer of the baseline image
  * @param threshold    - Diff threshold (0–1); fraction of pixels that may differ before flagging
@@ -49,7 +63,13 @@ export function compareScreenshot(
   }
 
   // --- Fast path: byte-identical images --------------------------------------
-  if (Buffer.compare(current.buffer, baseline) === 0) {
+  // Skippable via FRONTGUARD_DISABLE_BYTE_COMPARE=1 so the validation harness can
+  // force every comparison through pixelmatch and measure the diff engine against
+  // Chromium's own encoder noise (val-5). Customer default leaves the fast path on.
+  if (
+    process.env.FRONTGUARD_DISABLE_BYTE_COMPARE !== '1' &&
+    Buffer.compare(current.buffer, baseline) === 0
+  ) {
     return {
       route: current.route,
       viewport: current.viewport,
