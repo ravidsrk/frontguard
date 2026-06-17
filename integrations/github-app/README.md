@@ -16,7 +16,7 @@ When a PR opens or its head commit changes the app:
 
 On install the app also opens a **bootstrap PR** in every repo that doesn't
 have a config yet — `frontguard.config.ts` plus a workflow file pinned to
-the tagged release of the action (`ravidsrk/frontguard@v1`).
+the tagged release of the action (`ravidsrk/frontguard@v0`).
 
 ## Install
 
