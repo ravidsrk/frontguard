@@ -15,7 +15,7 @@ The answer, by default, is **no**.
 This page explains why, what Frontguard does about it, and how to wire the Dockerized renderer into your workflow so a baseline captured on your macOS laptop matches a screenshot taken on a Linux CI runner — byte for byte.
 
 <Callout type="info">
-The pinned image and the `--docker` flag are part of Frontguard's IN-7 milestone. They are stable and supported. The same image is also what Frontguard's cloud runner (post-T6) uses, so a baseline captured locally with `--docker` will match a cloud run with no extra configuration.
+The pinned image and the `--docker` flag are part of Frontguard's IN-7 milestone. The renderer plumbing is stable, but the `frontguard/render` image is **not yet published to a registry for this release** — you build it locally first (see [Building the image locally](#building-the-image-locally)). Registry publication is tracked as a launch follow-up in `docs/ops-actions.md`. The same image is what Frontguard's cloud runner (post-T6) uses, so once it's built, a baseline captured locally with `--docker` matches a cloud run with no extra configuration.
 </Callout>
 
 ---
@@ -66,7 +66,7 @@ The container's entrypoint is the `@frontguard/cli` binary that was packed into 
 
 ## The image
 
-The Dockerfile lives at `packages/cli/docker/Dockerfile` in the Frontguard monorepo and is published as `frontguard/render:vX.Y.Z` matching the `@frontguard/cli` version.
+The Dockerfile lives at `packages/cli/docker/Dockerfile` in the Frontguard monorepo. The image **must be built locally today** (see [Building the image locally](#building-the-image-locally)); registry publication under the `frontguard/render:vX.Y.Z` tag — matching the `@frontguard/cli` version — is tracked as a launch follow-up.
 
 What's pinned:
 
@@ -78,11 +78,38 @@ The version-pin policy is documented in the Dockerfile's header comment. When th
 
 ---
 
+## Building the image locally
+
+The `frontguard/render` image is **not yet published to Docker Hub or GHCR** for this release — registry publication is tracked as a launch follow-up in `docs/ops-actions.md` (in the repo). Until it lands, build the image yourself. From the repo root:
+
+```bash
+# 1. Pack the CLI into the tarball the build context expects:
+(cd packages/cli && npm pack && mv frontguard-cli-*.tgz docker/frontguard-cli.tgz)
+
+# 2. Build the image, pinning the architecture:
+docker build --platform linux/amd64 \
+  -t frontguard/render:v0.2.0 -t frontguard/render:latest \
+  packages/cli/docker
+```
+
+`--platform linux/amd64` is **required**, not optional. Chromium's rasterizer produces different sub-pixel anti-aliasing on arm64 vs amd64, so an arm64-built image would not be byte-equivalent to the amd64 image your CI (and the cloud runner) use. `frontguard run --docker` injects the same `--platform linux/amd64` into `docker run`, so on Apple Silicon the container runs under Rosetta/qemu emulation — correct bytes, but expect runs to be roughly **3–5× slower** than a native arm64 container would be.
+
+Once built, the image is cached locally and `frontguard run --docker` reuses it. If you skip this step, the CLI preflights the image and fails fast with the exact `docker build` command to run, rather than a cryptic `pull access denied`. When the registry-publish step lands, this build becomes optional — `--docker` will pull the published tag automatically.
+
+---
+
 ## Usage
 
-### Day-to-day: run with `--docker`
+### Day-to-day: build once, then run with `--docker`
 
-If you have Docker Desktop (or any modern Docker) installed, the simplest path is to pass `--docker` to your normal command:
+First, build the render image locally. This is a one-time step until registry publication lands (see [Building the image locally](#building-the-image-locally)):
+
+```bash
+(cd packages/cli && npm pack && mv frontguard-cli-*.tgz docker/frontguard-cli.tgz)
+docker build --platform linux/amd64 -t frontguard/render:latest packages/cli/docker
+```
+
+Then, if you have Docker Desktop (or any modern Docker) installed, pass `--docker` to your normal command:
 
 ```bash
 frontguard run --url http://host.docker.internal:3000 --docker
@@ -90,13 +117,17 @@ frontguard run --url http://host.docker.internal:3000 --docker
 
 On macOS and Windows, `host.docker.internal` is resolved automatically. On Linux, Frontguard adds the `host-gateway` alias so the same URL works.
 
-The first time you run this, Docker will pull the `frontguard/render:latest` image (~600 MB). Subsequent runs reuse the cached image.
+<Callout type="warn">
+`frontguard run --docker` does **not** pull `frontguard/render` from Docker Hub yet — the image is not published for this release. If you skip the build step above, the CLI preflights the image and fails fast with the exact `docker build` command to run, rather than a cryptic `pull access denied`. Subsequent runs reuse the locally cached image (~600 MB). When the registry-publish step lands, the first `--docker` run will pull the image automatically and the manual build becomes optional.
+</Callout>
 
 ### Pinning a specific image version
 
 By default the CLI runs `frontguard/render:latest`. To pin a specific version (recommended for CI), set the `FRONTGUARD_DOCKER_IMAGE` environment variable:
 
 ```bash
+# Assumes you've already built (or, once published, pulled) this exact tag
+# locally — e.g. `docker build --platform linux/amd64 -t frontguard/render:v0.2.0 packages/cli/docker`.
 export FRONTGUARD_DOCKER_IMAGE=frontguard/render:v0.2.0
 frontguard run --url http://host.docker.internal:3000 --docker
 ```
@@ -179,7 +210,7 @@ Frontguard's cloud runner (the Daytona-backed compute path introduced in T6) con
 
 This means:
 
-- A baseline captured locally with `frontguard run --docker --update-baselines` matches a cloud-captured baseline, byte for byte.
+- A baseline captured locally with `frontguard run --docker --update-baselines` matches a cloud-captured baseline, byte for byte — **across the same architecture**. The Dockerfile pins `--platform linux/amd64` so arm64 dev machines and amd64 CI runners produce byte-equivalent output; the trade-off is that local `--docker` runs on Apple Silicon execute under Rosetta/qemu emulation and are roughly 3–5× slower than a native container.
 - The cloud's pipeline output for the same URL, same viewport, same browser, same revision is reproducible on any developer's box that has Docker.
 - Pinning `FRONTGUARD_DOCKER_IMAGE=frontguard/render:v0.2.0` in your CI config and Cloud-API project settings keeps the two in lockstep across versions.
 
@@ -221,17 +252,22 @@ Cache the image in your CI. GitHub Actions example:
   with:
     path: /tmp/frontguard-image.tar
     key: frontguard-image-${{ env.FRONTGUARD_VERSION }}
-- name: Load image
+- name: Build (or load cached) Frontguard image
   run: |
     if [ -f /tmp/frontguard-image.tar ]; then
       docker load -i /tmp/frontguard-image.tar
     else
-      docker pull frontguard/render:${{ env.FRONTGUARD_VERSION }}
+      # The image is not on a registry yet, so build it from the repo.
+      # Once frontguard/render is published, replace the build with:
+      #   docker pull frontguard/render:${{ env.FRONTGUARD_VERSION }}
+      (cd packages/cli && npm pack && mv frontguard-cli-*.tgz docker/frontguard-cli.tgz)
+      docker build --platform linux/amd64 \
+        -t frontguard/render:${{ env.FRONTGUARD_VERSION }} packages/cli/docker
       docker save frontguard/render:${{ env.FRONTGUARD_VERSION }} -o /tmp/frontguard-image.tar
     fi
 ```
 
-This drops the image pull from ~30s to ~3s on warm runs.
+This caches the built image, so only the first (cold) run pays the build cost; warm runs load the tarball in ~3s.
 
 ### The image is too big to download in my environment
 
@@ -242,11 +278,11 @@ git clone https://github.com/ravidsrk/frontguard.git
 cd frontguard/packages/cli
 npm pack
 mv frontguard-*.tgz docker/frontguard-cli.tgz
-docker build -t frontguard/render:dev docker/
+docker build --platform linux/amd64 -t frontguard/render:dev docker/
 FRONTGUARD_DOCKER_IMAGE=frontguard/render:dev frontguard run --docker --url http://host.docker.internal:3000
 ```
 
-The locally built image is byte-equivalent to the published one as long as you're on the same `@frontguard/cli` version and you haven't modified the Dockerfile.
+The locally built image is byte-equivalent to the published one as long as you're on the same `@frontguard/cli` version, you build with the same `--platform linux/amd64`, and you haven't modified the Dockerfile.
 
 ---
 
