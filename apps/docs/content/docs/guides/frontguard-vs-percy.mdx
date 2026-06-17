@@ -111,7 +111,7 @@ Percy wins here today: a polished, collaborative web dashboard. Frontguard's rev
 1. **Install Frontguard.**
    ```bash
    npm install -D @frontguard/cli
-   npx frontguard init
+   npx -p @frontguard/cli frontguard init
    ```
 2. **Translate your Percy snapshots to routes.** Percy `percySnapshot(name)` calls / story URLs become entries in `routes`.
    ```typescript title="frontguard.config.ts"
@@ -129,8 +129,8 @@ Percy wins here today: a polished, collaborative web dashboard. Frontguard's rev
 5. **For interaction flows**, use the [Playwright plugin](/docs/playwright/setup) instead of Percy SDK calls.
 6. **Capture baselines and run.**
    ```bash
-   npx frontguard baseline
-   npx frontguard run
+   npx -p @frontguard/cli frontguard baseline
+   npx -p @frontguard/cli frontguard run
    ```
 7. **Update CI** — replace the `percy exec` wrapper with `frontguard run`. Remove `PERCY_TOKEN`.
 

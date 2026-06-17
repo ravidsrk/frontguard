@@ -81,7 +81,7 @@ parameters, CI-friendly — and adds the pieces it was missing:
 ### 2. Scaffold a Storybook-aware config
 
 ```bash
-npx frontguard init
+npx -p @frontguard/cli frontguard init
 ```
 
 When `frontguard init` sees a `.storybook/main.ts` (or `.js` / `.mjs` /
@@ -121,7 +121,7 @@ Force the storybook block on a non-Storybook project (rare) with
 npm run storybook
 
 # In another terminal
-npx frontguard run
+npx -p @frontguard/cli frontguard run
 ```
 
 The first run captures baselines; subsequent runs diff against them.
@@ -353,7 +353,7 @@ jobs:
         run: npx wait-on http://localhost:6006
 
       - name: Frontguard
-        run: npx frontguard run --baseline-strategy git --ai
+        run: npx -p @frontguard/cli frontguard run --baseline-strategy git --ai
         env:
           # Optional: AI classification + auto-fix suggestions
           FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -380,7 +380,7 @@ than running `storybook dev` on every PR:
 - name: Serve static Storybook
   run: npx http-server storybook-static -p 6006 &
 - run: npx wait-on http://localhost:6006
-- run: npx frontguard run
+- run: npx -p @frontguard/cli frontguard run
 ```
 
 `/index.json` is included in the static build, so discovery still works.
@@ -492,7 +492,7 @@ cd packages/cli/__fixtures__/storybook
 npm install
 npm run storybook            # http://localhost:6006
 # in another terminal
-npx frontguard run --config ./frontguard.config.ts
+npx -p @frontguard/cli frontguard run --config ./frontguard.config.ts
 ```
 
 Use it as a working reference whenever your own project's setup misbehaves.

@@ -329,7 +329,7 @@ If you're already on Argos and want to try Frontguard alongside or instead, here
 
 ```bash
 npm install -D @frontguard/cli
-npx frontguard init
+npx -p @frontguard/cli frontguard init
 ```
 
 `init` auto-detects your framework (Next.js / Remix / SvelteKit / Nuxt / Astro) and generates a `frontguard.config.ts`.
@@ -399,10 +399,10 @@ await visualTest(page, 'dashboard', {
 
 ```bash
 # First run — captures baselines, no comparison yet
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 
 # Subsequent runs — compares against baselines, runs AI analysis on diffed pages
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
 Frontguard stores baselines on a git orphan branch (`frontguard-baselines`) by default. If you'd rather use a directory, set `baselineStorage: { type: 'fs', path: './visual-baselines' }`.
@@ -428,13 +428,13 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run build && npm run start &
       - run: npx wait-on http://localhost:3000
-      - run: npx frontguard run --url http://localhost:3000
+      - run: npx -p @frontguard/cli frontguard run --url http://localhost:3000
         env:
           FRONTGUARD_OPENAI_KEY: ${{ secrets.FRONTGUARD_OPENAI_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-Replace `argos upload` steps with `npx frontguard run`. Remove `ARGOS_TOKEN`. If you were uploading traces to Argos, decide whether you want them in R2/S3 (configure `uploadStage` in Frontguard) or to stay on the CI runner.
+Replace `argos upload` steps with `npx -p @frontguard/cli frontguard run`. Remove `ARGOS_TOKEN`. If you were uploading traces to Argos, decide whether you want them in R2/S3 (configure `uploadStage` in Frontguard) or to stay on the CI runner.
 
 ### Step 6 — Decide what to do with Playwright traces
 
