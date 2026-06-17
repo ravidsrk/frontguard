@@ -18,7 +18,11 @@
  * @module cli/run
  */
 
-import { runDocker, DockerNotInstalledError } from '../render/docker.js';
+import {
+  runDocker,
+  DockerNotInstalledError,
+  DockerImageUnavailableError,
+} from '../render/docker.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -68,9 +72,14 @@ export async function maybeRunInDocker(
     const code = await runDocker({ argv: cliArgs });
     return code;
   } catch (err) {
-    if (err instanceof DockerNotInstalledError) {
-      // Print ONLY the friendly message — no stack trace. This is the
-      // "ONE clear error, not a stack trace" acceptance bar.
+    if (
+      err instanceof DockerNotInstalledError ||
+      err instanceof DockerImageUnavailableError
+    ) {
+      // Print ONLY the friendly, actionable message — no stack trace. This is
+      // the "ONE clear error, not a stack trace" acceptance bar. The image
+      // error already carries its own build-locally recipe, so we surface it
+      // verbatim rather than burying it in a cryptic `pull access denied`.
       logger.error(err.message);
       return 127;
     }
