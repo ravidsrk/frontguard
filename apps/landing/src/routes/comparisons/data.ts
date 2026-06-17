@@ -56,7 +56,10 @@ export const MATRIX: MatrixRow[] = [
   { capability: 'Open source', emphasize: true, origin: 'design', cells: ['✓ MIT', '✕', '◐', '✓', '◐', '✓ MIT'] },
   { capability: 'CLI-first', origin: 'design', cells: ['✓', '✕', '✕', '✓', '✓', '✓'] },
   // floor "AI diff explanation" → design "AI change classification"
-  { capability: 'AI change classification', emphasize: true, origin: 'rename', cells: ['✓', '✕', '✕', '✕', '✕', '✕'] },
+  // Percy ships the Visual Review Agent (NL summaries / auto-classified) → ◐, per
+  // docs/research.md §3.1/§347; Chromatic ("no diff-classification AI") and Argos
+  // ("no AI overhead") are honest ✕.
+  { capability: 'AI change classification', emphasize: true, origin: 'rename', cells: ['✓', '◐', '✕', '✕', '✕', '✕'] },
   // floor "Sandbox-verified fixes" → design "AI fix verification"
   { capability: 'AI fix verification', emphasize: true, origin: 'rename', cells: ['✓', '✕', '✕', '✕', '✕', '✕'] },
   { capability: 'Anti-flake rendering', origin: 'design', cells: ['✓', '◐', '◐', '✕', '✕', '◐'] },
