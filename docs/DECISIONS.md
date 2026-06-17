@@ -57,3 +57,49 @@ Each decision: `## YYYY-MM-DD — short title` followed by **Context**, **Decisi
 **Rejected**: Running fresh-reviewer workers anyway for symmetry — added latency with no marginal correctness gain on docs deliverables.
 
 **Effect**: Two-worker (implementer + fresh reviewer) discipline applies from T4 onward, where code correctness, type-safety, and "fully complete to real depth" need an adversarial second pass.
+
+---
+
+## 2026-06-17 — Adversarial remediation kickoff (autonomous)
+
+**Context**: The post-ship adversarial audit produced 49 confirmed findings
+(22 P0 / 15 P1 / 12 P2) in docs/adversarial-v020-postship.md. User invoked
+`/orchestration` to drive an autonomous remediation that closes every finding
+via the PR-per-task pipeline (BUILD → VERIFY → REVIEW → SHIP), preserving all
+commits via merge commits, never squash.
+
+**Decision: dossier handling.** The committed dossier (PR #48, 011bcd3) quoted
+the literal `DEV_SESSION_SECRET` value + a working forged-cookie example in
+four places. Redacted via PR #50 (597427a) to `<REDACTED — see sec-1>` markers
+before the convergence loop starts. The raw dossier (with the secret
+verbatim, needed by workers to read the full recommendations) lives in
+`.frontguard-audit/adversarial-v020-postship.md` — added to .gitignore so it
+never lands in a future commit. Workers reference the raw dossier by absolute
+path; the public/committed version is the redacted one.
+
+**Decision: rotation is OPS.** The DEV_SESSION_SECRET is already public from
+the npm package itself. Code-side fix (C5: fail-closed in production, document
+the required secret, remove the constant from source) ships as a PR. Actual
+rotation of the secret + revocation of any forged-cookie sessions in flight is
+an OPS action — recorded in docs/ops-actions.md by T_FINAL, not executed by
+the loop.
+
+**Decision: maintainer authorship.** Every commit on every branch sets
+`user.name=ravidsrk`, `user.email=ravidsrk@gmail.com` before commit #1. No
+`Co-Authored-By` / `Generated with` / `Assisted-by` trailers on any commit or
+PR body — clean public history, free of tool attribution.
+
+**Decision: secret-scan tool fallback.** gitleaks is not installed locally.
+Workers use the grep fallback enumerated in the directive (`ghp_|gho_|ghs_`,
+Stripe / AWS prefixes, `BEGIN PRIVATE KEY`, `*_SECRET|*_TOKEN|*_API_KEY|*_PASSWORD`
+literal assignments). The grep examines `git diff --staged` BEFORE every
+commit and again BEFORE every push. Adversarial false-positives on commits
+that REMOVE secrets (lines prefixed `-` in the diff) are filtered.
+
+**Decision: merge command.** `gh pr merge --merge --delete-branch` — never
+--squash, never --rebase. Confirmed by the redaction PR #50.
+
+**Decision: OPS actions tracked but not executed.** Per the directive: no
+npm publish, no docker push, no registry logins, no deploys, no secret
+rotation execution. These accumulate in docs/ops-actions.md (T_FINAL output)
+with the finding IDs each one unblocks from full closure.
