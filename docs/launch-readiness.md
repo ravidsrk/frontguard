@@ -5,7 +5,26 @@ autonomous product-completion build that took Frontguard from "stalled
 mid-build, marketing site full of fabricated stats" to "complete product
 ready to ship." Authored by the orchestration coordinator on 2026-06-15.*
 
-> **Verdict: GO with documented operational follow-ups.** The product is
+> ## ⚠️ 2026-06-17 update — post-ship adversarial audit contradicts this verdict
+>
+> v0.2.0 was tagged and packages were published to npm on 2026-06-17. A
+> 15-dimension post-ship adversarial review — 161 candidate findings, 112
+> refuted under two-lens verification, **49 confirmed (22 P0 / 15 P1 /
+> 12 P2)** — is the new source of truth and contradicts the unconditional
+> GO below. See [`docs/adversarial-v020-postship.md`](./adversarial-v020-postship.md)
+> for the full punch list. Headline confirmed defects:
+> `frontguard init` writes a `.ts` config the CLI cannot load (Quick Start
+> step 2 fails on every clean machine); the cloud Daytona path never
+> uploads prior baselines so every run returns `new_baseline` (the cloud
+> can't detect regressions); the dashboard session secret has a hardcoded
+> production fallback shipped in published code (any reader can forge any
+> user's cookie); the marketed `frontguard/render` Docker image isn't on
+> Docker Hub; the Pricing CTA points at `app.frontguard.dev` (NXDOMAIN);
+> the Pro tier advertises `productionMonitoring` whose own gate returns
+> HTTP 402 to Pro customers. **Treat the v0.2.0 launch as a public beta,
+> not a 1.0 candidate, until the post-ship dossier's P0 list is closed.**
+
+> **Verdict (original, 2026-06-15): GO with documented operational follow-ups.** The product is
 > complete: every IN-scope feature from
 > [`docs/product-completion-plan.md`](./product-completion-plan.md) is built
 > to full depth, every P0 from
@@ -14,7 +33,7 @@ ready to ship." Authored by the orchestration coordinator on 2026-06-15.*
 > build all pass. The remaining work is **distribution, not engineering** —
 > three operational steps the human owner has to execute (npm publish,
 > marketplace submissions, DNS attachment). None of those steps require
-> further code.
+> further code. **Superseded by the 2026-06-17 post-ship audit above.**
 
 ---
 
@@ -184,3 +203,61 @@ to ship, no marketing claim outran the engineering, and the genuine
 post-v1 work is on the ROADMAP rather than half-built in main.
 
 — Frontguard product-completion build, 2026-06-15.
+
+---
+
+## 2026-06-17 Post-ship audit — addendum
+
+The pre-ship verdict above was confidence-by-construction (every IN-scope
+acceptance gate passed). A 15-dimension adversarial review run **after**
+the public ship — through a 339-subagent workflow with two perspective-diverse
+refuters per finding (code reality + customer impact) — overturned that
+confidence. Headline: 49 of 161 candidate findings survived two-lens
+refutation (70% refute rate, healthy adversarial discipline; the 30% that
+survived are real and ship-affecting).
+
+**Severity split of confirmed findings:**
+
+| Tier | Count | What lives there |
+|---|---|---|
+| **P0** | 22 | Quick-start broken on clean machine; cloud can't detect regressions; dashboard session secret hardcoded in published source; `frontguard/render` Docker image not on Docker Hub; Pricing CTA → NXDOMAIN host; Pro tier advertises a Business-only feature; Slack always reports "No visual regressions"; GitHub App bootstrap PR pins to non-existent `@v1`; Storybook `play()`-aware capture is silently best-effort; every `npx frontguard …` snippet in the docs targets a non-existent npm package; validation 0.0% FP gate measured against a byte-compare fast-path that short-circuits before any real diff runs. |
+| **P1** | 15 | README inside the npm tarball is stale; sb-3 storybook ready-wait throws; SSRF guard missing on `POST /v1/run`; two critical CVEs in the runtime dep tree (protobufjs RCE, shell-quote injection); no `npm audit` CI gate; Daytona snapshot installs `frontguard@latest` (does not exist); MCP `accept_baseline` silently approves the entire run; MCP `recent_runs` is per-user not per-team; report HTML footer drifted to `v0.1.0`; sandbox/cross-OS/distribution/results docs orphaned from sidebar. |
+| **P2** | 12 | Telemetry endpoint NXDOMAIN; 28 npm vulns (13 high); comparison-table cells with stale facts about competitors; MCP diff_id discards browser dimension; self-host doc drift; misleading version-string claim in installation docs; Schema.org `aggregateRating: 4.8/36` shipped on a 0-star repo. |
+
+**Coverage gaps the audit itself flagged** (in `adversarial-v020-postship.md`
+§Coverage gaps): license/OSI compliance of the dep tree, GDPR data-subject-rights
+flow, telemetry contract documentation, WCAG 2.2 AA accessibility,
+cross-OS font hinting / sub-pixel AA, R2 storage cost & lifecycle policy,
+disaster recovery (D1 backups + secret rotation), bus factor, Stripe billing
+correctness (replay / idempotency / refund), rate-limiting & DoS, sandbox
+abuse semantics, internationalisation, multi-browser parity (Firefox/WebKit
+beyond Chromium), trademark conflict, and the "compositional attack" a
+hostile competitor's marketing team would assemble from these P0s.
+
+**Audit-thinness notes (where the 49 findings are themselves under-sampled),
+verbatim from the dossier:**
+
+- The install path was probed on a single clean machine (macOS arm64). Linux
+  x86_64, Windows WSL2, and the Node 20 / 22 / 24 matrix were not separately
+  exercised.
+- Storybook reproduction used Storybook 8.6.x only. The 9.0 release changes
+  `/index.json` again; the `sb-1` finding may be worse there.
+- Cloud-api / Daytona findings were verified from source — `api.frontguard.dev`
+  is NXDOMAIN, so no live deployment was reachable for end-to-end probes.
+- Integration findings (Vercel, Netlify, GitHub App, Slack) rely on
+  code-reading; live end-to-end runs against real marketplace listings
+  weren't possible because the listings are 404.
+- The session-secret finding (sec-1) is code-only; a live forged-cookie
+  session against a running dashboard worker was not exercised.
+- The val-5 byte-compare short-circuit finding was based on result-JSON
+  inspection; the harness was not re-run with byte-compare disabled to
+  measure what the actual pixel-only FP rate is on the same 43 routes.
+
+**Updated launch posture.** The npm packages are live and cannot be
+unpublished without triggering the 72-hour grace + the per-version
+permanence rule. Treat v0.2.0 as a **public beta**: useful to early
+adopters who understand the constraints, not suitable for "trust us,
+we're production-ready" marketing copy. The P0 punch list in the
+dossier is the v0.2.1 release boundary.
+
+— Frontguard post-ship adversarial audit, 2026-06-17.
