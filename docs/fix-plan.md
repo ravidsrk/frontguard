@@ -447,3 +447,612 @@ each other through shared files, so they serialise behind cloud-1:
   `packages/cloud-api/src/processor.ts:53-60` (must stop stripping browser).
 - *Code vs OPS:* **CODE → CLOSED.** No OPS. (Shares `processor.ts:53-60` with
   cloud-1/mcp-2 → land after them.)
+
+---
+
+### C4 — docker-render  **[INDEPENDENT]**
+
+**Findings:** install-4 (P0), docker-1 (P0), docker-3 (P0), docs-3 (P0).
+**Shared-file collision:** `apps/docs/content/docs/cross-os-rendering.mdx` is
+edited by docs-3 (lines 69/93/100/228) **and** by C15/docs-9 (line 273
+relabel). **Not in the directive's collision list — flagged here.** Also
+`sandbox.mdx` (docs-3) overlaps C15/docs-8's sidebar work (meta.json, different
+file — low risk). Serialise C4↔C15 on `cross-os-rendering.mdx`. The code surface
+(`docker.ts`, `Dockerfile`, `release.yml`) is C4-exclusive.
+
+**install-4 / docker-1 — `frontguard/render:latest` is not published; `--docker` fails out of the box**
+*(install-4 and docker-1 are the same defect from the install-path and
+docker-render lenses; fix once.)*
+- *Recommendation (paraphrased):* either add a Docker buildx + multi-arch push
+  step to `release.yml` that publishes `frontguard/render:vX.Y.Z` and `:latest`
+  (and smoke-pulls before claiming the feature ships), or flip `--docker` to a
+  build-locally-from-source path and add a preflight `docker manifest inspect`
+  that, on miss, surfaces an actionable "build it yourself from
+  `packages/cli/docker/Dockerfile`" error instead of a raw `pull access denied`.
+- *Evidence repro:*
+  `curl -s -o /dev/null -w '%{http_code}' https://hub.docker.com/v2/repositories/frontguard/render/`
+  → `404`;
+  `curl -s https://hub.docker.com/v2/repositories/frontguard/` → `{"count":0,…}`.
+- *file:line targets:* `packages/cli/src/render/docker.ts:42` (`DEFAULT_IMAGE`);
+  `packages/cli/src/cli/index.ts:265` (advertises `--docker`);
+  `packages/cli/src/render/docker.ts:144-186` (`runDocker`, add preflight);
+  `.github/workflows/release.yml` (no buildx/push today).
+- *Code vs OPS:* **CODE_CLOSED (OPS: publish `frontguard/render` image to Docker
+  Hub/GHCR).** The preflight + build-locally fallback + actionable error is the
+  code mitigation that removes the raw-failure evidence now.
+
+**docker-3 — no `--platform` pin; arm64 vs amd64 images produce different bytes**
+- *Recommendation (paraphrased):* pin `FROM --platform=linux/amd64 …` in the
+  Dockerfile so the same machine code rasterizes everywhere; inject
+  `--platform linux/amd64` into the `docker run` argv; document the Apple-Silicon
+  emulation perf cost; publish multi-arch tags only if byte-equivalence is proven
+  across them.
+- *Evidence repro:*
+  `grep -n 'platform' packages/cli/docker/Dockerfile packages/cli/docker/docker-compose.yml packages/cli/src/render/docker.ts`
+  → no matches.
+- *file:line targets:* `packages/cli/docker/Dockerfile:37` (base image);
+  `packages/cli/src/render/docker.ts:144-186` (`buildDockerArgs`).
+- *Code vs OPS:* **CODE → CLOSED** (the Dockerfile pin + argv injection is pure
+  code). Multi-arch publication, if pursued, is OPS — but the byte-divergence
+  defect is closed by pinning to a single platform.
+
+**docs-3 — `cross-os-rendering.mdx` tells users to pull an unpublished image**
+- *Recommendation (paraphrased):* publish the image as part of the release
+  pipeline, or gate `--docker` behind an explicit `frontguard build-image` step
+  in the doc and drop the "just `--docker` and it works" framing.
+- *Evidence repro:*
+  `curl -s https://hub.docker.com/v2/repositories/frontguard/render/` →
+  `{"message":"object not found"}`.
+- *file:line targets:* `apps/docs/content/docs/cross-os-rendering.mdx:69,93,100,228`;
+  `apps/docs/content/docs/sandbox.mdx:41-45` (inherits the same image).
+- *Code vs OPS:* **CODE_CLOSED (OPS: publish image)** — doc gating ships now.
+  (Coordinate `cross-os-rendering.mdx` with C15/docs-9.)
+
+---
+
+### C5 — session-secret  **[INDEPENDENT]**
+
+**Findings:** sec-1 (P0), cloud-4 (P0). *(Same root defect from the
+security-auth and cloud-api lenses; fix once.)*
+**Shared-file collision:** `packages/cloud-api/src/index.ts` (boot-time check)
+collides with C6 (`:54`) and C7 (`:377-381`); `auth/session.ts` is C5-exclusive.
+Serialise cloud-api `index.ts` edits (see §3).
+**SECRET-HANDLING (critical):** never write the literal `DEV_SESSION_SECRET`
+value, never reproduce or quote a forged cookie. Reference by ID and public
+file:line only.
+
+**sec-1 / cloud-4 — dashboard session secret has a hardcoded production fallback shipped in published code**
+- *Recommendation (paraphrased):* fail closed — when `isProduction(env)` is true
+  and `DASHBOARD_SESSION_SECRET` is unset, refuse to mint any session cookie
+  (return 503 / throw at startup on first request). Remove the `DEV_SESSION_SECRET`
+  constant from shipped source, or gate it strictly behind a
+  non-production runtime check (and rename it to make misuse obvious). Add
+  `DASHBOARD_SESSION_SECRET` to `wrangler.toml`'s documented-secrets list and to
+  `docs/launch-readiness.md`. **Rotation of the secret and revocation of any
+  sessions signed with the old value is OPS (per DECISIONS.md), not code.**
+- *Evidence repro (SAFE — no forging):*
+  `grep -n "DEV_SESSION_SECRET" packages/cloud-api/src/auth/session.ts` (shows
+  the exported constant + the `|| DEV_SESSION_SECRET` fallback at `:32-34`);
+  `grep -n "DASHBOARD_SESSION_SECRET" packages/cloud-api/wrangler.toml` (shows
+  it is **absent** from the documented secrets at `:39-49`). The dossier's
+  cookie-forge step is **deliberately omitted** here per the secret-handling
+  rule.
+- *file:line targets:* `packages/cloud-api/src/auth/session.ts:29` (constant),
+  `:32-34` (silent fallback); `packages/cloud-api/wrangler.toml:39-49`
+  (documented secrets, missing the session secret);
+  `packages/cloud-api/src/index.ts` (add the boot-time `isProduction` guard);
+  `packages/cloud-api/dist/index.js:1498` (where the constant currently ships);
+  `docs/launch-readiness.md` (add the required secret).
+- *Code vs OPS:* **CODE_CLOSED (OPS: rotate `DASHBOARD_SESSION_SECRET` /
+  remove the public constant's value from the deployed env + revoke in-flight
+  sessions signed with the old key + set the secret in prod).** The
+  fail-closed guard + constant removal ships now and removes the
+  forge-from-source vector; rotation closes the residual real-world exposure.
+
+---
+
+### C6 — ssrf-guard  **[INDEPENDENT]**
+
+**Findings:** sec-2 (P1), int-7 (P1).
+**Shared-file collisions:** `packages/cloud-api/src/index.ts:54` collides with
+C5 (boot) and C7 (`:377-381`) — serialise. `integrations/slack-app/src/runs.ts`
+collides with C9 (int-1 `summarizeRun`) — **directive-listed**; serialise
+C6↔C9 on `runs.ts`.
+
+**sec-2 — `POST /v1/run` accepts any http/https URL; no SSRF guard on the cloud-api**
+- *Recommendation (paraphrased):* port the `isPrivateOrLoopbackHost` helper from
+  the Vercel integration into a shared module and run it on `data.url` in
+  `/v1/run`; reject plain `http://` (https-only) in production; resolve the
+  hostname at fetch time and re-check (DNS-rebinding guard).
+- *Evidence repro (SAFE local check):* with the bundled zod —
+  `z.string().url().safeParse('http://127.0.0.1/')` → `{ success: true }`
+  (proving the schema admits loopback);
+  `grep -rnE 'isPrivateOrLoopbackHost|169\.254|SSRF' packages/cloud-api/src`
+  → no matches.
+- *file:line targets:* `packages/cloud-api/src/index.ts:54` (the
+  `z.string().url()` validator); source of the helper to port —
+  `integrations/vercel/src/webhook.ts:127-154`;
+  `integrations/slack-app/src/runs.ts:17` (accepts `http:`).
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+**int-7 — Slack `/frontguard status <url>` has no SSRF guard; pivots through the cloud-api**
+- *Recommendation (paraphrased):* import the Vercel `isPrivateOrLoopbackHost`
+  helper into the Slack app and reject before submitting, or — preferable —
+  move SSRF guarding into the cloud-api so every entry point inherits it (the
+  sandbox is the actual fetcher). Fixing sec-2 at the cloud-api layer largely
+  subsumes this.
+- *Evidence repro:* code inspection —
+  `integrations/slack-app/src/runs.ts:17-24` and
+  `integrations/slack-app/src/events.ts:89` check only the URL scheme, never a
+  private/loopback host.
+- *file:line targets:* `integrations/slack-app/src/runs.ts:17-24`;
+  `integrations/slack-app/src/events.ts:82-101` (esp. `:89`);
+  `packages/cloud-api/src/index.ts:53`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+---
+
+### C8 — github-action-ref  **[INDEPENDENT]**
+
+**Findings:** int-3 (P0), docs-5 (P0), docs-6 (P0).
+**Shared-file collisions (docs set):** `apps/docs/content/docs/integrations/slack.mdx`
+and `vercel.mdx` are touched by docs-6 and also by C3/docs-2 (api-url) and
+C15/docs-9 (vercel.mdx link). `distribution.mdx` is C8-exclusive. Partition by
+section. The code surface (`integrations/github-app/**`, repo-root `action.yml`)
+is C8-exclusive.
+
+**int-3 — GitHub App bootstrap PR pins to `ravidsrk/frontguard@v1` (nonexistent ref; no repo-root `action.yml`)**
+- *Recommendation (paraphrased):* add an `action.yml` shim at the repo root that
+  re-uses `packages/cli/action.yml` (GitHub resolves `<owner>/<repo>` against the
+  root only), change `ACTION_REF` to a working pinned ref (a `v0`/`v0.2.0` major
+  tag), and add a CI smoke test that runs the action against the local repo so
+  the drift cannot ship again.
+- *Evidence repro:* `git tag --list` → only `v0.1.0`, `v0.2.0` (no `v1`);
+  `find . -name action.yml -not -path '*/node_modules/*'` → only
+  `packages/cli/action.yml`.
+- *file:line targets:* `integrations/github-app/src/github-api.ts:362`
+  (`ACTION_REF`), `:373-391` (`DEFAULT_WORKFLOW_YML`);
+  `integrations/github-app/README.md:19`; new repo-root `action.yml`.
+- *Code vs OPS:* **CODE_CLOSED (OPS: push the `v0` git tag pointing at a stable
+  commit).** The root `action.yml` shim + corrected `ACTION_REF` ship now; the
+  tag must be pushed out-of-band.
+
+**docs-5 — GH Actions/App docs reference `@main` and `@v1`, but `action.yml` isn't at root and no `v1` tag exists**
+- *Recommendation (paraphrased):* pick one canonical reference — add the root
+  `action.yml` shim, tag a `v0` major tag pinned to `v0.2.0`, rewrite every doc
+  to `uses: ravidsrk/frontguard@v0`, and delete the phantom
+  `frontguard/frontguard-action@v0` reference.
+- *Evidence repro:* `find . -maxdepth 2 -name action.yml` → only
+  `packages/cli/action.yml`;
+  `git ls-remote --tags https://github.com/ravidsrk/frontguard` → only `v0.1.0`,
+  `v0.2.0`; `curl -sI https://github.com/frontguard/frontguard-action` →
+  `HTTP/2 404`.
+- *file:line targets:* `apps/docs/content/docs/ci-cd/github-actions.mdx:31,82,123,134,157`;
+  `apps/docs/content/docs/integrations/github.mdx:106`;
+  `apps/docs/content/docs/distribution.mdx:45,53`.
+- *Code vs OPS:* **CODE_CLOSED (OPS: push `v0` tag).** Doc rewrite + root
+  `action.yml` ship now.
+
+**docs-6 — marketplace listings claimed live but 404 (GitHub Marketplace/App, Slack directory, Vercel)**
+- *Recommendation (paraphrased):* add a `<Callout type="warn">` banner at the top
+  of every integration page stating the marketplace listing is in review and the
+  manifest can be self-hosted today; propagate `distribution.mdx`'s honest
+  "Coming soon" tone; remove or 404-proof every dead link; and either implement
+  or delete the Vercel post-install `frontguard.dev/api/install` endpoint.
+- *Evidence repro:* `curl -sI https://github.com/marketplace/frontguard` → `404`;
+  `curl -sI https://github.com/apps/frontguard` → `404`;
+  `curl -sI https://frontguard.dev/api/install` → `404`.
+- *file:line targets:* `apps/docs/content/docs/integrations/github.mdx`;
+  `apps/docs/content/docs/distribution.mdx`;
+  `apps/docs/content/docs/integrations/slack.mdx`;
+  `apps/docs/content/docs/integrations/vercel.mdx` (+ the `/api/install` backend
+  if implemented).
+- *Code vs OPS:* **CODE_CLOSED (OPS: submit/publish the GitHub/Slack/Vercel
+  marketplace listings; implement the `/api/install` backend if the listing is
+  pursued).** The honest callouts + dead-link removal ship now.
+
+---
+
+### C9 — slack-result-shape  **[INDEPENDENT]**
+
+**Findings:** int-1 (P0).
+**Shared-file collision:** `integrations/slack-app/src/runs.ts` is touched by C6
+(int-7 SSRF). **Directive-listed.** Serialise C9↔C6 on `runs.ts`.
+
+**int-1 — Slack app reads a fabricated run-result shape; every message reports "No visual regressions"**
+- *Recommendation (paraphrased):* replace `summarizeRun()` with the same
+  status-string logic the Netlify integration uses
+  (`status === 'regression' | 'changed' | 'failed'`, etc.) and add a
+  fixture-driven test parallel to Netlify's `FIXTURE_FAILING`, so the test
+  exercises the real cloud-api wire shape rather than a hand-fed one.
+- *Evidence repro:* code inspection — `integrations/slack-app/src/runs.ts:45`
+  declares `results` as `Array<{ regression?; warning? }>`, but the real wire
+  shape is `status:'passed'|'regression'|…`
+  (`packages/cloud-api/src/types.ts:30-37`); `summarizeRun()` at `:128-144`
+  counts fields that never exist on the payload, so it always reports zero
+  regressions. The existing unit test (`test/runs.test.ts:178-202`) hand-feeds
+  the wrong shape.
+- *file:line targets:* `integrations/slack-app/src/runs.ts:45`, `:128-144`;
+  `integrations/slack-app/test/runs.test.ts:178-202`; reference correct logic at
+  `integrations/netlify/lib/core.js:215-227` and test
+  `integrations/netlify/test/core.test.js:177-200`;
+  wire shape `packages/cloud-api/src/types.ts:30-37`, `processor.ts:53-60`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+---
+
+### C10 — storybook  **[INDEPENDENT]**
+
+**Findings:** sb-1 (P0), sb-3 (P0).
+**Shared-file collision:** `apps/docs/content/docs/integrations/storybook.mdx`
+is touched by the doc-retraction parts of sb-1/sb-3 **and** by C15/docs-4 (strip
+nonexistent flags) **and** by C1/sb-2 (fixture `.ts` command). **Not in the
+directive's collision list — flagged here.** Serialise the `storybook.mdx`
+edits across C10, C15, and C1. The code surface
+(`discovery/storybook.ts`, `render/playwright.ts`) is C10-exclusive.
+
+**sb-1 — real Storybook 8 strips `parameters` from `/index.json`; per-story overrides silently no-op**
+- *Recommendation (paraphrased):* extract per-story parameters from a source
+  that actually has them — either navigate to each
+  `iframe.html?id=…&viewMode=story` and read
+  `window.__STORYBOOK_PREVIEW__.storyStore.fromId(id).parameters?.frontguard`,
+  or static-parse the `.stories` files via `@storybook/csf-tools`. If neither is
+  wired before shipping, retract the docs claim that `parameters.frontguard`
+  works today.
+- *Evidence repro:* in `packages/cli/__fixtures__/storybook` —
+  `npm install && npm run storybook`, then
+  `curl -s localhost:6006/index.json -o /tmp/sb-index.json` and
+  `python3 -c "import json; d=json.load(open('/tmp/sb-index.json')); print(list(next(iter(d['entries'].values())).keys()))"`
+  → keys are `type/id/name/title/importPath/componentPath/tags` (no
+  `parameters`).
+- *file:line targets:* `packages/cli/src/discovery/storybook.ts:350-354`
+  (`entry.parameters?.frontguard`);
+  `packages/cli/test/discovery/storybook.test.ts:107-147` (hand-fabricated
+  index); doc claim in `apps/docs/content/docs/integrations/storybook.mdx`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+**sb-3 — `STORYBOOK_READY_SCRIPT` ready-wait throws on every story; play()-await is silently best-effort**
+- *Recommendation (paraphrased):* invoke the ready-script as a function —
+  wrap it as an immediately-invoked arrow in the evaluate string
+  (`(STORYBOOK_READY_SCRIPT)(sbTimeout)`) or pass a real function, because
+  `page.evaluate(string, arg)` does not invoke the function on the Playwright
+  side, so the result is `undefined` and `result.reason` throws. Add
+  an integration test that boots the fixture's Storybook and asserts no
+  ready-wait warnings appear and that a play()-driven story matches a known-good
+  baseline. Until fixed, drop the "first-class play()-aware" claim.
+- *Evidence repro:* a live run against the fixture's seven stories emits
+  `⚠ Storybook ready-wait failed for /iframe.html?id=…` on every story
+  (visible in `frontguard run` output / logs against the fixture Storybook).
+- *file:line targets:* `packages/cli/src/render/playwright.ts:269` (the
+  `page.evaluate(STORYBOOK_READY_SCRIPT, sbTimeout)` call), `:275`
+  (`result.reason`), `:281-285` (the swallowing catch); doc claim at
+  `apps/docs/content/docs/integrations/storybook.mdx:13-15,264-296`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+---
+
+### C11 — supply-chain  **[INDEPENDENT]**
+
+**Findings:** supply-2 (P1), supply-6 (P1), install-13 (P2).
+**Shared-file collision:** `packages/cli/package.json` is edited by supply-2 and
+install-13 — internal to C11. `package-lock.json` regenerates here (large diff,
+isolated to this cluster). No cross-cluster collision (C7 doesn't change
+package manifests).
+
+**supply-2 — two critical CVEs in the runtime dep tree (protobufjs, shell-quote) via `@daytonaio/sdk`**
+- *Recommendation (paraphrased):* bump `@daytonaio/sdk` to the audit's listed fix
+  (`^0.187.0`) in both `packages/cli/package.json` and
+  `packages/cloud-api/package.json`, regenerate `package-lock.json`, run
+  `npm audit` until critical/high is 0, then cut and re-publish 0.2.1. Add a CI
+  gate that runs `npm audit --audit-level=high` and fails the build.
+- *Evidence repro:* `npm audit` (summary shows the critical/high counts);
+  `npm ls shell-quote` and `npm ls protobufjs` show the prod (`dev=false`)
+  subtree under `@daytonaio/sdk`.
+- *file:line targets:* `packages/cli/package.json` and
+  `packages/cloud-api/package.json` (`@daytonaio/sdk` version);
+  `package-lock.json` (regenerate); `.github/workflows/ci.yml` (add audit gate).
+- *Code vs OPS:* **CODE_CLOSED (OPS: cut + publish `@frontguard/cli@0.2.1` to
+  npm).** The dep bump + lock regen + CI gate close the audit locally; consumers
+  only get the fix on the next publish.
+
+**supply-6 — no CI gate on `npm audit`; no dependabot/renovate automation**
+- *Recommendation (paraphrased):* add `.github/dependabot.yml` (npm +
+  github-actions ecosystems, weekly), add a CI job that runs
+  `npm audit --audit-level=high --omit=dev` and fails the build, and add a
+  separate scheduled weekly audit that posts the diff into an issue.
+- *Evidence repro:* `grep -RE "audit|trivy|snyk" .github/` → no matches;
+  `ls .github/dependabot.yml renovate.json .renovaterc* 2>/dev/null` → not found.
+- *file:line targets:* `.github/workflows/ci.yml`; new `.github/dependabot.yml`;
+  optional new scheduled workflow.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+**install-13 — clean install ships 28 npm vulnerabilities (13 high) via `@daytonaio/sdk`'s OTel exporters; sdk deprecated**
+- *Recommendation (paraphrased):* move `@daytonaio/sdk` to an
+  `optionalDependency` / `peerDependencyMeta` entry so users who never use
+  Daytona don't pull the chain; migrate to the renamed `@daytona/sdk`; track the
+  upstream OTel CVEs and pin past them or ship a `package-lock.json` override.
+- *Evidence repro:* `npm install @frontguard/cli` in a fresh dir prints the
+  deprecation warning and the vulnerability count; `npm audit --json` enumerates
+  the high CVEs in `@opentelemetry/exporter-*` and `protobufjs`.
+- *file:line targets:* `packages/cli/package.json` (`dependencies` →
+  `optionalDependencies` / `peerDependencyMeta`); `package-lock.json`.
+- *Code vs OPS:* **CODE_CLOSED (OPS: re-publish to npm).** Source change ships
+  now; consumers see the smaller tree only after publish.
+
+---
+
+### C12 — mcp-correctness  **[INDEPENDENT]**
+
+**Findings:** mcp-3 (P1), mcp-6 (P1), mcp-8 (P2), mcp-10 (P2).
+**Shared-file collisions:** `packages/mcp/**` collides with C7 — both edit
+`tools/list-regressions.ts` (C7/mcp-1 at `:70-77`, C12/mcp-8 at `:64`) and
+`tools/recent-runs.ts` (C7/mcp-1 at `:71-78`, C12/mcp-8 at `:62`).
+**Directive-listed.** Serialise C12 **after** C7's mcp work.
+`apps/docs/content/docs/integrations/mcp.mdx` is touched by mcp-6/mcp-10 **and**
+by C7/mcp-2 (doc claim) **and** C3/docs-2 (api-url at `:290`) — serialise the
+mcp.mdx edits. `accept-baseline.ts` reaches into
+`packages/cloud-api/src/index.ts:405-414` (collision with C5/C6/C7 on
+`index.ts`).
+
+**mcp-3 — `invokedDirectly` path-equality check fails via `/tmp`, firmlinks, symlinks (silent no-op on every npx)**
+- *Recommendation (paraphrased):* replace the path-equality guard with a robust
+  idiom — drop the conditional entirely (the file only runs as a bin) and gate
+  the test-side import via a named `main()` export, or compare realpaths
+  (`realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])`).
+- *Evidence repro:* `cd /tmp/mcp-test && cat init.jsonl | npx -y @frontguard/mcp@0.2.0`
+  → exit 0 with zero bytes of stdout/stderr (no tools registered). Prefer
+  reproducing against the **local build** rather than the published 0.2.0:
+  `node packages/mcp/dist/index.js < init.jsonl` from a `/tmp` cwd.
+- *file:line targets:* `packages/mcp/src/index.ts:152-159`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS. (mcp-10 depends on this fix.)
+
+**mcp-6 — `accept_baseline` silently approves an entire run when the agent thinks it accepted one diff**
+- *Recommendation (paraphrased):* add per-diff approval to the cloud-api
+  (`POST /v1/baselines/:runId/approve` with a `{diffIds:[…]}` body) and have the
+  MCP tool take and forward an array; or rename the tool to
+  `accept_run_baselines` and rewrite the docs so the agent performs an explicit
+  "I reviewed all N regressions" check before calling it. As shipped, an LLM
+  following the docs can promote broken UI to canonical.
+- *Evidence repro:* code inspection — `accept-baseline.ts:29-37` parses
+  `diff_id` only to extract the `runId` and discards the per-diff selector;
+  `index.ts:405-414` sets `baselinesApproved=true` on the whole run; the docs
+  prompt at `mcp.mdx:353-360` encourages the per-diff phrasing.
+- *file:line targets:* `packages/mcp/src/tools/accept-baseline.ts:29-37`;
+  `packages/cloud-api/src/index.ts:405-414`;
+  `apps/docs/content/docs/integrations/mcp.mdx:353-360`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS. (Touches cloud-api `index.ts` →
+  serialise with C5/C6/C7.)
+
+**mcp-8 — treating `status='new'` as a regression mislabels first-time baselines**
+- *Recommendation (paraphrased):* drop `'new'` from `REGRESSION_STATUSES` in both
+  tools (or rename the set `BASELINE_ISSUE_STATUSES` and document the semantic),
+  and add a regression test with a sample run whose results include
+  `status='new'`. The codebase already knows the right answer — the cloud-api
+  emits `new_baseline`, which is correctly excluded.
+- *Evidence repro:* code inspection —
+  `grep -n "'new'" packages/mcp/src/tools/list-regressions.ts packages/mcp/src/tools/recent-runs.ts`
+  shows `'new'` inside the regression set (`list-regressions.ts:64`,
+  `recent-runs.ts:62`); the CLI sets `status:'new'` for first-time baselines
+  (`packages/cli/src/diff/pixel.ts:207`).
+- *file:line targets:* `packages/mcp/src/tools/list-regressions.ts:64`;
+  `packages/mcp/src/tools/recent-runs.ts:62`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS. (Shares the two files with C7/mcp-1 →
+  serialise.)
+
+**mcp-10 — documented "tools/list empty → Node version" troubleshooting is wrong (real cause is mcp-3)**
+- *Recommendation (paraphrased):* after fixing mcp-3, add a real launch
+  diagnostic — have the binary write a one-line
+  `frontguard-mcp v<version> starting on stdio` to stderr on launch — and update
+  the troubleshooting table to add "no output at all → likely a path-resolution
+  bug; file an issue with `which npx` and your cwd."
+- *Evidence repro:* `apps/docs/content/docs/integrations/mcp.mdx:381-391` states
+  the empty-tools case is "almost always a Node version issue"; reproduced on
+  Node 22 (see mcp-3 repro) — the real cause is the silent-exit path bug.
+- *file:line targets:* `apps/docs/content/docs/integrations/mcp.mdx:381-391`;
+  the MCP binary launch path (`packages/mcp/src/index.ts`, add the stderr line).
+- *Code vs OPS:* **CODE → CLOSED.** No OPS. **Depends on mcp-3** (land mcp-3
+  first within C12).
+
+---
+
+### C13 — init-gitignore  **[INDEPENDENT]**
+
+**Findings:** install-2 (P0).
+**Shared-file collision:** `packages/cli/src/cli/init.ts` — C13 edits the
+`.gitignore` entry list at `:247`; C1/install-1 edits the default `format` at
+`:158`. **Not in the directive's collision list — flagged here.** Serialise
+C13↔C1 on `init.ts` (or fold both into one worktree).
+
+**install-2 — first-run baseline init explodes when `node_modules` is in the worktree (init's `.gitignore` omits `node_modules/`)**
+- *Recommendation (paraphrased):* add `node_modules/` to the entries `init`
+  appends to `.gitignore`; more robustly, have `GitOrphanStorage` detect a
+  worktree containing a `package.json` and refuse to check out unless the working
+  tree is clean of ignorable dirs, and emit a real error message rather than
+  "All screenshots will be treated as new" followed by an internal
+  "not initialized" panic. Add a `maxBuffer` override to the `git` spawn.
+- *Evidence repro:* in a fresh dir —
+  `git init && npm install && <frontguard init> && git commit -am init`, then
+  serve a local site (`npx serve` on `:8765`) and run
+  `<frontguard run>` → fails with
+  `Baseline storage init failed: git rm failed: spawnSync git ENOBUFS` and
+  `Comparison failed: GitOrphanStorage not initialized.` (use the
+  `-p @frontguard/cli` invocation form for the `frontguard` commands).
+- *file:line targets:* `packages/cli/src/cli/init.ts:247` (the `entriesToAdd`
+  list); the `GitOrphanStorage` checkout / `execFileSync` site
+  (`packages/cli/src/.../git-orphan.ts:88-92`, no `maxBuffer`).
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+---
+
+### C14 — marketing-claims  **[INDEPENDENT]**
+
+**Findings:** claim-5 (P0), claim-7 (P2), claim-9 (P2), dist-11 (P2).
+**Shared-file collisions:** `README.md` comparison-table region (claim-7 `:102`,
+claim-9 `:101`) overlaps C3 (install-6/claim-6 at `:74`/`:104`).
+**Directive-listed (docs set).** Serialise C14↔C3 on `README.md`.
+`apps/landing/**` (claim-5 `pricing.tsx`, dist-11 `index.html`) overlaps C3
+(claim-4 `pricing.tsx`) — `pricing.tsx` is touched by **both** claim-4 (C3) and
+claim-5 (C14); serialise on `pricing.tsx`.
+
+**claim-5 — Pro tier advertises "Production monitoring scheduler" but the plan flag is `false` (Business-only); runtime returns 402**
+- *Recommendation (paraphrased):* decide intent — either flip
+  `pro.limits.productionMonitoring` to `true` (and let the cron route allow the
+  Pro plan), or remove the feature from the Pro tier's `features` array and from
+  the comparison `MATRIX` row. Add a snapshot/integration test asserting every
+  feature claim on the pricing page maps back to a `hasFeature()` returning
+  `true` for that plan id.
+- *Evidence repro:* code inspection —
+  `apps/landing/src/routes/pricing.tsx:71` lists the feature;
+  `packages/cloud-api/src/billing/plans.ts:59` has
+  `pro.limits.productionMonitoring: false` while `:73` has business `true`;
+  `packages/cloud-api/src/routes/monitors.ts:68` returns HTTP 402 to Pro.
+- *file:line targets:* `apps/landing/src/routes/pricing.tsx:71`, `:115` (MATRIX);
+  `packages/cloud-api/src/billing/plans.ts:48-61`, `:63-76`, `:107-110`;
+  `packages/cloud-api/src/routes/monitors.ts:68`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+**claim-7 — README "BackstopJS — 6yr (quiet)" cell is fabricated**
+- *Recommendation (paraphrased):* change the cell to a claim defensible from the
+  project's own cited source (e.g. `❌ (low activity)` or
+  `❌ (last release ~2024)`). Add a test asserting every quantitative claim in
+  the README comparison table maps to a citation in `docs/research.md`.
+- *Evidence repro:* `npm view backstopjs time` → last release `v6.3.25` ~2024
+  (not six years); `docs/research.md:230-238` does not say "6 years".
+- *file:line targets:* `README.md:102`; reference `docs/research.md:230-238`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+**claim-9 — README "Chromatic Pro entry per-snapshot" is misleading (Starter is flat $179/mo)**
+- *Recommendation (paraphrased):* replace "per-snapshot" with "$179/mo" in the
+  README table to match the project's own research.md and the live
+  `/comparisons` page.
+- *Evidence repro:* `docs/research.md:93-98` documents Chromatic Starter at
+  `$179/mo` (35,000 snapshots); `apps/landing/src/routes/comparisons/data.ts:79`
+  already says `$179/mo`.
+- *file:line targets:* `README.md:101`; reference `docs/research.md:93-98`,
+  `apps/landing/src/routes/comparisons/data.ts:79`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+**dist-11 — live site Schema.org `aggregateRating` 4.8/36 on a 0-star repo**
+- *Recommendation (paraphrased):* strip the `AggregateRating` block. The fix is
+  already in `apps/landing/index.html` on main — but the **live** site still
+  serves the old build, so the remaining work is deployment (or a Cloudflare
+  HTML Rewriter hot-fix that strips the block immediately).
+- *Evidence repro:* `curl -s https://frontguard.dev/ | grep -i aggregateRating`
+  (the live HTML still includes it); `curl -s https://api.github.com/repos/ravidsrk/frontguard | python3 -c "import json,sys;print(json.load(sys.stdin)['stargazers_count'])"`
+  → `0`.
+- *file:line targets:* `apps/landing/index.html` (verify the source no longer
+  contains the block — already removed on main).
+- *Code vs OPS:* **CODE_CLOSED (OPS: deploy/redeploy the landing site so the live
+  HTML matches main).** Source is clean; the live misrepresentation persists
+  until the deploy.
+
+---
+
+### C15 — docs-hygiene-residual  **[INDEPENDENT]**
+
+**Findings:** docs-4 (P0), docs-7 (P2), docs-8 (P1), docs-9 (P2).
+**Shared-file collisions (heavy — partition carefully):**
+- `storybook.mdx` (docs-4 flag strip) ↔ C10 (sb-1/sb-3 doc retraction) ↔ C1
+  (sb-2 fixture command).
+- `cross-os-rendering.mdx` (docs-9 `:273`) ↔ C4 (docs-3 `:69/93/100/228`).
+- `vercel.mdx` (docs-9 `:281`) ↔ C3 (docs-2 `:67`) ↔ C8 (docs-6 install URL).
+- moving `frontguard-vs-percy.mdx`/`frontguard-vs-chromatic.mdx` into
+  `comparisons/` (docs-8) changes URLs that C3 (install-6/claim-6 README links)
+  point to — coordinate destinations.
+Sequence C15 **last** among the doc clusters (after C2/C3/C4/C8/C10 settle their
+shared mdx), or partition each file by line and serialise.
+
+**docs-4 — Storybook integration doc invokes CLI flags that don't exist (`--baseline-strategy`, `--ai`)**
+- *Recommendation (paraphrased):* strip `--baseline-strategy` and `--ai` from the
+  Storybook CI recipe (AI is enabled by config + env keys; baseline strategy is
+  config-only today) and fix the "Next steps" claim that lists them as documented
+  flags. Either implement the flags or fix the docs — fixing the docs is
+  recommended since `frontguard.config.ts` already covers both.
+- *Evidence repro:*
+  `node packages/cli/dist/cli/index.js run --baseline-strategy git --ai` →
+  `error: unknown option '--baseline-strategy'`;
+  `grep -n "option('--" packages/cli/src/cli/index.ts` lists the real flags
+  (`:256-263`).
+- *file:line targets:* `apps/docs/content/docs/integrations/storybook.mdx:356,505`;
+  actual flags at `packages/cli/src/cli/index.ts:256-263`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+**docs-7 — `self-host.mdx` claims `/health` returns `0.1.0`; ghcr image isn't published**
+- *Recommendation (paraphrased):* update the `/health` sample output to `0.2.0`
+  (or a `<your release>` placeholder). Either publish a public
+  `ghcr.io/ravidsrk/frontguard-cloud-api` image and verify anonymous pulls, or
+  drop the GHCR pattern and document `docker compose build` from source.
+- *Evidence repro:* `curl -sI https://ghcr.io/v2/ravidsrk/frontguard-cloud-api/manifests/latest`
+  → `HTTP/2 401`; `/health` actually returns `PACKAGE_VERSION`
+  (`packages/cloud-api/src/index.ts:132`).
+- *file:line targets:* `apps/docs/content/docs/self-host.mdx:117` (version
+  sample), `:357`, `:406` (ghcr deploy lines).
+- *Code vs OPS:* **CODE_CLOSED (OPS: publish public `ghcr.io` cloud-api image)**
+  if the GHCR pattern is kept; **CODE → CLOSED** if the doc switches to
+  build-from-source (the version-string fix is pure doc either way).
+
+**docs-8 — sandbox / cross-os / distribution / results pages orphaned from the sidebar**
+- *Recommendation (paraphrased):* add `sandbox`, `cross-os-rendering`, and
+  `distribution` to the top-level `meta.json` (e.g. under a new
+  Deployment/Advanced group), and move `frontguard-vs-percy.mdx` /
+  `frontguard-vs-chromatic.mdx` into `comparisons/` and list all three in
+  `comparisons/meta.json`.
+- *Evidence repro:*
+  `grep -n "sandbox\|cross-os\|distribution" apps/docs/content/docs/meta.json`
+  → no entries; `cat apps/docs/content/docs/comparisons/meta.json` →
+  `"pages": ["frontguard-vs-argos"]` only.
+- *file:line targets:* `apps/docs/content/docs/meta.json:3-22`;
+  `apps/docs/content/docs/comparisons/meta.json:3`;
+  `apps/docs/content/docs/guides/meta.json:20-22`.
+- *Code vs OPS:* **CODE → CLOSED.** No OPS. *(Coordinate moved-file URLs with C3
+  README links.)*
+
+**docs-9 — internal links to nonexistent docs + a `frontguard approve` command that doesn't exist**
+- *Recommendation (paraphrased):* replace `/docs/guides/scheduled-monitors` with
+  `/docs/guides/production-monitoring`; relabel the cross-os link to the
+  Playwright-plugin-setup page; replace the invented `frontguard approve` with
+  `frontguard update-baselines` (or `accept-fix <id>`) and rephrase the
+  surrounding sentence.
+- *Evidence repro:*
+  `ls apps/docs/content/docs/guides/scheduled-monitors* 2>/dev/null` → no match;
+  `grep -rn "frontguard approve" apps/docs/content/docs` → hits in comparison/
+  migration pages;
+  `grep -n ".command('" packages/cli/src/cli/index.ts` → real commands (`run`,
+  `init`, `update-baselines`, `doctor`, `monitor`, `accept-fix`, `reject-fix`,
+  `export-patterns`, `plugin …`) — no `approve`.
+- *file:line targets:* `apps/docs/content/docs/integrations/vercel.mdx:281`;
+  `apps/docs/content/docs/cross-os-rendering.mdx:273`;
+  `apps/docs/content/docs/guides/frontguard-vs-chromatic.mdx:98` (+ the other
+  `frontguard approve` occurrences across the comparison/migration files).
+- *Code vs OPS:* **CODE → CLOSED.** No OPS.
+
+---
+
+### C16 — validation-methodology  **[INDEPENDENT]**
+
+**Findings:** val-5 (P2).
+**Shared-file collision:** none — `validation/**` and the validation results doc
+are C16-exclusive. `packages/cli/src/diff/pixel.ts` is referenced read-only
+(the byte-identical fast path is correct behavior; the issue is the harness
+methodology, not the fast path).
+
+**val-5 — two-pass recheck against unchanged code is not an independent measurement (pixelmatch short-circuits on byte-identical PNGs)**
+- *Recommendation (paraphrased):* make the recheck pass an actual independent
+  measurement — boot a fresh dev-server process (fresh CSS/JS hashes, font
+  sub-pixel decisions), or render against a separate clone, or seed the recheck
+  with a no-op `git commit --allow-empty` plus a forced server restart — then
+  re-run the harness and update the methodology write-up. The current setup
+  shares dev-server PID, work dir, SHA, and baseline between passes, so it
+  measures Chromium encoder determinism, not false-positive rate.
+- *Evidence repro:* code inspection — `packages/cli/src/diff/pixel.ts:51-63`
+  takes a `Buffer.compare(current, baseline) === 0` fast path;
+  `validation/results/tailwind-dashboard.json:40-99` shows every diff entry at
+  `diffPercentage: 0` (consistent with the fast path firing on every entry).
+- *file:line targets:* `validation/**` (the recheck harness);
+  `packages/cli/src/diff/pixel.ts:51-63` (the fast path it exploits);
+  `validation/results/results-v0.2.md:46-49` (methodology claim to revise).
+- *Code vs OPS:* **CODE → CLOSED** (harness change + re-run + corrected
+  methodology write-up). No OPS — but a local validation re-run is required; if
+  the re-run isn't feasible in the loop, the minimum closure is the corrected
+  methodology disclosure plus the harness change that forces an independent
+  second pass.
