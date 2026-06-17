@@ -40,10 +40,10 @@ Frontguard has two packages — install what you need:
   </Tab>
 </Tabs>
 
-Or run directly with `npx`:
+Or run without installing — note `npx` needs the package name (`-p @frontguard/cli`) because the bin (`frontguard`) differs from the package (`@frontguard/cli`). Once installed, you can drop the prefix and run `frontguard <cmd>` directly.
 
 ```bash
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
 ## Playwright Plugin
@@ -124,13 +124,13 @@ GITHUB_TOKEN=ghp_...
 ## Verify Installation
 
 ```bash
-npx frontguard --version
+npx -p @frontguard/cli frontguard --version
 ```
 
-You should see output like:
+You should see the installed CLI version printed as a SemVer string (the exact value depends on which version you installed):
 
 ```
-frontguard
+0.2.0
 ```
 
 ## Next Steps

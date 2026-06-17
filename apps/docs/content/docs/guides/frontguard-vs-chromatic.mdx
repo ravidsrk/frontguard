@@ -117,7 +117,7 @@ Chromatic clearly wins today: branch-aware baselines, PR checks, multi-reviewer 
 1. **Install Frontguard.**
    ```bash
    npm install -D @frontguard/cli
-   npx frontguard init
+   npx -p @frontguard/cli frontguard init
    ```
 2. **Decide your scope.** Keep testing Storybook stories *and/or* add real page routes.
    <Tabs items={['Test real pages', 'Test Storybook stories']}>
@@ -154,8 +154,8 @@ Chromatic clearly wins today: branch-aware baselines, PR checks, multi-reviewer 
 5. **For interaction/play-function flows**, use the [Playwright plugin](/docs/playwright/setup).
 6. **Capture baselines and run.**
    ```bash
-   npx frontguard baseline
-   npx frontguard run
+   npx -p @frontguard/cli frontguard baseline
+   npx -p @frontguard/cli frontguard run
    ```
 7. **Update CI** — replace the `chromatic` command with `frontguard run`. Remove `CHROMATIC_PROJECT_TOKEN`.
 

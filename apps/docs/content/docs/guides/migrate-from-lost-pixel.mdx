@@ -259,7 +259,7 @@ A realistic Lost Pixel config and its Frontguard translation, end to end.
    ```bash
    npm uninstall lost-pixel
    npm install -D @frontguard/cli
-   npx frontguard init
+   npx -p @frontguard/cli frontguard init
    ```
 2. **Map `pageShots.pages` → `routes`** (path stays, drop `name`).
 3. **Map `breakpoints` → `viewports`** (1:1).
@@ -271,8 +271,8 @@ A realistic Lost Pixel config and its Frontguard translation, end to end.
 9. **Drop `lostPixelProjectId` / `apiKey`** — not needed.
 10. **Capture baselines, run, approve.**
     ```bash
-    npx frontguard baseline
-    npx frontguard run
+    npx -p @frontguard/cli frontguard baseline
+    npx -p @frontguard/cli frontguard run
     ```
 11. **(Optional) Enable AI** — set `FRONTGUARD_OPENAI_KEY`.
 

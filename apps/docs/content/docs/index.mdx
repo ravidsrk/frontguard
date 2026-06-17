@@ -27,13 +27,13 @@ AI explains what changed and why → Suggests fixes → Posts PR comment
 
 ```bash title="Terminal"
 # Initialize config (auto-detects your framework)
-npx frontguard init
+npx -p @frontguard/cli frontguard init
 
 # Run visual regression tests
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 
 # Accept current screenshots as new baselines
-npx frontguard update-baselines
+npx -p @frontguard/cli frontguard update-baselines
 ```
 
 ## How It Works
@@ -77,7 +77,7 @@ The pipeline runs in stages: `discover → filter → render → diff → analyz
 
 | Package | Description |
 |---------|-------------|
-| [`frontguard`](./cli) | CLI tool for visual regression testing |
+| [`@frontguard/cli`](./cli) | CLI tool for visual regression testing |
 | [`@frontguard/playwright`](./playwright) | Playwright plugin for in-test visual assertions |
 
 ## Next Steps

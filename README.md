@@ -59,16 +59,16 @@ AI explains what changed and why → Suggests fixes → Posts PR comment
 npm install @frontguard/cli
 
 # Initialize config (auto-detects your framework, --ci adds a GitHub Action)
-npx frontguard init --ci
+npx -p @frontguard/cli frontguard init --ci
 
 # Verify your environment is ready
-npx frontguard doctor
+npx -p @frontguard/cli frontguard doctor
 
 # Run visual regression tests
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 
 # Accept current screenshots as new baselines
-npx frontguard update-baselines
+npx -p @frontguard/cli frontguard update-baselines
 ```
 
 > **Full documentation:** [frontguard.dev](https://frontguard.dev) · [`docs/`](./docs/) folder

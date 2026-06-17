@@ -14,7 +14,7 @@ Run Frontguard automatically on every pull request. When a visual regression is 
 The fastest way to get a working workflow:
 
 ```bash
-npx frontguard init --ci
+npx -p @frontguard/cli frontguard init --ci
 ```
 
 This generates `.github/workflows/frontguard.yml` tailored to your detected framework (correct dev command and port).
@@ -61,7 +61,7 @@ jobs:
           npm run dev &
           npx wait-on http://localhost:3000 --timeout 60000
 
-      - run: npx frontguard run --url http://localhost:3000 --output json
+      - run: npx -p @frontguard/cli frontguard run --url http://localhost:3000 --output json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```

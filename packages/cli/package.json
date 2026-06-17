@@ -26,7 +26,7 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "node ./scripts/check-readme-version.mjs && npm run build"
   },
   "keywords": [
     "visual-regression",
