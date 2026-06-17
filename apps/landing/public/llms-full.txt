@@ -7,7 +7,12 @@ Frontguard is an open-source CLI + cloud platform. The CLI is MIT-licensed and f
 ## Key Pages
 
 - [Home](https://frontguard.dev) — Product overview, install paths, comparison vs Percy / Chromatic / Argos
-- [Documentation](https://docs.frontguard.dev) — Full API reference, guides, configuration
+- [Pricing](https://frontguard.dev/pricing) — Free CLI ($0, MIT), Pro ($29/mo), Team/Enterprise; compare-plans matrix and the 8-question FAQ
+- [Comparisons](https://frontguard.dev/comparisons) — Capability-by-capability vs Percy, Chromatic, BackstopJS, Lost Pixel, Argos, with sources
+- [Changelog](https://frontguard.dev/changelog) — Notable releases, newest first (Keep a Changelog)
+- [Brand](https://frontguard.dev/brand) — The amber shield mark, lockups, color tokens, typography, voice
+- [Docs](https://frontguard.dev/docs) — New-brand docs surface: install, CLI, configuration, AI analysis, CI/CD, self-hosting
+- [Documentation (deep)](https://docs.frontguard.dev) — Full API reference, guides, configuration
 - [GitHub](https://github.com/ravidsrk/frontguard) — Source code, issues, contributing
 - [npm: @frontguard/cli](https://www.npmjs.com/package/@frontguard/cli)
 - [npm: @frontguard/playwright](https://www.npmjs.com/package/@frontguard/playwright)
@@ -232,7 +237,12 @@ CLI sends screenshots only to your configured AI provider. On the hosted cloud, 
 ## Links
 
 - Website: https://frontguard.dev
-- Documentation: https://docs.frontguard.dev
+- Pricing: https://frontguard.dev/pricing
+- Comparisons: https://frontguard.dev/comparisons
+- Changelog: https://frontguard.dev/changelog
+- Brand: https://frontguard.dev/brand
+- Docs (new-brand surface): https://frontguard.dev/docs
+- Documentation (deep): https://docs.frontguard.dev
 - GitHub: https://github.com/ravidsrk/frontguard
 - npm: https://www.npmjs.com/package/@frontguard/cli
 - Author: Ravindra Kumar — https://github.com/ravidsrk · https://x.com/ravidsrk
