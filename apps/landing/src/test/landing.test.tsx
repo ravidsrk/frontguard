@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from './test-utils';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { ReactElement } from 'react';

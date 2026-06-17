@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from './test-utils';
 import { MemoryRouter } from 'react-router-dom';
 import { Component as Comparisons } from '../routes/comparisons';
 import { ComparisonMatrix } from '../routes/comparisons/ComparisonMatrix';

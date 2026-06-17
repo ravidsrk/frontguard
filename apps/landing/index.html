@@ -8,32 +8,31 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/logo-16.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/logo-180.png" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production. Open source CLI under MIT, Pro cloud at $29/mo." />
-<title>Frontguard — Catch the regression, not the noise</title>
 <meta name="theme-color" content="#0d0c0b" />
 
-<!-- Open Graph -->
+<!-- Per-route title, meta description, canonical link, and the route-varying
+     og:title / og:url / og:description / twitter:title / twitter:description are
+     emitted by the Seo component (src/components/Seo.tsx) through vite-react-ssg's
+     Head, so each prerendered route gets a single, route-correct copy in the head.
+     They are intentionally NOT declared here to avoid duplicate, self-
+     canonicalizing tags across routes. -->
+
+<!-- Open Graph (global; route-specific og:title / og:url / og:description come from Seo) -->
 <meta property="og:type" content="website" />
-<meta property="og:title" content="Frontguard — AI-powered visual regression testing" />
-<meta property="og:description" content="Detect, understand, and fix visual bugs before they ship to production. Anti-flake consensus, AI classification, sandbox-verified fixes. Open source under MIT." />
-<meta property="og:url" content="https://frontguard.dev" />
 <meta property="og:image" content="https://frontguard.dev/og-image.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="og:site_name" content="Frontguard" />
 
-<!-- Twitter Card -->
+<!-- Twitter Card (global; route-specific twitter:title / twitter:description come from Seo) -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="@ravidsrk" />
 <meta name="twitter:creator" content="@ravidsrk" />
-<meta name="twitter:title" content="Frontguard — AI-powered visual regression testing" />
-<meta name="twitter:description" content="Detect, understand, and fix visual bugs before they ship to production. Anti-flake consensus, AI classification, sandbox-verified fixes." />
 <meta name="twitter:image" content="https://frontguard.dev/og-image.png" />
 
 <!-- Additional SEO -->
 <meta name="author" content="Ravindra Kumar" />
 <meta name="keywords" content="visual regression testing, AI visual testing, Playwright, Storybook visual testing, frontend testing, CSS regression, screenshot testing, open source visual testing, MCP server" />
-<link rel="canonical" href="https://frontguard.dev" />
 
 <!-- Security -->
 <meta http-equiv="X-Content-Type-Options" content="nosniff" />
@@ -79,80 +78,11 @@
 }
 </script>
 
-<!-- Structured Data: FAQPage — answers mirror the React FAQ component
-     verbatim. No fabricated stats, no invented citations. -->
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "How do I install Frontguard?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Run npm install @frontguard/cli to install the engine, then npx frontguard init to write a typed config and npx frontguard run --url <your URL> to do your first scan. The Playwright plugin is a thin wrapper: npm install -D @frontguard/cli @frontguard/playwright."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "How does Frontguard handle cross-OS rendering differences?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Playwright's own docs warn that local rendering varies by OS and hardware. Frontguard ships a pinned Docker renderer image with Chromium, Firefox, and WebKit so baselines render byte-equivalently on macOS, Linux, and CI. Enable with frontguard run --docker."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Can I self-host the cloud?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. The cloud (Hono on Cloudflare Workers with D1 and R2) is MIT-licensed and runs locally via docker-compose up — miniflare for the Worker runtime, SQLite in place of D1, and a local-disk adapter in place of R2."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "What environment variables does Frontguard read?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "For AI: FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY. The Playwright plugin also accepts unprefixed OPENAI_API_KEY / ANTHROPIC_API_KEY when present. For the hosted cloud: FRONTGUARD_API_URL and FRONTGUARD_API_KEY. frontguard doctor reads exactly the same env names the runtime reads."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "OpenAI or Anthropic — which should I use?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Either works. Frontguard sends the diff image, the DOM snapshot, console errors, and axe-core findings. Claude Sonnet is the default when both keys are present; GPT-4o is the fallback. Switch with ai.provider in frontguard.config.ts."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Does Frontguard work with Storybook?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. frontguard init detects an existing Storybook (looks for .storybook/main.ts) and scaffolds a Storybook-aware config. The adapter walks the Storybook iframe, runs each story's play() function, and produces one screenshot per story by viewport."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is there an MCP server for in-IDE agents?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "@frontguard/mcp exposes list_regressions(pr_id), get_suggested_fix(diff_id), accept_baseline(diff_id), and recent_runs(repo, branch) to Claude Code, Cursor, Cline, and Copilot. Run as npx @frontguard/mcp and drop the snippet into your mcp.json."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "What is the data retention policy for screenshots?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "The CLI never sends screenshots anywhere except the AI provider you configured. On the hosted cloud, baselines and diff thumbnails are stored in R2 under your team scope; default retention is 30 days on Pro, configurable up to 1 year on Enterprise."
-      }
-    }
-  ]
-}
-</script>
+<!-- FAQPage structured data is emitted by the /pricing route (src/routes/pricing.tsx),
+     where the FAQ UI lives, from the same FAQS that render on the page. It is
+     intentionally NOT in this global head: a FAQPage on routes without a visible
+     FAQ (home, comparisons, changelog, brand, docs) violates Google's structured-
+     data guidelines, and a duplicate copy on /pricing trips rich-result validators. -->
 
 <!-- Fonts (Space Grotesk + JetBrains Mono) are self-hosted via @fontsource and
      bundled by Vite; no runtime Google Fonts request. -->
