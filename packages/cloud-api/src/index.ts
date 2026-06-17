@@ -386,11 +386,28 @@ app.get('/v1/runs/:id', async (c) => {
 
 // ---------------------------------------------------------------------------
 // GET /v1/runs — List runs
+//
+// Team-scoped (mcp-7): mirrors POST /v1/run's team handling. By default the
+// caller sees their own runs plus runs from every team they belong to, so a
+// personal MCP key still finds the runs a CI service account submitted under a
+// shared team. An explicit `?teamId=` narrows to that team only and 403s for a
+// non-member.
 // ---------------------------------------------------------------------------
 app.get('/v1/runs', async (c) => {
   const store = c.get('store');
-  const allRuns = await store.listRuns(c.get('userId'), 50);
-  return c.json({ runs: allRuns, total: allRuns.length });
+  const userId = c.get('userId');
+  const teamId = c.req.query('teamId');
+
+  if (teamId) {
+    const member = await store.getMember(teamId, userId);
+    if (!member) return c.json({ error: 'Not a member of the requested team' }, 403);
+    const runs = await store.listRuns(userId, { teamIds: [teamId], includeOwn: false, limit: 50 });
+    return c.json({ runs, total: runs.length });
+  }
+
+  const teams = await store.listTeamsForUser(userId);
+  const runs = await store.listRuns(userId, { teamIds: teams.map((t) => t.id), limit: 50 });
+  return c.json({ runs, total: runs.length });
 });
 
 // ---------------------------------------------------------------------------
