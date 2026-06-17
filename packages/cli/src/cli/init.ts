@@ -263,7 +263,8 @@ export function runInit(opts: InitOptions = {}): InitResult {
   if (existsSync(gitignorePath)) {
     gitignoreContent = readFileSync(gitignorePath, 'utf-8');
   }
-  const newEntries = entriesToAdd.filter((entry) => !gitignoreContent.includes(entry));
+  const existingLines = new Set(gitignoreContent.split('\n').map((line) => line.trim()));
+  const newEntries = entriesToAdd.filter((entry) => !existingLines.has(entry));
   if (newEntries.length > 0) {
     const addition =
       (gitignoreContent.endsWith('\n') || gitignoreContent === '' ? '' : '\n') +
