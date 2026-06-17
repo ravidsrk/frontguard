@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import { z } from 'zod';
 import type { Run } from './types.js';
@@ -15,6 +15,7 @@ import { persistScreenshots, type PendingScreenshot } from './storage/persist-sc
 import { completeCheckRun } from './github-callback.js';
 import { monitorRoutes } from './routes/monitors.js';
 import { dashboardRoutes, sessionDashboardRoutes } from './routes/dashboard.js';
+import { hasValidSessionSecret } from './auth/session.js';
 import { teamRoutes } from './routes/teams.js';
 import { can } from './db/teams.js';
 import { billingRoutes } from './routes/billing.js';
@@ -138,6 +139,25 @@ app.get('/health', (c) => c.json({ status: 'ok', version: PACKAGE_VERSION }));
 app.route('/auth', authRoutes);
 app.route('/v1/keys', keyRoutes);
 app.route('/v1/billing', billingRoutes);
+
+// Fail closed (sec-1, cloud-4): in production the dashboard session secret MUST
+// be configured (set + >= 32 chars). Without it we refuse to serve any
+// dashboard route rather than silently signing `fg_session` cookies with the
+// insecure fallback that ships in the published source — which would let anyone
+// reading the OSS repo forge a cookie for any user. Returns 503 so an operator
+// who forgot `wrangler secret put DASHBOARD_SESSION_SECRET` gets a clear signal.
+// Dev/tests (no D1 `DB` binding) are unaffected and keep their no-config UX.
+const requireDashboardSecret: MiddlewareHandler<{
+  Bindings: Bindings;
+  Variables: Variables;
+}> = async (c, next) => {
+  if (isProduction(c.env) && !hasValidSessionSecret(c.env)) {
+    return c.text('Dashboard not configured (DASHBOARD_SESSION_SECRET missing)', 503);
+  }
+  await next();
+};
+app.use('/dashboard', requireDashboardSecret);
+app.use('/dashboard/*', requireDashboardSecret);
 
 // Browser dashboard (session-cookie auth) — mounted before the /v1 guard so it
 // is NOT behind the API-key requirement.
