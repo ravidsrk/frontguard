@@ -25,6 +25,8 @@ export interface SuggestedFixResult {
   runId: string;
   route: string;
   viewport: number;
+  /** Browser the matched diff was captured in, when the run records it (mcp-9). */
+  browser?: string;
   fix: CloudSuggestedFix | null;
   /** Set when the diff exists but no AI-generated fix is available. */
   reason?: string;
@@ -46,10 +48,17 @@ export async function getSuggestedFix(
     };
   }
 
-  const { runId, route, viewport } = parsed;
+  const { runId, route, viewport, browser } = parsed;
   const run = await client.getRun(runId);
+  // When the diff_id carries a browser (multi-browser runs), match it exactly
+  // so two browsers regressing the same route+viewport don't resolve to the
+  // wrong fix. Legacy 3-segment ids have no browser, so they fall back to the
+  // route+viewport match (first result) and keep working (mcp-9).
   const match = (run.results ?? []).find(
-    (r) => r.route === route && r.viewport === viewport,
+    (r) =>
+      r.route === route &&
+      r.viewport === viewport &&
+      (browser === undefined || r.browser === browser),
   );
 
   if (!match) {
@@ -69,6 +78,7 @@ export async function getSuggestedFix(
       runId,
       route,
       viewport,
+      browser: match.browser,
       fix: null,
       reason:
         'No AI fix available for this diff. Re-run with an `ai` provider configured to generate suggestions.',
@@ -80,6 +90,7 @@ export async function getSuggestedFix(
     runId,
     route,
     viewport,
+    browser: match.browser,
     fix: match.suggestedFix,
   };
 }
