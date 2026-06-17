@@ -35,6 +35,25 @@ export interface CloudRunResponse {
   statusUrl?: string;
 }
 
+/**
+ * One per-route result inside a completed run. Mirrors the cloud-api wire shape
+ * (`RunResult`): each result carries a `status` STRING, not a boolean flag.
+ *
+ * Per-result `status` ∈ `passed | regression | changed | warning |
+ * new_baseline | failed` (`failed` is defensive; the API does not emit it today
+ * but the type is widened so we don't ignore it if it appears).
+ *
+ * @see packages/cloud-api/src/types.ts:30 (RunResult)
+ */
+export interface CloudRunResult {
+  route?: string;
+  viewport?: number;
+  status?: string;
+  diffPercentage?: number;
+  classification?: string;
+  timestamp?: string;
+}
+
 /** Shape of a completed run, polled via `GET /v1/runs/:id`. */
 export interface CloudRunStatus {
   id: string;
@@ -42,7 +61,7 @@ export interface CloudRunStatus {
   url?: string;
   reportUrl?: string | null;
   error?: string;
-  results?: Array<{ regression?: boolean; warning?: boolean }>;
+  results?: CloudRunResult[] | null;
 }
 
 export interface SubmitRunOptions {
@@ -125,14 +144,26 @@ export async function pollRunUntilTerminal(opts: {
   return last;
 }
 
-/** Counts regressions and warnings in a polled run. */
+/**
+ * Counts regressions and warnings in a polled run.
+ *
+ * Reads the per-result `status` string from the real cloud-api wire shape —
+ * mirroring `isFailingRun()`/`summarizeResults()` in
+ * `integrations/netlify/lib/core.js`:
+ *   - `regression` / `changed` / `failed` are failure-worthy → counted as
+ *     regressions (RunSummary has no separate `failed` bucket, so a per-result
+ *     `failed` folds in here);
+ *   - `warning` is a soft warning;
+ *   - `passed` / `new_baseline` are clean and counted as neither.
+ */
 export function summarizeRun(run: CloudRunStatus, fallbackUrl: string): RunSummary {
   const results = run.results ?? [];
   let regressions = 0;
   let warnings = 0;
   for (const r of results) {
-    if (r.regression) regressions++;
-    else if (r.warning) warnings++;
+    const status = r && typeof r === 'object' ? r.status : undefined;
+    if (status === 'regression' || status === 'changed' || status === 'failed') regressions++;
+    else if (status === 'warning') warnings++;
   }
   return {
     url: run.url ?? fallbackUrl,
