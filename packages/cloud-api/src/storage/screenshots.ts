@@ -58,6 +58,32 @@ export function screenshotKey(
   return `${runPrefix(userId, runId)}${slug}-${viewport}-${browser}-${type}.png`;
 }
 
+/**
+ * Converts a route path to the safe filesystem segment the CLI uses for
+ * baseline storage. Mirrors `sanitizeRoutePath` in the CLI's git-orphan
+ * storage (`packages/cli/src/storage/git-orphan.ts`) so a baseline restored
+ * into the sandbox lands at exactly the path the reporter reads back.
+ *
+ * `/` → `_root`; path traversal is collapsed; only `[A-Za-z0-9_-/]` survive.
+ */
+export function sanitizeRoutePath(route: string): string {
+  let sanitized = route.replace(/^\/+/, '').replace(/\.\./g, '_');
+  if (!sanitized || sanitized === '.') sanitized = '_root';
+  return sanitized.replace(/[^a-zA-Z0-9_\-/]/g, '_');
+}
+
+/**
+ * Path (relative to the repo/work dir) of a baseline PNG in the CLI's git
+ * orphan-branch layout: `baselines/<sanitized-route>/<viewport>/<browser>.png`.
+ *
+ * The cloud runner restores prior baselines under this path and seeds them into
+ * the `frontguard-baselines` orphan branch so `frontguard run` compares against
+ * them instead of treating every screenshot as a new baseline (cloud-1).
+ */
+export function orphanBaselinePath(route: string, viewport: number, browser: string): string {
+  return `baselines/${sanitizeRoutePath(route)}/${viewport}/${browser}.png`;
+}
+
 // ---------------------------------------------------------------------------
 // R2 implementation
 // ---------------------------------------------------------------------------

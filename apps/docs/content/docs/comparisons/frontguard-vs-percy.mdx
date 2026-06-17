@@ -89,7 +89,7 @@ This is the core philosophical difference. Percy relies on a human reviewing the
 Percy ships a proprietary computer-vision diff (the "Percy Visual Engine") that suppresses anti-aliasing and dynamic-content noise, but it does **not** classify diffs (regression vs intentional vs content update) and does **not** explain *why* something changed. Frontguard sends baseline + current images to OpenAI or Anthropic (BYOK) and returns a plain-English explanation plus an optional suggested CSS fix. See [AI Analysis](/docs/guides/ai-analysis).
 
 ### Review & approval
-Percy wins here today: a polished, collaborative web dashboard. Frontguard's review is CLI/report-based (`frontguard approve`). A hosted dashboard is on the roadmap but **not shipped yet**.
+Percy wins here today: a polished, collaborative web dashboard. Frontguard's review is CLI/report-based (`frontguard accept-fix <id>` for individual AI fixes, `frontguard update-baselines` to promote current screenshots in bulk). A hosted dashboard is on the roadmap but **not shipped yet**.
 
 ## Pricing Comparison
 

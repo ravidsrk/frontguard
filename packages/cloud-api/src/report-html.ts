@@ -1,4 +1,5 @@
 import type { Run } from './types.js';
+import { PACKAGE_VERSION } from './version.js';
 
 export function generateReportHtml(run: Run): string {
   const resultsRows = (run.results || [])
@@ -198,7 +199,7 @@ export function generateReportHtml(run: Run): string {
     <div id="actionStatus" style="margin-bottom:1rem;font-size:0.875rem;"></div>
 
     <div class="footer">
-      Frontguard v0.1.0 · Visual regression testing for the modern web
+      Frontguard v${PACKAGE_VERSION} · Visual regression testing for the modern web
     </div>
   </div>
 
