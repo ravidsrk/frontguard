@@ -205,6 +205,17 @@ for entry in "${NPM_PACKAGES[@]}"; do
     cd "$ROOT_DIR/$pkg_path"
     run npm publish "${PUBLISH_FLAGS[@]}"
   )
+
+  # `npm publish --access public` only flips access on the FIRST publish, and
+  # even there it can be silently overridden by the org's default if the org
+  # is configured to ship private-by-default. Force the access explicitly for
+  # scoped packages so the registry CDN exposes the tarball publicly.
+  # (Unscoped packages are always public — npm rejects `access set` on them.)
+  if [ "$DRY_RUN" -eq 0 ] && [[ "$pkg_name" == @*/* ]]; then
+    if ! run npm access set status=public "$pkg_name"; then
+      warn "$pkg_name: failed to set access=public — verify at https://www.npmjs.com/package/$pkg_name/access"
+    fi
+  fi
   ok "$pkg_name@$VERSION published"
 done
 
