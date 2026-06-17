@@ -60,11 +60,25 @@ describe('landing page — all 14 sections render', () => {
     ).toBeInTheDocument();
   });
 
-  it('keeps the #demo anchor target and #features section id', () => {
+  // Floor item 2 / parity spec §7 row 2: the on-page anchor IDs that must stay
+  // stable so existing deep links and the no-JS fallback nav resolve instead of
+  // dead-scrolling. `#main-content` is the layout skip target (asserted in the
+  // layout suite); the rest are owned by the landing route's sections.
+  const REQUIRED_ANCHOR_IDS = [
+    'demo', // Hero inline demo
+    'problem', // ProblemStrip
+    'how-it-works', // Pipeline
+    'features', // Features
+    'install', // InstallTabs
+    'validation', // Validation
+    'compare', // ComparisonSummary (design anchor; #comparison redirects to /comparisons)
+  ];
+
+  it('exposes every floor-canonical section anchor id in the rendered DOM', () => {
     const { container } = renderRouted(<Landing />);
-    expect(container.querySelector('#demo')).not.toBeNull();
-    expect(container.querySelector('#features')).not.toBeNull();
-    expect(container.querySelector('#compare')).not.toBeNull();
+    for (const id of REQUIRED_ANCHOR_IDS) {
+      expect(container.querySelector(`#${id}`)).not.toBeNull();
+    }
   });
 });
 

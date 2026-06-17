@@ -106,7 +106,7 @@ export function InstallTabs() {
   }
 
   return (
-    <div className="mt-5">
+    <div id="install" className="mt-5 scroll-mt-20">
       <div
         role="tablist"
         aria-label="Installation method"

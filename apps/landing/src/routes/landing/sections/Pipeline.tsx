@@ -4,12 +4,13 @@ import { STAGES } from '../data';
 
 /*
   Six-stage pipeline. `repeat(6,1fr)` on desktop, wrapping 6 → 3 → 2 on narrower
-  screens (the 1px gaps form the hairline grid via the faint backing). `id="how"`
-  preserves the design's in-page anchor.
+  screens (the 1px gaps form the hairline grid via the faint backing).
+  `id="how-it-works"` is the floor's canonical anchor (parity spec §7 row 2), so
+  deep links to `/#how-it-works` and the no-JS fallback nav resolve here.
 */
 export function Pipeline() {
   return (
-    <section id="how" className="mx-auto max-w-[1200px] scroll-mt-20 px-7 py-[84px]">
+    <section id="how-it-works" className="mx-auto max-w-[1200px] scroll-mt-20 px-7 py-[84px]">
       <SectionHeader
         kicker="// THE PIPELINE"
         kickerTone="amber"
