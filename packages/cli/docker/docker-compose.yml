@@ -37,7 +37,14 @@
 
 services:
   frontguard:
+    # The image is not published to a registry yet — build it locally first:
+    #   docker build --platform linux/amd64 -t frontguard/render:latest ../packages/cli/docker
+    # (or `docker compose ... build`, which uses the build: block below).
     image: frontguard/render:${FRONTGUARD_TAG:-latest}
+    # Pin the architecture so renders are byte-equivalent across an arm64-dev /
+    # amd64-CI fleet. Mirrors the `FROM --platform=linux/amd64` in the Dockerfile
+    # and the `--platform` the CLI injects into `docker run`.
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
