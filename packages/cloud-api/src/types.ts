@@ -53,6 +53,8 @@ export interface SuggestedFix {
 export interface RunResult {
   route: string;
   viewport: number;
+  /** Browser engine this result was captured in (chromium/firefox/webkit). */
+  browser?: string;
   status: string;
   diffPercentage: number;
   classification?: string;

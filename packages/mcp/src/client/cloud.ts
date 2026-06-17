@@ -21,6 +21,8 @@ import type { FrontguardAuth } from '../auth.js';
 export interface CloudRunResult {
   route: string;
   viewport: number;
+  /** Browser engine (chromium/firefox/webkit). Disambiguates multi-browser runs. */
+  browser?: string;
   status: string;
   diffPercentage: number;
   classification?: string;
@@ -145,21 +147,61 @@ export class CloudClient {
 
 /**
  * Stable id for a diff inside a run. The cloud-api does not currently expose
- * a per-diff primary key, so we derive one from `runId + route + viewport` —
- * agents call back with this id and we map it back to the originating run.
+ * a per-diff primary key, so we derive one from `runId + route + viewport`,
+ * plus `browser` when known — the sandbox emits one result per
+ * browser×viewport×route, so without the browser dimension two browsers
+ * regressing the same route+viewport collapse to one diffId (mcp-9).
+ *
+ * Legacy 3-segment ids (no browser) are still produced when `browser` is
+ * absent, so existing agent sessions keep working.
  */
-export function diffIdFor(runId: string, result: Pick<CloudRunResult, 'route' | 'viewport'>): string {
-  return `${runId}:${result.route}:${result.viewport}`;
+export function diffIdFor(
+  runId: string,
+  result: Pick<CloudRunResult, 'route' | 'viewport' | 'browser'>,
+): string {
+  const base = `${runId}:${result.route}:${result.viewport}`;
+  return result.browser ? `${base}:${result.browser}` : base;
 }
 
-/** Parse a {@link diffIdFor} string. */
-export function parseDiffId(diffId: string): { runId: string; route: string; viewport: number } | null {
-  const idx1 = diffId.indexOf(':');
-  const idx2 = diffId.lastIndexOf(':');
-  if (idx1 === -1 || idx1 === idx2) return null;
-  const runId = diffId.slice(0, idx1);
-  const route = diffId.slice(idx1 + 1, idx2);
-  const viewport = Number(diffId.slice(idx2 + 1));
-  if (!runId || !route || !Number.isFinite(viewport)) return null;
-  return { runId, route, viewport };
+/**
+ * Parse a {@link diffIdFor} string back into its parts.
+ *
+ * Routes can contain colons, so we never split naively. Instead we peel from
+ * the right: `runId` is everything before the first colon; the viewport is the
+ * trailing numeric segment, optionally followed by a non-numeric browser
+ * segment. Because viewports are always numeric and browser names never are,
+ * this unambiguously distinguishes 3-segment (legacy) from 4-segment ids even
+ * when the route itself contains colons.
+ */
+export function parseDiffId(
+  diffId: string,
+): { runId: string; route: string; viewport: number; browser?: string } | null {
+  const first = diffId.indexOf(':');
+  if (first === -1) return null;
+  const runId = diffId.slice(0, first);
+  const rest = diffId.slice(first + 1); // `route…:viewport[:browser]`
+  if (!runId || !rest) return null;
+
+  const lastColon = rest.lastIndexOf(':');
+  if (lastColon === -1) return null; // need at least `route:viewport`
+
+  const lastSeg = rest.slice(lastColon + 1);
+  const lastIsNumeric = lastSeg !== '' && Number.isFinite(Number(lastSeg));
+
+  if (lastIsNumeric) {
+    // 3-segment legacy form: `route:viewport`.
+    const route = rest.slice(0, lastColon);
+    if (!route) return null;
+    return { runId, route, viewport: Number(lastSeg) };
+  }
+
+  // 4-segment form: `route:viewport:browser`.
+  const browser = lastSeg;
+  const beforeBrowser = rest.slice(0, lastColon); // `route:viewport`
+  const vpColon = beforeBrowser.lastIndexOf(':');
+  if (vpColon === -1) return null;
+  const vpSeg = beforeBrowser.slice(vpColon + 1);
+  const route = beforeBrowser.slice(0, vpColon);
+  if (!route || !browser || vpSeg === '' || !Number.isFinite(Number(vpSeg))) return null;
+  return { runId, route, viewport: Number(vpSeg), browser };
 }

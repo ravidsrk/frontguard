@@ -53,6 +53,10 @@ export async function processRun(
       run.results = sandboxResult.results.map((r) => ({
         route: r.route,
         viewport: r.viewport,
+        // Preserve the browser dimension — the sandbox emits one result per
+        // browser×viewport×route, and the MCP diffId encodes browser so
+        // multi-browser runs don't collapse to one diff (mcp-9).
+        browser: r.browser,
         status: r.status,
         diffPercentage: r.diffPercentage,
         classification: r.classification,
