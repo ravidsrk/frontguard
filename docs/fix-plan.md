@@ -1056,3 +1056,261 @@ methodology, not the fast path).
   the re-run isn't feasible in the loop, the minimum closure is the corrected
   methodology disclosure plus the harness change that forces an independent
   second pass.
+
+---
+
+## 3. Foundation-first dispatch order
+
+The convergence loop should bias toward the four foundation clusters, but they
+are **not** all freely parallel — the doc-heavy foundations (C2, C3) and the
+cloud-api foundation (C7) collide with later clusters on shared files. The order
+below maximises parallelism subject to the collision map.
+
+### Wave 0 — foundation (fire first)
+Run these as early as possible; the rest of the pipeline inherits their
+decisions.
+
+1. **C7 (cloud-api data model)** — longest pole; start immediately in an isolated
+   worktree scoped to `packages/cloud-api/**` + `packages/mcp/**`. **Internally
+   serialised:** `cloud-1` first (it lands the R2→sandbox restore and the
+   run/result shape), then in order: `cloud-9` (report-html/otel version —
+   independent but shares the worktree) → `mcp-1` (db schema + d1-store) →
+   `mcp-2` (processor `suggestedFix`) → `mcp-9` (processor `browser` — shares
+   `processor.ts:53-60` with mcp-2, so after it) → `mcp-7` (index.ts listing).
+   This serial chain exists because all six touch the same handful of cloud-api
+   files; do **not** fan them out.
+2. **C1 (ts-config-loader)** — isolated to `packages/cli/src/core/config.ts` +
+   `init.ts` + the storybook fixture. Land `config.ts` (the loader) first; it
+   unblocks the Quick-Start repros (#2/#3) that many other clusters' manual
+   verifications rely on. **Owns `init.ts` ahead of C13** (or hand C13's
+   `init.ts:247` edit to the same worktree).
+3. **C2 (bin/package-name)** ∥ **C3 (hosts/DNS code-side)** — these two
+   foundations can run in parallel **iff** partitioned by file:
+   - C2 owns `apps/docs/.../index.mdx|quick-start.mdx|installation.mdx`,
+     `packages/cli/README.md`, `scripts/build-daytona-snapshot.ts`.
+   - C3 owns `apps/landing/**`, root `README.md` (doc-links region `:74/:104`),
+     the integration `*.mdx` api-url defaults, integration manifests, and CLI
+     telemetry.
+   They do not share a file under this partition. Freeze the bin-invocation
+   decision (C2) and the api-url decision (C3) before any other cluster rewrites
+   command/URL examples.
+
+### Wave 1 — independents that touch foundation files (serialise behind Wave 0)
+- **C13 (init-gitignore)** — after C1 releases `init.ts` (`:247` vs `:158`).
+- **C5 (session-secret)** then **C6 (ssrf-guard)** — both edit
+  `packages/cloud-api/src/index.ts`; run them **after** C7 finishes the
+  cloud-api worktree, and serialise C5→C6 (or partition by region:
+  C5 = boot guard + `auth/session.ts`; C6 = `index.ts:54` validator). C6 also
+  edits `integrations/slack-app/src/runs.ts`.
+- **C12 (mcp-correctness)** — after C7's mcp work (shares
+  `list-regressions.ts`/`recent-runs.ts`/`mcp.mdx`). Internally land **mcp-3
+  before mcp-10** (mcp-10's diagnostic depends on the mcp-3 fix). mcp-6 also
+  edits `cloud-api/src/index.ts:405-414` → coordinate with the C5/C6/C7
+  cloud-api serialisation.
+- **C9 (slack-result-shape)** — shares `integrations/slack-app/src/runs.ts` with
+  C6/int-7; serialise C9↔C6 (either order; one worktree at a time on `runs.ts`).
+
+### Wave 2 — independents, parallel subject to the docs partition
+These have no code-file collision with each other and can fan out, but the
+doc-touching ones must respect the shared-mdx serialisation:
+- **C4 (docker-render)** — code surface (`docker.ts`, `Dockerfile`,
+  `release.yml`) is exclusive and can run anytime; its doc edit
+  (`cross-os-rendering.mdx`, `sandbox.mdx`) serialises with C15/docs-9.
+- **C10 (storybook)** — code surface (`discovery/storybook.ts`,
+  `render/playwright.ts`) exclusive; its `storybook.mdx` retraction serialises
+  with C15/docs-4 and C1/sb-2.
+- **C11 (supply-chain)** — fully isolated (package manifests + lock + CI). Safe
+  to run fully parallel.
+- **C16 (validation-methodology)** — fully isolated. Safe to run fully parallel.
+- **C8 (github-action-ref)**, **C14 (marketing-claims)**, **C15
+  (docs-hygiene-residual)** — the docs cluster. Serialise/partition on the
+  shared docs set (`README.md`, `slack.mdx`, `vercel.mdx`, `mcp.mdx`,
+  `cross-os-rendering.mdx`, `storybook.mdx`). Recommended sub-order:
+  **C8 → C14 → C15 last** (C15 has the most cross-cluster mdx overlap), after
+  C2/C3 have frozen the getting-started + api-url wording.
+
+### Collision summary (the partition the loop must honour)
+| Shared file | Clusters | In directive? | Resolution |
+|---|---|---|---|
+| `packages/cli/src/cli/init.ts` | C1, C13 | **No (new)** | C1 owns first, then C13 |
+| `packages/cloud-api/src/index.ts` | C5, C6, C7, C12(mcp-6) | Partial (C5/C6/C7) | Serialise; C7 → C5 → C6; mcp-6 coordinates |
+| `packages/cloud-api/src/processor.ts:53-60` | C7 (cloud-1, mcp-2, mcp-9) | Internal | Serialise within C7 |
+| `packages/mcp/tools/list-regressions.ts`, `recent-runs.ts` | C7(mcp-1), C12(mcp-8) | Yes | C7-mcp → C12 |
+| `integrations/slack-app/src/runs.ts` | C6, C9 | Yes | Serialise C6↔C9 |
+| `README.md` (`:74,:101-104`) | C3, C14 | Yes (docs set) | Serialise C3↔C14 |
+| `apps/landing/.../pricing.tsx` | C3(claim-4), C14(claim-5) | **No (new)** | Serialise |
+| `mcp.mdx` | C3(docs-2), C7(mcp-2), C12(mcp-6/10) | Partial | Serialise mdx edits |
+| `vercel.mdx` | C3(docs-2), C8(docs-6), C15(docs-9) | Partial (docs set) | Partition by section |
+| `slack.mdx` | C3(docs-2), C8(docs-6) | Partial (docs set) | Partition by section |
+| `cross-os-rendering.mdx` | C4(docs-3), C15(docs-9) | **No (new)** | Serialise C4↔C15 |
+| `storybook.mdx` | C1(sb-2), C10(sb-1/3), C15(docs-4) | **No (new)** | Serialise |
+| moved comparison pages | C15(docs-8) → C3(README links) | **No (new)** | Agree dest paths first |
+
+---
+
+## 4. OPS actions list (draft)
+
+Every OPS action surfaced across the 49 findings. The convergence loop **does
+not execute any of these** (per DECISIONS.md). T_FINAL turns this into
+`docs/ops-actions.md`. Each finding gated by an OPS action can still reach
+`CODE_CLOSED` once its code-side mitigation ships.
+
+1. **Attach DNS for the `frontguard.dev` subdomains** (point
+   `app.`, `api.`, `github-app.`, and — if telemetry is kept — `telemetry.` at
+   Cloudflare/the Worker) and deploy the cloud-api Worker + dashboard.
+   *Unblocks:* claim-4, dist-3, docs-2, install-6†, claim-6†, install-9†.
+   († these also reach full CLOSED via the code-side rewrite without DNS; DNS is
+   the alternative path.)
+2. **Publish the Docker renderer image** (`frontguard/render:latest` + version
+   tags, multi-arch only if byte-equivalence is proven) to Docker Hub/GHCR, and
+   add the buildx+push step to the release pipeline.
+   *Unblocks:* install-4, docker-1, docker-3 (multi-arch only), docs-3.
+3. **Publish a `frontguard` npm shim package** (re-exports `@frontguard/cli`) —
+   only if option (a) is chosen for docs-1; the `-p @frontguard/cli` doc rewrite
+   closes docs-1 without it.
+   *Unblocks:* docs-1 (option a).
+4. **Re-publish the npm packages** (`@frontguard/cli` etc.) to ship the refreshed
+   bundled README and the dependency-bumped `0.2.1`.
+   *Unblocks:* install-7, supply-2, install-13.
+5. **Push the `v0` (and/or `v1`) git tag** pointing at a stable commit, paired
+   with the repo-root `action.yml` shim, for the GitHub Action reference.
+   *Unblocks:* int-3, docs-5.
+6. **Submit/publish the marketplace listings** (GitHub Marketplace, GitHub App
+   `github.com/apps/frontguard`, Slack directory, Vercel integration) and
+   implement the Vercel `/api/install` backend endpoint.
+   *Unblocks:* docs-6.
+7. **Rotate the dashboard session secret / set `DASHBOARD_SESSION_SECRET` in
+   production** and revoke any sessions signed with the old public constant.
+   *Unblocks:* sec-1, cloud-4 (full real-world closure beyond the fail-closed
+   code guard).
+8. **Publish a public `ghcr.io/ravidsrk/frontguard-cloud-api` image** (verify
+   anonymous pulls) — only if the GHCR self-host pattern is kept.
+   *Unblocks:* docs-7.
+9. **Deploy/redeploy the landing site** so the live HTML matches main (strips the
+   stale `aggregateRating` block; also makes the C3 landing CTA fix live).
+   *Unblocks:* dist-11 (and the live side of claim-4).
+10. **Build, publish, and wire the Daytona snapshot into CI** so cloud-side
+    regression/ fix-verification actually runs end-to-end.
+    *Unblocks:* the live verification of cloud-1 (C7); related to ci-3's snapshot
+    path (ci-3's source fix closes independently).
+
+**OPS action count: 10.**
+
+---
+
+## 5. Verification protocol
+
+Per-finding closure test = **"the Evidence no longer reproduces."** Each cluster
+worker re-runs the exact Evidence command(s) from §2 after its fix and confirms
+the failing signal is gone. Rules:
+
+- **Read-only network probes** (`curl`, `nslookup`, `host`, `npm view`,
+  `git ls-remote`) are safe to re-run as-is; for DNS/registry/marketplace
+  findings whose *true* fix is OPS, the code-side verification is instead "the
+  dead default/link is no longer present in source" (grep the file) — not "the
+  host now resolves."
+- **Destructive or external-publishing evidence is never run against live
+  services.** Specifically:
+  - **npm publish (supply-2, install-7, install-13, docs-1 option a):** verify on
+    a **local** clean install — `npm pack` the package into a tmp dir, install
+    from the tarball, and re-run the repro (`npm audit --audit-level=high
+    --omit=dev` returns 0; the bundled README shows 0.2.0; `frontguard` resolves
+    via the packed shim). **Never** `npm publish`.
+  - **docker push (install-4/docker-1/docs-3):** verify by building the image
+    locally (`docker build -f packages/cli/docker/Dockerfile`) and confirming the
+    preflight/build-locally path produces an actionable message — **never** push
+    to a registry.
+  - **git tag push (int-3/docs-5):** verify the repo-root `action.yml` resolves a
+    local `act`/workflow smoke run; do not create/push public tags.
+  - **deploys (dist-11, claim-4 live side, DNS):** verify the **source** is clean
+    (grep shows the `aggregateRating` block / dead CTA removed); do not deploy.
+- **Secret finding (sec-1/cloud-4):** verification is **code-only and
+  forge-free.** Confirm (a) `grep` shows no plaintext `DEV_SESSION_SECRET` value
+  remains in `src/` (and ideally `dist/`), and (b) in a **non-production local
+  build**, with the DB binding present and `DASHBOARD_SESSION_SECRET` unset,
+  session minting refuses (503/throw). **Never** mint or replay a forged cookie,
+  and never write the literal secret into a test fixture or assertion.
+- **Behavioral cloud findings (cloud-1 and dependents):** verify against a
+  **local emulation** (`wrangler dev` / miniflare with a local D1 + R2 fixture),
+  not `api.frontguard.dev`. The closure test for cloud-1: submit a run, change
+  the baseline, submit again, and confirm the second run reports a regression
+  rather than `new_baseline`. If a Daytona sandbox is unreachable, use the
+  stubbed runner (see §6) and assert the R2-restore code path executes (the
+  restore list/download is invoked before exec).
+- **Tests as durable verification:** where the recommendation prescribes a test
+  (the pricing-feature/`hasFeature` snapshot for claim-5; the D1 github
+  round-trip for mcp-1; the e2e `suggestedFix` round-trip for mcp-2; the
+  Netlify-parallel fixture for int-1; the `status='new'` regression test for
+  mcp-8; the ready-wait-warning assertion for sb-3; the README-claim→research.md
+  citation test for claim-7), the new test failing on `main` and passing on the
+  branch **is** the verification artifact — it prevents regression of the
+  finding.
+- **Per-finding "no longer reproduces" is recorded in `docs/fix-progress.md`'s
+  EVID column** by the convergence loop (T2 owns that ledger). T1 only specifies
+  the test; it does not edit the ledger.
+
+---
+
+## 6. Risk register
+
+**R1 — C7/cloud-1 baseline-restore depends on the Daytona sandbox API; CI may not
+reach Daytona.** The restore path (list R2 → download to sandbox → exec) is hard
+to exercise end-to-end without a live Daytona sandbox, and `api.frontguard.dev`
+is NXDOMAIN so there is no deployed instance to test against.
+*Fallback / stub plan:* split the verification — (a) unit-test the **R2-restore
+logic** against a local R2/D1 fixture (miniflare) with the Daytona client
+**mocked** (assert it lists the baseline prefix and downloads each object before
+`exec`); (b) gate the actual Daytona end-to-end behind an opt-in env flag
+(`DAYTONA_API_KEY` present) that is skipped in CI with a logged "skipped: no
+Daytona" line. Do **not** let "Daytona unreachable" block marking cloud-1
+CODE_CLOSED — the defect (missing restore code) is closed by the code + the
+mocked-restore test; live behavior is gated on OPS #10.
+
+**R2 — shared-file collisions cause merge churn / clobbered edits.** The
+collision table in §3 lists four collisions **not** in the original directive
+(`init.ts` C1↔C13; `pricing.tsx` C3↔C14; `cross-os-rendering.mdx` C4↔C15;
+`storybook.mdx` C1↔C10↔C15), plus the per-mdx overlaps inside the docs set.
+*Mitigation:* the loop must serialise (one open PR at a time) on each shared file
+per the partition table; never dispatch two clusters that touch the same file
+concurrently. Worktree isolation prevents local clobbering but not merge
+conflicts — the serialisation is what avoids the conflict.
+
+**R3 — over-claiming closure on OPS-gated findings.** 9 of 49 findings cannot
+reach real-world CLOSED from code alone (the OPS list). *Mitigation:* mark them
+`CODE_CLOSED (OPS: <action>)` explicitly in the ledger; the PR description must
+state the residual OPS dependency so a reviewer doesn't read CODE_CLOSED as
+fully resolved.
+
+**R4 — the `npx frontguard` repro form masks/compounds findings.** Many dossier
+repros use the broken bin form, which 404s before reaching the downstream
+behavior. *Mitigation:* §2's repro note mandates the `-p @frontguard/cli` form
+(or local `dist`) for downstream verification; a worker that runs the bare form
+and sees a 404 must not conclude "still broken" for the downstream finding.
+
+**R5 — secret leakage during C5 work or in any commit.** The raw dossier and the
+live source contain the literal secret + a forged cookie. *Mitigation:* the
+DECISIONS.md secret-scan grep runs on the staged diff before every commit and
+push (filtering removal lines); C5 verification is forge-free and code-only; the
+raw dossier (`.frontguard-audit/`) is gitignored and must never be staged. A
+commit that *removes* the constant will show the literal on a `-` line — that is
+expected and is filtered by the removal-line exclusion, but the worker must
+confirm the value does not also appear on any `+` line.
+
+**R6 — doc moves break inbound links.** C15/docs-8 relocates the Percy/Chromatic
+comparison pages; C3's README links and any internal cross-links point at the old
+paths. *Mitigation:* agree the destination paths before either cluster edits, and
+re-grep for the old paths after the move (`grep -rn "guides/frontguard-vs-percy"
+README.md apps/docs` should return only intended references).
+
+**R7 — validation re-run (C16) may not be reproducible in the loop.** val-5's
+true fix requires re-running the validation harness with an independent second
+pass, which needs the sample repos to boot. *Mitigation:* if the harness re-run
+isn't feasible, the minimum closure is the harness code change (force a fresh
+dev-server/clone on the recheck pass) plus a corrected methodology disclosure in
+`results-v0.2.md`; flag the un-re-run state in the ledger note rather than
+fabricating a new FP number.
+
+---
+
+*End of fix-plan. Next: T2 freezes scope into `docs/fix-progress.md`; the
+convergence loop dispatches C1..C16 per §3.*
