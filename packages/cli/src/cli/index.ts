@@ -455,7 +455,21 @@ export async function main(argv?: string[]): Promise<number> {
 
         // Update .gitignore
         const gitignorePath = join(cwd, '.gitignore');
-        const entriesToAdd = ['auth.json', '.frontguard/', '.frontguard-debug/', 'frontguard-report/'];
+        // `node_modules/` is critical (install-2): without it a natural
+        // `git init && npm install && frontguard init && git commit -am init`
+        // drags node_modules into the repo, and the orphan-baseline worktree
+        // checkout then explodes with ENOBUFS on first run. `.env`/`.env.*`
+        // keep secrets out of git (leak-hygiene policy); `auth.json` holds
+        // captured login state and must never be committed.
+        const entriesToAdd = [
+          'node_modules/',
+          'auth.json',
+          '.env',
+          '.env.*',
+          '.frontguard/',
+          '.frontguard-debug/',
+          'frontguard-report/',
+        ];
         let gitignoreContent = '';
 
         if (existsSync(gitignorePath)) {
