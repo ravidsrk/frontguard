@@ -263,7 +263,7 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--experimental', 'Enable experimental features (required for --mode judge)')
     .option(
       '--docker',
-      'Run the renderer inside the pinned frontguard/render Docker image for deterministic cross-OS baselines',
+      'Run the renderer inside the pinned frontguard/render Docker image for deterministic cross-OS baselines (build the image locally until the registry-publish release step lands: `docker build --platform linux/amd64 -t frontguard/render:latest packages/cli/docker`)',
     )
     .action(async (opts) => {
       try {
