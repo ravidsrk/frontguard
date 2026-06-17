@@ -27,14 +27,25 @@
 #   the docker-compose / build script, so the image self-contains a known
 #   `@frontguard/cli` build instead of fetching `latest` from npm at runtime.
 #
-# Tag convention
-# --------------
-# Built images SHOULD be tagged `frontguard/render:vX.Y.Z` where X.Y.Z matches
-# the @frontguard/cli VERSION file. The repo's CI publishes both that tag and
-# `frontguard/render:latest` on release.
+# Build & tag
+# -----------
+# The image is NOT yet published to a registry (tracked as an OPS action —
+# see docs/ops-actions.md). Until then, build it locally from the repo root.
+# First produce the CLI tarball this build context expects, then build with the
+# architecture pinned so the rendered bytes match across a mixed fleet:
+#
+#   (cd packages/cli && npm pack && mv frontguard-cli-*.tgz docker/frontguard-cli.tgz)
+#   docker build --platform linux/amd64 \
+#     -t frontguard/render:v0.2.0 -t frontguard/render:latest \
+#     packages/cli/docker
+#
+# `--platform linux/amd64` is required: Chromium's rasterizer emits different
+# sub-pixel anti-aliasing per architecture, so an arm64 build and an amd64
+# build would NOT be byte-equivalent. The `FROM --platform=` directive below
+# enforces the same pin at image-build time even if `docker build` omits it.
 # =============================================================================
 
-FROM mcr.microsoft.com/playwright:v1.59.0-jammy
+FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.59.0-jammy
 
 LABEL org.opencontainers.image.title="frontguard-render" \
       org.opencontainers.image.description="Deterministic cross-OS rendering image for Frontguard visual regression tests" \
