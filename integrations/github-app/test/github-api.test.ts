@@ -296,7 +296,7 @@ describe('bootstrapConfigPr', () => {
     expect(pr!.number).toBe(1);
     expect(writtenConfig).toBe(DEFAULT_CONFIG_TS);
     // The workflow file pins to the tagged action ref (P1-11), not @main.
-    expect(writtenWorkflow).toContain('ravidsrk/frontguard@v1');
+    expect(writtenWorkflow).toContain('ravidsrk/frontguard@v0');
     expect(writtenWorkflow).not.toContain('@main');
     // The config file imports from @frontguard/cli, not the never-published
     // @frontguard/core.

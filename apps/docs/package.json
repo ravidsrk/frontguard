@@ -16,6 +16,7 @@
     "dev": "next dev --turbopack --port 3001",
     "build": "next build",
     "start": "next start",
+    "check:doc-links": "node scripts/check-doc-links.mjs"
     "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
