@@ -81,7 +81,7 @@ runs:
 
     - name: Install Frontguard
       shell: bash
-      run: npm install -g frontguard@latest
+      run: npm install -g @frontguard/cli@latest
 
     - name: Install Playwright browsers
       shell: bash
