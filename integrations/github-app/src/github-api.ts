@@ -355,11 +355,13 @@ export default defineConfig({
 
 /**
  * Major version of the published GitHub Action that the bootstrap workflow
- * pins to. Using a tagged ref (e.g. `@v1`) instead of `@main` means new repos
- * don't break when the action's main branch changes (P1-11). Bump this when
- * we cut a v2 of the action.
+ * pins to. Using a tagged ref (e.g. `@v0`) instead of `@main` means new repos
+ * don't break when the action's main branch changes (P1-11). The ref resolves
+ * against the repo-root `action.yml` shim; OPS keeps the `v0` lightweight tag
+ * moving forward on each minor release. Bump this when we cut a `v1` of the
+ * action.
  */
-export const ACTION_REF = 'ravidsrk/frontguard@v1';
+export const ACTION_REF = 'ravidsrk/frontguard@v0';
 
 /**
  * Default `.github/workflows/frontguard.yml` planted alongside the config.
@@ -372,7 +374,7 @@ export const ACTION_REF = 'ravidsrk/frontguard@v1';
  */
 export const DEFAULT_WORKFLOW_YML = `# Frontguard visual regression workflow.
 # Pinned to a tagged release of the action so this file keeps working as the
-# action evolves. Bump to a new major (e.g. \`@v2\`) when prompted.
+# action evolves. Bump to a new major (e.g. \`@v1\`) when prompted.
 name: Frontguard
 on:
   pull_request:
