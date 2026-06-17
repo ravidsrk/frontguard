@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from './test-utils';
 import { afterEach, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { Component as Pricing } from '../routes/pricing';
