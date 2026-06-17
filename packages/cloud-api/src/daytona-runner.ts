@@ -1,4 +1,5 @@
 import { Daytona } from '@daytonaio/sdk';
+import type { SuggestedFix } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,6 +35,8 @@ export interface RunResult {
     classification?: string;
     explanation?: string;
     timestamp: string;
+    /** AI-generated fix emitted by the CLI report, when present. */
+    suggestedFix?: SuggestedFix;
   }>;
   reportHtml: string;
   duration: number;
