@@ -403,13 +403,28 @@ app.post('/v1/run', async (c) => {
 // ---------------------------------------------------------------------------
 app.get('/v1/runs/:id', async (c) => {
   const store = c.get('store');
+  const userId = c.get('userId');
   const id = c.req.param('id');
   const run = await store.getRun(id);
   if (!run) return c.json({ error: 'Run not found' }, 404);
-  if ((await store.getRunOwner(id)) !== c.get('userId')) {
-    return c.json({ error: 'Run not found' }, 404);
+
+  // Allow access if the user owns the run directly.
+  if ((await store.getRunOwner(id)) === userId) {
+    return c.json(run);
   }
-  return c.json(run);
+
+  // Allow access if the run belongs to a project in a team the user is a member of.
+  if (run.projectId) {
+    const project = await store.getProjectById(run.projectId);
+    if (project) {
+      const member = await store.getMember(project.teamId, userId);
+      if (member) {
+        return c.json(run);
+      }
+    }
+  }
+
+  return c.json({ error: 'Run not found' }, 404);
 });
 
 // ---------------------------------------------------------------------------
@@ -443,11 +458,22 @@ app.get('/v1/runs', async (c) => {
 // ---------------------------------------------------------------------------
 app.get('/v1/reports/:id', async (c) => {
   const store = c.get('store');
+  const userId = c.get('userId');
   const id = c.req.param('id');
   const run = await store.getRun(id);
-  if (!run || (await store.getRunOwner(id)) !== c.get('userId')) {
-    return c.json({ error: 'Run not found' }, 404);
+  if (!run) return c.json({ error: 'Run not found' }, 404);
+
+  // Check access: user must own the run or be a member of its project's team.
+  let hasAccess = (await store.getRunOwner(id)) === userId;
+  if (!hasAccess && run.projectId) {
+    const project = await store.getProjectById(run.projectId);
+    if (project) {
+      const member = await store.getMember(project.teamId, userId);
+      if (member) hasAccess = true;
+    }
   }
+  if (!hasAccess) return c.json({ error: 'Run not found' }, 404);
+
   if (run.status !== 'completed') {
     return c.json({ error: 'Run not yet completed', status: run.status }, 202);
   }
@@ -462,11 +488,22 @@ app.get('/v1/reports/:id', async (c) => {
 // ---------------------------------------------------------------------------
 app.post('/v1/baselines/:runId/approve', async (c) => {
   const store = c.get('store');
+  const userId = c.get('userId');
   const id = c.req.param('runId');
   const run = await store.getRun(id);
-  if (!run || (await store.getRunOwner(id)) !== c.get('userId')) {
-    return c.json({ error: 'Run not found' }, 404);
+  if (!run) return c.json({ error: 'Run not found' }, 404);
+
+  // Check access: user must own the run or be a member of its project's team.
+  let hasAccess = (await store.getRunOwner(id)) === userId;
+  if (!hasAccess && run.projectId) {
+    const project = await store.getProjectById(run.projectId);
+    if (project) {
+      const member = await store.getMember(project.teamId, userId);
+      if (member) hasAccess = true;
+    }
   }
+  if (!hasAccess) return c.json({ error: 'Run not found' }, 404);
+
   await store.updateRun(id, { baselinesApproved: true });
   return c.json({ approved: true, runId: id });
 });

@@ -116,4 +116,16 @@ describe('GET /v1/runs — team scoping (mcp-7)', () => {
     const body = (await res.json()) as { runs: Run[] };
     expect(body.runs.map((r) => r.id).sort()).toEqual(['run_ci_1', 'run_ci_2']);
   });
+
+  it('bob (team member) can fetch alice CI runs by id', async () => {
+    const res = await get('/v1/runs/run_ci_1', BOB_KEY);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Run;
+    expect(body.id).toBe('run_ci_1');
+  });
+
+  it('eve (non-member) gets 404 for alice CI run', async () => {
+    const res = await get('/v1/runs/run_ci_1', EVE_KEY);
+    expect(res.status).toBe(404);
+  });
 });
