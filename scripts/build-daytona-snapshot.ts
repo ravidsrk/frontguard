@@ -44,7 +44,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, renameSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -58,6 +58,16 @@ const cliDir = resolve(repoRoot, 'packages/cli');
 const dockerDir = resolve(cliDir, 'docker');
 const tarballName = 'frontguard-cli.tgz';
 const tarballDest = resolve(dockerDir, tarballName);
+
+// Exact published CLI version, read from the workspace manifest at runtime so the
+// snapshot pins `@frontguard/cli@<version>` and never drifts to a 404
+// `frontguard@latest` — the unscoped `frontguard` package does not exist on npm
+// (`npm view frontguard` → 404). Pinning the exact version (not `@latest`) keeps
+// the published snapshot reproducible.
+const cliVersion = (
+  JSON.parse(readFileSync(resolve(cliDir, 'package.json'), 'utf8')) as { version: string }
+).version;
+const cliInstallSpec = `@frontguard/cli@${cliVersion}`;
 
 // ---------------------------------------------------------------------------
 // Snapshot version — bump alongside the Dockerfile / Playwright base
@@ -256,8 +266,10 @@ async function publishSnapshot(args: { name: string; dryRun: boolean }): Promise
     // The published snapshot installs the CLI from the npm registry because
     // Daytona's image builder doesn't accept a local tarball. The local docker
     // build (step [2/3]) verifies the in-repo bits; the snapshot is what
-    // production renders run against.
-    'npm install -g frontguard@latest',
+    // production renders run against. Install the scoped, version-pinned package
+    // (`@frontguard/cli@<version>`) — NOT unscoped `frontguard@latest`, which is
+    // a 404 on npm and would break the snapshot on first boot.
+    `npm install -g ${cliInstallSpec}`,
     'mkdir -p /home/daytona/output',
   );
 
