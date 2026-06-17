@@ -42,3 +42,34 @@ describe('docs: installation page documents the scoped package', () => {
     expect(installationMdx).toContain('@frontguard/cli');
   });
 });
+
+describe('docs-10: installation.mdx --version expected output is the real SemVer', () => {
+  const installationMdx = readFileSync(
+    join(repoRoot, 'apps/docs/content/docs/installation.mdx'),
+    'utf8',
+  );
+
+  // Isolate the `## Verify Installation` section up to the next h2, then grab the
+  // fenced block shown after "You should see" — that is the expected CLI output.
+  const sectionStart = installationMdx.indexOf('## Verify Installation');
+  const section = installationMdx.slice(sectionStart);
+  const verifySection = section.slice(0, section.indexOf('\n## ', 1));
+  const afterHint = verifySection.slice(verifySection.indexOf('You should see'));
+  const outputBlock = (afterHint.match(/```[a-z]*\n([\s\S]*?)```/)?.[1] ?? '').trim();
+
+  it('locates the expected-output block', () => {
+    expect(sectionStart, '## Verify Installation section must exist').toBeGreaterThan(-1);
+    expect(outputBlock, 'expected-output fenced block must be present').not.toBe('');
+  });
+
+  it('shows a SemVer version, not the literal word `frontguard`', () => {
+    // The CLI prints SemVer (e.g. `0.2.0`); the old docs claimed it prints `frontguard`.
+    expect(outputBlock).toMatch(/\d+\.\d+\.\d+/);
+    for (const line of outputBlock.split('\n').map((l) => l.trim()).filter(Boolean)) {
+      expect(line, `expected-output line should be a version, not "${line}"`).not.toMatch(
+        /^frontguard(\s|$)/,
+      );
+    }
+  });
+});
+
