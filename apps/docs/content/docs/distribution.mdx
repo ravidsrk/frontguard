@@ -1,0 +1,139 @@
+---
+title: Where to find Frontguard
+description: npm packages and marketplace listings — every surface where you can install Frontguard.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Where to find Frontguard
+
+Frontguard ships across four developer marketplaces and the public npm
+registry. Pick the surface that matches how your team already deploys.
+
+<Callout type="info">
+  Frontguard `0.2.0` is the first release on every marketplace. If a listing
+  is marked **Coming soon**, the integration is built and tested — we are
+  waiting for the marketplace's review queue. The corresponding npm package
+  is published and usable today.
+</Callout>
+
+## npm registry
+
+All Node-installable surfaces live on the public npm registry under the
+`@frontguard/*` scope. Every release ships with [npm
+provenance](https://docs.npmjs.com/generating-provenance-statements) so you
+can verify it was built from `main` in CI.
+
+| Package | What it is | Install |
+|---------|------------|---------|
+| [`@frontguard/cli`](https://www.npmjs.com/package/@frontguard/cli) | Standalone CLI + GitHub Action entrypoint | `npm i -D @frontguard/cli` |
+| [`@frontguard/playwright`](https://www.npmjs.com/package/@frontguard/playwright) | 3-line visual assertion plugin for Playwright | `npm i -D @frontguard/playwright` |
+| [`@frontguard/netlify-plugin`](https://www.npmjs.com/package/@frontguard/netlify-plugin) | Build plugin that runs on every Netlify deploy | `npm i -D @frontguard/netlify-plugin` |
+| [`create-frontguard-plugin`](https://www.npmjs.com/package/create-frontguard-plugin) | Scaffold a custom Frontguard plugin | `npm create frontguard-plugin` |
+
+Once installed, the CLI's [installation guide](./installation) and
+[quick-start](./quick-start) cover the rest.
+
+## GitHub Marketplace
+
+Frontguard ships as both a **GitHub App** (deeper Check Runs + PR signal) and
+a **composite Action** (no install required, drop into any workflow).
+
+| Surface | Status | Install |
+|---------|--------|---------|
+| Frontguard GitHub App | **Coming soon** — [follow the listing](https://github.com/apps/frontguard) | One-click app install |
+| Frontguard composite Action | Available via `@frontguard/cli` | `uses: frontguard/frontguard-action@v0` |
+
+Action manifest: [`packages/cli/action.yml`](https://github.com/ravidsrk/frontguard/blob/main/packages/cli/action.yml).
+App manifest: [`integrations/github-app/manifest.yml`](https://github.com/ravidsrk/frontguard/blob/main/integrations/github-app/manifest.yml).
+
+### Composite Action usage
+
+```yaml
+- uses: frontguard/frontguard-action@v0
+  with:
+    api-key: ${{ secrets.FRONTGUARD_API_KEY }}
+    routes: '/,/pricing,/docs'
+```
+
+## Vercel Marketplace
+
+The Frontguard Vercel integration listens for **Deployment Ready** webhooks
+and runs a Frontguard run against the preview URL, posting results back to
+the originating PR.
+
+| Status |  |
+|---|---|
+| Marketplace listing | **Coming soon** — track [vercel.com/integrations/frontguard](https://vercel.com/integrations) |
+| Manual install | Available now via [integration manifest](https://github.com/ravidsrk/frontguard/blob/main/integrations/vercel) |
+
+### Install via Vercel CLI
+
+```bash
+vercel integrations install frontguard
+# or, while it's in review, point at our manifest:
+vercel integrations install --manifest=integrations/vercel/frontguard.config.ts
+```
+
+## Netlify Build Plugins
+
+The official Netlify Build Plugin runs Frontguard in `onSuccess` against the
+live deploy URL — the most reliable place to catch preview regressions.
+
+| Status |  |
+|---|---|
+| npm package | [`@frontguard/netlify-plugin`](https://www.npmjs.com/package/@frontguard/netlify-plugin) — available |
+| Build Plugins directory | **Coming soon** — [Netlify Build Plugin partner program](https://app.netlify.com/integrations/build-plugins) |
+
+### Install in `netlify.toml`
+
+```toml
+[[plugins]]
+  package = "@frontguard/netlify-plugin"
+
+  [plugins.inputs]
+    apiUrl   = "https://api.frontguard.dev"
+    routes   = ["/", "/pricing"]
+    failBuild = false
+```
+
+Set `FRONTGUARD_API_KEY` (and optionally `GITHUB_TOKEN`) in the site
+environment — never in `netlify.toml`.
+
+## Slack App Directory
+
+The native Slack app posts run results into Slack and gives every developer
+a `/frontguard` slash command for ad-hoc runs.
+
+| Status |  |
+|---|---|
+| Slack manifest | [`integrations/slack-app/manifest.yml`](https://github.com/ravidsrk/frontguard/blob/main/integrations/slack-app/manifest.yml) |
+| Directory listing | **Coming soon** — [Slack App Directory](https://slack.com/marketplace) |
+| Manual install | Available today via the **Add to Slack** button on the [docs site](https://frontguard.dev) |
+
+### Quick install
+
+1. Click **Add to Slack** on [frontguard.dev](https://frontguard.dev).
+2. Approve the requested scopes (`chat:write`, `commands`).
+3. Run `/frontguard help` in any channel.
+
+## Self-hosting
+
+Every surface above hits the public Frontguard Cloud API by default. To
+point at a self-hosted instance, set `apiUrl` (Netlify, GitHub Action,
+Playwright) or `FRONTGUARD_API_URL` (CLI) to your endpoint. The cloud-api
+package is in the same monorepo — see [`packages/cloud-api`](https://github.com/ravidsrk/frontguard/tree/main/packages/cloud-api).
+
+## Release cadence
+
+Releases land on the same day across every surface: tag a `v*` on `main`,
+the [Release workflow](https://github.com/ravidsrk/frontguard/blob/main/.github/workflows/release.yml)
+publishes the npm packages, and a release captain submits the marketplace
+listings using [`scripts/release.sh`](https://github.com/ravidsrk/frontguard/blob/main/scripts/release.sh).
+The npm tarballs are reproducible — `npm pack --dry-run` will print the
+exact contents of the next release before publish.
+
+<Callout>
+  Found a marketplace surface we're missing? [Open an
+  issue](https://github.com/ravidsrk/frontguard/issues/new) and we'll add it.
+</Callout>

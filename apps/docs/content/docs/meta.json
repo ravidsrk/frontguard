@@ -10,6 +10,14 @@
     "playwright",
     "---Guides---",
     "ci-cd",
-    "guides"
+    "guides",
+    "---Integrations---",
+    "integrations",
+    "---Comparisons---",
+    "comparisons",
+    "---Deployment---",
+    "self-host",
+    "---Trust---",
+    "results"
   ]
 }

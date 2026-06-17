@@ -1,0 +1,387 @@
+---
+title: Netlify
+description: Run Frontguard visual regression on every Netlify deploy preview using the official Build Plugin.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Netlify Build Plugin
+
+The `@frontguard/netlify-plugin` is an official [Netlify Build
+Plugin](https://docs.netlify.com/integrations/build-plugins/) that runs
+Frontguard visual-regression checks against every deploy preview, posts
+the results to the originating GitHub pull request, and optionally fails
+the deploy when regressions are detected.
+
+Unlike the CLI integration (where you run `frontguard run` from a workflow
+file), the build plugin hooks directly into the Netlify lifecycle. You add
+six lines to `netlify.toml`, set one environment variable, and every
+preview deploy gets a visual diff — no GitHub Actions YAML, no self-hosted
+runners, no separate "wait for deploy" step.
+
+<Callout type="info">
+  **Who is this for?** Teams that deploy to Netlify and want visual
+  regression gating on every PR without managing CI configuration. If you
+  already have a GitHub Actions workflow that runs Frontguard, you can keep
+  it — but most teams prefer the build plugin for the simpler setup and the
+  guaranteed-correct preview URL.
+</Callout>
+
+## How it works
+
+The plugin runs in the Netlify `onSuccess` lifecycle, **after** the deploy
+is published and reachable on its preview URL. From there it:
+
+1. Resolves the preview URL — `DEPLOY_PRIME_URL` first, then `DEPLOY_URL`,
+   then `URL` as the production fallback.
+2. POSTs a run to `https://api.frontguard.dev/v1/run` (or your self-hosted
+   API) with the URL and the routes you configured.
+3. Polls `GET /v1/runs/:id` every three seconds until the run reaches a
+   terminal status, or until 120 seconds elapses.
+4. Renders a Markdown summary of the result and posts it to the GitHub PR
+   that triggered the deploy preview — if a `GITHUB_TOKEN` is available.
+5. Optionally fails the Netlify build when the run reports any regression.
+
+The decision logic is pure and unit-tested
+([`lib/core.js`](https://github.com/ravidsrk/frontguard/blob/main/integrations/netlify/lib/core.js)),
+so the plugin's behavior is the same in CI as in the test suite.
+
+## Install
+
+```bash
+npm install -D @frontguard/netlify-plugin
+```
+
+Then add the plugin block to `netlify.toml` at the root of your repo:
+
+```toml
+[[plugins]]
+  package = "@frontguard/netlify-plugin"
+
+  [plugins.inputs]
+    apiUrl = "https://api.frontguard.dev"
+    routes = ["/", "/pricing", "/blog"]
+    failBuild = false
+    productionToo = false
+```
+
+Set the API key in **Site settings → Environment variables**:
+
+```
+FRONTGUARD_API_KEY=fg_live_...
+```
+
+Optionally, set `GITHUB_TOKEN` (a fine-grained PAT or a GitHub App token
+with `pull_requests:write` / `issues:write`) so the plugin can post results
+to the PR.
+
+That's it. Your next deploy preview will trigger a Frontguard run, and the
+results will appear as a PR comment within ~30 seconds of the deploy
+turning green.
+
+## Configuration reference
+
+### Inputs (`netlify.toml`)
+
+| Input           | Default                       | Description                                                                |
+| --------------- | ----------------------------- | -------------------------------------------------------------------------- |
+| `apiUrl`        | `https://api.frontguard.dev`  | Frontguard Cloud API base URL. Override only for self-hosted deployments.  |
+| `apiKey`        | _(none)_                      | Frontguard API key. **Use the `FRONTGUARD_API_KEY` env var instead.**      |
+| `routes`        | `["/"]`                       | Routes to screenshot, relative to the preview URL.                         |
+| `failBuild`     | `false`                       | Fail the Netlify deploy when the run reports any regression.               |
+| `productionToo` | `false`                       | Also run on the `production` deploy context (default: previews only).      |
+| `githubToken`   | _(none)_                      | Token for PR comments. **Use `GITHUB_TOKEN` env var instead.**             |
+
+### Environment variables
+
+These come from **Site settings → Environment variables**, not from
+`netlify.toml`. Putting secrets in `netlify.toml` would commit them to
+your repository.
+
+| Variable             | Required | Notes                                                                                |
+| -------------------- | -------- | ------------------------------------------------------------------------------------ |
+| `FRONTGUARD_API_KEY` | yes      | Get one from [app.frontguard.dev/keys](https://app.frontguard.dev/keys).             |
+| `FRONTGUARD_API_URL` | no       | Fallback for `apiUrl` — handy when you want to switch URLs without editing toml.     |
+| `GITHUB_TOKEN`       | no       | Enables PR comments. The token only needs `pull_requests:write` and `issues:write`.  |
+
+<Callout type="warn">
+  Never put `FRONTGUARD_API_KEY` or `GITHUB_TOKEN` in `netlify.toml`. The
+  file is committed to your repository and would leak the secret to anyone
+  with read access. Always use Netlify environment variables.
+</Callout>
+
+### Netlify-provided context
+
+Netlify sets these on every build; the plugin reads them automatically.
+You usually don't need to do anything here, but they're useful to know
+when debugging.
+
+| Variable           | Used for                                                  |
+| ------------------ | --------------------------------------------------------- |
+| `CONTEXT`          | Decides skip / run / production-too.                      |
+| `DEPLOY_PRIME_URL` | First-choice preview URL.                                 |
+| `DEPLOY_URL`       | Fallback when prime URL is empty (rare).                  |
+| `URL`              | Last-resort URL (the production URL).                     |
+| `REVIEW_ID`        | PR number — required for posting PR comments.             |
+| `REPOSITORY_URL`   | Parsed for `owner/repo`. GitHub URLs only.                |
+| `COMMIT_REF`       | Head commit SHA (forwarded to the cloud API for context). |
+
+If `CONTEXT` is unset, the plugin no-ops. This protects you from
+accidentally running it against `api.frontguard.dev` when you execute
+`netlify build` locally without `--cwd-context`.
+
+## Failing the build
+
+By default, `failBuild = false` — the plugin reports regressions through
+the PR comment but does not block the deploy. Set it to `true` once you
+trust the baselines:
+
+```toml
+[[plugins]]
+  package = "@frontguard/netlify-plugin"
+  [plugins.inputs]
+    failBuild = true
+```
+
+A run is considered "failing" when **any** of the following holds:
+
+- top-level `run.status` is `failed`, `error`, or `timeout`
+- any `run.results[].status` is `regression`, `changed`, or `failed`
+
+`warning` and `new_baseline` results do **not** fail the build, because
+they generally need human review rather than an automatic block.
+
+<Callout type="info">
+  This rule lives in
+  [`isFailingRun`](https://github.com/ravidsrk/frontguard/blob/main/integrations/netlify/lib/core.js)
+  and mirrors the cloud API's own `deriveOutcome` logic. The GitHub Check
+  and the Netlify build always agree on the verdict.
+</Callout>
+
+## URL resolution
+
+The plugin prefers the **prime** URL — the stable per-deploy permalink that
+Netlify never recycles — over the per-deploy URL or the production URL.
+This matters because the baseline image is keyed on the URL: if you
+screenshot a churned URL on Monday and a different URL on Tuesday,
+Frontguard treats them as different pages.
+
+```
+1. DEPLOY_PRIME_URL   (set on every deploy preview, e.g. deploy-preview-42--site.netlify.app)
+2. DEPLOY_URL         (set on every deploy, e.g. 65abcd--site.netlify.app)
+3. URL                (production URL, e.g. site.com)
+```
+
+You can override this entirely by setting `apiUrl` to a self-hosted
+Frontguard instance, but the URL the plugin tests will always be the
+Netlify preview — there is no per-deploy URL override (open an issue if
+you need one).
+
+## Production deploys
+
+By default, the plugin skips `CONTEXT === "production"` builds. Most teams
+only want visual regression on previews, where reviewers can still gate the
+merge. To opt in:
+
+```toml
+[plugins.inputs]
+  productionToo = true
+```
+
+Production runs are useful when:
+
+- You auto-deploy from `main` and want a post-deploy baseline check.
+- You're using Frontguard for production monitoring rather than PR review.
+- You want every visit recorded for the dashboard's historical view.
+
+They are **not** useful when:
+
+- You already check the same URL in the deploy preview (you'll get
+  duplicate runs and double the cost).
+- Your production deploys are gated on the preview having passed.
+
+## PR comments
+
+When `REPOSITORY_URL`, `REVIEW_ID`, and `GITHUB_TOKEN` are all available,
+the plugin posts a Markdown summary like this:
+
+```markdown
+## ✅ Frontguard visual check
+
+**Preview:** https://deploy-preview-42--site.netlify.app
+**Status:** `completed`
+**Screenshots:** 5
+
+[View full report](https://api.frontguard.dev/v1/reports/run_abc123)
+```
+
+When the run finds regressions, the icon flips to ❌ and the comment lists
+counts:
+
+```markdown
+## ❌ Frontguard visual check
+
+**Preview:** https://deploy-preview-42--site.netlify.app
+**Status:** `completed`
+**Screenshots:** 3
+**Regressions:** 1
+**Warnings:** 1
+
+[View full report](https://api.frontguard.dev/v1/reports/run_abc124)
+```
+
+The comment is **best-effort**: a missing token, a non-GitHub repository,
+or a network error logs a warning but never fails the deploy.
+
+<Callout type="info">
+  For organizations that prefer a Check Run over a PR comment, install the
+  [Frontguard GitHub App](/docs/integrations/github-app) — it creates a
+  proper Check on the commit, with deep links into the dashboard. The
+  build plugin's PR comment is the lightweight alternative for teams that
+  don't want to install a GitHub App.
+</Callout>
+
+## Local development
+
+You can dry-run the plugin against a fake Netlify environment:
+
+```bash
+CONTEXT=deploy-preview \
+DEPLOY_PRIME_URL=https://your-staging-url.example.com \
+FRONTGUARD_API_KEY=fg_live_... \
+npx netlify build
+```
+
+Without `CONTEXT`, the plugin no-ops. This is intentional — running
+`netlify build` locally normally produces an empty `CONTEXT`, and we don't
+want to silently hit `api.frontguard.dev` from your laptop.
+
+To work on the plugin itself:
+
+```bash
+cd integrations/netlify
+npm test              # vitest, 36 unit tests
+npm run typecheck     # tsc --noEmit (checkJs: true on JSDoc)
+```
+
+The plugin is pure ESM JavaScript with JSDoc types — there's no build
+step, no transpiler, no `dist/`. Netlify loads the package straight from
+`integrations/netlify/index.js` and `integrations/netlify/lib/core.js`.
+
+## Troubleshooting
+
+### `FRONTGUARD_API_URL / FRONTGUARD_API_KEY not set — skipping run.`
+
+The plugin requires both an API URL and an API key. Confirm
+`FRONTGUARD_API_KEY` is set in **Site settings → Environment variables**
+and that the deploy is using the right context scope (Netlify lets you
+scope env vars to `production`, `deploy-preview`, or `branch-deploy`
+separately).
+
+### `Skipped: No Netlify CONTEXT set`
+
+You are running outside a Netlify build. The plugin no-ops. To dry-run
+locally, set `CONTEXT=deploy-preview` manually before invoking
+`netlify build`.
+
+### `Skipped: Skipping production context`
+
+Production deploys are skipped by default. Set
+`productionToo = true` in `netlify.toml` to opt in.
+
+### `Run error (non-blocking): ...`
+
+`failBuild = false` (the default) — the plugin logged the error and let
+the deploy continue. Set `failBuild = true` if you want errors to surface
+as build failures. Common causes:
+
+- Wrong `apiUrl` — should point at `https://api.frontguard.dev` or your
+  self-hosted instance.
+- Wrong / revoked `FRONTGUARD_API_KEY`.
+- The preview URL is not publicly reachable (basic auth, IP allowlist).
+
+### The PR comment never appears
+
+The PR comment is best-effort. It requires three things:
+
+- `GITHUB_TOKEN` env var with `pull_requests:write` / `issues:write`.
+- `REPOSITORY_URL` parseable as a GitHub URL (Netlify sets this for repos
+  connected via GitHub).
+- `REVIEW_ID` set — Netlify provides this for deploy previews of GitHub
+  PRs but **not** for branch deploys.
+
+The plugin logs `Could not post PR comment (non-blocking).` when any of
+these are missing. Branch deploys will never get a PR comment because
+there's no PR to comment on.
+
+### `Run finished: timeout`
+
+The 120-second poll deadline elapsed before the run reached a terminal
+status. With `failBuild = true` this fails the build; without it, the
+plugin logs the timeout and continues. If you regularly hit the timeout,
+your run is genuinely slow — try:
+
+- Reducing the number of routes.
+- Splitting the run across multiple deploys (each route block runs in
+  parallel inside cloud-api, but the overall wall clock is gated by the
+  slowest one).
+- Filing a support ticket if you're a paying customer — your account's
+  concurrency cap may be set conservatively.
+
+### Builds were passing, then started failing after the 0.2.0 upgrade
+
+`0.2.0` fixed a regression-detection bug. Before, the plugin inspected
+`run.results.changed` — a field cloud-api never returns — so every build
+looked clean even when there were real regressions. After the upgrade,
+the plugin inspects `run.results[].status` correctly. If you had
+`failBuild = true` set on `0.1.x`, you were effectively running with
+gating disabled. Audit recent deploys in the
+[Frontguard dashboard](https://app.frontguard.dev) before re-enabling
+gating.
+
+## Comparison with the GitHub Actions workflow
+
+| | Build plugin (this page)              | GitHub Actions ([guide](/docs/ci-cd/github-actions)) |
+| --- | --- | --- |
+| Trigger              | Netlify deploy lifecycle              | GitHub workflow event                                |
+| Preview URL accuracy | Netlify's own `DEPLOY_PRIME_URL`      | Manual `wait-for-deployment` step                    |
+| Setup                | 6 lines in `netlify.toml`             | YAML workflow + token + URL detection logic          |
+| Failure surface      | Netlify build status + PR comment     | GitHub Check + PR comment                            |
+| Self-hosted Frontguard support | yes (set `apiUrl`)         | yes (`FRONTGUARD_API_URL`)                           |
+
+The two are not mutually exclusive — you can use the build plugin to gate
+the deploy and a GitHub Actions workflow to publish a richer Check. Most
+teams pick one and stop.
+
+## Marketplace listing
+
+The plugin is published to the
+[Netlify Plugins marketplace](https://app.netlify.com/plugins). You can
+install it from the Netlify dashboard with one click; the manifest in
+[`integrations/netlify/manifest.yml`](https://github.com/ravidsrk/frontguard/blob/main/integrations/netlify/manifest.yml)
+is what the dashboard reads to render the inputs form.
+
+For the npm package, see
+[@frontguard/netlify-plugin](https://www.npmjs.com/package/@frontguard/netlify-plugin).
+
+## Changelog
+
+### 0.2.0 — current
+
+- **Fixed (P0):** `isFailingRun` now inspects `run.results[].status` per
+  the actual cloud-api response shape. Previous versions read a
+  nonexistent `run.results.changed` field and reported every build as
+  passing, even with real regressions.
+- **Fixed (P2):** the plugin no longer runs when `CONTEXT` is unset.
+  Previously it defaulted to `deploy-preview`, which meant every local
+  `netlify build` invocation tried to call `api.frontguard.dev`.
+- **Added:** `summarizeResults` helper exported from `lib/core.js` for
+  downstream callers that want the per-status counts without re-deriving
+  them.
+- **Publishing:** `private: false`, correct npm name, `publishConfig.access`
+  set to `public`, and the package can now be installed from npm.
+
+### 0.1.0 — initial release
+
+- First version of the build plugin. Did not actually flag failing builds
+  due to the P0 bug above. Do not use.

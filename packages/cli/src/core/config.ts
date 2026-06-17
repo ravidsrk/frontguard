@@ -216,10 +216,50 @@ export const configSchema = z.object({
 
   /** Sandbox backend for fix verification (default: 'local'). */
   fixSandbox: z.enum(['local', 'daytona']).optional(),
+
+  /** Storybook integration — enumerate routes from a running Storybook server. */
+  storybook: z
+    .object({
+      url: z
+        .string({ required_error: 'Config error at `storybook.url`: this field is required' })
+        .url('Config error at `storybook.url`: expected a valid URL'),
+      stories: z.array(z.string().min(1)).optional(),
+      exclude: z.array(z.string().min(1)).optional(),
+      fetchTimeoutMs: z.number().int().positive().optional(),
+    })
+    .optional(),
 });
 
 /** Inferred Zod output type — should match `FrontguardConfig`. */
 export type ConfigSchemaOutput = z.output<typeof configSchema>;
+
+/**
+ * User-facing config type — every field with a schema default is optional.
+ *
+ * This is the input shape `defineConfig` accepts: only `baseUrl` is required,
+ * and any field the user omits is filled in by the Zod schema at load time.
+ * Use it as the static type for `frontguard.config.ts`.
+ */
+export type UserFrontguardConfig = z.input<typeof configSchema>;
+
+/**
+ * Identity helper that gives `frontguard.config.ts` files static typing and
+ * IDE autocomplete without forcing the user to import the (more strict)
+ * `FrontguardConfig` interface.
+ *
+ * @example
+ * ```ts
+ * import { defineConfig } from '@frontguard/cli';
+ *
+ * export default defineConfig({
+ *   baseUrl: 'http://localhost:3000',
+ *   routes: ['/'],
+ * });
+ * ```
+ */
+export function defineConfig(config: UserFrontguardConfig): UserFrontguardConfig {
+  return config;
+}
 
 // ---------------------------------------------------------------------------
 // Config File Search
@@ -521,7 +561,7 @@ export function generateDefaultConfig(options: GenerateConfigOptions = {}): stri
   // JS / TS format
   const exportKeyword = format === 'ts' ? 'export default' : 'module.exports =';
   const typeAnnotation = format === 'ts'
-    ? "import type { FrontguardConfig } from 'frontguard';\n\n"
+    ? "import type { FrontguardConfig } from '@frontguard/cli';\n\n"
     : '';
   const satisfies = format === 'ts' ? ' satisfies FrontguardConfig' : '';
 

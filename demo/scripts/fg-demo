@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# fg-demo — deterministic, no-deps wrapper that mirrors @frontguard/cli output
+# for the demo GIF. Each subcommand prints exactly what the real CLI would
+# print in the happy-path: same colours, same markers, same wording. Lets the
+# VHS recording stay fast (no Playwright launch, no network) while staying
+# honest — every line here can be found in packages/cli/src/* with the same
+# phrasing.
+#
+# Used only by demo/frontguard-demo.tape. Not shipped to users.
+#
+# Why a wrapper? A real `frontguard run` against a real localhost in VHS would
+# need to (a) install browsers (~200MB pull), (b) boot a dev server, (c) wait
+# 10-30s per viewport. The recording would balloon to a megabyte+ and still
+# show the same final summary. The wrapper keeps the artifact compact.
+
+set -eu
+
+GREEN=$'\033[0;32m'
+YEL=$'\033[0;33m'
+DIM=$'\033[2m'
+BOLD=$'\033[1m'
+NC=$'\033[0m'
+
+case "${1:-}" in
+  --version)
+    echo "0.2.0"
+    ;;
+
+  init)
+    echo "  ℹ Detecting framework…"
+    sleep 0.2
+    echo "  ℹ ✅ Created frontguard.config.ts"
+    echo "  ℹ Updated .gitignore with: auth.json, .frontguard/, frontguard-report/"
+    echo "  ℹ"
+    echo "  ℹ Next steps:"
+    echo "  ℹ   1. Edit frontguard.config.ts to set your baseUrl and routes"
+    echo "  ℹ   2. Start your dev server (e.g. npm run dev)"
+    echo "  ℹ   3. Run: npx frontguard run"
+    cat > frontguard.config.ts <<'CONFIG'
+import type { FrontguardConfig } from '@frontguard/cli';
+
+export default {
+  version: 1,
+  baseUrl: 'http://localhost:3000',
+  routes: ['/', '/about', '/pricing'],
+  viewports: [375, 768, 1440],
+  browsers: ['chromium'],
+  threshold: 0.1,
+} satisfies FrontguardConfig;
+CONFIG
+    ;;
+
+  doctor)
+    echo ""
+    echo "${BOLD}Frontguard Doctor${NC}"
+    echo "────────────────────────────────────────────────────────────"
+    printf '%s✅%s Node.js version: v22.15.0 (>= 18 required)\n' "$GREEN" "$NC"
+    printf '%s✅%s Playwright installed: playwright package is resolvable\n' "$GREEN" "$NC"
+    printf '%s✅%s Browser binaries: chromium ready\n' "$GREEN" "$NC"
+    printf '%s✅%s Configuration: frontguard.config.ts loaded\n' "$GREEN" "$NC"
+    printf '%s✅%s AI provider keys: found: OpenAI\n' "$GREEN" "$NC"
+    printf '%s✅%s Git repository: inside a git work tree\n' "$GREEN" "$NC"
+    printf '%s✅%s Baseline branch: frontguard-baselines (3 commits)\n' "$GREEN" "$NC"
+    echo "────────────────────────────────────────────────────────────"
+    printf '%s✅ All checks passed. You'\''re ready to run %sfrontguard run%s.\n' "$GREEN" "$BOLD" "$NC"
+    ;;
+
+  run)
+    # Mirrors the real renderer's status pattern: discovery → render → diff → AI.
+    echo "  ℹ Running Frontguard against http://localhost:3000"
+    sleep 0.4
+    printf '  %s✔%s 🔍 Discovering routes — 3 route(s) found\n' "$GREEN" "$NC"
+    sleep 0.5
+    printf '  %s✔%s 🎯 Smart filter — 3 changed since last run\n' "$GREEN" "$NC"
+    sleep 0.5
+    printf '  %s✔%s 🖥  Rendering — 9 screenshot(s) captured (3 routes × 3 viewports)\n' "$GREEN" "$NC"
+    sleep 0.6
+    printf '  %s✔%s 🧮 Diffing against baseline — 1 regression, 2 unchanged\n' "$GREEN" "$NC"
+    sleep 0.6
+    printf '  %s✔%s 🧠 AI classification — gpt-4o (1 finding analysed)\n' "$GREEN" "$NC"
+    sleep 0.4
+    echo ""
+    echo "${BOLD}Report${NC}: ./frontguard-report/index.html"
+    echo ""
+    printf '  %s✘%s /dashboard @ 375px  %sregression%s  98%% confidence\n' "$YEL" "$NC" "$BOLD" "$NC"
+    echo "    ${DIM}AI:${NC} Sidebar overlaps main content on mobile because"
+    echo "        ${DIM}flex-direction changed in Dashboard.module.css line 28.${NC}"
+    echo "    ${DIM}Suggested fix:${NC} restore @media (max-width: 640px) override"
+    echo "    ${DIM}Sandbox-verified:${NC} ✅ patch closes the diff"
+    ;;
+
+  *)
+    echo "fg-demo: unknown command '${1:-}'"
+    exit 1
+    ;;
+esac

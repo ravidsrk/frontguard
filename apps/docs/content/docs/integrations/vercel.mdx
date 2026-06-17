@@ -1,0 +1,308 @@
+---
+title: Vercel
+description: Run Frontguard against every Vercel preview deployment — including custom-domain previews — with a native integration.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Vercel integration
+
+Frontguard's Vercel integration runs visual regression checks on **every
+preview deployment** — `*.vercel.app`, custom domains, and branch aliases —
+without any GitHub Actions workflow or `npx` step in your build. Install it
+once on a team, and every PR gets a `Frontguard / Preview` check populated by
+us.
+
+This page is the user-facing guide for the integration. Engineers working on
+the integration itself should also read
+[`integrations/vercel/README.md`](https://github.com/ravidsrk/frontguard/tree/main/integrations/vercel/README.md)
+in the repo.
+
+## What you get
+
+- A pass/fail check on every preview deployment, posted back to the linked
+  PR by the Frontguard Cloud API.
+- Support for **custom-domain previews** (e.g. `https://preview.acme.com`,
+  `https://feature-x.staging.shop.io`), not just `*.vercel.app`.
+- Routes and viewports configured once per project — no CI YAML.
+- Idempotent ingestion: Vercel sometimes retries deliveries; we dedupe by
+  delivery id.
+
+## How it compares to the CLI
+
+| Concern                          | CLI / GitHub Actions               | Vercel integration                |
+| -------------------------------- | ---------------------------------- | --------------------------------- |
+| Install effort                   | Add `frontguard` to `npx`/yaml     | One-click on Vercel Marketplace   |
+| Per-project config               | `frontguard.config.ts`             | Project env vars (`FRONTGUARD_*`) |
+| Triggers                         | CI job runs on push                | Vercel webhook fires on success   |
+| Custom-domain previews           | Resolves env var (`VERCEL_URL`)    | Native — accepts any host          |
+| PR comments                      | Via GitHub token in CI             | Via cloud-api github-pr reporter  |
+| Works without GitHub             | No                                 | Yes (Cloud-only)                  |
+
+<Callout type="info">
+  Both approaches use the same Cloud API and produce the same baseline. You
+  can install the integration and *also* keep the CLI workflow if you want
+  belt-and-braces — runs are deduped server-side by deployment URL + commit
+  SHA.
+</Callout>
+
+## Install
+
+1. Go to the [Frontguard integration page on Vercel
+   Marketplace](https://vercel.com/integrations/frontguard).
+2. Click **Add Integration**.
+3. Choose the team or personal scope you want the integration installed on.
+4. Pick the projects (or "all current and future projects") you want
+   Frontguard to monitor. **This is the consent boundary** — only projects
+   you select here will be allowed to have their deployment URLs (custom
+   domains included) accepted by Frontguard.
+5. Vercel sends you to `https://frontguard.dev/api/install?code=…`. We
+   exchange the code for an access token, create your Frontguard team if it
+   doesn't exist, and send you on to the post-install screen.
+6. Add three env vars to each project (Vercel → Project → Settings →
+   Environment Variables):
+
+   | Var                  | Value                                            |
+   | -------------------- | ------------------------------------------------ |
+   | `FRONTGUARD_API_URL` | `https://api.frontguard.dev`                     |
+   | `FRONTGUARD_API_KEY` | Your team's API key (from frontguard.dev settings) |
+   | `FRONTGUARD_ROUTES`  | Comma-separated routes, e.g. `/,/about,/pricing` |
+
+That's it — push a PR and you should see a `Frontguard / Preview` check
+appear once Vercel's preview deployment goes green.
+
+## Trust model
+
+The integration's job is to take a deployment URL Vercel hands us — possibly
+a custom domain we've never seen before — and decide whether it's safe to
+screenshot. We use a multi-layer check.
+
+### Layer 1: HMAC signature
+
+Every webhook from Vercel carries an `x-vercel-signature` header that's an
+HMAC-SHA1 over the raw request body, keyed by **our integration's client
+secret**. We verify it before doing anything else. If the secret isn't
+configured server-side, we **fail closed** — every webhook returns 500. If
+the signature doesn't match, we return 401.
+
+A valid signature proves the event was emitted by Vercel for an integration
+whose secret we hold — i.e. it's an installation that someone consented to
+create. That's the foundation everything else rests on.
+
+### Layer 2: install record lookup
+
+Layer 1 alone isn't quite enough — a valid signature tells us *some*
+installation exists, but not *which* projects the team meant to share with
+us. So on install, we persist a per-`configurationId` record (and a
+per-`teamId` index) into a KV store. When a webhook fires, the handler
+looks up the project id and team id from the payload against KV:
+
+- `project:<id>` → exact-match consent for that specific Vercel project.
+- `team:<id>` → consent at the team level (every project on the team).
+- First-time arrival → if a team install record exists, we **lazy-register**
+  the project so subsequent lookups are O(1).
+
+If neither key resolves and the URL isn't on `*.vercel.app`, the handler
+rejects the webhook with HTTP 400. This is how revoking an installation
+takes effect: deleting the KV record causes custom-domain webhooks for that
+team to bounce immediately.
+
+### Layer 3: SSRF defense (always on)
+
+A consenting user could still — accidentally or maliciously — point a custom
+domain at a private IP and use Frontguard as an SSRF gadget. So even with
+consent, the URL guard rejects:
+
+- Anything that isn't `https:` (`http://`, `file://`, `javascript:`, etc.)
+- Loopback hosts: `127.0.0.0/8`, `::1`, `localhost`, `localhost.localdomain`
+- Link-local: `169.254.0.0/16` — note this is the **AWS / GCP cloud
+  metadata endpoint** at `169.254.169.254`. Allowing this would let any
+  install exfiltrate cloud credentials.
+- RFC1918 private space: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`
+- IPv6 unique-local: `fc00::/7`
+- IPv6 link-local: `fe80::/10`
+- CGNAT: `100.64.0.0/10`
+- Multicast / reserved: `224.0.0.0/4` and up, plus `0.0.0.0/8`
+- `metadata.google.internal`, `metadata`
+
+These checks run on the literal host in the URL. The Cloud-side fetcher is
+expected to do DNS-time SSRF validation as well (re-resolving the host
+inside the screenshot worker) — never trust a single layer.
+
+### Layer 4: idempotency
+
+Vercel will sometimes redeliver the same event. When the payload carries a
+delivery `id`, we record it in KV with a 24h TTL and short-circuit duplicate
+deliveries with `triggered:false, reason:"Duplicate delivery"`.
+
+## Event filtering
+
+The handler only triggers a Frontguard run when **all** of these hold:
+
+- `payload.type` is `deployment.succeeded` or `deployment.ready` (not
+  `.created`, not `.error`, not `.canceled`)
+- `payload.payload.deployment.target` is `null` or `undefined` — i.e. it's a
+  **preview** deployment, never production or `staging`
+- `payload.payload.deployment.url` is non-empty
+
+Production deployments are explicitly skipped. You almost never want a
+visual diff against the version that's live for your users — that's not a
+regression, that's the new baseline.
+
+## Configuring routes
+
+Frontguard takes screenshots of routes you list explicitly. The integration
+reads them from the `FRONTGUARD_ROUTES` project env var:
+
+```
+FRONTGUARD_ROUTES=/,/about,/pricing,/docs
+```
+
+Whitespace is trimmed. Empty entries are dropped. If you don't set the var
+at all, the Cloud API falls back to a single screenshot of `/`.
+
+For more advanced shapes (per-route viewports, masked regions, network
+overrides), drop a `frontguard.config.ts` at your project root and check it
+into git. The integration ignores this file; it's read by the Cloud-side
+crawler. See [Configuration reference](/docs/cli#configuration) for the
+full schema.
+
+## Git metadata + PR comments
+
+The webhook payload carries Vercel's git metadata for the deployment under
+`payload.payload.deployment.meta`. We extract:
+
+- `githubCommitSha` → the deployed commit SHA
+- `githubPrId` / `githubCommitRef` → PR number or branch ref
+- `githubOrg` / `githubCommitOrg` → repo owner
+- `githubRepo` / `githubCommitRepo` → repo slug
+- `githubCommitRef` / `gitCommitRef` → branch name
+
+We forward these to the Cloud API under a `github` object on the `POST
+/v1/run` body. The API's github-pr reporter uses them to post the result as
+a PR comment via the GitHub App you already authorized when connecting your
+GitHub workspace. If the metadata isn't present (e.g. you deployed directly
+from CLI), we skip the comment — the run still happens; results are
+viewable in the Frontguard dashboard.
+
+<Callout type="warn">
+  Custom git providers (GitLab, Bitbucket) aren't mapped yet. Vercel doesn't
+  populate `githubCommitSha` for non-GitHub repos, so we fall back to
+  `gitCommitSha` / `gitCommitRef` and post results only in the dashboard.
+  Follow [`#143`](https://github.com/ravidsrk/frontguard/issues/143) for
+  multi-provider PR comments.
+</Callout>
+
+## Endpoints reference
+
+| Method | Path           | Purpose                                                               |
+| ------ | -------------- | --------------------------------------------------------------------- |
+| `GET`  | `/health`      | Returns `{status:"ok", integration:"vercel"}`. Use for uptime probes. |
+| `GET`  | `/api/install` | OAuth landing (302 to Vercel) + callback handler (`?code=…`)          |
+| `POST` | `/api/webhook` | Vercel deployment events. HMAC-required, fails closed.                |
+
+### `/api/webhook` response shapes
+
+A few examples of what callers see:
+
+```json
+// 200 — preview triggered a run
+{ "triggered": true, "runId": "run_abc", "previewUrl": "https://preview.acme.com" }
+
+// 200 — preview ignored (production target)
+{ "triggered": false, "reason": "Skipping production deployment" }
+
+// 200 — duplicate delivery
+{ "triggered": false, "reason": "Duplicate delivery (already processed)" }
+
+// 200 — fully ignored (e.g. event type we don't act on)
+{ "triggered": false, "reason": "Ignored event type: deployment.created" }
+
+// 200 — signature valid, but Cloud API not yet configured
+{ "triggered": false, "reason": "Frontguard API not configured (FRONTGUARD_API_URL / FRONTGUARD_API_KEY)" }
+
+// 400 — preview URL failed the SSRF / authorization check
+{ "triggered": false, "error": "Preview URL not allowed" }
+
+// 401 — signature didn't match
+{ "error": "Invalid signature" }
+
+// 500 — VERCEL_CLIENT_SECRET not configured (fail-closed)
+{ "error": "Webhook secret not configured" }
+```
+
+## Troubleshooting
+
+### "Preview URL not allowed" on every webhook
+
+You're using a custom domain and the integration has no install record for
+the project. Three things to check:
+
+1. Re-open the Marketplace listing and confirm the project is in the
+   "Authorized projects" list (or that the team install is set to "All
+   projects"). If you toggled it off and back on, Vercel sometimes drops
+   the project from the access list silently.
+2. Confirm KV is bound in your deployment. Without KV, custom-domain
+   webhooks are always rejected — `*.vercel.app` previews still work.
+3. Confirm the webhook payload's `project.id` and `team.id` aren't being
+   stripped by a proxy. Hit `/api/webhook` from `curl --verbose` with a
+   sample signed payload to confirm what reaches the handler.
+
+### Webhooks return 401
+
+`x-vercel-signature` didn't match the HMAC of the raw body keyed by
+`VERCEL_CLIENT_SECRET`. The most common causes:
+
+- The body was JSON-parsed by an upstream middleware before reaching the
+  handler. The signature is over the **raw** bytes — re-serializing
+  changes whitespace and breaks the MAC.
+- You're using the wrong secret. Vercel rotates secrets on integration
+  config changes; double-check the dashboard.
+
+### Webhooks return 500 with "secret not configured"
+
+The handler is configured to **fail closed** when `VERCEL_CLIENT_SECRET`
+isn't present. Set it on the deployment and redeploy.
+
+### Run was triggered but no PR comment appeared
+
+The Frontguard Cloud API posts PR comments through the GitHub App you
+authorized when you connected your workspace. Visit
+[Settings → Integrations → GitHub](https://frontguard.dev/settings/integrations)
+to confirm the App is installed on the repo. If the deployment came from a
+non-GitHub provider, the run will appear in the dashboard but no comment
+will be posted yet.
+
+### Production deployment was skipped — was that on purpose?
+
+Yes. The handler explicitly skips `target=production` deployments. Visual
+regression against the version that's currently live is rarely what you
+want. To monitor production look + feel, use a [scheduled
+monitor](/docs/guides/scheduled-monitors) instead.
+
+## FAQ
+
+**Does the integration read my source code?** No. It receives only
+deployment metadata (URL, commit SHA, branch, PR id) from Vercel. The
+Cloud-side worker fetches the deployed pages from your preview URL.
+
+**Does it cost anything beyond my Frontguard plan?** The integration itself
+is free — runs it triggers count against your plan's monthly run budget like
+any other.
+
+**What happens if my Cloud API key rotates?** Set the new key as
+`FRONTGUARD_API_KEY` on the project. Runs queued with the old key during the
+swap will return `502` from the integration with the underlying Cloud API
+error; Vercel will retry the delivery automatically.
+
+**Can I install on multiple teams?** Yes. Each install gets its own
+`configurationId` and KV record. Removing one team's install doesn't affect
+the others.
+
+**Can I run this without the Frontguard Cloud?** Not yet — the integration
+forwards to the Cloud API by design. For self-hosted Frontguard, point
+`FRONTGUARD_API_URL` at your installation; the wire format is the same.
+
+**Is this open source?** Yes — see
+[`integrations/vercel/`](https://github.com/ravidsrk/frontguard/tree/main/integrations/vercel)
+in the monorepo.

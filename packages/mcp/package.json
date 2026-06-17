@@ -1,0 +1,73 @@
+{
+  "name": "@frontguard/mcp",
+  "version": "0.2.0",
+  "description": "Model Context Protocol server for Frontguard — lets in-IDE agents (Claude Code, Cursor, Copilot) query visual regressions and suggested fixes.",
+  "type": "module",
+  "bin": {
+    "frontguard-mcp": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./tools": {
+      "import": "./dist/tools/index.js",
+      "types": "./dist/tools/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "frontguard",
+    "visual-regression",
+    "ai",
+    "agents",
+    "claude-code",
+    "cursor",
+    "copilot"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ravidsrk/frontguard",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://frontguard.dev",
+  "bugs": {
+    "url": "https://github.com/ravidsrk/frontguard/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@frontguard/cli": "*",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.2"
+  },
+  "author": "Ravindra Kumar <ravidsrk@gmail.com>"
+}

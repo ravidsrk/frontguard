@@ -1,13 +1,23 @@
 # Frontguard Slack app manifest.
 #
-# Create the app at https://api.slack.com/apps → "From an app manifest", paste
-# this, then set the request URLs to your deployed handler:
-#   Events:        https://<host>/slack/events
-#   Slash command: https://<host>/slack/commands
-#   OAuth redirect: https://<host>/slack/oauth/callback
+# Deploy target: Cloudflare Workers (see ../wrangler.toml). Host the worker
+# behind `slack.frontguard.dev` (either via a Workers custom route or the
+# stock `*.workers.dev` subdomain — update the URLs below to match).
 #
-# Copy the Signing Secret and Client ID/Secret into the handler's env:
-#   SLACK_SIGNING_SECRET, SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_REDIRECT_URI
+# Create the app:
+#   1. https://api.slack.com/apps → "Create New App" → "From an app manifest".
+#   2. Pick your workspace, paste this YAML, and confirm.
+#   3. After creation, copy:
+#        - Signing Secret      → wrangler secret put SLACK_SIGNING_SECRET
+#        - Client ID / Secret  → wrangler secret put SLACK_CLIENT_ID
+#                                wrangler secret put SLACK_CLIENT_SECRET
+#   4. Set the OAuth redirect URL in Slack to the same value as
+#      `oauth_config.redirect_urls[0]` below, and put it in the env as
+#      SLACK_REDIRECT_URI.
+#
+# All three URLs below MUST point at the same deployed worker; the only
+# thing varying is the path. If you self-host on a different domain,
+# replace `slack.frontguard.dev` with your own host everywhere.
 
 display_information:
   name: Frontguard
@@ -20,14 +30,14 @@ features:
     always_online: true
   slash_commands:
     - command: /frontguard
-      url: https://example.com/slack/commands
+      url: https://slack.frontguard.dev/slack/commands
       description: Run a visual check or get help
       usage_hint: status <url>
       should_escape: false
 
 oauth_config:
   redirect_urls:
-    - https://example.com/slack/oauth/callback
+    - https://slack.frontguard.dev/slack/oauth/callback
   scopes:
     bot:
       - chat:write
@@ -35,7 +45,7 @@ oauth_config:
 
 settings:
   event_subscriptions:
-    request_url: https://example.com/slack/events
+    request_url: https://slack.frontguard.dev/slack/events
     bot_events:
       - app_mention
   org_deploy_enabled: false

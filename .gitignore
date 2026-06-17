@@ -39,3 +39,19 @@ Thumbs.db
 .turbo/
 .vercel/
 .netlify/
+
+# Release artifacts (scripts/release.sh)
+.release-notes/
+*.tgz
+
+# build artifacts under apps/demo
+apps/demo/next-env.d.ts
+apps/demo/out/
+apps/demo/tsconfig.json
+
+# Mogra workspace metadata
+.mogra/
+.mogra
+
+# Internal adversarial-audit workspace — quotes live secrets, never commit
+.frontguard-audit/

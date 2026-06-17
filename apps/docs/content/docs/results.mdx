@@ -1,0 +1,107 @@
+---
+title: Validation results
+description: How Frontguard performs against real open-source frontends — the live harness, the numbers we publish, and the limits we admit.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Validation results
+
+Frontguard publishes how it performs against real open-source frontends —
+not staged fixtures. This page is the customer-facing summary of the latest
+harness run; the [raw measurement file][results-md] in the repo holds the
+unedited numbers, methodology, and skip notes.
+
+<Callout title="What this page is, and isn't">
+This is a **honest snapshot** of what the v0.2 harness measured. The
+classification-accuracy numbers shipped on the landing page are gated on AI
+provider keys being configured in CI — when they aren't, we report only the
+pixel-only false-positive rate and disclose that explicitly.
+</Callout>
+
+## Methodology in one breath
+
+For every target repo, the harness:
+
+1. Clones at `--depth 1`.
+2. Installs dependencies (auto-detects pnpm / yarn / npm; falls back to
+   non-frozen install when lockfiles are out of date).
+3. Boots the dev server and waits up to **120 s** for it to serve traffic.
+4. Runs Frontguard with `--update-baselines` against every configured route —
+   the **baseline pass**.
+5. Runs Frontguard again against the *same unchanged code* — the **recheck
+   pass**.
+6. Tears the dev server down and removes the temp dir.
+
+Anything non-pass in the recheck pass is, by definition, a pixel-only false
+positive on unchanged code. That's the metric we treat as a launch gate.
+
+## The target repos
+
+| Name | Repo | Why it's in the harness |
+|---|---|---|
+| `taxonomy` | [shadcn-ui/taxonomy][taxonomy] | App Router marketing + dashboard |
+| `tailwind-dashboard` | [shadcn-ui/next-template][next-template] | Tailwind-heavy components, npm-based |
+| `chakra-ui-docs` | [chakra-ui/chakra-ui-docs][chakra-docs] | Component library docs, large surface |
+| `medusa-storefront` | [medusajs/nextjs-starter-medusa][medusa] | Commerce flows; needs a Medusa backend |
+| `nextra-docs` | [shuding/nextra][nextra] | MDX docs site monorepo |
+
+The selection is intentionally diverse — marketing pages, dashboards,
+component galleries, commerce flows, and docs. The point isn't to pick easy
+targets; it's to find the rendering modes that *actually* generate noise.
+
+## How to reproduce the numbers
+
+```bash
+# 1. Build and link the CLI so the harness can resolve `frontguard`.
+npm run build:cli
+(cd packages/cli && npm link)
+
+# 2. Run the harness against all 5 repos (or filter to one).
+./validation/run-external.sh
+./validation/run-external.sh tailwind-dashboard
+
+# 3. Aggregate into the metrics table.
+node validation/aggregate-results.mjs
+```
+
+Each per-repo run produces `validation/results/<name>.json` containing the
+full pixel diff + (when AI is enabled) the classifier verdict for every
+route × viewport combination. The aggregator script flattens those into the
+pixel-only false-positive rate that the landing page surfaces.
+
+## What we can't measure today
+
+<Callout type="warn" title="Honest limitations">
+The launch-gate template asks for AI classification accuracy. We can't
+measure that without a key, and we don't fake it.
+</Callout>
+
+- **AI classification accuracy** requires `OPENAI_API_KEY` or
+  `ANTHROPIC_API_KEY`. The classifier code and the metrics module
+  (`src/diff/validation-metrics.ts`) are implemented and unit tested; only
+  the live measurement is gated on credentials.
+- **True-positive rate.** Without a known-regression PR set, we can't tell
+  how often Frontguard *catches* a real bug. The recheck pass measures
+  only negatives.
+- **Anti-flake consensus.** The harness renders each route once per pass.
+  Multi-render consensus is exercised by Frontguard's normal pipeline but
+  not isolated as a separate metric here.
+- **Repos requiring backend services.** `medusa-storefront` needs a running
+  Medusa backend and a publishable API key — neither of which the harness
+  provisions.
+
+## The current published numbers
+
+The aggregate and per-repo tables live in [`validation/results-v0.2.md`][results-md]
+in the repo. The landing page's Validation section reads from the same JSON
+artifacts. If you see a percentage on the marketing site that doesn't trace
+back to those artifacts, please [open an issue][issues].
+
+[results-md]: https://github.com/ravidsrk/frontguard/blob/main/validation/results-v0.2.md
+[taxonomy]: https://github.com/shadcn-ui/taxonomy
+[next-template]: https://github.com/shadcn-ui/next-template
+[chakra-docs]: https://github.com/chakra-ui/chakra-ui-docs
+[medusa]: https://github.com/medusajs/nextjs-starter-medusa
+[nextra]: https://github.com/shuding/nextra
+[issues]: https://github.com/ravidsrk/frontguard/issues

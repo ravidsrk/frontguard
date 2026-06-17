@@ -60,18 +60,40 @@ describe('timingSafeEqual', () => {
 });
 
 describe('isAllowedPreviewUrl', () => {
-  it('allows https *.vercel.app hosts', () => {
+  it('allows https *.vercel.app hosts (no authorization required)', () => {
     expect(isAllowedPreviewUrl('https://my-app-abc123.vercel.app')).toBe(true);
     expect(isAllowedPreviewUrl('https://vercel.app')).toBe(true);
   });
   it('rejects non-https schemes', () => {
     expect(isAllowedPreviewUrl('http://my-app.vercel.app')).toBe(false);
     expect(isAllowedPreviewUrl('file:///etc/passwd')).toBe(false);
+    expect(isAllowedPreviewUrl('http://preview.acme.com', { authorizedProject: true })).toBe(false);
   });
-  it('rejects non-vercel hosts (SSRF)', () => {
-    expect(isAllowedPreviewUrl('https://evil.com')).toBe(false);
+  it('rejects custom domains when project is NOT authorized', () => {
+    expect(isAllowedPreviewUrl('https://preview.acme.com')).toBe(false);
+    expect(isAllowedPreviewUrl('https://staging.shop.io')).toBe(false);
     expect(isAllowedPreviewUrl('https://vercel.app.evil.com')).toBe(false);
-    expect(isAllowedPreviewUrl('https://169.254.169.254')).toBe(false);
+  });
+  it('accepts custom domains when the project IS authorized', () => {
+    expect(isAllowedPreviewUrl('https://preview.acme.com', { authorizedProject: true })).toBe(true);
+    expect(isAllowedPreviewUrl('https://feature-x--shop.netlify.app', { authorizedProject: true })).toBe(true);
+    expect(isAllowedPreviewUrl('https://branch--app.pages.dev', { authorizedProject: true })).toBe(true);
+  });
+  it('always blocks private/loopback/link-local hosts (SSRF, even when authorized)', () => {
+    for (const url of [
+      'https://169.254.169.254', // EC2 / GCE metadata
+      'https://127.0.0.1',
+      'https://10.0.0.5',
+      'https://192.168.1.1',
+      'https://172.16.0.1',
+      'https://172.31.255.255',
+      'https://localhost',
+      'https://metadata.google.internal',
+      'https://[::1]',
+    ]) {
+      expect(isAllowedPreviewUrl(url, { authorizedProject: true })).toBe(false);
+      expect(isAllowedPreviewUrl(url)).toBe(false);
+    }
   });
   it('rejects empty/invalid input', () => {
     expect(isAllowedPreviewUrl(undefined)).toBe(false);
@@ -353,14 +375,94 @@ describe('webhook HTTP handler', () => {
     expect((await res.json()).triggered).toBe(false);
   });
 
-  // FIX V4: SSRF host allowlist on the deploy URL.
-  it('rejects a non-vercel.app preview URL (400, SSRF guard)', async () => {
+  // SSRF: custom-domain previews are rejected when the project has not been
+  // authorized via the install flow (no KV install record).
+  it('rejects a custom-domain preview when project is NOT authorized', async () => {
     const app = createVercelApp();
-    const body = JSON.stringify(previewPayload({ url: 'https://evil.com/internal' }));
+    const body = JSON.stringify(previewPayload({ url: 'https://preview.acme.com' }));
     const res = await app.request(
       '/api/webhook',
       { method: 'POST', body, headers: { 'x-vercel-signature': sign(body) } },
       { VERCEL_CLIENT_SECRET: SECRET, FRONTGUARD_API_URL: 'https://api.frontguard.dev', FRONTGUARD_API_KEY: 'fg_x' },
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/not allowed/i);
+  });
+
+  // T10: accept custom-domain previews when the project is authorized
+  // (KV has an integration record for the owning team).
+  it('accepts a custom-domain preview when the project IS authorized via KV', async () => {
+    const app = createVercelApp();
+    const kv = memoryKV();
+    // Simulate a prior install: integration + team records present.
+    kv.store.set(
+      'integration:icfg_acme',
+      JSON.stringify({ accessToken: 'tok', teamId: 'team_acme', configurationId: 'icfg_acme', installedAt: 'x' }),
+    );
+    kv.store.set('team:team_acme', JSON.stringify({ configurationId: 'icfg_acme', installedAt: 'x' }));
+
+    const payload: VercelWebhookPayload = {
+      type: 'deployment.succeeded',
+      payload: {
+        deployment: {
+          id: 'dpl_acme',
+          url: 'preview-feature-x.acme.com',
+          target: null,
+          meta: { githubCommitSha: 'sha_acme', githubOrg: 'acme', githubRepo: 'web' },
+        },
+        project: { id: 'prj_acme' },
+        team: { id: 'team_acme' },
+      },
+    };
+    const body = JSON.stringify(payload);
+
+    let captured: { url: string } | null = null;
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      captured = JSON.parse(init.body as string);
+      return new Response(JSON.stringify({ id: 'run_x', statusUrl: '/v1/runs/run_x' }), { status: 202 });
+    }) as typeof fetch;
+    try {
+      const res = await app.request(
+        '/api/webhook',
+        { method: 'POST', body, headers: { 'x-vercel-signature': sign(body) } },
+        {
+          VERCEL_CLIENT_SECRET: SECRET,
+          FRONTGUARD_API_URL: 'https://api.frontguard.dev',
+          FRONTGUARD_API_KEY: 'fg_x',
+          KV: kv,
+        },
+      );
+      const json = await res.json();
+      expect(res.status).toBe(200);
+      expect(json.triggered).toBe(true);
+      expect(json.runId).toBe('run_x');
+      expect(captured!.url).toBe('https://preview-feature-x.acme.com');
+      // Project was lazy-registered for future O(1) lookups.
+      expect(kv.store.has('project:prj_acme')).toBe(true);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  // SSRF: even with an authorized project, private/loopback hosts must be rejected.
+  it('rejects a private/loopback host even when the project is authorized', async () => {
+    const app = createVercelApp();
+    const kv = memoryKV();
+    kv.store.set('team:team_acme', JSON.stringify({ configurationId: 'icfg_x', installedAt: 'x' }));
+    const payload: VercelWebhookPayload = {
+      type: 'deployment.succeeded',
+      payload: {
+        deployment: { id: 'dpl_bad', url: 'http://169.254.169.254/latest/meta-data/', target: null },
+        project: { id: 'prj_acme' },
+        team: { id: 'team_acme' },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const res = await app.request(
+      '/api/webhook',
+      { method: 'POST', body, headers: { 'x-vercel-signature': sign(body) } },
+      { VERCEL_CLIENT_SECRET: SECRET, FRONTGUARD_API_URL: 'https://api.frontguard.dev', FRONTGUARD_API_KEY: 'fg_x', KV: kv },
     );
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/not allowed/i);

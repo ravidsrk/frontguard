@@ -15,7 +15,7 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
       "name": "What is the difference between Frontguard and Percy?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Percy (by BrowserStack) is a hosted visual testing platform with a polished review dashboard and cross-browser rendering grid, billed per screenshot. Frontguard is a CLI-first, open-source (MIT) visual regression tool with AI vision analysis that explains why a diff happened. Frontguard's CLI is free forever; Percy starts free then jumps to $399/mo at scale."
+        "text": "Percy (by BrowserStack) is a hosted visual testing platform with a polished review dashboard, a cross-browser rendering grid, and a proprietary computer-vision diff (the 'Percy Visual Engine'), billed per screenshot. Frontguard is a CLI-first, open-source (MIT) visual regression tool that adds an LLM classification layer on top of the pixel diff — it explains why a diff happened, classifies it as regression vs intentional vs content update, and can suggest a fix. Frontguard's CLI is free forever; Percy starts free then jumps to around $399/mo at scale."
       }
     },
     {
@@ -55,7 +55,7 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 | Pricing @ 5K shots/mo | Free / entry tier | Free (CLI) |
 | Pricing @ 50K shots/mo | ~$399/mo+ | Free (CLI) + your AI usage |
 | False-positive approach | Manual review in dashboard | AI classifies regression vs intentional vs content |
-| AI capabilities | ❌ None | 🟢 Vision analysis + suggested fixes (BYOK) |
+| AI capabilities | 🟡 Computer-vision diff ("Visual Engine"), no LLM classification or fix suggestions | 🟢 LLM classification (regression / intentional / content) + suggested fixes (BYOK) |
 | Review dashboard | 🟢 Mature, multi-reviewer | 🔴 Not yet (CLI/report only) |
 | Cross-browser grid | 🟢 Hosted grid | Local Playwright (chromium/firefox/webkit) |
 | License | Proprietary (SaaS) | MIT, self-hostable |
@@ -80,13 +80,13 @@ Be honest with yourself — Percy is the better choice when:
 ## Feature-by-Feature Deep Dive
 
 ### Rendering & CI model
-Percy uploads your DOM/snapshots to its cloud, which renders and diffs server-side. This means snapshots leave your infrastructure and counts meter your bill. Frontguard renders with Playwright **inside your CI** and stores baselines on a git orphan branch — nothing has to leave your pipeline.
+Percy uploads your DOM/snapshots to its cloud, which renders and diffs server-side. This means snapshots leave your infrastructure and counts meter your bill. Frontguard renders with Playwright **inside your CI** and stores baselines on a git orphan branch — nothing has to leave your pipeline (the optional LLM call only fires on pages that actually diffed, and only if you opted in).
 
 ### False positives
 This is the core philosophical difference. Percy relies on a human reviewing the dashboard to dismiss noise (anti-aliasing, dynamic content, intentional changes). Frontguard adds an **AI classification layer**: each diff is labeled `regression`, `intentional`, or `content_update` with a confidence score, so you triage far fewer images by hand. Frontguard also has **anti-flake multi-render consensus** to suppress flaky pixel noise before it ever becomes a diff.
 
 ### AI analysis
-Percy has no AI explanation feature. Frontguard sends baseline + current images to OpenAI or Anthropic (BYOK) and returns a plain-English explanation plus an optional suggested CSS fix. See [AI Analysis](/docs/guides/ai-analysis).
+Percy ships a proprietary computer-vision diff (the "Percy Visual Engine") that suppresses anti-aliasing and dynamic-content noise, but it does **not** classify diffs (regression vs intentional vs content update) and does **not** explain *why* something changed. Frontguard sends baseline + current images to OpenAI or Anthropic (BYOK) and returns a plain-English explanation plus an optional suggested CSS fix. See [AI Analysis](/docs/guides/ai-analysis).
 
 ### Review & approval
 Percy wins here today: a polished, collaborative web dashboard. Frontguard's review is CLI/report-based (`frontguard approve`). A hosted dashboard is on the roadmap but **not shipped yet**.
@@ -111,7 +111,7 @@ Percy wins here today: a polished, collaborative web dashboard. Frontguard's rev
 1. **Install Frontguard.**
    ```bash
    npm install -D @frontguard/cli
-   npx frontguard init
+   npx -p @frontguard/cli frontguard init
    ```
 2. **Translate your Percy snapshots to routes.** Percy `percySnapshot(name)` calls / story URLs become entries in `routes`.
    ```typescript title="frontguard.config.ts"
@@ -129,8 +129,8 @@ Percy wins here today: a polished, collaborative web dashboard. Frontguard's rev
 5. **For interaction flows**, use the [Playwright plugin](/docs/playwright/setup) instead of Percy SDK calls.
 6. **Capture baselines and run.**
    ```bash
-   npx frontguard baseline
-   npx frontguard run
+   npx -p @frontguard/cli frontguard baseline
+   npx -p @frontguard/cli frontguard run
    ```
 7. **Update CI** — replace the `percy exec` wrapper with `frontguard run`. Remove `PERCY_TOKEN`.
 

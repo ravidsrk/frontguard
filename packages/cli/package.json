@@ -4,18 +4,19 @@
   "description": "AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.",
   "type": "module",
   "bin": {
-    "frontguard": "./dist/cli/index.js"
+    "frontguard": "./dist/cli/index.js",
+    "frontguard-render": "./bin/frontguard-render"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./plugins": {
-      "import": "./dist/plugins/index.js",
-      "types": "./dist/plugins/index.d.ts"
+      "types": "./dist/plugins/index.d.ts",
+      "import": "./dist/plugins/index.js"
     }
   },
   "scripts": {
@@ -25,7 +26,7 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "node ./scripts/check-readme-version.mjs && npm run build"
   },
   "keywords": [
     "visual-regression",
@@ -43,8 +44,10 @@
   },
   "files": [
     "dist",
+    "bin",
     "action.yml",
     "Dockerfile",
+    "docker",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"

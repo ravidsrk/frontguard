@@ -1,28 +1,60 @@
 # Frontguard
 
-> AI-powered visual regression testing for Playwright
+> AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.
 
-Frontguard is a free, open-source CLI tool that detects visual regressions in web applications. It plugs into Playwright, runs in CI pipelines, and uses AI to explain what broke, why it broke, and how to fix it.
+Frontguard is an open-source CLI + cloud platform. The CLI is MIT-licensed and free forever. The hosted cloud (team baselines, history, flake-score badges) is the paid tier at $29/month per user.
 
 ## Key Pages
 
-- [Home](https://frontguard.dev) — Product overview, features, getting started
-- [Documentation](https://docs.frontguard.dev) — Full API reference, guides, configuration
+- [Home](https://frontguard.dev) — Product overview, install paths, comparison vs Percy / Chromatic / Argos
+- [Pricing](https://frontguard.dev/pricing) — Free CLI ($0, MIT), Pro ($29/mo), Team/Enterprise; compare-plans matrix and the 8-question FAQ
+- [Comparisons](https://frontguard.dev/comparisons) — Capability-by-capability vs Percy, Chromatic, BackstopJS, Lost Pixel, Argos, with sources
+- [Changelog](https://frontguard.dev/changelog) — Notable releases, newest first (Keep a Changelog)
+- [Brand](https://frontguard.dev/brand) — The amber shield mark, lockups, color tokens, typography, voice
+- [Docs](https://frontguard.dev/docs) — New-brand docs surface: install, CLI, configuration, AI analysis, CI/CD, self-hosting
+- [Documentation (deep)](https://docs.frontguard.dev) — Full API reference, guides, configuration
 - [GitHub](https://github.com/ravidsrk/frontguard) — Source code, issues, contributing
-- [npm](https://www.npmjs.com/package/frontguard) — Package installation
+- [npm: @frontguard/cli](https://www.npmjs.com/package/@frontguard/cli) — CLI package
+- [npm: @frontguard/playwright](https://www.npmjs.com/package/@frontguard/playwright) — Playwright plugin
+- [Validation results](https://github.com/ravidsrk/frontguard/blob/main/validation/results-v0.2.md) — Real-repo AI accuracy harness
 
 ## What Frontguard Does
 
-- Zero-config route discovery — automatically finds all routes in Next.js, Remix, Astro, Vite, and SvelteKit projects
-- Multi-viewport screenshot capture — renders pages at desktop (1280px), tablet (768px), and mobile (375px)
-- Pixel-level diffing — compares screenshots against baselines to detect visual changes
-- AI-powered analysis — explains regressions in plain English with root cause and suggested fixes
-- CI/CD integration — runs as a Playwright test in any CI pipeline (GitHub Actions, GitLab CI, etc.)
+- Anti-flake consensus — three captures per route, majority wins; SSIM perceptual matching as fallback
+- AI classification — diff goes to GPT-4o or Claude Sonnet with DOM + axe-core findings inline; returns category + confidence + cause
+- Sandbox-verified fixes — every AI patch is applied in a local Playwright sandbox (or Daytona snapshot), re-rendered, and only shipped if the diff clears
+- Plugin architecture — six lifecycle hooks; built-ins for accessibility (axe-core), Figma compare, perf budgets, monitor, third-party-script drift
+- CI-native — composite GitHub Action, PR comment with baseline / current / diff thumbnails; GitLab CI, CircleCI, Jenkins via the same CLI
+- Self-hostable — Cloudflare Workers + D1 + R2, or docker-compose on your laptop with miniflare + SQLite + local-disk adapters
+
+## Install
+
+```
+npm install @frontguard/cli
+npx frontguard init
+npx frontguard run --url http://localhost:3000
+```
+
+Playwright plugin:
+
+```
+npm install -D @frontguard/cli @frontguard/playwright
+```
+
+GitHub Action:
+
+```
+- uses: ravidsrk/frontguard@v1
+  with:
+    url: ${{ steps.preview.outputs.url }}
+  env:
+    FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+```
 
 ## Author
 
-Ravindra Kumar — https://github.com/ravidsrk
+Ravindra Kumar — https://github.com/ravidsrk · https://x.com/ravidsrk
 
 ## License
 
-MIT — Free and open source
+MIT

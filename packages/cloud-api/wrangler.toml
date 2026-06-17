@@ -3,6 +3,17 @@ main = "src/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Production routes — bind the worker to api.frontguard.dev.
+#
+# Prerequisite: the `frontguard.dev` zone must be on the same Cloudflare
+# account as the worker for this route to attach on `wrangler deploy`.
+# If the zone is not yet on Cloudflare, comment this block out and create
+# the route in the Cloudflare dashboard after the DNS migration. The DNS
+# setup checklist lives in the PR body that introduced this route.
+[[routes]]
+pattern = "api.frontguard.dev/*"
+zone_name = "frontguard.dev"
+
 # D1 — persistent storage (Task 5.2)
 # Create with: wrangler d1 create frontguard
 # Then paste the returned database_id below.
@@ -29,6 +40,14 @@ PUBLIC_BASE_URL = "https://api.frontguard.dev"
 #   GITHUB_CLIENT_ID
 #   GITHUB_CLIENT_SECRET
 #   DAYTONA_API_KEY
+#   DASHBOARD_SESSION_SECRET  (REQUIRED in production — signs the `fg_session`
+#                              dashboard cookie. Must be a high-entropy value of
+#                              at least 32 chars, e.g.
+#                              `openssl rand -base64 32`. Set it with
+#                              `wrangler secret put DASHBOARD_SESSION_SECRET`.
+#                              If unset, every /dashboard route fails closed with
+#                              HTTP 503 — see sec-1, cloud-4. NEVER reuse the
+#                              dev fallback constant from src/auth/session.ts.)
 #   RESEND_API_KEY     (email alerts, Task 6.2)
 #   ALERT_FROM_EMAIL   (email alerts, Task 6.2)
 #   STRIPE_SECRET_KEY      (billing, Task 8.2)

@@ -1,198 +1,149 @@
 @import "tailwindcss";
 
+/*
+  Frontguard design system — terminal-native, mono-forward, single amber accent.
+  Tokens are the authoritative port of docs/design-extract.md (Color / Typography /
+  Spacing / Radius / Motion). Sharp corners everywhere (radius 0), 1px hairlines,
+  warm near-black canvas, warm-grey ink, four CLI-borrowed status colors.
+*/
 @theme {
-  /* Frontguard brand palette — dark, technical, trustworthy */
-  --color-bg: #06080c;
-  --color-bg-elevated: #0c1018;
-  --color-bg-card: #111827;
-  --color-bg-card-hover: #1a2332;
-  --color-border: #1e293b;
-  --color-border-bright: #334155;
+  /* ---- Warm neutrals (canvas & ink) ---- */
+  --color-canvas: #0d0c0b;        /* page background */
+  --color-panel: #131210;         /* cards, code blocks, raised surfaces */
+  --color-raised: #1f1c19;        /* raised button/input fill, ghost hover */
+  --color-border: #322d28;        /* strong 1px border (inputs, key cards) */
+  --color-border-card: #2a2622;   /* default card border (most cards) */
+  --color-border-faint: #211e1b;  /* hairline dividers, grid-gap fill */
+  --color-border-hover: #54493f;  /* hover border (cards, buttons, faq, vs) */
+  --color-ink-mid: #b8b0a6;       /* body text */
+  --color-ink-hi: #f5f1ea;        /* headings, primary/hover text */
 
-  /* Accent — electric cyan/teal. NOT purple gradient slop. */
-  --color-accent: #22d3ee;
-  --color-accent-dim: #0891b2;
-  --color-accent-glow: rgba(34, 211, 238, 0.15);
+  /* ---- Extended neutral ramp (surfaces + text shades) ---- */
+  --color-surface-alt: #100f0e;   /* darker section band (problem / CTA) */
+  --color-surface-term: #121110;  /* terminal panel background */
+  --color-surface-strip: #161412; /* input/header strip, table header, row hover */
+  --color-ink-faint: #564f48;     /* faint mono label, terminal dots, idle nav border */
+  --color-ink-dim: #6b645c;       /* faint footer/secondary text */
+  --color-ink-muted: #7c746b;     /* muted label / "$" prompt */
+  --color-ink-soft: #8c847a;      /* secondary body, competitor cells */
+  --color-ink-soft2: #9b958c;     /* secondary text on light */
+  --color-ink-bright: #c8c0b6;    /* slightly brighter body */
+  --color-ink-bright2: #d8d0c5;   /* bright body (list items, table caps) */
+  --color-ink-term: #e6e0d6;      /* terminal command text */
 
-  /* Warm accent for CTAs — stands out against cool palette */
-  --color-cta: #f97316;
-  --color-cta-hover: #fb923c;
+  /* ---- Brand accent (amber) ---- */
+  --color-amber: #e8862e;         /* the one brand color; oklch(0.72 0.18 50) */
+  --color-amber-hover: #f59b45;   /* primary button hover */
+  --color-amber-tint: #1a130b;    /* amber-tinted panel (badges, callouts) */
+  --color-amber-tint2: #15110c;   /* Pro pricing card fill */
+  --color-amber-brd: #3a2a18;     /* amber-tinted border */
 
-  /* Danger / regression red */
-  --color-danger: #ef4444;
-  --color-danger-dim: rgba(239, 68, 68, 0.15);
+  /* ---- Status palette (the terminal language) ---- */
+  --color-pass: #4fb477;          /* ✓ */
+  --color-warning: #e8862e;       /* ⚠ (= amber) */
+  --color-regression: #e5484d;    /* ✘ */
+  --color-new: #5b8def;           /* ★ / blue accent */
+  --color-pass-brd: #24472f;
+  --color-pass-bg: #0e1410;
+  --color-regression-brd: #4a2424;
+  --color-regression-bg: #170f0e;
 
-  /* Success green */
-  --color-success: #22c55e;
-  --color-success-dim: rgba(34, 197, 94, 0.15);
+  /* ---- Code-syntax palette (<pre> blocks) ---- */
+  --color-code-keyword: #c678dd;
+  --color-code-string: #98c379;
+  --color-code-added: #4fb477;
+  --color-code-blue: #5b8def;
+  --color-code-number: #e8862e;
+  --color-code-comment: #564f48;
+  --color-code-default: #b8b0a6;
 
-  /* Text */
-  --color-text: #f1f5f9;
-  --color-text-secondary: #cbd5e1; /* legible secondary headlines on dark bg */
-  --color-text-muted: #94a3b8;
-  --color-text-dim: #768BA2;
+  /* ---- Type ---- */
+  --font-sans: 'Space Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 
-  /* Fonts — distinctive, not generic */
-  --font-display: "Outfit", system-ui, sans-serif;
-  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  /* ---- Radius: zero everywhere (only terminal dots use rounded-full) ---- */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+
+  /* ---- Motion ---- */
+  --animate-blink: fg-blink 1.1s step-end infinite;
+  --animate-pulse-dot: fg-pulse 2s ease-in-out infinite;
+  --animate-scan: fg-scan 4s linear infinite;
+
+  @keyframes fg-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  @keyframes fg-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+  @keyframes fg-scan {
+    from { transform: translateY(0); }
+    to { transform: translateY(340px); }
+  }
 }
 
-/* Base */
+/* ---- Base ---- */
 html {
   color-scheme: dark;
   scroll-behavior: smooth;
-  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-body);
+  background: var(--color-canvas);
+  color: var(--color-ink-mid);
+  font-family: var(--font-sans);
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
-  overflow-x: hidden;
 }
 
-/* Grain overlay for texture */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 0.03;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+/* Headings recolor to ink-hi by default */
+h1, h2, h3, h4 {
+  color: var(--color-ink-hi);
 }
 
-/* Scrollbar */
+/* ---- Custom scrollbar (9px, thumb #2a2622) ---- */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 9px;
+  height: 9px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-bg);
+  background: var(--color-canvas);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 3px;
+  background: var(--color-border-card);
 }
 
-/* Selection */
+/* ---- Selection ---- */
 ::selection {
-  background: var(--color-accent);
-  color: var(--color-bg);
+  background: var(--color-amber);
+  color: var(--color-canvas);
 }
 
-/* Focus visible */
+/* ---- Focus ring (amber) ---- */
 *:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-amber);
   outline-offset: 2px;
 }
 
-/* Scroll animations */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes fadeInLeft {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes fadeInRight {
-  from { opacity: 0; transform: translateX(20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes fadeInFromRight {
-  from { opacity: 0; transform: translateX(40px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-.animate-fade-up {
-  animation: fadeUp 0.5s ease-out forwards;
-  opacity: 0;
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
-  opacity: 0;
-}
-
-.animate-fade-in-left {
-  animation: fadeInLeft 0.6s ease-out forwards;
-  opacity: 0;
-}
-
-.animate-fade-in-right {
-  animation: fadeInRight 0.5s ease-out forwards;
-  opacity: 0;
-}
-
-.animate-fade-in-from-right {
-  animation: fadeInFromRight 0.7s ease-out forwards;
-  opacity: 0;
-}
-
-/* Comparison table — highlight Frontguard column on row hover */
-.comparison-row:hover td:nth-child(2) {
-background-color: rgba(34, 211, 238, 0.06);
-}
-.comparison-row {
-transition: background-color 0.15s ease;
-}
-.comparison-row:hover {
-background-color: rgba(34, 211, 238, 0.03);
-}
-
-/* Animated gradient border for "Most Popular" pricing card */
-@keyframes gradient-rotate {
-0% { background-position: 0% 50%; }
-50% { background-position: 100% 50%; }
-100% { background-position: 0% 50%; }
-}
-
-.pricing-popular {
-position: relative;
-border: none !important;
-}
-
-.pricing-popular::before {
-content: "";
-position: absolute;
-inset: 0;
-border-radius: 0.75rem;
-padding: 1px;
-background: linear-gradient(
-135deg,
-var(--color-accent),
-var(--color-cta),
-var(--color-accent),
-var(--color-cta)
-);
-background-size: 300% 300%;
-animation: gradient-rotate 4s ease infinite;
--webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
--webkit-mask-composite: xor;
-mask-composite: exclude;
-pointer-events: none;
-}
-
-/* Reduced motion */
+/*
+  Reduced motion (a11y floor): neutralize all animations including the brand
+  keyframes fg-blink / fg-pulse / fg-scan, and disable smooth scroll.
+*/
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
   html {
     scroll-behavior: auto;

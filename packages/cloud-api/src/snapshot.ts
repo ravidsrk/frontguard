@@ -22,7 +22,7 @@ export async function createFrontguardSnapshot(): Promise<string> {
   // Build a custom image with Playwright baked in
   const image = Image.base('node:20-bookworm')
     .runCommands(
-      'npm install -g frontguard@latest',
+      'npm install -g @frontguard/cli@latest',
       'npx playwright install --with-deps chromium',
       'mkdir -p /home/daytona/output',
     );

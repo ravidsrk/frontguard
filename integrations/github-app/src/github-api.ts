@@ -333,28 +333,66 @@ export async function getRepoConfig(
 }
 
 /** Default `frontguard.config.ts` planted by the bootstrap PR. */
-export const DEFAULT_CONFIG_TS = `import { defineConfig } from '@frontguard/core';
+export const DEFAULT_CONFIG_TS = `import { defineConfig } from '@frontguard/cli';
 
 /**
  * Frontguard configuration.
  * Docs: https://frontguard.dev/docs/config
  */
 export default defineConfig({
-  // Pages / routes to capture for visual regression.
-  pages: ['/'],
-  // Viewports to test.
-  viewports: [
-    { width: 1280, height: 800, label: 'desktop' },
-    { width: 375, height: 667, label: 'mobile' },
-  ],
-  // Fail the check when pixel diff exceeds this ratio (0–1).
+  // Base URL of the deployed preview that Frontguard will visit.
+  // The GitHub App rewrites this at run time using the PR's preview deployment
+  // (Vercel, Netlify, Cloudflare Pages …); keep it as a sensible local default.
+  baseUrl: 'http://localhost:3000',
+  // Routes / paths to capture for visual regression.
+  routes: ['/'],
+  // Viewport widths (px) to capture at. Height is determined by page content.
+  viewports: [375, 768, 1440],
+  // Fail the check when the pixel-diff fraction exceeds this value (0-1).
   threshold: 0.01,
 });
 `;
 
 /**
- * Bootstraps a default `frontguard.config.ts` via a pull request when the repo
- * has no Frontguard config yet.
+ * Major version of the published GitHub Action that the bootstrap workflow
+ * pins to. Using a tagged ref (e.g. `@v1`) instead of `@main` means new repos
+ * don't break when the action's main branch changes (P1-11). Bump this when
+ * we cut a v2 of the action.
+ */
+export const ACTION_REF = 'ravidsrk/frontguard@v1';
+
+/**
+ * Default `.github/workflows/frontguard.yml` planted alongside the config.
+ *
+ * Pins to the tagged action ref rather than `@main` so a green install today
+ * stays green next week. The workflow auto-detects Vercel and Netlify preview
+ * URLs via the composite action; users can still drive runs through the
+ * hosted GitHub App + Cloud API path, in which case this file is harmless and
+ * can be deleted.
+ */
+export const DEFAULT_WORKFLOW_YML = `# Frontguard visual regression workflow.
+# Pinned to a tagged release of the action so this file keeps working as the
+# action evolves. Bump to a new major (e.g. \`@v2\`) when prompted.
+name: Frontguard
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Frontguard
+        uses: ${ACTION_REF}
+        with:
+          # The action auto-detects Vercel and Netlify preview URLs;
+          # set \`url\` explicitly if your platform isn't auto-detected.
+          config: ./frontguard.config.ts
+`;
+
+/**
+ * Bootstraps a default `frontguard.config.ts` (and matching workflow) via a
+ * pull request when the repo has no Frontguard config yet.
  *
  * Returns the opened PR, or `null` when a config already exists (skipped).
  */
@@ -381,6 +419,27 @@ export async function bootstrapConfigPr(
     undefined,
     fetchImpl,
   );
+  // The workflow file is best-effort: if a repo already pins a different
+  // CI tool or restricts workflow writes, we still want the config PR to
+  // succeed. Per-file failures are swallowed.
+  try {
+    await createOrUpdateFile(
+      token,
+      repo.owner,
+      repo.name,
+      '.github/workflows/frontguard.yml',
+      DEFAULT_WORKFLOW_YML,
+      'chore: add Frontguard workflow',
+      branch,
+      undefined,
+      fetchImpl,
+    );
+  } catch (err) {
+    console.warn(
+      `[github-app] Could not plant workflow file in ${repo.owner}/${repo.name}: ` +
+        (err instanceof Error ? err.message : String(err)),
+    );
+  }
   return createPullRequest(
     token,
     repo.owner,
@@ -390,9 +449,11 @@ export async function bootstrapConfigPr(
       head: branch,
       base: repo.default_branch,
       body:
-        'This PR adds a default `frontguard.config.ts` so Frontguard can run ' +
-        'visual regression checks on your pull requests.\n\n' +
-        'Tweak the `pages`, `viewports`, and `threshold` to fit your app, then merge. ✅',
+        'This PR adds a default `frontguard.config.ts` and a matching workflow so ' +
+        'Frontguard can run visual regression checks on your pull requests.\n\n' +
+        'The workflow pins to a tagged release of the action ' +
+        `(\`${ACTION_REF}\`) so it stays stable as the action evolves.\n\n` +
+        'Tweak the `routes`, `viewports`, and `threshold` to fit your app, then merge. ✅',
     },
     fetchImpl,
   );

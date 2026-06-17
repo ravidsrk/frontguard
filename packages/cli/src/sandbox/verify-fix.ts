@@ -78,11 +78,31 @@ export async function verifyFix(
     return { fixApplied: false, diffPercentage: 100, verified: false, error: 'No baseline image to verify against.' };
   }
 
-  const sandbox = opts.sandboxImpl ?? createSandbox(opts.sandbox ?? 'local');
+  const requestedKind = opts.sandbox ?? 'local';
+  let sandbox = opts.sandboxImpl ?? createSandbox(requestedKind);
   const url = new URL(diff.route.path, opts.baseUrl).href;
 
   try {
-    await sandbox.create();
+    try {
+      await sandbox.create();
+    } catch (createErr) {
+      // Daytona is the only sandbox that can fail at create-time for a
+      // *configuration* reason (missing DAYTONA_API_KEY or SDK). Surface a
+      // clear warning and fall back to the local sandbox so a missing cloud
+      // credential never silently drops fix verification.
+      const msg = createErr instanceof Error ? createErr.message : String(createErr);
+      const isDaytonaConfig =
+        requestedKind === 'daytona' &&
+        !opts.sandboxImpl &&
+        (msg.includes('DAYTONA_API_KEY') || msg.includes('@daytonaio/sdk'));
+      if (!isDaytonaConfig) throw createErr;
+      logger.warn(
+        `Daytona fix verification unconfigured (${msg}). Falling back to local sandbox.`,
+      );
+      await sandbox.destroy().catch(() => {});
+      sandbox = createSandbox('local');
+      await sandbox.create();
+    }
     await sandbox.applyPatch({ type: fix.fixType, content: fix.patch });
 
     const afterBuffer = await sandbox.screenshot({

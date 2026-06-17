@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect width="32" height="32" fill="#0d0c0b"/>
+  <defs>
+    <clipPath id="shield">
+      <path d="M6 5 H26 V17.7 L16 26 L6 17.7 Z"/>
+    </clipPath>
+  </defs>
+  <path d="M6 5 H26 V17.7 L16 26 L6 17.7 Z" fill="#e8862e"/>
+  <rect x="14.9" y="5" width="2.2" height="21" fill="#0d0c0b" clip-path="url(#shield)"/>
+</svg>

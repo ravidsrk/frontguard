@@ -55,7 +55,7 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 | Pricing @ 5K shots/mo | Free → paid as usage grows | Free (CLI) |
 | Pricing @ 50K shots/mo | Paid (per-snapshot, scales with volume) | Free (CLI) + your AI usage |
 | False-positive approach | Manual review + TurboSnap scoping | AI classifies regression vs intentional vs content |
-| AI capabilities | ❌ None | 🟢 Vision analysis + suggested fixes (BYOK) |
+| AI capabilities | 🔴 None — deterministic pixel/perceptual diff | 🟢 LLM classification (regression / intentional / content) + suggested fixes (BYOK) |
 | Storybook required | 🟢 Designed for it | ❌ Optional (tests any route) |
 | Review dashboard | 🟢 Mature, PR-integrated | 🔴 Not yet (CLI/report only) |
 | License | Proprietary (SaaS) | MIT, self-hostable |
@@ -92,7 +92,7 @@ Chromatic's **TurboSnap** detects which stories a commit affects and skips the r
 Chromatic relies on human review (with good tooling) to dismiss noise. Frontguard adds an **AI classification layer** + **anti-flake multi-render consensus** to suppress flaky/intentional changes automatically before they reach a human.
 
 ### AI analysis
-Chromatic has no AI explanation feature. Frontguard sends baseline + current images to OpenAI/Anthropic (BYOK) and returns a classification, severity, explanation, and optional suggested fix. See [AI Analysis](/docs/guides/ai-analysis).
+Chromatic uses a deterministic pixel + perceptual diff and intentionally avoids LLM-driven classification — predictable, fast, no per-snapshot token cost. Frontguard sends baseline + current images to OpenAI/Anthropic (BYOK) only on pages that actually diffed, and returns a classification, severity, explanation, and optional suggested fix. See [AI Analysis](/docs/guides/ai-analysis).
 
 ### Review & approval
 Chromatic clearly wins today: branch-aware baselines, PR checks, multi-reviewer dashboard. Frontguard's review is CLI/report-based (`frontguard approve`); a hosted dashboard is **on the roadmap, not shipped**.
@@ -117,7 +117,7 @@ Chromatic clearly wins today: branch-aware baselines, PR checks, multi-reviewer 
 1. **Install Frontguard.**
    ```bash
    npm install -D @frontguard/cli
-   npx frontguard init
+   npx -p @frontguard/cli frontguard init
    ```
 2. **Decide your scope.** Keep testing Storybook stories *and/or* add real page routes.
    <Tabs items={['Test real pages', 'Test Storybook stories']}>
@@ -154,8 +154,8 @@ Chromatic clearly wins today: branch-aware baselines, PR checks, multi-reviewer 
 5. **For interaction/play-function flows**, use the [Playwright plugin](/docs/playwright/setup).
 6. **Capture baselines and run.**
    ```bash
-   npx frontguard baseline
-   npx frontguard run
+   npx -p @frontguard/cli frontguard baseline
+   npx -p @frontguard/cli frontguard run
    ```
 7. **Update CI** — replace the `chromatic` command with `frontguard run`. Remove `CHROMATIC_PROJECT_TOKEN`.
 

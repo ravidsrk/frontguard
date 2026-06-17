@@ -1,0 +1,283 @@
+{
+  "name": "chakra-ui-docs",
+  "repo": "chakra-ui/chakra-ui-docs",
+  "category": "component library docs",
+  "baseUrl": "http://localhost:3000",
+  "timestamp": "2026-06-17T15:37:36Z",
+  "aiEnabled": false,
+  "baselineRuns": [
+    { "route": "/", "url": "http://localhost:3000/", "result": {"url":"http://localhost:3000/","note":"no JSON emitted (likely --update-baselines run)"} },
+    { "route": "/docs/components/button", "url": "http://localhost:3000/docs/components/button", "result": {"url":"http://localhost:3000/docs/components/button","note":"no JSON emitted (likely --update-baselines run)"} },
+    { "route": "/docs/components/modal", "url": "http://localhost:3000/docs/components/modal", "result": {"url":"http://localhost:3000/docs/components/modal","note":"no JSON emitted (likely --update-baselines run)"} },
+    { "route": "/getting-started", "url": "http://localhost:3000/getting-started", "result": {"url":"http://localhost:3000/getting-started","note":"no JSON emitted (likely --update-baselines run)"} }
+  ]
+  ,
+  "recheckRuns": [
+    { "route": "/", "url": "http://localhost:3000/", "result": {"url":"http://localhost:3000/","error":"frontguard run failed"} },
+    { "route": "/docs/components/button", "url": "http://localhost:3000/docs/components/button", "result": {"url":"http://localhost:3000/docs/components/button","error":"frontguard run failed"} },
+    { "route": "/docs/components/modal", "url": "http://localhost:3000/docs/components/modal", "result": {"url":"http://localhost:3000/docs/components/modal","error":"frontguard run failed"} },
+    { "route": "/getting-started", "url": "http://localhost:3000/getting-started", "result": {
+  "summary": {
+    "total": 21,
+    "passed": 21,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 0,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 1,
+    "render": 16477,
+    "compare": 4181,
+    "ai": 0,
+    "total": 20687
+  },
+  "diffs": [
+    {
+      "route": "/404",
+      "label": "/404",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/404",
+      "label": "/404",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/404",
+      "label": "/404",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/blog",
+      "label": "/blog",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/blog",
+      "label": "/blog",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/blog",
+      "label": "/blog",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/showcase",
+      "label": "/community/showcase",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/showcase",
+      "label": "/community/showcase",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/showcase",
+      "label": "/community/showcase",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/team",
+      "label": "/community/team",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/team",
+      "label": "/community/team",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/community/team",
+      "label": "/community/team",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/resources",
+      "label": "/resources",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/resources",
+      "label": "/resources",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/resources",
+      "label": "/resources",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/search",
+      "label": "/search",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/search",
+      "label": "/search",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/search",
+      "label": "/search",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": false,
+      "hasDiffImage": false
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000/getting-started",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} }
+  ]
+}

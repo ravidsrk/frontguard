@@ -1,0 +1,332 @@
+---
+title: GitHub App
+description: One-click visual regression checks on every pull request, with no CI config to write.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# GitHub App
+
+The Frontguard GitHub App turns every pull request into a visual-regression
+check run. Install it, pick the repos you want covered, and Frontguard takes
+care of the rest — no workflow file to write, no API keys to wire into CI,
+no preview-URL detection to plumb through.
+
+This page covers:
+
+- [Installing the app](#install) and choosing which repos it can see.
+- The [bootstrap PR](#bootstrap-pr) the app opens on first install.
+- How [preview URL detection](#preview-url-detection) works for
+  Vercel, Netlify, and Cloudflare Pages.
+- [Configuring the baseline branch](#baseline-branch) and per-PR overrides.
+- [Troubleshooting](#troubleshooting) common install and run failures.
+
+<Callout type="info">
+  **Hosted vs self-hosted.** The marketplace install runs on Frontguard's
+  hosted worker — runs and screenshots live in the Frontguard Cloud. For
+  air-gapped or on-prem GHE setups, [self-host](#self-hosting) the worker
+  alongside your own Cloud API deployment.
+</Callout>
+
+## Install
+
+The hosted app is published to the GitHub Marketplace:
+
+  → [github.com/marketplace/frontguard](https://github.com/marketplace/frontguard)
+
+Click **Install**, pick the account (personal or organisation), then choose
+the repositories to grant access to. You can pick **All repositories** or
+**Select repositories** — switching later is supported via the GitHub UI.
+
+After install, the app:
+
+1. Lists every repo it now has access to.
+2. For each repo, checks whether a `frontguard.config.ts` or
+   `.github/frontguard.yml` already exists on the default branch.
+3. For repos that don't have one, opens a [bootstrap PR](#bootstrap-pr).
+
+### Choose repositories
+
+Use **Select repositories** when:
+
+- The org has dozens of repos and only a handful need visual checks.
+- You're rolling out gradually and want to avoid drowning teammates in
+  bootstrap PRs all at once.
+- Some repos are private mirrors that should not contact the Cloud API.
+
+Adding a repo later (via the org's **Configure** page) fires the
+`installation_repositories` webhook — the app bootstraps it the same way
+it would on first install.
+
+### Permissions and scopes
+
+The app asks for the smallest set of permissions that lets it post a check
+run + open the bootstrap PR + pick up preview URLs:
+
+| Permission       | Scope  | Why                                                       |
+| ---------------- | ------ | --------------------------------------------------------- |
+| `pull_requests`  | write  | Read PR metadata; required for write on certain edge cases (rebases).  |
+| `checks`         | write  | Create + update the visual-regression Check Run on each PR. |
+| `contents`       | write  | Read `frontguard.config.*` from the head ref; open the bootstrap PR. |
+| `metadata`       | read   | Standard on every GitHub App.                              |
+| `statuses`       | read   | Subscribe to Vercel's `commit_status` deliveries.          |
+| `deployments`    | read   | Subscribe to Netlify and Cloudflare Pages `deployment_status` events. |
+
+Widening these later forces existing installs to re-consent, so we keep the
+list lean. If you spot a permission you don't recognise on the consent
+screen, double-check the app's published manifest at
+[github.com/ravidsrk/frontguard/blob/main/integrations/github-app/manifest.yml](https://github.com/ravidsrk/frontguard/blob/main/integrations/github-app/manifest.yml).
+
+## Bootstrap PR
+
+For each repo that has no Frontguard config yet, the app opens a single PR
+on a branch named `frontguard/bootstrap-config`. The PR contains two files:
+
+```ts title="frontguard.config.ts"
+import { defineConfig } from '@frontguard/cli';
+
+export default defineConfig({
+  baseUrl: 'http://localhost:3000',
+  routes: ['/'],
+  viewports: [375, 768, 1440],
+  threshold: 0.01,
+});
+```
+
+```yaml title=".github/workflows/frontguard.yml"
+name: Frontguard
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ravidsrk/frontguard@v1
+        with:
+          config: ./frontguard.config.ts
+```
+
+A few things worth flagging:
+
+- The config uses **`@frontguard/cli`**, not the never-published
+  `@frontguard/core`. Earlier preview builds had this typo'd — bootstrap PRs
+  opened by an old worker will fail to install. Re-running the install
+  re-opens a fresh PR with the correct import.
+- The workflow pins to **`ravidsrk/frontguard@v1`**, not `@main`. New repos
+  no longer break the day the action's `main` branch ships an incompatible
+  change. Bump the tag yourself when you're ready to pick up a new major.
+- The workflow is optional. If you only want the hosted GitHub App path,
+  delete `.github/workflows/frontguard.yml` after merging — the app keeps
+  posting check runs either way.
+
+### Already have a config?
+
+If the default branch already contains `frontguard.config.ts` (or
+`.github/frontguard.yml`) the bootstrap is skipped — the app reports
+`bootstrapped: true, opened: [], skipped: ['acme/web']` in its webhook
+response so you can verify from the GitHub App's deliveries page.
+
+## Preview URL detection
+
+This is the headline fix for the original (P0-8) bug: earlier the GitHub
+App handed `pull_request.html_url` — i.e. the PR page on github.com — to
+the Cloud API as the test target. Running visual regression against that
+URL just screenshots the GitHub UI; you'd get baselines of issue comments
+and merge buttons, not your app.
+
+The current detection chain, in priority order:
+
+1. **Provider-observed URL** — picked up from a `commit_status` or
+   `deployment_status` event seen earlier on the same head commit.
+2. **`FRONTGUARD_PREVIEW_URL_TEMPLATE`** — rendered with the PR's metadata.
+3. **No URL** — the run is skipped with a clear reason. We never fall
+   back to a github.com URL.
+
+### Vercel
+
+Vercel posts a `commit_status` to GitHub whenever a preview deployment
+finishes. The status looks like:
+
+```jsonc
+{
+  "state": "success",
+  "context": "Vercel",
+  "target_url": "https://my-app-abc123-acme.vercel.app",
+  "sha": "deadbeef…"
+}
+```
+
+The app subscribes to `status` events, recognises the Vercel context,
+and caches the URL keyed by `<owner>/<repo>@<sha>`. The next time a
+`pull_request` event arrives on the same SHA (e.g. a `synchronize`), the
+cached URL is used.
+
+### Netlify
+
+Netlify publishes a GitHub `deployment_status` event with the preview URL
+in either `target_url` (older) or `environment_url` (newer). The app
+classifies a status as Netlify when the URL host matches `*.netlify.app`
+or the `environment` string contains `netlify`. Production deployments
+(`environment: production`) are explicitly ignored.
+
+### Cloudflare Pages
+
+Cloudflare Pages publishes a similar `deployment_status` event with the
+URL in `environment_url`. The app recognises the `*.pages.dev` host (and
+explicit `cloudflare` environment strings) and treats those statuses the
+same way as Netlify.
+
+### Template fallback
+
+When you self-host previews on your own platform — internal preview
+infra, Render, Heroku review apps, Coolify — set
+`FRONTGUARD_PREVIEW_URL_TEMPLATE` on the worker:
+
+```toml title="wrangler.toml"
+[vars]
+FRONTGUARD_PREVIEW_URL_TEMPLATE = "https://pr-{prNumber}.preview.example.com"
+```
+
+Supported placeholders:
+
+| Token              | Substituted with                              |
+| ------------------ | --------------------------------------------- |
+| `{owner}`          | `acme`                                        |
+| `{repo}`           | `web`                                         |
+| `{prNumber}`       | `42`                                          |
+| `{commitSha}`      | Full head SHA, e.g. `deadbeef…`               |
+| `{commitShortSha}` | First 7 chars of the head SHA.                |
+| `{branch}`         | Source branch name (`pull_request.head.ref`). |
+
+Unknown placeholders are left in place so misconfigured templates fail
+loudly rather than fetching the wrong host.
+
+## Baseline branch
+
+Frontguard compares each PR head against a baseline. By default this is
+the repo's default branch (`main` / `master`), refreshed when the PR is
+merged. To target a different baseline branch, override it in the config:
+
+```ts title="frontguard.config.ts"
+import { defineConfig } from '@frontguard/cli';
+
+export default defineConfig({
+  baseUrl: 'http://localhost:3000',
+  routes: ['/', '/pricing', '/dashboard'],
+  viewports: [375, 768, 1440],
+  threshold: 0.01,
+});
+```
+
+### Per-PR overrides
+
+You can override config per PR by putting a `.github/frontguard.yml` on
+the head ref of the PR — the app reads it via the Contents API at run
+time. This is useful when the PR itself changes which routes should be
+captured.
+
+## Self-hosting
+
+The hosted app is a Cloudflare Worker built from
+[`integrations/github-app`](https://github.com/ravidsrk/frontguard/tree/main/integrations/github-app).
+The worker is deliberately stateless beyond an in-memory preview-URL
+cache — every secret it needs comes from the environment.
+
+```bash
+cd integrations/github-app
+npm install
+wrangler deploy
+```
+
+You'll need to:
+
+1. Create a GitHub App from the [manifest](https://github.com/ravidsrk/frontguard/blob/main/integrations/github-app/manifest.yml).
+   Set `hook_attributes.url` to your worker's public URL.
+2. Generate a private key, copy the App id, and store both as
+   `wrangler secret put GITHUB_APP_ID` /
+   `wrangler secret put GITHUB_APP_PRIVATE_KEY`.
+3. Set `wrangler secret put GITHUB_WEBHOOK_SECRET` to the value GitHub
+   shows on the App settings page.
+4. Set `FRONTGUARD_API_URL`, `FRONTGUARD_API_KEY`, and
+   `FRONTGUARD_CALLBACK_SECRET` to point at your Cloud API deployment.
+
+See the integration's [README](https://github.com/ravidsrk/frontguard/blob/main/integrations/github-app/README.md)
+for the full variable matrix.
+
+## Troubleshooting
+
+### "Webhook secret not configured" (HTTP 500)
+
+The worker rejects every webhook delivery if `GITHUB_WEBHOOK_SECRET` is
+unset — fail-closed protects you from forged events. Set the secret:
+
+```bash
+wrangler secret put GITHUB_WEBHOOK_SECRET
+```
+
+…then re-deliver the failed event from the App's **Advanced → Recent
+Deliveries** page.
+
+### "Invalid signature" (HTTP 401)
+
+GitHub's HMAC didn't match the worker's. Two common causes:
+
+1. The webhook secret in the App settings doesn't match
+   `GITHUB_WEBHOOK_SECRET` on the worker. Regenerate one or the other and
+   re-deliver.
+2. A reverse proxy in front of the worker is rewriting the request body
+   before the worker sees it. The HMAC is computed over the raw body — any
+   compression/transcoding will break the signature.
+
+### Check run stays "in progress" forever
+
+The worker creates the check run synchronously but the Cloud API closes it
+out asynchronously via `POST /runs/:checkRunId/complete`. If the check
+never closes:
+
+- The Cloud API hasn't received the run yet → check
+  `FRONTGUARD_API_URL` and `FRONTGUARD_API_KEY` on the worker.
+- The Cloud API can't reach the worker callback → confirm the worker's
+  public route is reachable from the Cloud API, and that
+  `FRONTGUARD_CALLBACK_SECRET` matches on both sides.
+
+### `triggered: false, reason: "No preview URL available yet"`
+
+The PR event fired before any deployment event was observed for the head
+commit. Wait for the deployment to finish — Vercel/Netlify will post a
+`commit_status` / `deployment_status` and a subsequent `synchronize` event
+will pick up the cached URL. For platforms that don't post deployment
+events, set `FRONTGUARD_PREVIEW_URL_TEMPLATE`.
+
+### Bootstrap PR not opened
+
+The app opens at most one bootstrap PR per repo per install. Once the PR
+is open (merged, closed, or open) re-running the install does not open a
+second one — that's intentional, so users don't get duplicate PRs from
+toggling repo access. To re-bootstrap, delete the
+`frontguard/bootstrap-config` branch and re-trigger the
+`installation_repositories` event from the App's deliveries page.
+
+### Tagged action vs `@main`
+
+If you cloned an older version of the bootstrap workflow that uses
+`uses: ravidsrk/frontguard@main`, switch to the tagged form:
+
+```diff
+- uses: ravidsrk/frontguard@main
++ uses: ravidsrk/frontguard@v1
+```
+
+Pinning to a tag means new repos don't break when the action's main
+branch ships a breaking change.
+
+## See also
+
+- [GitHub Actions reference](/docs/ci-cd/github-actions) — the underlying
+  composite action the bootstrap workflow uses.
+- [Configuration reference](/docs/cli) — every option `defineConfig`
+  accepts.
+- [Self-hosting the Cloud API](/docs/guides) — required if you want
+  end-to-end private hosting alongside this app.

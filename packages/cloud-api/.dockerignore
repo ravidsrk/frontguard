@@ -1,0 +1,54 @@
+# Build artefacts
+dist
+build
+out
+.next
+.turbo
+
+# Dependencies — installed fresh inside the container
+node_modules
+**/node_modules
+
+# Wrangler local state (would clobber the persistent /data volume)
+.wrangler
+.dev.vars
+
+# Logs & runtime droppings
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+
+# IDE / OS noise
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Tests & coverage (not needed in the runtime image)
+coverage
+.nyc_output
+test
+tests
+__tests__
+
+# Git
+.git
+.gitignore
+.github
+
+# Docs / fixtures that aren't needed in the image
+README.md
+CHANGELOG.md
+docs
+
+# Env files — never bake secrets into the image
+.env
+.env.*
+!.env.example
+
+# Misc
+*.tsbuildinfo
+.eslintcache
