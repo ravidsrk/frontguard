@@ -1,0 +1,176 @@
+# Repo-root composite-action shim.
+#
+# GitHub resolves `uses: <owner>/<repo>@<ref>` against an `action.yml` at the
+# repository ROOT — it does NOT honour a sub-path `action.yml` by default. The
+# canonical manifest lives at `packages/cli/action.yml`; this root shim mirrors
+# it byte-for-byte (same inputs, outputs, and steps) so that
+# `uses: ravidsrk/frontguard@v0` resolves end-to-end.
+#
+# Why the steps are duplicated rather than delegated via `uses: ./packages/cli`:
+# a local-path `uses:` inside a composite action is resolved against the
+# CONSUMER's checkout, which will not contain `packages/cli`. Re-implementing
+# the steps here is the only form that works for an external consumer pinning
+# `ravidsrk/frontguard@v0`.
+#
+# Keep this file in sync with `packages/cli/action.yml`. The
+# `.github/workflows/action-smoke.yml` workflow exercises both on every PR so
+# behavioural drift surfaces immediately.
+#
+# Sub-path consumers (`uses: ravidsrk/frontguard/packages/cli@v0.2.0`) continue
+# to resolve against `packages/cli/action.yml` — that file is intentionally
+# preserved.
+name: 'Frontguard Visual Regression'
+description: 'AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.'
+author: 'ravidsrk'
+branding:
+  icon: 'eye'
+  color: 'blue'
+
+inputs:
+  url:
+    description: 'Base URL to test. Auto-detects Vercel/Netlify preview URLs if not set.'
+    required: false
+  routes:
+    description: 'Comma-separated routes to test (optional — auto-discovers if not set)'
+    required: false
+  viewports:
+    description: 'Comma-separated viewport widths (default: 375,768,1440)'
+    required: false
+    default: '375,768,1440'
+  browsers:
+    description: 'Comma-separated browsers: chromium,firefox,webkit (default: chromium)'
+    required: false
+    default: 'chromium'
+  threshold:
+    description: 'Pixel diff threshold percentage (default: 0.1)'
+    required: false
+    default: '0.1'
+  config:
+    description: 'Path to frontguard.config.ts'
+    required: false
+  ai-provider:
+    description: 'AI provider: openai or anthropic'
+    required: false
+  ai-model:
+    description: 'AI model name (e.g., gpt-4o, claude-3-5-sonnet-20241022)'
+    required: false
+  update-baselines:
+    description: 'Accept current screenshots as new baselines'
+    required: false
+    default: 'false'
+  github-token:
+    description: 'GitHub token for PR comments (defaults to github.token)'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  result:
+    description: 'JSON result of the visual regression test run'
+  regressions:
+    description: 'Number of regressions found'
+  status:
+    description: 'pass, fail, or error'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Frontguard
+      shell: bash
+      run: npm install -g frontguard@latest
+
+    - name: Install Playwright browsers
+      shell: bash
+      run: npx playwright install --with-deps ${{ inputs.browsers }}
+
+    - name: Detect Preview URL
+      id: preview-url
+      shell: bash
+      run: |
+        # Auto-detect preview URL from CI environment
+        if [ -n "${{ inputs.url }}" ]; then
+          echo "url=${{ inputs.url }}" >> $GITHUB_OUTPUT
+          echo "Preview URL: ${{ inputs.url }} (from input)"
+        elif [ -n "$VERCEL_URL" ]; then
+          echo "url=https://$VERCEL_URL" >> $GITHUB_OUTPUT
+          echo "Preview URL: https://$VERCEL_URL (Vercel)"
+        elif [ -n "$VERCEL_PREVIEW_URL" ]; then
+          echo "url=$VERCEL_PREVIEW_URL" >> $GITHUB_OUTPUT
+          echo "Preview URL: $VERCEL_PREVIEW_URL (Vercel)"
+        elif [ -n "$DEPLOY_PRIME_URL" ]; then
+          echo "url=$DEPLOY_PRIME_URL" >> $GITHUB_OUTPUT
+          echo "Preview URL: $DEPLOY_PRIME_URL (Netlify)"
+        elif [ -n "$DEPLOY_URL" ]; then
+          echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "Preview URL: $DEPLOY_URL (Netlify)"
+        elif [ -n "$CF_PAGES_URL" ]; then
+          echo "url=$CF_PAGES_URL" >> $GITHUB_OUTPUT
+          echo "Preview URL: $CF_PAGES_URL (Cloudflare Pages)"
+        elif [ -n "$RAILWAY_STATIC_URL" ]; then
+          echo "url=https://$RAILWAY_STATIC_URL" >> $GITHUB_OUTPUT
+          echo "Preview URL: https://$RAILWAY_STATIC_URL (Railway)"
+        elif [ -n "$RENDER_EXTERNAL_URL" ]; then
+          echo "url=$RENDER_EXTERNAL_URL" >> $GITHUB_OUTPUT
+          echo "Preview URL: $RENDER_EXTERNAL_URL (Render)"
+        else
+          echo "url=" >> $GITHUB_OUTPUT
+          echo "⚠️ No preview URL detected. Set the 'url' input or ensure your deployment sets environment variables."
+        fi
+
+    - name: Run Frontguard
+      id: frontguard
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        FRONTGUARD_OPENAI_KEY: ${{ env.FRONTGUARD_OPENAI_KEY }}
+        FRONTGUARD_ANTHROPIC_KEY: ${{ env.FRONTGUARD_ANTHROPIC_KEY }}
+      run: |
+        ARGS=""
+
+        if [ -n "${{ steps.preview-url.outputs.url }}" ]; then
+          ARGS="$ARGS --url ${{ steps.preview-url.outputs.url }}"
+        fi
+
+        if [ -n "${{ inputs.routes }}" ]; then
+          ARGS="$ARGS --routes ${{ inputs.routes }}"
+        fi
+
+        ARGS="$ARGS --viewports ${{ inputs.viewports }}"
+        ARGS="$ARGS --browsers ${{ inputs.browsers }}"
+        ARGS="$ARGS --threshold ${{ inputs.threshold }}"
+
+        if [ -n "${{ inputs.config }}" ]; then
+          ARGS="$ARGS --config ${{ inputs.config }}"
+        fi
+
+        if [ "${{ inputs.update-baselines }}" = "true" ]; then
+          ARGS="$ARGS --update-baselines"
+        fi
+
+        # Run and capture output
+        frontguard run $ARGS --output json > /tmp/frontguard-result.json 2>&1 || true
+
+        # Parse results
+        REGRESSIONS=$(cat /tmp/frontguard-result.json | jq -r '.summary.regressions // 0')
+
+        echo "result=$(cat /tmp/frontguard-result.json)" >> $GITHUB_OUTPUT
+        echo "regressions=$REGRESSIONS" >> $GITHUB_OUTPUT
+
+        if [ "$REGRESSIONS" -gt 0 ]; then
+          echo "status=fail" >> $GITHUB_OUTPUT
+          exit 1
+        else
+          echo "status=pass" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontguard-report
+        path: frontguard-report/
+        if-no-files-found: ignore
