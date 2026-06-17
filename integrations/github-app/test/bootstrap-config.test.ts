@@ -11,11 +11,41 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { DEFAULT_CONFIG_TS, DEFAULT_WORKFLOW_YML, ACTION_REF } from '../src/github-api.js';
+
+/** Repo-root `action.yml` (the shim that makes `uses: <owner>/<repo>@<ref>` resolve). */
+const ROOT_ACTION_YML = fileURLToPath(new URL('../../../action.yml', import.meta.url));
+/** Canonical sub-path manifest the root shim mirrors. */
+const CLI_ACTION_YML = fileURLToPath(new URL('../../../packages/cli/action.yml', import.meta.url));
+
+/**
+ * Extracts the top-level keys under an action.yml's `inputs:` block without a
+ * YAML parser — the github-app package declares none, and we don't want a
+ * phantom dependency in a regression guard. Relies only on the well-formed
+ * two-space indentation both action.yml files use (input names at two spaces,
+ * their properties at four).
+ */
+function actionInputKeys(yml: string): string[] {
+  const keys: string[] = [];
+  let inInputs = false;
+  for (const line of yml.split('\n')) {
+    if (/^inputs:\s*$/.test(line)) {
+      inInputs = true;
+      continue;
+    }
+    if (!inInputs) continue;
+    // A non-indented, non-blank line ends the block (e.g. `outputs:` / `runs:`).
+    if (/^\S/.test(line)) break;
+    const m = line.match(/^ {2}([A-Za-z][\w-]*):/);
+    if (m) keys.push(m[1]);
+  }
+  return keys.sort();
+}
 
 /** Minimal `.d.ts` for `@frontguard/cli` matching the real public surface. */
 const CLI_DTS = `
@@ -112,9 +142,32 @@ describe('DEFAULT_CONFIG_TS', () => {
 
 describe('DEFAULT_WORKFLOW_YML', () => {
   it('pins to the tagged action ref (not @main)', () => {
-    expect(ACTION_REF).toBe('ravidsrk/frontguard@v1');
+    expect(ACTION_REF).toBe('ravidsrk/frontguard@v0');
     expect(DEFAULT_WORKFLOW_YML).toContain(`uses: ${ACTION_REF}`);
     expect(DEFAULT_WORKFLOW_YML).not.toContain('@main');
+  });
+
+  it('pins the bootstrap workflow to a major tag that resolves to a repo-root action.yml', () => {
+    // Regression guard for int-3: the bootstrap workflow used to pin `@v1`
+    // (no such tag) against a repo with no repo-root action.yml, so every
+    // fresh install got a Day-1 red CI run.
+
+    // 1. The ref must be a bare major tag (`@v0`, `@v1`, …) — never `@main`,
+    //    never a non-existent `@v1`, never a sub-path/SHA form.
+    expect(ACTION_REF).toMatch(/^ravidsrk\/frontguard@v\d+$/);
+
+    // 2. A repo-root action.yml must exist for the ref to resolve at all —
+    //    GitHub does not honour the sub-path packages/cli/action.yml here.
+    expect(existsSync(ROOT_ACTION_YML)).toBe(true);
+    expect(existsSync(CLI_ACTION_YML)).toBe(true);
+
+    // 3. The root shim must expose the same inputs as the canonical manifest,
+    //    so a user pinning the major tag gets identical behaviour to the
+    //    sub-path form.
+    const rootInputs = actionInputKeys(readFileSync(ROOT_ACTION_YML, 'utf8'));
+    const cliInputs = actionInputKeys(readFileSync(CLI_ACTION_YML, 'utf8'));
+    expect(rootInputs.length).toBeGreaterThan(0);
+    expect(rootInputs).toEqual(cliInputs);
   });
 
   it('triggers on the PR actions we care about', () => {

@@ -56,6 +56,19 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
 
+  docs-links:
+    # Guards the docs against regressing the action ref (docs-5) or
+    # re-introducing a dead marketplace link (docs-6). The checker is a
+    # dependency-free Node script, so no `npm ci` / docs build is needed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check docs action refs + marketplace links
+        run: node apps/docs/scripts/check-doc-links.mjs
+
   build:
     runs-on: ubuntu-latest
     steps:

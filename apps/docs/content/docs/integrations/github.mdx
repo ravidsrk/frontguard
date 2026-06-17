@@ -30,13 +30,17 @@ This page covers:
 
 ## Install
 
-The hosted app is published to the GitHub Marketplace:
+<Callout type="warn">
+  The GitHub Marketplace listing is **in review**. To use the GitHub App
+  today, self-host it from
+  [`integrations/github-app/`](https://github.com/ravidsrk/frontguard/tree/main/integrations/github-app)
+  — see the [self-hosting guide](#self-hosting) below.
+</Callout>
 
-  → [github.com/marketplace/frontguard](https://github.com/marketplace/frontguard)
-
-Click **Install**, pick the account (personal or organisation), then choose
-the repositories to grant access to. You can pick **All repositories** or
-**Select repositories** — switching later is supported via the GitHub UI.
+Once the listing is live, installing is one-click from the GitHub Marketplace:
+pick the account (personal or organisation), then choose the repositories to
+grant access to. You can pick **All repositories** or **Select repositories**
+— switching later is supported via the GitHub UI.
 
 After install, the app:
 
@@ -103,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ravidsrk/frontguard@v1
+      - uses: ravidsrk/frontguard@v0
         with:
           config: ./frontguard.config.ts
 ```
@@ -114,7 +118,7 @@ A few things worth flagging:
   `@frontguard/core`. Earlier preview builds had this typo'd — bootstrap PRs
   opened by an old worker will fail to install. Re-running the install
   re-opens a fresh PR with the correct import.
-- The workflow pins to **`ravidsrk/frontguard@v1`**, not `@main`. New repos
+- The workflow pins to **`ravidsrk/frontguard@v0`**, not `@main`. New repos
   no longer break the day the action's `main` branch ships an incompatible
   change. Bump the tag yourself when you're ready to pick up a new major.
 - The workflow is optional. If you only want the hosted GitHub App path,
@@ -311,12 +315,12 @@ toggling repo access. To re-bootstrap, delete the
 
 ### Tagged action vs `@main`
 
-If you cloned an older version of the bootstrap workflow that uses
-`uses: ravidsrk/frontguard@main`, switch to the tagged form:
+If you cloned an older bootstrap workflow that pinned the action to the
+`@main` branch, switch to the tagged form:
 
 ```diff
 - uses: ravidsrk/frontguard@main
-+ uses: ravidsrk/frontguard@v1
++ uses: ravidsrk/frontguard@v0
 ```
 
 Pinning to a tag means new repos don't break when the action's main
