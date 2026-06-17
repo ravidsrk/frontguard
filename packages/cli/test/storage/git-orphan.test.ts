@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { sanitizeRoutePath, GitOrphanStorage } from '../../src/storage/git-orphan.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  sanitizeRoutePath,
+  GitOrphanStorage,
+  gitSpawnErrorMessage,
+} from '../../src/storage/git-orphan.js';
 
 describe('sanitizeRoutePath', () => {
   it('strips leading slash from normal routes', () => {
@@ -94,4 +102,86 @@ describe('GitOrphanStorage', () => {
     };
     await expect(storage.writeManifest(manifest)).rejects.toThrow('not initialized');
   });
+});
+
+/**
+ * Regression coverage for install-2: a git spawn whose output overflows the
+ * buffer must NOT surface the cryptic `spawnSync git ENOBUFS`, and the per-spawn
+ * buffer must be large enough that reading/writing real baselines never hits the
+ * 1 MiB Node default in the first place.
+ */
+describe('gitSpawnErrorMessage (install-2)', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'fg-git-err-'));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('maps an ENOBUFS failure to a friendly node_modules error (not the raw ENOBUFS)', () => {
+    // Simulate the worktree path resolving to a dir that contains node_modules.
+    mkdirSync(join(dir, 'node_modules'), { recursive: true });
+    const err = Object.assign(new Error('spawnSync git ENOBUFS'), { code: 'ENOBUFS' });
+
+    const msg = gitSpawnErrorMessage('rm', err, dir);
+
+    expect(msg).toContain('node_modules');
+    expect(msg).toContain('.gitignore');
+    // The cryptic raw form must be gone.
+    expect(msg).not.toBe('git rm failed: spawnSync git ENOBUFS');
+  });
+
+  it('detects ENOBUFS by message text even when code is absent', () => {
+    const err = new Error('some wrapper: spawnSync git ENOBUFS');
+    const msg = gitSpawnErrorMessage('checkout', err, dir); // no node_modules in dir
+    expect(msg).toMatch(/large tracked directory|node_modules/);
+    expect(msg).not.toContain('failed: some wrapper');
+  });
+
+  it('passes non-ENOBUFS errors through with the original message', () => {
+    const err = new Error('fatal: not a git repository');
+    const msg = gitSpawnErrorMessage('status', err, dir);
+    expect(msg).toBe('git status failed: fatal: not a git repository');
+  });
+});
+
+describe('GitOrphanStorage maxBuffer (install-2)', () => {
+  let repoDir: string;
+
+  function git(...args: string[]): void {
+    execFileSync('git', args, { cwd: repoDir, stdio: 'pipe' });
+  }
+
+  beforeEach(() => {
+    repoDir = mkdtempSync(join(tmpdir(), 'fg-orphan-repo-'));
+    git('init', '--quiet');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+    git('config', 'commit.gpgsign', 'false');
+    writeFileSync(join(repoDir, 'README.md'), '# fixture\n');
+    git('add', '-A');
+    git('commit', '--quiet', '-m', 'initial');
+  });
+
+  afterEach(() => {
+    rmSync(repoDir, { recursive: true, force: true });
+  });
+
+  it('round-trips a baseline larger than the 1 MiB default buffer without ENOBUFS', async () => {
+    const storage = new GitOrphanStorage(repoDir);
+    await storage.init();
+
+    // 2 MiB payload — reading this back via `git show` would throw ENOBUFS
+    // under Node's 1 MiB execFileSync default; the raised maxBuffer fixes it.
+    const big = Buffer.alloc(2 * 1024 * 1024, 7);
+    await storage.writeBaseline('/big', 1440, 'chromium', big);
+
+    const read = await storage.readBaseline('/big', 1440, 'chromium');
+    expect(read).not.toBeNull();
+    expect(read!.length).toBeGreaterThan(1024 * 1024);
+    expect(read!.equals(big)).toBe(true);
+  }, 30_000);
 });
