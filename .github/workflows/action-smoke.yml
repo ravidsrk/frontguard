@@ -1,0 +1,57 @@
+# This smoke workflow uses 'uses: ./' rather than 'uses: ravidsrk/frontguard@v0' because v0 is an OPS-managed lightweight tag that only resolves on the public marketplace after merge. Locally-pathed uses verifies the action.yml resolves end-to-end.
+#
+# It is the standing regression guard for int-3: a repo-root action.yml must
+# exist and resolve so 'uses: ravidsrk/frontguard@<ref>' works, and the historic
+# sub-path consumer ('uses: ravidsrk/frontguard/packages/cli@<ref>') must keep
+# working too.
+#
+# NOTE on `continue-on-error`: the composite action's "Install Frontguard" step
+# runs `npm install -g frontguard@latest`. The `frontguard` npm shim is owned by
+# a separate remediation (docs-1) and is not published yet — until it is, that
+# step 404s. The `test -f` guard below is the DETERMINISTIC int-3 check
+# (independent of npm); the `uses: ./` invocation is a best-effort end-to-end
+# exercise marked continue-on-error so the docs-1 gap doesn't turn this workflow
+# red. Drop `continue-on-error` once the `frontguard` package is published.
+name: Action smoke
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-root-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert repo-root action.yml exists (int-3 regression guard)
+        run: test -f ./action.yml
+
+      - name: Run repo-root composite action
+        # Equivalent to what `ravidsrk/frontguard@v0` resolves to once OPS tags
+        # v0. Proves GitHub resolves the repo-root action.yml and begins running
+        # its steps. See the continue-on-error note at the top of this file.
+        continue-on-error: true
+        uses: ./
+        with:
+          url: https://example.com
+          update-baselines: 'true'
+
+  smoke-subpath-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert sub-path action.yml exists
+        run: test -f ./packages/cli/action.yml
+
+      - name: Run sub-path composite action
+        # Verifies the historical 'ravidsrk/frontguard/packages/cli@<ref>'
+        # consumer pattern still resolves. See the continue-on-error note above.
+        continue-on-error: true
+        uses: ./packages/cli
+        with:
+          url: https://example.com
+          update-baselines: 'true'
