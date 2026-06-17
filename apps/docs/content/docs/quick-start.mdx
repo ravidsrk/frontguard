@@ -18,7 +18,7 @@ Get visual regression testing running in under 5 minutes.
 Run `frontguard init` in your project root. It auto-detects your framework (Next.js, Remix, SvelteKit, Nuxt, Astro) and generates a config file:
 
 ```bash
-npx frontguard init
+npx -p @frontguard/cli frontguard init
 ```
 
 This creates `frontguard.config.ts`:
@@ -63,7 +63,7 @@ Make sure your app is accessible at the `baseUrl` defined in your config.
 Your first run captures baseline screenshots — the "known good" state of your application:
 
 ```bash
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
 Since there are no existing baselines, all pages are marked as **NEW** and saved automatically.
@@ -92,7 +92,7 @@ Since there are no existing baselines, all pages are marked as **NEW** and saved
 Now make a CSS or layout change in your code, then run Frontguard again:
 
 ```bash
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
 Frontguard compares the new screenshots against your baselines and reports differences:
@@ -121,7 +121,7 @@ Frontguard compares the new screenshots against your baselines and reports diffe
 When changes are intentional, accept the new screenshots as baselines:
 
 ```bash
-npx frontguard update-baselines
+npx -p @frontguard/cli frontguard update-baselines
 ```
 
 This replaces old baselines with the current screenshots. Future runs compare against this new state.

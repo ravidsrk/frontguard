@@ -26,16 +26,16 @@ AI explains what changed and why → Suggests fixes → Posts PR comment
 
 ```bash
 # Initialize config (auto-detects your framework; --ci adds a GitHub Action)
-npx frontguard init --ci
+npx -p @frontguard/cli frontguard init --ci
 
 # Verify your environment (Node, Playwright, browsers, git, config)
-npx frontguard doctor
+npx -p @frontguard/cli frontguard doctor
 
 # Run visual regression tests
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 
 # Accept current screenshots as new baselines
-npx frontguard update-baselines
+npx -p @frontguard/cli frontguard update-baselines
 ```
 
 ## Commands
