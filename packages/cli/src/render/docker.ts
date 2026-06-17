@@ -117,6 +117,36 @@ export class DockerNotInstalledError extends Error {
 }
 
 /**
+ * Error thrown when the render image is neither in the local Docker cache nor
+ * pullable from any registry. Until `frontguard/render` is published to Docker
+ * Hub (tracked as an OPS action — see docs/ops-actions.md), the only way to use
+ * `--docker` is to build the image locally; this error tells the user exactly
+ * how, instead of letting them hit a cryptic `pull access denied` from the
+ * docker daemon. Sibling of {@link DockerNotInstalledError} so the CLI's
+ * top-level handler can print a one-line, actionable message — not a stack
+ * trace.
+ */
+export class DockerImageUnavailableError extends Error {
+  /** The image tag that could not be resolved locally or in any registry. */
+  readonly image: string;
+
+  constructor(image: string, message?: string) {
+    super(
+      message ??
+        `--docker: image "${image}" is not available locally and cannot be pulled from any registry.\n\n` +
+          'This image is not yet published to Docker Hub for this release. To use --docker today,\n' +
+          'build the image locally:\n\n' +
+          `    docker build --platform linux/amd64 -t ${image} packages/cli/docker\n\n` +
+          'Or point the CLI at a pre-built image you control via the FRONTGUARD_DOCKER_IMAGE env var.\n\n' +
+          'See packages/cli/docker/Dockerfile and apps/docs/content/docs/cross-os-rendering.mdx\n' +
+          'for the full build recipe and the planned registry tags.',
+    );
+    this.name = 'DockerImageUnavailableError';
+    this.image = image;
+  }
+}
+
+/**
  * Strips the `--docker` flag (and only `--docker`) from an argv list so the
  * container does not recursively re-spawn itself.
  *
@@ -133,6 +163,7 @@ export function stripDockerFlag(argv: readonly string[]): string[] {
  *
  * Shape:
  *   docker run --rm
+ *     --platform <platform>                            (linux/amd64 by default)
  *     -v <workspaceDir>:/workspace
  *     -w /workspace
  *     [--add-host=host.docker.internal:host-gateway]   (Linux only — best-effort)
@@ -151,6 +182,18 @@ export function buildDockerArgs(opts: {
   const { argv, workspaceDir, image, env, tty } = opts;
 
   const args: string[] = ['run', '--rm'];
+
+  // Pin the container architecture. The render image's whole purpose is
+  // byte-equivalent baselines across a mixed fleet (arm64 dev laptops +
+  // amd64 CI runners). Chromium's rasterizer emits different sub-pixel
+  // anti-aliasing per architecture, so we force a single platform — by
+  // default linux/amd64 — so the same machine code rasterizes everywhere.
+  // This MUST come before the image positional or docker silently ignores
+  // it. `FRONTGUARD_DOCKER_PLATFORM` is an escape hatch for users who
+  // genuinely want a different (e.g. arm64-native) build; the default stays
+  // linux/amd64 to preserve byte-equivalence.
+  const platform = env.FRONTGUARD_DOCKER_PLATFORM || 'linux/amd64';
+  args.push('--platform', platform);
 
   if (tty) {
     args.push('-it');
@@ -186,6 +229,23 @@ export function buildDockerArgs(opts: {
 }
 
 /**
+ * Runs a docker subcommand purely for its exit status (stdout/stderr ignored)
+ * and resolves to `true` on exit 0, `false` on any non-zero exit or spawn
+ * failure. Used by the preflight checks below.
+ */
+async function dockerCommandSucceeds(
+  runner: DockerRunner,
+  args: string[],
+): Promise<boolean> {
+  try {
+    const code = await runner('docker', args, { stdio: 'ignore' });
+    return code === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Verifies that the `docker` binary is on PATH and responsive.
  *
  * Implementation: spawn `docker --version` and resolve to true on exit 0.
@@ -193,12 +253,37 @@ export function buildDockerArgs(opts: {
  * shells don't ship `which`.
  */
 async function dockerIsAvailable(runner: DockerRunner): Promise<boolean> {
-  try {
-    const code = await runner('docker', ['--version'], { stdio: 'ignore' });
-    return code === 0;
-  } catch {
-    return false;
+  return dockerCommandSucceeds(runner, ['--version']);
+}
+
+/**
+ * Determines whether the render image can actually be run, and where it would
+ * come from, without triggering a blocking pull:
+ *
+ *   - `local`    — `docker image inspect <image>` exits 0 (image already in the
+ *                  local daemon cache).
+ *   - `registry` — image not cached locally, but `docker manifest inspect
+ *                  <image>` exits 0 (the tag exists in a registry and is
+ *                  pullable).
+ *   - `missing`  — both checks fail. The caller surfaces a
+ *                  {@link DockerImageUnavailableError} with build instructions
+ *                  instead of letting `docker run` hit a cryptic
+ *                  `pull access denied`.
+ *
+ * Routed through the {@link DockerRunner} abstraction so tests can mock both
+ * calls without spawning real docker.
+ */
+export async function imageIsAvailableLocallyOrInRegistry(
+  runner: DockerRunner,
+  image: string,
+): Promise<{ available: boolean; source: 'local' | 'registry' | 'missing' }> {
+  if (await dockerCommandSucceeds(runner, ['image', 'inspect', image])) {
+    return { available: true, source: 'local' };
   }
+  if (await dockerCommandSucceeds(runner, ['manifest', 'inspect', image])) {
+    return { available: true, source: 'registry' };
+  }
+  return { available: false, source: 'missing' };
 }
 
 /**
@@ -250,6 +335,16 @@ export async function runDocker(opts: RunDockerOptions): Promise<number> {
     const available = await dockerIsAvailable(runner);
     if (!available) {
       throw new DockerNotInstalledError();
+    }
+
+    // The image is not published to a registry for this release, so a naive
+    // `docker run` would emit `pull access denied`. Preflight the image and,
+    // if it's neither cached locally nor pullable, throw an actionable error
+    // pointing at the local-build recipe (see DockerImageUnavailableError).
+    const { available: imageAvailable } =
+      await imageIsAvailableLocallyOrInRegistry(runner, image);
+    if (!imageAvailable) {
+      throw new DockerImageUnavailableError(image);
     }
   }
 

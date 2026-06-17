@@ -11,7 +11,9 @@ import {
   buildDockerArgs,
   stripDockerFlag,
   runDocker,
+  imageIsAvailableLocallyOrInRegistry,
   DockerNotInstalledError,
+  DockerImageUnavailableError,
   DEFAULT_IMAGE,
   FORWARDED_ENV_VARS,
   type DockerRunner,
@@ -131,24 +133,71 @@ describe('buildDockerArgs', () => {
     expect(FORWARDED_ENV_VARS).toContain('FRONTGUARD_ANTHROPIC_KEY');
     expect(FORWARDED_ENV_VARS).toContain('FRONTGUARD_GEMINI_KEY');
   });
+
+  it('pins --platform linux/amd64 by default', () => {
+    const args = buildDockerArgs(baseOpts);
+    const i = args.indexOf('--platform');
+    expect(i).toBeGreaterThan(-1);
+    // The flag value must immediately follow the flag.
+    expect(args[i + 1]).toBe('linux/amd64');
+    // ...and the whole --platform pair must precede the image positional, or
+    // docker silently ignores the platform request.
+    expect(i).toBeLessThan(args.indexOf(baseOpts.image));
+  });
+
+  it('honors FRONTGUARD_DOCKER_PLATFORM env override', () => {
+    const args = buildDockerArgs({
+      ...baseOpts,
+      env: { FRONTGUARD_DOCKER_PLATFORM: 'linux/arm64' },
+    });
+    const i = args.indexOf('--platform');
+    expect(i).toBeGreaterThan(-1);
+    expect(args[i + 1]).toBe('linux/arm64');
+  });
+
+  it('places --platform before the image positional', () => {
+    // Guard against a future refactor moving the image push above --platform.
+    const args = buildDockerArgs(baseOpts);
+    expect(args.indexOf('--platform')).toBeLessThan(
+      args.indexOf(baseOpts.image),
+    );
+  });
 });
 
 describe('runDocker', () => {
   /**
-   * Build a mock runner that captures every invocation. The test then asserts
-   * the second invocation (the actual `docker run`) matches the expected shape.
-   * The first invocation is the preflight `docker --version` (unless
-   * skipPreflight is true).
+   * Build a mock runner that captures every invocation. With the default
+   * (all-zero) exits, the runner reports docker installed, the image present
+   * locally, and a successful run — so the call sequence is:
+   *   [ docker --version, docker image inspect <image>, docker run … ]
+   * `manifest inspect` only fires when `imageInspectExit` is non-zero. Tests
+   * locate the real run call via {@link runCallOf} rather than a fixed index,
+   * so the preflight calls don't make the assertions brittle.
    */
-  function makeRunner(opts: { versionExit?: number; runExit?: number } = {}) {
+  function makeRunner(
+    opts: {
+      versionExit?: number;
+      imageInspectExit?: number;
+      manifestInspectExit?: number;
+      runExit?: number;
+    } = {},
+  ) {
     const calls: Array<{ command: string; args: string[] }> = [];
     const runner: DockerRunner = async (command, args) => {
       calls.push({ command, args });
       if (args[0] === '--version') return opts.versionExit ?? 0;
+      if (args[0] === 'image' && args[1] === 'inspect')
+        return opts.imageInspectExit ?? 0;
+      if (args[0] === 'manifest' && args[1] === 'inspect')
+        return opts.manifestInspectExit ?? 0;
       return opts.runExit ?? 0;
     };
     return { runner, calls };
   }
+
+  /** The `docker run …` invocation, regardless of how many preflights ran. */
+  const runCallOf = (calls: Array<{ command: string; args: string[] }>) =>
+    calls.find((c) => c.args[0] === 'run');
 
   it('runs `docker --version` as a preflight check', async () => {
     const { runner, calls } = makeRunner();
@@ -171,14 +220,16 @@ describe('runDocker', () => {
       env: {},
       runner,
     });
-    // calls[0] is the preflight; calls[1] is the real run.
-    const runCall = calls[1];
-    expect(runCall.command).toBe('docker');
-    expect(runCall.args[0]).toBe('run');
-    expect(runCall.args).toContain('--rm');
-    expect(runCall.args).toContain('frontguard/render:test');
+    // calls[0] is the --version preflight, then the image preflight; the real
+    // run is located by command rather than a fixed index.
+    const runCall = runCallOf(calls);
+    expect(runCall).toBeDefined();
+    expect(runCall!.command).toBe('docker');
+    expect(runCall!.args[0]).toBe('run');
+    expect(runCall!.args).toContain('--rm');
+    expect(runCall!.args).toContain('frontguard/render:test');
     // User's url should make it to the container argv.
-    expect(runCall.args).toContain('http://host.docker.internal:3000');
+    expect(runCall!.args).toContain('http://host.docker.internal:3000');
   });
 
   it('returns the exit code from the docker run', async () => {
@@ -201,7 +252,7 @@ describe('runDocker', () => {
       env: { FRONTGUARD_DOCKER_IMAGE: 'my.registry/frontguard:v9.9.9' },
       runner,
     });
-    expect(calls[1].args).toContain('my.registry/frontguard:v9.9.9');
+    expect(runCallOf(calls)!.args).toContain('my.registry/frontguard:v9.9.9');
   });
 
   it('falls back to DEFAULT_IMAGE when nothing is configured', async () => {
@@ -212,7 +263,7 @@ describe('runDocker', () => {
       env: {},
       runner,
     });
-    expect(calls[1].args).toContain(DEFAULT_IMAGE);
+    expect(runCallOf(calls)!.args).toContain(DEFAULT_IMAGE);
   });
 
   it('throws DockerNotInstalledError when preflight fails (non-zero exit)', async () => {
@@ -265,6 +316,107 @@ describe('runDocker', () => {
         runner,
       }),
     ).rejects.toThrow(/workspace directory does not exist/);
+  });
+
+  describe('runDocker preflight', () => {
+    it('throws DockerImageUnavailableError when both image inspect and manifest inspect fail', async () => {
+      // Simulates the v0.2.0 reality: the image is neither cached locally nor
+      // pullable from any registry (Docker Hub still 404s frontguard/render).
+      const { runner, calls } = makeRunner({
+        imageInspectExit: 1,
+        manifestInspectExit: 1,
+      });
+      let thrown: unknown;
+      try {
+        await runDocker({
+          argv: ['run'],
+          workspaceDir: process.cwd(),
+          image: 'frontguard/render:unpublished',
+          env: {},
+          runner,
+        });
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toBeInstanceOf(DockerImageUnavailableError);
+      const message = (thrown as Error).message;
+      // The actionable error must name the image AND the build command — not a
+      // cryptic `pull access denied`.
+      expect(message).toContain('frontguard/render:unpublished');
+      expect(message).toContain('docker build');
+      expect(message).toContain('packages/cli/docker');
+      // Both inspect strategies were tried before giving up; `docker run` never
+      // ran (no point pulling an image that does not exist).
+      expect(
+        calls.some((c) => c.args[0] === 'image' && c.args[1] === 'inspect'),
+      ).toBe(true);
+      expect(
+        calls.some((c) => c.args[0] === 'manifest' && c.args[1] === 'inspect'),
+      ).toBe(true);
+      expect(calls.some((c) => c.args[0] === 'run')).toBe(false);
+    });
+
+    it('proceeds when image is available locally', async () => {
+      const { runner, calls } = makeRunner({ imageInspectExit: 0 });
+      const code = await runDocker({
+        argv: ['run', '--url', 'http://host.docker.internal:3000'],
+        workspaceDir: process.cwd(),
+        image: 'frontguard/render:test',
+        env: {},
+        runner,
+      });
+      expect(code).toBe(0);
+      // A local hit short-circuits before the registry round-trip.
+      expect(calls.some((c) => c.args[0] === 'manifest')).toBe(false);
+      const runCall = runCallOf(calls);
+      expect(runCall).toBeDefined();
+      expect(runCall!.args[0]).toBe('run');
+      expect(runCall!.args).toContain('frontguard/render:test');
+    });
+
+    it('proceeds when image is available via manifest inspect', async () => {
+      // Not cached locally, but the registry has the tag (the post-publish
+      // world): image inspect fails, manifest inspect succeeds.
+      const { runner, calls } = makeRunner({
+        imageInspectExit: 1,
+        manifestInspectExit: 0,
+      });
+      const code = await runDocker({
+        argv: ['run'],
+        workspaceDir: process.cwd(),
+        image: 'frontguard/render:test',
+        env: {},
+        runner,
+      });
+      expect(code).toBe(0);
+      expect(
+        calls.some((c) => c.args[0] === 'image' && c.args[1] === 'inspect'),
+      ).toBe(true);
+      expect(
+        calls.some((c) => c.args[0] === 'manifest' && c.args[1] === 'inspect'),
+      ).toBe(true);
+      expect(calls.some((c) => c.args[0] === 'run')).toBe(true);
+    });
+
+    it('classifies image source via imageIsAvailableLocallyOrInRegistry', async () => {
+      const local = makeRunner({ imageInspectExit: 0 });
+      await expect(
+        imageIsAvailableLocallyOrInRegistry(local.runner, 'img'),
+      ).resolves.toEqual({ available: true, source: 'local' });
+
+      const registry = makeRunner({ imageInspectExit: 1, manifestInspectExit: 0 });
+      await expect(
+        imageIsAvailableLocallyOrInRegistry(registry.runner, 'img'),
+      ).resolves.toEqual({ available: true, source: 'registry' });
+
+      const missing = makeRunner({
+        imageInspectExit: 1,
+        manifestInspectExit: 1,
+      });
+      await expect(
+        imageIsAvailableLocallyOrInRegistry(missing.runner, 'img'),
+      ).resolves.toEqual({ available: false, source: 'missing' });
+    });
   });
 });
 
