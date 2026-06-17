@@ -23,14 +23,7 @@ import { getPlan, checkLimit } from './billing/plans.js';
 import { evaluateSpendCap } from './billing/spend-cap.js';
 import { runScheduledChecks } from './scheduler.js';
 import type { AlertEnv } from './alerts/index.js';
-import pkg from '../package.json';
-
-/**
- * Canonical product version reported by `/health`. Sourced from package.json
- * so it tracks every release automatically — previously this was hardcoded
- * to "0.1.0" and drifted from the canonical 0.2.x line (P2-3).
- */
-const PACKAGE_VERSION: string = (pkg as { version: string }).version;
+import { PACKAGE_VERSION } from './version.js';
 
 // ---------------------------------------------------------------------------
 // Types
