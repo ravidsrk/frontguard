@@ -192,7 +192,9 @@ Eyebrow "What's in the box". Heading: "Six features built for the problems pixel
 
 ### Comparison (`#comparison`)
 
-Eyebrow "Vs Percy / Chromatic / Argos". Heading: "How Frontguard stacks up." Sub cites `docs/research.md` for sources (link to GitHub blob). 11 rows × 4 vendors (Frontguard highlighted): Free tier, Paid entry tier, Snapshot overage, AI diff explanation, Sandbox-verified fixes, Self-host, Storybook integration, MCP server for in-IDE agents, PR comment with thumbnail triplet, Cross-OS render normalisation, Enterprise SSO/SAML. Desktop = sticky-header/sticky-first-column scrollable `<table>` with `<caption class="sr-only">`; mobile = stacked `<dl>` cards.
+Eyebrow "Vs Percy / Chromatic / Argos". Heading: "How Frontguard stacks up." Sub cites `docs/research.md` for sources (link to GitHub blob). The React `Comparison` component (`rows` array) renders 11 rows × 4 vendors (Frontguard highlighted): Free tier, Paid entry tier, Snapshot overage, AI diff explanation, Sandbox-verified fixes, Self-host, Storybook integration, MCP server for in-IDE agents, PR comment with thumbnail triplet, Cross-OS render normalisation, Enterprise SSO/SAML. Desktop = sticky-header/sticky-first-column scrollable `<table>` with `<caption class="sr-only">`; mobile = stacked `<dl>` cards.
+
+Row-count discrepancy with the static fallback: the `index.html` SEO-fallback comparison table is shorter — it has 9 `<tr>` data rows, not 11. It omits "PR comment with thumbnail triplet" and "Enterprise SSO/SAML", and labels two rows differently ("Paid entry" vs "Paid entry tier", "MCP server" vs "MCP server for in-IDE agents"). So crawlers/no-JS see 9 of the 11 comparison rows. This is a floor item to flag: the reskin should either keep both representations or consciously reconcile them, not silently inherit the shorter fallback.
 
 ### QuickStart (`#install`)
 
@@ -229,7 +231,7 @@ Eyebrow "FAQ". Heading: "Eight questions, eight straight answers." Eight `<detai
 7. Is there an MCP server for in-IDE agents?
 8. What's the data retention policy for screenshots? (answer links `docs/retention.md`)
 
-The eight FAQ entries are mirrored verbatim in the `index.html` FAQPage JSON-LD (see SEO section). Reskin must keep the two in sync.
+Relationship to the `index.html` FAQPage JSON-LD: the JSON-LD lists the same 8 questions in the same order, but it is not a verbatim copy. Question 8's wording differs — JSON-LD says "What is the data retention policy for screenshots?" while the React component says "What's the data retention policy for screenshots?". The JSON-LD answers are condensed paraphrases of the React answers: they drop the inline doc link (`docs/retention.md`), the `DELETE /v1/teams/:id/data` example, and several parentheticals (e.g. "your key, your account"; "Anthropic's"/"OpenAI's"; the a11y-fused-prompt note), and the install answer is reworded ("Run npm install … to install the engine, then …" vs "npm install … installs the engine. Run …"). Note: the source comment above that JSON-LD block claims the answers "mirror the React FAQ component verbatim" — that comment overstates it; the two are aligned in substance and topic order but not verbatim. The same condensed answers and the "What is" wording also appear in the static SEO-fallback `<section id="faq">`. Reskin should keep the question set and substance aligned across React, JSON-LD, and the fallback.
 
 ### Footer
 
@@ -315,9 +317,9 @@ Present-but-unreferenced assets (kept in repo; reskin can prune or repurpose, bu
 Structured data (two JSON-LD blocks):
 
 - `SoftwareApplication` — DeveloperApplication/Testing Tool; url, MIT license, npm downloadUrl, author (Ravindra Kumar / github.com/ravidsrk), codeRepository, and two `offers` (Free CLI $0, Pro $29). Comment explicitly notes: no fabricated review-rating block until real measured numbers exist.
-- `FAQPage` — 8 questions whose `acceptedAnswer.text` mirror the React FAQ component. Keep in sync on reskin.
+- `FAQPage` — the same 8 questions as the React FAQ, in the same order, but the `acceptedAnswer.text` values are condensed paraphrases (not verbatim) and question 8 reads "What is …" vs the React "What's …". The block's own source comment claims the answers "mirror the React FAQ component verbatim"; that overstates it (see the FAQ section above for the exact differences). Keep the question set and substance aligned on reskin.
 
-SEO fallback inside `#root`: a complete, self-styled static HTML mirror of every section (nav, hero, problem, how-it-works, features, comparison table, install code blocks, validation, pricing grid, FAQ, footer + sitemap). React overwrites it on mount. It uses inline `<style>` with the same palette. This is the crawler-visible content and the no-JS experience baseline. There is also a `<noscript>` block with a minimal links list.
+SEO fallback inside `#root`: a self-styled static HTML version of the page that includes every section (nav, hero, problem, how-it-works, features, comparison table, install code blocks, validation, pricing grid, FAQ, footer + sitemap). It mirrors the sections, but not always row-for-row or word-for-word: the comparison table carries 9 of the 11 React rows (see Comparison section), and the FAQ uses the condensed JSON-LD-style answers. React overwrites it on mount. It uses inline `<style>` with the same palette. This is the crawler-visible content and the no-JS experience baseline. There is also a `<noscript>` block with a minimal links list.
 
 Note: the SEO fallback's Validation section names the five validation repos by their upstream GitHub identity ("shadcn-ui taxonomy, shadcn-ui next-template, chakra-ui-docs, medusajs storefront, and shuding nextra") and says accuracy is gated on ">= 70% / FPR < 15%" with "no accuracy number ships until that run lands". The live React `Validation` component instead shows the measured pixel-only run (see below) and uses the friendly repo names. Both describe the same five repos; the fallback copy is the older "coming soon" framing. Reskin should reconcile the fallback to match the live component.
 
@@ -350,7 +352,7 @@ Structure and content:
 1. All eleven sections render, in order, with their real copy: Nav, Hero (+ inline demo), Problem, HowItWorks, Features, Comparison, QuickStart/Install, Validation, Pricing, FAQ, Footer.
 2. Section anchor IDs stay stable so existing links keep working: `#main-content`, `#demo`, `#problem`, `#how-it-works`, `#features`, `#comparison`, `#install`, `#validation`, `#pricing`, `#faq`.
 3. The Hero inline demo (GIF with terminal-mock fallback) and the `#demo` target remain.
-4. The static SEO fallback in `index.html` keeps mirroring every section for crawlers and no-JS, and the `<noscript>` block stays.
+4. The static SEO fallback in `index.html` keeps a static version of every section for crawlers and no-JS, and the `<noscript>` block stays. (It is not row-for-row identical to React today — the fallback comparison table has 9 of 11 rows and the FAQ uses condensed answers; preserve at least this coverage, and ideally reconcile the gaps.)
 
 Interactivity:
 
@@ -371,7 +373,7 @@ Accessibility:
 SEO/meta:
 
 15. `<head>` title/description/canonical/theme-color, Open Graph + Twitter cards (incl. `og-image.png` 1200×630), favicons/apple-touch-icon.
-16. Both JSON-LD blocks (`SoftwareApplication` offers, `FAQPage` mirroring the FAQ), kept truthful and in sync with on-page content.
+16. Both JSON-LD blocks (`SoftwareApplication` offers, `FAQPage` covering the same 8 FAQ questions), kept truthful and aligned in substance with on-page content (the FAQPage answers are condensed paraphrases today, not verbatim).
 17. `robots.txt`, `sitemap.xml`, `llms.txt`, `llms-full.txt`, `404.html` continue to be served.
 
 Data integrity:
@@ -390,3 +392,5 @@ Build/deploy:
 - Many `public/logo-*` variants (all `.webp`, plus `logo-64/128/192/logo.png`) are unreferenced; `logo-192` implies a PWA manifest that does not exist.
 - `fly.toml` is present but no workflow deploys via Fly; the live path is Cloudflare Pages.
 - The SEO-fallback Validation copy ("coming soon", gated thresholds) lags the live React Validation component (which shows the measured pixel-only run). Reconcile during the reskin.
+- The `index.html` SEO-fallback comparison table has 9 data rows vs the React component's 11 (missing "PR comment with thumbnail triplet" and "Enterprise SSO/SAML"); crawlers/no-JS see the shorter table.
+- The FAQPage JSON-LD answers are condensed paraphrases of the React FAQ, and question 8 differs in wording ("What is" vs "What's"), yet the JSON-LD's own source comment claims they "mirror the React FAQ component verbatim". Aligned in substance, not verbatim.
