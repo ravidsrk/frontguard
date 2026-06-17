@@ -499,7 +499,7 @@ app.post('/v1/baselines/:runId/approve', async (c) => {
     const project = await store.getProjectById(run.projectId);
     if (project) {
       const member = await store.getMember(project.teamId, userId);
-      if (member) hasAccess = true;
+      if (member && can(member.role, 'run_tests')) hasAccess = true;
     }
   }
   if (!hasAccess) return c.json({ error: 'Run not found' }, 404);
