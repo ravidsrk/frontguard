@@ -163,6 +163,14 @@ None of them require further code:
    `apps/docs/content/docs/distribution.mdx` and is emitted as a workflow
    summary by `release.yml`.
 
+4. **Rotate the dashboard session secret (sec-1, cloud-4).** The previously
+   public dev session-secret constant shipped in published npm source and must
+   be treated as **COMPROMISED** — rotation (set a fresh high-entropy
+   `DASHBOARD_SESSION_SECRET` via `wrangler secret put`, then redeploy to
+   invalidate any forged `fg_session` cookies) is an OPS action. The code-side
+   fail-closed — production now refuses to serve `/dashboard` (HTTP 503) unless
+   a real ≥32-char secret is configured — is shipped by this PR.
+
 ---
 
 ## Residual risks
