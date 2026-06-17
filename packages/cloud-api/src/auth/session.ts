@@ -7,14 +7,17 @@
  * signature is an HMAC-SHA256 (via Web Crypto) over `userId.expiry`. No server
  * state is needed to verify — we just recompute the MAC and check expiry.
  *
- * The signing secret comes from the `DASHBOARD_SESSION_SECRET` binding, with a
- * dev fallback constant so local dev and tests work without configuration. The
- * secret is only ever used in-memory and never logged.
+ * The signing secret comes from the `DASHBOARD_SESSION_SECRET` binding. In
+ * production ({@link isProduction}) the secret is mandatory and the resolver
+ * fails closed if it is missing or too short — we never sign cookies with a
+ * public fallback. Only in dev/tests does a self-documenting insecure fallback
+ * constant kick in so local work needs no configuration. The secret is only
+ * ever used in-memory and never logged.
  *
  * @module auth/session
  */
 
-import type { Bindings } from '../db/factory.js';
+import { isProduction, type Bindings } from '../db/factory.js';
 
 /** Cookie name carrying the signed dashboard session. */
 export const SESSION_COOKIE = 'fg_session';
@@ -23,14 +26,64 @@ export const SESSION_COOKIE = 'fg_session';
 export const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
 /**
- * Dev/test fallback secret. Used only when `DASHBOARD_SESSION_SECRET` is not
- * configured (local dev, tests). Production MUST set the real secret.
+ * Minimum acceptable length, in characters, for a production session secret.
+ * Anything shorter is treated as unconfigured and fails closed.
  */
-export const DEV_SESSION_SECRET = 'frontguard-dev-session-secret';
+export const MIN_SESSION_SECRET_LENGTH = 32;
 
-/** Resolves the session signing secret from env, falling back for dev/tests. */
+/**
+ * Dev/test-only fallback secret. Used ONLY when `DASHBOARD_SESSION_SECRET` is
+ * unset AND the runtime is not production (no D1 `DB` binding — see
+ * {@link isProduction}). The name is self-documenting by design: it ships in
+ * the published source, so it must read as obviously unusable in production.
+ * Its value mirrors its name so any accidental leak is instantly recognisable
+ * as the insecure dev placeholder rather than a real secret.
+ */
+export const INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD =
+  'INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD';
+
+/**
+ * Thrown by {@link sessionSecret} when running in production without a usable
+ * `DASHBOARD_SESSION_SECRET`. The dashboard routes are guarded up front (see
+ * `index.ts`) so they fail closed with a 503 before reaching this throw; this
+ * is the backstop for any other caller (e.g. the OAuth callback) so a misconfig
+ * can never silently sign cookies with a fallback secret.
+ */
+export class SessionSecretMissingError extends Error {
+  constructor() {
+    super('DASHBOARD_SESSION_SECRET is required in production (must be set and >= 32 chars)');
+    this.name = 'SessionSecretMissingError';
+  }
+}
+
+/**
+ * Returns true when `env` carries a usable production session secret — set and
+ * at least {@link MIN_SESSION_SECRET_LENGTH} characters. Used by the boot-time
+ * dashboard guard in `index.ts` to decide whether to fail closed.
+ */
+export function hasValidSessionSecret(env: Bindings | undefined): boolean {
+  const secret = env?.DASHBOARD_SESSION_SECRET;
+  return typeof secret === 'string' && secret.length >= MIN_SESSION_SECRET_LENGTH;
+}
+
+/**
+ * Resolves the session signing secret from env.
+ *
+ * In production ({@link isProduction} — a real D1 `DB` binding present) this
+ * fails closed: if `DASHBOARD_SESSION_SECRET` is unset or shorter than
+ * {@link MIN_SESSION_SECRET_LENGTH}, it throws {@link SessionSecretMissingError}
+ * rather than signing cookies with a public fallback. In dev/tests it falls
+ * back to {@link INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD}.
+ */
 export function sessionSecret(env: Bindings | undefined): string {
-  return env?.DASHBOARD_SESSION_SECRET || DEV_SESSION_SECRET;
+  const configured = env?.DASHBOARD_SESSION_SECRET;
+  if (isProduction(env)) {
+    if (!configured || configured.length < MIN_SESSION_SECRET_LENGTH) {
+      throw new SessionSecretMissingError();
+    }
+    return configured;
+  }
+  return configured || INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD;
 }
 
 /** Encodes bytes as URL-safe base64 (no padding). */
