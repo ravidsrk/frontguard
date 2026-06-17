@@ -3,13 +3,13 @@
   "repo": "chakra-ui/chakra-ui-docs",
   "category": "component library docs",
   "baseUrl": "http://localhost:3000",
-  "timestamp": "2026-06-16T10:07:09Z",
+  "timestamp": "2026-06-17T15:37:36Z",
   "aiEnabled": false,
   "baselineRuns": [
-    { "route": "/", "url": "http://localhost:3000/", "result": {"note":"--update-baselines emits no JSON"} },
-    { "route": "/docs/components/button", "url": "http://localhost:3000/docs/components/button", "result": {"note":"--update-baselines emits no JSON"} },
-    { "route": "/docs/components/modal", "url": "http://localhost:3000/docs/components/modal", "result": {"note":"--update-baselines emits no JSON"} },
-    { "route": "/getting-started", "url": "http://localhost:3000/getting-started", "result": {"note":"--update-baselines emits no JSON"} }
+    { "route": "/", "url": "http://localhost:3000/", "result": {"url":"http://localhost:3000/","note":"no JSON emitted (likely --update-baselines run)"} },
+    { "route": "/docs/components/button", "url": "http://localhost:3000/docs/components/button", "result": {"url":"http://localhost:3000/docs/components/button","note":"no JSON emitted (likely --update-baselines run)"} },
+    { "route": "/docs/components/modal", "url": "http://localhost:3000/docs/components/modal", "result": {"url":"http://localhost:3000/docs/components/modal","note":"no JSON emitted (likely --update-baselines run)"} },
+    { "route": "/getting-started", "url": "http://localhost:3000/getting-started", "result": {"url":"http://localhost:3000/getting-started","note":"no JSON emitted (likely --update-baselines run)"} }
   ]
   ,
   "recheckRuns": [
@@ -27,10 +27,10 @@
   },
   "timing": {
     "discovery": 1,
-    "render": 15799,
-    "compare": 2521,
+    "render": 16477,
+    "compare": 4181,
     "ai": 0,
-    "total": 18349
+    "total": 20687
   },
   "diffs": [
     {

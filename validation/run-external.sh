@@ -56,6 +56,21 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# Kill only the running dev server, leaving WORK_DIR (and the cloned repo +
+# baseline orphan branch) intact. Used between the baseline and recheck passes
+# so the recheck runs against a FRESH dev-server process — new PID, fresh
+# in-memory CSS/JS hashes, fresh font sub-pixel decisions — which is what makes
+# the recheck an independent measurement rather than a determinism test (val-5).
+kill_dev_only() {
+  if [[ -n "${DEV_PID}" ]] && kill -0 "${DEV_PID}" 2>/dev/null; then
+    echo "  → stopping dev server (pid ${DEV_PID})"
+    kill "${DEV_PID}" 2>/dev/null || true
+    sleep 2
+    kill -9 "${DEV_PID}" 2>/dev/null || true
+  fi
+  DEV_PID=""
+}
+
 # --- Pre-flight checks -------------------------------------------------------
 for bin in node npx git jq; do
   if ! command -v "$bin" >/dev/null 2>&1; then
@@ -208,10 +223,16 @@ run_repo() {
   fi
 
   # --- Run Frontguard against each route ---
-  # Two-pass methodology for honest false-positive measurement:
-  #   pass 1 "baseline": fresh run, no baseline exists yet (routes are "new")
-  #   pass 2 "recheck":  re-run against unchanged code — any non-pass status
-  #                      is a pixel-only false positive.
+  # Two-pass methodology for honest false-positive measurement (val-5):
+  #   pass 1 "baseline": fresh run, no baseline exists yet (routes are "new").
+  #   pass 2 "recheck":  re-run against unchanged code on a FRESH dev-server
+  #                      process (see kill_dev_only + reboot below) with the
+  #                      byte-identical fast path disabled
+  #                      (FRONTGUARD_DISABLE_BYTE_COMPARE=1). Any non-pass status
+  #                      here is a pixel-only false positive. Restarting the dev
+  #                      server + disabling the fast path is what turns the
+  #                      recheck from a Chromium-encoder determinism test into an
+  #                      independent measurement of the diff engine.
   local out_file="${RESULTS_DIR}/${name}.json"
   local run_ok=1
   echo "  → running frontguard against ${url}"
@@ -274,7 +295,31 @@ run_repo() {
 
   run_one_pass "baselineRuns"
   echo "  ," >>"${out_file}"
+
+  # --- Restart the dev server for an independent recheck pass (val-5) ---------
+  # Kill the baseline-pass server and boot a brand-new one with the same command.
+  # A fresh process re-derives CSS/JS content hashes and font sub-pixel layout,
+  # so the recheck captures are no longer guaranteed byte-identical to baseline.
+  echo "  → restarting dev server for recheck pass (fresh PID)"
+  kill_dev_only
+  # shellcheck disable=SC2086
+  ${devCommand} >"${WORK_DIR}/dev-recheck.log" 2>&1 &
+  DEV_PID=$!
+  if ! wait_for_url "${url}"; then
+    echo "WARNING: fresh dev server for ${name} recheck pass did not come up at ${url}" >&2
+    echo "  ---- last 20 lines of dev-recheck.log ----"
+    tail -n 20 "${WORK_DIR}/dev-recheck.log" 2>/dev/null || true
+    run_ok=0
+    # Fall through anyway: the recheck pass will record `error` envelopes, which
+    # the aggregator counts separately from false positives — an honest signal
+    # that the recheck server failed rather than a fabricated 0%.
+  fi
+
+  # Disable the byte-identical fast path for the recheck pass ONLY, then unset so
+  # it never bleeds into the next repo's baseline pass.
+  export FRONTGUARD_DISABLE_BYTE_COMPARE=1
   run_one_pass "recheckRuns"
+  unset FRONTGUARD_DISABLE_BYTE_COMPARE
 
   {
     echo "}"
