@@ -1,0 +1,275 @@
+---
+title: Slack
+description: Run Frontguard visual regression checks from Slack with the /frontguard slash command, with results posted back to the same channel.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Slack integration
+
+Frontguard ships a native Slack app so any teammate can kick off a visual
+regression run without leaving Slack. The app installs per-workspace via Slack's
+standard OAuth v2 flow, stores one bot token per team in a Cloudflare Worker,
+and submits runs to the Frontguard Cloud API. Results arrive back in the channel
+where you typed the slash command — usually within a couple of minutes.
+
+<Callout type="info">
+  The Slack app is one of several alerting surfaces. If you want emails or a
+  generic incoming webhook instead, see the
+  [production monitoring](/docs/guides/production-monitoring) guide.
+</Callout>
+
+## What you can do from Slack
+
+| Slash command | What it does |
+|---------------|--------------|
+| `/frontguard status <url>` | Submits a one-off visual regression run against `<url>`. The bot acks immediately, then posts the result back to the same channel when the run finishes. |
+| `/frontguard help` | Prints the available subcommands and usage. |
+
+A typical flow looks like this:
+
+```text
+you   › /frontguard status https://staging.acme.com
+bot   › 🔍 Queued visual check `r_…` for `https://staging.acme.com`.
+        I'll post the result here when it's done.
+bot   › 🟢 Frontguard — No visual regressions
+        URL:         https://staging.acme.com
+        Tested:      4 page(s)
+        Regressions: 0
+        Warnings:    0
+        [ View report ]
+```
+
+If the run finds regressions, the badge flips to 🔴 and the action button
+points at the full HTML report on the Frontguard dashboard.
+
+## How it works under the hood
+
+```
+Slack →  POST /slack/commands                  ← HMAC-SHA256 signed
+          │
+          ├── verifies signature
+          ├── parses the slash command
+          ├── if `status <url>`: submits run to api.frontguard.dev
+          ├── returns ephemeral ack ("queued")
+          └── schedules a delayed follow-up via response_url
+
+Cloud API → completes the run → updates run state
+                   ↓
+Worker polls /v1/runs/:id → posts in_channel reply to response_url
+```
+
+Two key Slack mechanics make this work without a Slack-side queue:
+
+- **3-second ack**: every slash command must get a response within three
+  seconds. The worker answers immediately with the ephemeral "queued" message.
+- **`response_url`**: Slack hands the slash command a private webhook URL that
+  is valid for ~30 minutes. The worker uses it to deliver the in-channel
+  follow-up once the cloud run reaches a terminal state.
+
+## Install the app (admins only)
+
+The app is in the [Slack App Directory](https://slack.com/apps) — search for
+**Frontguard** or click the install button on
+[frontguard.dev/integrations/slack](https://frontguard.dev/integrations/slack). Slack will:
+
+1. Show the requested scopes (`chat:write`, `commands`).
+2. Redirect you to the Frontguard worker's OAuth callback.
+3. The worker exchanges the OAuth code for a bot token and stores it keyed
+   by your Slack `team_id` in a Cloudflare Workers KV namespace.
+4. You're redirected back to Slack with the app installed.
+
+### Scopes the app requests
+
+| Scope | Why we need it |
+|-------|----------------|
+| `commands` | Lets you register and invoke the `/frontguard` slash command. |
+| `chat:write` | Lets the bot post follow-up messages with run results in the channel where the command was issued. |
+
+No other scopes are requested. The app does not read message history, member
+lists, or files.
+
+### Workspaces vs. enterprise grids
+
+The app is workspace-scoped (`org_deploy_enabled: false` in the manifest).
+Each workspace in an Enterprise Grid installs separately and gets its own
+bot token; runs from one workspace are isolated from another.
+
+## Connect the app to your Frontguard team
+
+After install, the Slack app needs a Frontguard API key so it can submit runs
+on your team's behalf:
+
+1. Create or grab a key from the
+   [Frontguard dashboard → Settings → API keys](https://frontguard.dev/dashboard/settings/keys).
+2. In your Cloudflare Workers dashboard (or via `wrangler secret put` if you
+   self-host the integration), set:
+
+   ```bash
+   wrangler secret put FRONTGUARD_API_KEY
+   ```
+
+3. Re-deploy the worker (or wait for the next scheduled deploy).
+
+Runs submitted from Slack count against the same monthly run budget as runs
+from the CLI or CI — there is no separate Slack quota.
+
+## Slash command reference
+
+### `/frontguard status <url>`
+
+Runs a visual check against `<url>` with the default route (`/`), viewport
+(`1440px`), and threshold (`0.01`). Use the CLI or dashboard if you need
+custom routes, viewports, or AI analysis on the run.
+
+URL formatting tips:
+
+- `https://example.com` works as-is.
+- `<https://example.com>` (Slack auto-link form) is unwrapped automatically.
+- `<https://example.com|example.com>` is also unwrapped.
+- Non-`http(s)` schemes are rejected with a help message.
+
+The bot's immediate reply is **ephemeral** (only you see it). The follow-up
+message with the result is **in-channel** so the whole team sees it.
+
+### `/frontguard help`
+
+Lists the subcommands. Also shown automatically when you invoke
+`/frontguard` with no arguments, or with an invalid URL.
+
+## Multi-team install
+
+A single deployment of the Slack worker can serve every workspace that
+installs the app. On each OAuth callback, the worker writes a row to KV:
+
+```json
+{
+  "teamId": "T01234567",
+  "teamName": "Acme Corp",
+  "accessToken": "xoxb-…",
+  "botUserId": "U09876543",
+  "scope": "chat:write,commands",
+  "installedAt": "2026-06-15T12:00:00.000Z"
+}
+```
+
+When `/frontguard status` fires, the worker uses the `response_url` Slack
+hands it for the follow-up — no token lookup needed for that path. The
+stored token is used for any future server-initiated posts (e.g. monitor-
+triggered alerts).
+
+<Callout type="warn">
+  Tokens are persisted **only** in your worker's KV namespace. They are not
+  sent anywhere else, and they never appear in logs or in HTTP responses.
+</Callout>
+
+## Self-hosting the Slack app
+
+If you host Frontguard on your own infrastructure, the integration lives in
+[`integrations/slack-app`](https://github.com/ravidsrk/frontguard/tree/main/integrations/slack-app)
+and ships with its own `wrangler.toml`. Steps:
+
+1. `cd integrations/slack-app && npm install`.
+2. `wrangler kv:namespace create SLACK_TEAMS` and paste the returned `id`
+   into `wrangler.toml`.
+3. Set the secrets:
+   ```bash
+   wrangler secret put SLACK_SIGNING_SECRET
+   wrangler secret put SLACK_CLIENT_ID
+   wrangler secret put SLACK_CLIENT_SECRET
+   wrangler secret put SLACK_REDIRECT_URI
+   wrangler secret put FRONTGUARD_API_KEY
+   ```
+4. Edit `manifest.yml` so every URL points at your host.
+5. Create the Slack app at [api.slack.com/apps](https://api.slack.com/apps) → "From an app
+   manifest" → paste the YAML.
+6. `wrangler deploy`.
+7. From your workspace, install the app via Slack's UI; the worker will
+   handle the OAuth callback and persist the install.
+
+## Configuration reference
+
+### Worker environment
+
+| Name | Where it lives | Required | Notes |
+|------|---------------|----------|-------|
+| `SLACK_SIGNING_SECRET` | secret | yes | Verifies the HMAC on every Slack-originated request. |
+| `SLACK_CLIENT_ID` | secret | yes | OAuth v2 client id. |
+| `SLACK_CLIENT_SECRET` | secret | yes | OAuth v2 client secret. |
+| `SLACK_REDIRECT_URI` | secret | yes | Must exactly match the manifest's redirect URL. |
+| `SLACK_SCOPES` | `wrangler.toml` `vars` | no | Defaults to `chat:write,commands`. |
+| `FRONTGUARD_API_URL` | `wrangler.toml` `vars` | no | Defaults to `https://api.frontguard.dev`. |
+| `FRONTGUARD_API_KEY` | secret | yes | Used to submit runs on behalf of the workspace. |
+| `SLACK_TEAMS` | `kv_namespaces` binding | yes | KV namespace holding per-team installs. |
+
+### Slack app manifest
+
+The manifest at `integrations/slack-app/manifest.yml` is the source of truth
+for the app's name, description, slash command, and scope list. Slack's UI
+re-syncs from the manifest whenever you edit it under
+**Basic Information → App Manifest**.
+
+## Troubleshooting
+
+### "Slack app is missing FRONTGUARD_API_URL / FRONTGUARD_API_KEY"
+
+The slash command worked end-to-end (signature OK, command parsed) but the
+worker has no Cloud API credentials to submit the run with. Set
+`FRONTGUARD_API_KEY` as a worker secret and re-deploy.
+
+### "Invalid signature" (401)
+
+Slack rejected the signature, which usually means one of:
+
+- The signing secret in `wrangler secret put SLACK_SIGNING_SECRET` does not
+  match the one on the Slack app's Basic Information page.
+- A proxy in front of the worker re-encoded the request body. Slack signs
+  the **raw** body — any whitespace difference breaks the signature.
+
+Run `wrangler tail` and re-issue the command to see the exact request the
+worker received.
+
+### Ack times out (Slack shows "did not respond")
+
+The 3-second ack budget includes the worker's call to
+`POST /v1/run`. If the cloud-api is slow or returns an error, the user sees
+the timeout. Two mitigations:
+
+- Confirm `FRONTGUARD_API_URL` is correct and reachable from your worker.
+- Tail the worker (`wrangler tail`) and look for `Cloud API run submission
+  failed` lines.
+
+### No follow-up message arrives
+
+The follow-up flows through Slack's `response_url`, which is valid for
+about 30 minutes after the slash command fires. Long runs that exceed that
+window simply drop on Slack's side. Either:
+
+- Reduce route count or viewport count to make the run finish faster.
+- Use the dashboard's email or webhook alerting instead — those don't have
+  a Slack-side expiration.
+
+### OAuth callback returns `{ "ok": true, "persisted": false }`
+
+The OAuth handshake succeeded, but `SLACK_TEAMS` is not bound in
+`wrangler.toml`. Add the KV binding, re-deploy, and re-install the app.
+
+## What the integration does **not** do (yet)
+
+- Schedule recurring runs from Slack (use [production monitoring](/docs/guides/production-monitoring)).
+- Trigger runs from a button press in a Slack message (Block Kit
+  interactivity is on the roadmap).
+- Cross-post a run that was triggered from CI back to a specific Slack
+  channel (planned — needs a per-channel routing config).
+
+If any of these are blocking you, open an issue at
+[github.com/ravidsrk/frontguard/issues](https://github.com/ravidsrk/frontguard/issues) with the use case.
+
+## Related
+
+- [Production monitoring](/docs/guides/production-monitoring) — schedule
+  recurring runs and alert on regressions.
+- [Cloud API](/docs/guides/cloud-api) — the underlying API the Slack worker
+  calls.
+- [GitHub Actions](/docs/ci-cd/github-actions) — pair Slack alerts with PR
+  comments.

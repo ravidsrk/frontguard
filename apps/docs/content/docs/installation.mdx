@@ -12,7 +12,7 @@ Frontguard has two packages — install what you need:
 
 | Package | Use Case |
 |---------|----------|
-| `frontguard` | CLI for standalone visual regression testing |
+| `@frontguard/cli` | CLI for standalone visual regression testing |
 | `@frontguard/playwright` | Plugin for visual assertions inside Playwright tests |
 
 ## CLI
@@ -20,30 +20,30 @@ Frontguard has two packages — install what you need:
 <Tabs items={['npm', 'pnpm', 'yarn', 'bun']}>
   <Tab value="npm">
     ```bash
-    npm install -D frontguard
+    npm install -D @frontguard/cli
     ```
   </Tab>
   <Tab value="pnpm">
     ```bash
-    pnpm add -D frontguard
+    pnpm add -D @frontguard/cli
     ```
   </Tab>
   <Tab value="yarn">
     ```bash
-    yarn add -D frontguard
+    yarn add -D @frontguard/cli
     ```
   </Tab>
   <Tab value="bun">
     ```bash
-    bun add -D frontguard
+    bun add -D @frontguard/cli
     ```
   </Tab>
 </Tabs>
 
-Or run directly with `npx`:
+Or run without installing — note `npx` needs the package name (`-p @frontguard/cli`) because the bin (`frontguard`) differs from the package (`@frontguard/cli`). Once installed, you can drop the prefix and run `frontguard <cmd>` directly.
 
 ```bash
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
 ## Playwright Plugin
@@ -124,13 +124,13 @@ GITHUB_TOKEN=ghp_...
 ## Verify Installation
 
 ```bash
-npx frontguard --version
+npx -p @frontguard/cli frontguard --version
 ```
 
-You should see output like:
+You should see the installed CLI version printed as a SemVer string (the exact value depends on which version you installed):
 
 ```
-frontguard v0.1.0
+0.2.0
 ```
 
 ## Next Steps

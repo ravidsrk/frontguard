@@ -2,12 +2,22 @@ import { describe, it, expect } from 'vitest';
 import {
   createSessionCookie,
   verifySessionCookie,
-  DEV_SESSION_SECRET,
+  INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD,
   sessionSecret,
+  hasValidSessionSecret,
+  MIN_SESSION_SECRET_LENGTH,
+  SessionSecretMissingError,
   SESSION_COOKIE,
 } from '../src/auth/session.js';
+import type { Bindings } from '../src/db/factory.js';
+import { createSqliteD1 } from './helpers/sqlite-d1.js';
 
-const SECRET = DEV_SESSION_SECRET;
+const SECRET = INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD;
+
+/** A production-like env — a real D1 `DB` binding flips isProduction → true. */
+function prodEnv(secret?: string): Bindings {
+  return { DB: createSqliteD1().db, DASHBOARD_SESSION_SECRET: secret };
+}
 
 describe('session cookie', () => {
   it('round-trips create → verify', async () => {
@@ -60,12 +70,46 @@ describe('session cookie', () => {
     expect(await verifySessionCookie('a.b.c.d', SECRET)).toBeNull();
   });
 
-  it('sessionSecret falls back to the dev secret', () => {
-    expect(sessionSecret(undefined)).toBe(DEV_SESSION_SECRET);
-    expect(sessionSecret({ DASHBOARD_SESSION_SECRET: 'real' })).toBe('real');
-  });
-
   it('exports the expected cookie name', () => {
     expect(SESSION_COOKIE).toBe('fg_session');
+  });
+});
+
+describe('sessionSecret — production fail-closed (sec-1, cloud-4)', () => {
+  it('falls back to the insecure dev secret outside production', () => {
+    expect(sessionSecret(undefined)).toBe(INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD);
+    // A configured value still wins in dev, even if short.
+    expect(sessionSecret({ DASHBOARD_SESSION_SECRET: 'real-dev-value' })).toBe('real-dev-value');
+  });
+
+  it('throws in production when DASHBOARD_SESSION_SECRET is unset', () => {
+    expect(() => sessionSecret(prodEnv(undefined))).toThrow(SessionSecretMissingError);
+  });
+
+  it('throws in production when the secret is shorter than the minimum', () => {
+    const short = 'x'.repeat(MIN_SESSION_SECRET_LENGTH - 1);
+    expect(() => sessionSecret(prodEnv(short))).toThrow(SessionSecretMissingError);
+  });
+
+  it('returns the configured secret in production when it is long enough', () => {
+    const strong = 'x'.repeat(MIN_SESSION_SECRET_LENGTH);
+    expect(sessionSecret(prodEnv(strong))).toBe(strong);
+  });
+
+  it('never resolves to the public dev fallback in production', () => {
+    const strong = 'y'.repeat(MIN_SESSION_SECRET_LENGTH);
+    expect(sessionSecret(prodEnv(strong))).not.toBe(
+      INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD,
+    );
+  });
+
+  it('hasValidSessionSecret requires the secret to be set and >= 32 chars', () => {
+    expect(hasValidSessionSecret(undefined)).toBe(false);
+    expect(hasValidSessionSecret({ DASHBOARD_SESSION_SECRET: 'too-short' })).toBe(false);
+    expect(
+      hasValidSessionSecret({
+        DASHBOARD_SESSION_SECRET: 'z'.repeat(MIN_SESSION_SECRET_LENGTH),
+      }),
+    ).toBe(true);
   });
 });

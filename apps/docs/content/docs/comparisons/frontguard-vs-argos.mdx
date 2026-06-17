@@ -1,0 +1,495 @@
+---
+title: Frontguard vs Argos
+description: An honest Frontguard vs Argos comparison — open-source licensing, AI capabilities, Playwright trace handling, pricing at 5K/35K/100K snapshots, and a step-by-step migration recipe.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is the difference between Frontguard and Argos?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Argos is an MIT-licensed, open-source visual testing service that markets itself on 'no AI overhead' — a fast, deterministic pixel/perceptual diff with a mature hosted review dashboard, generous Playwright trace handling, and a $100/mo Pro entry. Frontguard is also MIT-licensed and CLI-first, but its differentiators are AI-powered change classification (regression vs intentional vs content update), AI fix verification in an isolated sandbox, a plugin architecture (figma / perf budgets / accessibility / third-party scripts / monitor), and accessibility checks fused into the same render pass as visual diffs."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Frontguard a free alternative to Argos?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Both are MIT-licensed and free for open source projects. Frontguard's CLI is free forever; Argos's hosted dashboard tier starts free and moves to $100/mo Pro at higher snapshot volumes. The truthful answer depends on what you actually want: if you need a polished hosted review dashboard with role-based access today, Argos is the better choice; if you want AI explanations and a free local CLI, Frontguard fits."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does Argos have AI analysis?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No — Argos explicitly markets 'no AI overhead' as a feature, positioning itself as a fast, deterministic pixel/perceptual diff that prioritises predictable behavior over LLM-driven classification. Frontguard adds an optional AI layer (BYOK OpenAI / Anthropic) that only runs on pages that actually diffed, classifies the diff, explains the cause, and can verify a suggested fix in a sandbox."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do Argos and Frontguard handle Playwright traces?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Argos's headline strength here: Playwright traces are unlimited even on the free Hobby tier — uploading a 200 MB trace doesn't push you off the free plan. Frontguard renders inside your CI with Playwright and keeps traces on the runner; if you want centralized trace storage, point Frontguard at R2/S3 via its built-in upload-stage."
+      }
+    }
+  ]
+}) }} />
+
+# Frontguard vs Argos
+
+[Argos](https://argos-ci.com) is the closest spiritual cousin to Frontguard in the visual-testing landscape: **MIT-licensed**, **open core**, **CLI / SDK first**, with a polished hosted review dashboard layered on top. Argos's central positioning — repeated across their landing page and pricing — is that they offer **"no AI overhead"**: a fast, deterministic pixel + perceptual diff that doesn't depend on a language model deciding what counts as a regression.
+
+**Frontguard** takes the opposite bet. The CLI is free forever (MIT), but the differentiator is the AI layer: every diff goes through an LLM that **classifies** it (regression vs intentional vs content update), **explains** why it happened, and can **verify a suggested fix** in an isolated [Daytona](https://daytona.io) sandbox before the PR lands.
+
+Both tools are sincerely open source. Both can read Playwright traces. Both have honest free tiers. They disagree on whether the AI is a feature or a bug.
+
+<Callout type="info">
+  **Honest disclaimer:** Frontguard is a new, open-source project (early stars, no hosted review dashboard yet). Argos is mature, has an active community (~80K weekly npm downloads), and ships a more polished review UX today. This page tries to be accurate and fair, not promotional — read the "When to choose Argos" section first.
+</Callout>
+
+## TL;DR
+
+| | Argos | Frontguard |
+|---|-------|------------|
+| License | 🟢 MIT (CLI + SDK), hosted dashboard is SaaS | 🟢 MIT (CLI), optional cloud is SaaS |
+| Pricing floor | Free Hobby tier (unlimited Playwright traces) | Free (CLI) |
+| Pricing entry to Pro | **$100/mo** (Pro) | $29/mo Pro (optional) |
+| AI change classification | ❌ Explicitly "no AI overhead" | 🟢 BYOK OpenAI / Anthropic |
+| AI fix verification | ❌ N/A | 🟢 Sandboxed Daytona re-render |
+| Plugin architecture | 🟡 Limited (integrations, not lifecycle hooks) | 🟢 6 lifecycle hooks, 5 built-in plugins |
+| Accessibility fusion | ❌ Separate workflow | 🟢 axe-core in same render pass |
+| Performance budgets fusion | ❌ Separate workflow | 🟢 LCP/CLS/TTFB in same render pass |
+| Review dashboard | 🟢 Mature, multi-reviewer, branch-aware | 🔴 Not yet (CLI/report only) |
+| Playwright traces | 🟢 **Unlimited even on Hobby** | Stored in CI / your own R2/S3 |
+| Storybook integration | 🟢 First-class | 🟡 Works via served storybook URL |
+| GitHub PR check | 🟢 Mature | 🟢 Built-in (with PR thumbnails) |
+| Self-hostable | 🟡 OSS components exist; full dashboard not turnkey | 🟢 CLI is fully self-hostable |
+
+## Argos's "no AI overhead" Positioning
+
+This is the line Argos uses to frame the choice, and it's worth quoting because it's a real, principled architectural decision — not marketing fluff:
+
+> "No AI overhead — a fast, deterministic pixel + perceptual diff that doesn't depend on a model deciding what counts as a regression."
+
+There is a real reading of the visual-testing market in which this is correct:
+
+- **Deterministic.** Argos's pixel + perceptual diff produces the same answer every time. An LLM doesn't.
+- **Fast.** Pixel + perceptual diff is constant-time and runs in milliseconds. An LLM round-trip is hundreds of milliseconds to seconds.
+- **Predictable cost.** No per-diff token spend, no surprise bills when GPT-4o changes pricing.
+- **No data leaving your stack to a third-party LLM.** For some teams, that's a hard requirement.
+
+Frontguard does not disagree with any of this. Frontguard's argument is **"AI is optional, BYOK, and only fires on pages that actually diffed"** — which keeps the deterministic pixel diff as the fast gate and only spends LLM tokens on the small subset of changes that need triage. The two philosophies are not opposites; they're calibrations of where the human's time is most expensive.
+
+## Where Argos Leads
+
+These are the dimensions where Argos is honestly the better tool today.
+
+### 1. MIT license across the stack
+
+Argos's **CLI**, **SDK**, and several supporting libraries are MIT licensed. The hosted dashboard is a separate SaaS, but the open core is liberal and contributable. If you've been bitten by a vendor's "open source until the IPO" rug-pull, this matters.
+
+Frontguard's CLI is also MIT. The optional cloud API is a SaaS surface that's source-available but not MIT today. If license purity is the hill you die on, Argos's stance is slightly cleaner.
+
+### 2. **$100/mo Pro entry** is a real number
+
+Argos's Pro tier starts at **$100/mo**, which is genuinely cheap compared to Percy ($399/mo at the equivalent volume) and most Applitools or LambdaTest tiers. For a 5–20 engineer team that needs a hosted review dashboard, $100/mo is below most teams' "approve it without an exec sponsor" threshold.
+
+Frontguard's optional Pro is $29/mo, but **Argos's Pro buys a mature hosted dashboard** — Frontguard's Pro buys early-stage cloud features. At the $100/mo price point, what Argos gives you today is more polished.
+
+### 3. **Playwright traces are unlimited even on the free Hobby tier**
+
+This is, frankly, the single most underrated thing Argos ships. Every other vendor (Percy, Chromatic, Applitools) treats Playwright traces as either out of scope or a paid add-on. Argos lets you upload Playwright traces of arbitrary size on the **free** Hobby tier, then surfaces them next to the diff in the review UI.
+
+If you debug flaky tests by walking the Playwright trace, Argos's Hobby tier alone is worth installing. Frontguard renders inside your CI and keeps the trace on the runner; you can ship traces to R2/S3 via the built-in upload-stage, but you're wiring that yourself.
+
+### 4. Mature review dashboard, today
+
+Argos's review dashboard is years ahead of Frontguard's. It supports:
+
+- **Branch-aware baselines** with automatic baseline carry-over between PRs.
+- **Multi-reviewer approval flows** with per-snapshot comments.
+- **Bucket browsing** across builds and time.
+- **GitHub Checks integration** that's well-tuned to the GitHub Review UX.
+
+Frontguard's review surface is CLI + HTML report + PR comment thumbnails. A hosted dashboard is on the [ROADMAP](https://github.com/ravidsrk/frontguard/blob/main/docs/ROADMAP.md) but **not shipped today**.
+
+### 5. Storybook-first DX
+
+Argos's `@argos-ci/storybook` integration is first-class — it discovers stories, applies viewport/mode parameters, and uploads in one command. Frontguard treats Storybook as a routable URL: it works (point `baseUrl` at `storybook-static`) but you wire the URL list yourself.
+
+## Where Frontguard Leads
+
+These are the dimensions where Frontguard has shipped something Argos does not have.
+
+### 1. AI change classification
+
+Every diff that exceeds the pixel threshold is sent to your chosen LLM (OpenAI `gpt-4o` or Anthropic `claude-sonnet-4`) with the baseline image, current image, and visual diff overlay. The model returns:
+
+- A **classification** — `regression` / `intentional` / `content_update`.
+- A **severity** — `critical` / `warning` / `info`.
+- A **confidence score**.
+- A **plain-English explanation** of *what changed and why*, citing CSS / DOM clues.
+- An optional **suggested code fix** with file path and line number.
+
+```text title="Frontguard CLI output"
+✘ /dashboard @ 375px — 2.34% changed
+  🔴 AI Analysis — Regression (94% confidence)
+  "The sidebar overlaps the main content on mobile. A flex-direction
+   change in Dashboard.module.css:28 removed the column stacking."
+  Suggested fix: restore `flex-direction: column` at the < 768px breakpoint.
+```
+
+Argos's "no AI overhead" position means it returns the diff and lets the human classify it. Frontguard's bet is that classifying is the expensive human bottleneck.
+
+### 2. AI fix verification (sandboxed re-render)
+
+This is the feature with no direct equivalent in any other visual testing tool. Frontguard ships a [Daytona](https://daytona.io) integration that:
+
+1. Spins up an isolated sandbox of your repo at the PR commit.
+2. Applies the AI-suggested code fix.
+3. Re-runs the rendering pipeline against the changed page.
+4. Re-runs the visual diff to confirm the fix actually resolves the regression.
+5. Reports back into the PR with a "fix verified" green check (or "fix failed" with the new diff).
+
+See [AI Fixes](/docs/guides/ai-fixes) for the architecture. Argos has no equivalent — once the dashboard says "regressed," the human takes over.
+
+### 3. Plugin architecture with lifecycle hooks
+
+Frontguard ships **6 lifecycle hooks** (`beforeDiscover`, `afterDiscover`, `afterRender`, `afterCompare`, `afterRun`, `onError`) and **5 built-in plugins**:
+
+| Plugin | What it does |
+|--------|--------------|
+| **Figma** | Pulls the canonical design from Figma and overlays it on the current render to catch design-implementation drift. |
+| **Performance Budgets** | Records LCP / CLS / TTFB / TBT during the same render pass and correlates regressions with the visual diff. |
+| **Accessibility** | Runs axe-core during the same render pass and surfaces WCAG violations alongside the visual diff. |
+| **Third-Party Scripts** | Snapshots script origins (ads / analytics / widgets) and flags drift between runs. |
+| **Monitor** | Lifts the same pipeline to production URLs on a schedule, with threshold alerting and history tracking. |
+
+Argos exposes integrations (Cypress, Playwright, Storybook, Puppeteer) but does not expose the diff pipeline as a hookable surface for third-party plugins. If you want to add a custom check (e.g., "diff against a CMS-driven Figma file") you write it as a hook in Frontguard; in Argos you build it as a separate workflow.
+
+### 4. Accessibility audit in the same render pass
+
+The Accessibility plugin runs axe-core during the same Playwright render that captures the screenshot — meaning the accessibility check sees the **exact same DOM** that the visual diff sees, on the **exact same viewport**, with the **exact same authentication state**. That's a structural advantage over running axe-core in a separate test pass:
+
+- No duplicate render time.
+- No drift between "what the visual check saw" and "what the a11y check saw."
+- Failures land in the same report next to the visual diff.
+
+Argos has no built-in accessibility audit. You'd run axe-core as a separate Playwright test, which doubles the rendering cost.
+
+### 5. Performance budgets fused with the visual diff
+
+Same architectural story as accessibility: LCP / CLS / TTFB are sampled during the render that captures the screenshot. A visual regression that "looks fine" but tanks LCP shows up correlated in one report. Argos doesn't sample web vitals at all.
+
+### 6. CI-resident rendering with git-orphan baselines
+
+Frontguard renders inside your CI and stores baselines on a **git orphan branch** (`frontguard-baselines`). That branch is part of your repo — versioned, attributable, rebaseable — but doesn't bloat your main branch history. Argos uploads to cloud storage; baselines live in Argos's database keyed by your project, not in your git history.
+
+This matters when:
+
+- You want to walk `git log frontguard-baselines` and see who approved a baseline change.
+- You want to roll back a baseline by reverting a commit.
+- You don't want screenshots leaving your infrastructure.
+- You're in a regulated environment where the auditor wants every visual artifact in source control.
+
+### 7. Honest, predictable cost at scale
+
+Both tools are honest about pricing — neither plays "trial-and-cliff" games. But the cost curves shape differently as you grow.
+
+## Honest Cost Comparison
+
+Costs change. Verify on each vendor's pricing page. These numbers reflect commonly published tiers at time of writing — Argos figures from [argos-ci.com/pricing](https://argos-ci.com/pricing); Frontguard figures from [frontguard.dev](https://frontguard.dev).
+
+### At 5,000 snapshots/month
+
+| | Argos | Frontguard |
+|---|-------|------------|
+| Visual diff billing | $0 (within Hobby allotment) | $0 (CLI is free) |
+| Playwright traces | $0 (unlimited Hobby) | $0 (stays in CI) |
+| AI analysis | N/A | ~$2–8/mo BYOK (if you enable it) |
+| Hosted dashboard | $0 (Hobby) | N/A (use CLI / HTML report) |
+| **Total** | **$0/mo** | **$0–$8/mo** |
+
+**Honest read at 5K:** Argos wins on UX (dashboard included). Frontguard wins if you don't want a dashboard and you want AI explanations.
+
+### At 35,000 snapshots/month
+
+| | Argos | Frontguard |
+|---|-------|------------|
+| Visual diff billing | **$100/mo (Pro)** | $0 (CLI is free) |
+| Playwright traces | Included in Pro | Stays in CI / your R2 |
+| AI analysis | N/A | ~$15–40/mo BYOK |
+| Hosted dashboard | Included in Pro | N/A |
+| **Total** | **~$100/mo** | **$0–$40/mo** + R2 if you want traces |
+
+**Honest read at 35K:** Argos's $100/mo Pro is reasonable if you want the dashboard. Frontguard saves you ~$60/mo if you don't, but you give up branch-aware multi-reviewer review.
+
+### At 100,000 snapshots/month
+
+| | Argos | Frontguard |
+|---|-------|------------|
+| Visual diff billing | Pro + per-snapshot overage (varies; ballpark $250–500/mo at this volume) | $0 (CLI is free) |
+| Playwright traces | Included | Stays in CI / your R2 |
+| AI analysis | N/A | ~$40–120/mo BYOK (gated by diffed-page count, not snapshot count) |
+| Hosted dashboard | Included | N/A |
+| **Total** | **~$250–500/mo** | **$0–$120/mo** + R2 |
+
+**Honest read at 100K:** Frontguard's marginal cost is dominated by LLM spend on **diffed** pages, not the snapshot count. If 95% of your snapshots pass the pixel gate (typical for mature suites), your LLM bill is small. Argos's bill grows with total snapshot count.
+
+<Callout type="warn">
+  Numbers above are approximations. Argos publishes its tiers — always check [argos-ci.com/pricing](https://argos-ci.com/pricing) for current figures. Frontguard AI cost depends on which model you pick (gpt-4o vs claude-sonnet-4 vs gpt-4o-mini) and on your diff rate.
+</Callout>
+
+## When to Choose Argos
+
+Be honest with yourself — these are the situations where Argos is the right call:
+
+- **You need a polished, multi-reviewer hosted dashboard today.** Frontguard doesn't ship one yet. If you have a 10-engineer frontend team and "the design lead approves visual diffs in a browser tab" is non-negotiable, install Argos.
+- **You debug flaky tests by walking Playwright traces.** Argos's unlimited-traces-on-Hobby is genuinely unique and saves real money.
+- **You live in Storybook** and want first-class story discovery without writing your own URL list.
+- **You don't trust LLMs to classify regressions** and want a fast deterministic diff that you triage by hand.
+- **License purity is a hard requirement** and the source-available cloud API in Frontguard is a deal-breaker.
+- **You want a mature, established vendor** with three years of production history.
+
+## When to Choose Frontguard
+
+Conversely, Frontguard is the better choice when:
+
+- **AI classification would save more triage time than it costs in tokens.** Frontguard's bet — and the reason "no AI overhead" reads as a feature gap rather than a feature — is that for most teams, manually classifying every red diff is the expensive bottleneck, not the LLM round-trip.
+- **You want AI fix verification.** If "AI suggested this CSS change; did it actually fix the regression?" is a workflow you'd use, Frontguard is the only OSS tool that ships it.
+- **You want accessibility / performance / Figma / third-party-script audits fused with the visual diff** in the same render pass.
+- **You want CI-resident rendering** with baselines in your git history.
+- **You're an early-stage team** that doesn't need a hosted dashboard yet and would rather not pay $100/mo for one.
+- **You want a plugin architecture** to extend the diff pipeline with your own checks.
+
+## Feature-by-Feature Deep Dive
+
+### Rendering model
+
+**Argos** uploads screenshots to its cloud, where the diff happens server-side. The benefit is a centralised dashboard and consistent rendering. The cost is that snapshots leave your infra and bills meter on what you upload.
+
+**Frontguard** renders with Playwright **inside your CI** and runs pixelmatch + SSIM **inside your CI** — only failing diffs hit external services (the LLM, and only if you opted in). Baselines live on a git orphan branch.
+
+### Diff algorithm
+
+**Argos** uses a pixel + perceptual diff (the perceptual diff suppresses anti-aliasing noise without false negatives on real changes). It's well-tuned and battle-tested.
+
+**Frontguard** uses pixelmatch as the fast gate and falls back to SSIM for perceptual scoring. Pages that pass the fast gate never enter the AI layer — only diffed pages do.
+
+### False-positive triage
+
+**Argos** relies on the human reviewing the dashboard to dismiss noise (anti-aliasing, dynamic content, intentional changes). It has good UX for this: hover-to-toggle baseline vs current, region annotations, branch comparison.
+
+**Frontguard** adds two layers before a human sees the diff:
+
+1. **Anti-flake multi-render consensus** — renders the page N times (default 3) and treats only consistent differences as real diffs. Flaky pixel noise never reaches the report.
+2. **AI classification** — the LLM marks each diff as regression / intentional / content_update with confidence. You triage critical-confidence regressions; the rest stay in the report but don't gate the PR.
+
+### Review & approval
+
+**Argos** wins here clearly today: branch-aware baselines, multi-reviewer approvals, per-snapshot comments, build-vs-build comparison, GitHub Checks integration.
+
+**Frontguard**'s review surface is CLI + HTML report + PR comment thumbnails (with `accept` / `reject` buttons on the PR comment in the next release). A hosted dashboard is on the roadmap, **not shipped today**.
+
+### Playwright integration
+
+Both ship Playwright integrations.
+
+**Argos**'s `@argos-ci/playwright` uploads screenshots and traces from your existing Playwright test suite. Trace handling is the headline feature.
+
+**Frontguard**'s `@frontguard/playwright` exposes `visualTest(page, name)` for in-test visual assertions and integrates with the CLI's baseline / diff / AI pipeline. See [Playwright setup](/docs/playwright/setup).
+
+### Storybook integration
+
+**Argos** ships `@argos-ci/storybook` — story discovery, viewport / mode parameters, single-command upload.
+
+**Frontguard** doesn't ship a Storybook plugin per se, but treats Storybook as a routable URL. Serve `storybook-static` and add story iframe URLs to your `routes` list. Less ergonomic; same end result.
+
+### Self-hostability
+
+**Argos**'s open-source components (CLI, SDK, several supporting libraries) are self-hostable in the sense that the source is MIT. The full hosted dashboard experience requires their SaaS or substantial DIY work.
+
+**Frontguard**'s CLI is fully self-hostable — that's the entire product. The optional cloud API is a SaaS surface for teams that want centralised history without running their own infra; you can absolutely run Frontguard with zero hosted dependencies.
+
+## Migration Recipe (Argos → Frontguard)
+
+If you're already on Argos and want to try Frontguard alongside or instead, here's the path. You don't have to switch all at once — Frontguard runs happily in parallel on a separate CI job until you're ready to flip.
+
+### Step 1 — Install Frontguard
+
+```bash
+npm install -D @frontguard/cli
+npx -p @frontguard/cli frontguard init
+```
+
+`init` auto-detects your framework (Next.js / Remix / SvelteKit / Nuxt / Astro) and generates a `frontguard.config.ts`.
+
+### Step 2 — Translate `@argos-ci/playwright` calls to routes
+
+Argos calls look like this:
+
+```typescript title="Argos Playwright"
+import { argosScreenshot } from '@argos-ci/playwright';
+
+test('homepage', async ({ page }) => {
+  await page.goto('/');
+  await argosScreenshot(page, 'homepage');
+});
+```
+
+The simplest port is to capture the URLs in a Frontguard config:
+
+```typescript title="frontguard.config.ts"
+export default {
+  baseUrl: 'http://localhost:3000',
+  routes: ['/', '/pricing', '/checkout', '/dashboard'],
+  viewports: [375, 768, 1440],     // Argos viewports → Frontguard viewports
+  browsers: ['chromium'],
+  threshold: 0.1,
+  ai: { provider: 'openai', model: 'gpt-4o' },
+};
+```
+
+For tests that interact before snapshotting (login, fill forms, click), use the Playwright plugin instead — it gives you the same in-test assertion ergonomics as `argosScreenshot`:
+
+```typescript title="Frontguard Playwright plugin"
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
+test('homepage', async ({ page }) => {
+  await page.goto('/');
+  const result = await visualTest(page, 'homepage');
+  expect(result.passed).toBe(true);
+});
+```
+
+### Step 3 — Translate Argos ignore regions
+
+Argos uses `argosScreenshot(page, name, { mask })` for dynamic content. Frontguard supports the same idea both globally and per-route:
+
+```typescript title="frontguard.config.ts"
+export default {
+  // ... base config
+  ignore: [
+    { selector: '.dynamic-timestamp' },
+    { selector: '[data-test-id="user-avatar"]' },
+  ],
+};
+```
+
+Or per-call in the Playwright plugin:
+
+```typescript
+await visualTest(page, 'dashboard', {
+  mask: ['.timestamp', '.user-avatar', '.ad-slot'],
+});
+```
+
+### Step 4 — Capture baselines and run
+
+```bash
+# First run — captures baselines, no comparison yet
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
+
+# Subsequent runs — compares against baselines, runs AI analysis on diffed pages
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
+```
+
+Frontguard stores baselines on a git orphan branch (`frontguard-baselines`) by default. If you'd rather use a directory, set `baselineStorage: { type: 'fs', path: './visual-baselines' }`.
+
+### Step 5 — Wire the GitHub PR check
+
+```yaml title=".github/workflows/visual.yml"
+name: Visual Regression
+
+on: pull_request
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # required for baseline branch
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build && npm run start &
+      - run: npx wait-on http://localhost:3000
+      - run: npx -p @frontguard/cli frontguard run --url http://localhost:3000
+        env:
+          FRONTGUARD_OPENAI_KEY: ${{ secrets.FRONTGUARD_OPENAI_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+Replace `argos upload` steps with `npx -p @frontguard/cli frontguard run`. Remove `ARGOS_TOKEN`. If you were uploading traces to Argos, decide whether you want them in R2/S3 (configure `uploadStage` in Frontguard) or to stay on the CI runner.
+
+### Step 6 — Decide what to do with Playwright traces
+
+This is the only place where the swap genuinely costs you something. Argos hosts your traces for free on Hobby; Frontguard does not. Options:
+
+1. **Keep traces on the CI runner.** Free. Inspect them by downloading the GitHub Actions artifact. Works for small teams.
+2. **Ship traces to your own R2/S3** via Frontguard's upload-stage. ~$0.02/GB/mo on R2 (no egress fees). Works at any scale.
+3. **Keep Argos installed for traces only**, run Frontguard for visual diffs + AI. Some teams do this during a transition and never fully un-install Argos because the trace UX is too good. That's a legitimate steady state.
+
+### Step 7 — Decommission Argos (optional)
+
+When you're confident Frontguard's signal matches what you got from Argos:
+
+```bash
+npm uninstall @argos-ci/cli @argos-ci/playwright @argos-ci/storybook
+```
+
+Remove `ARGOS_TOKEN` from your secrets. Archive your Argos project (don't delete — you may want the historical baselines for audit).
+
+## Coexistence Pattern
+
+A pattern several teams have settled on: run both for two weeks, compare signal-to-noise.
+
+```yaml title="Parallel CI jobs"
+jobs:
+  argos:
+    # ... existing Argos job
+  frontguard:
+    # ... new Frontguard job (above)
+```
+
+At the end of two weeks, look at:
+
+- How many diffs each tool flagged.
+- How many of those diffs were actually intentional.
+- How many AI classifications matched your manual review (if Frontguard's AI marks 90% correctly, that's 90% less triage time).
+- How much you paid each tool.
+
+Then pick. It's totally legitimate to keep both running for traces vs. AI classification — they're not antagonists.
+
+## Honest Open Questions
+
+Things that would change the answer in either direction, and that we'll update this page as they evolve:
+
+- **When Frontguard ships its hosted dashboard**, the "Argos has a dashboard, Frontguard doesn't" argument deflates. This is on the roadmap.
+- **When Argos ships an AI layer** (rumored but not confirmed), the "AI is unique to Frontguard" argument deflates.
+- **If Argos drops Pro pricing below $100/mo**, the cost-at-scale advantage narrows.
+- **If your team can't reach consensus on whether LLMs belong in CI**, neither tool will fix that — but the choice is forcing the conversation, and that's not nothing.
+
+## Next Steps
+
+- [AI Analysis](/docs/guides/ai-analysis) — How Frontguard's classification layer works.
+- [AI Fixes](/docs/guides/ai-fixes) — How sandboxed fix verification works.
+- [Custom Plugins](/docs/guides/custom-plugins) — Build your own diff-pipeline hooks.
+- [Configuration reference](/docs/cli/configuration) — Full `frontguard.config.ts` reference.
+- [GitHub Actions](/docs/guides/github-actions) — Drop-in CI workflow.
+- [Frontguard vs Percy](/docs/guides/frontguard-vs-percy) — Comparison against the BrowserStack-owned market leader.
+- [Frontguard vs Chromatic](/docs/guides/frontguard-vs-chromatic) — Comparison against the Storybook-first incumbent.

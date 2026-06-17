@@ -1,0 +1,81 @@
+# =============================================================================
+# Frontguard render — docker-compose
+# =============================================================================
+#
+# This compose file is the supported way to run the Dockerized renderer
+# against a developer's local repo. It mounts the user's project at
+# /workspace and forwards the AI provider keys the CLI needs to generate
+# fixes or run judge mode.
+#
+# Usage
+# -----
+#   # From your project root, where frontguard.config.ts lives:
+#   docker compose -f node_modules/@frontguard/cli/docker/docker-compose.yml \
+#     run --rm frontguard run --url http://host.docker.internal:3000
+#
+# Or from the Frontguard monorepo while developing:
+#   (cd packages/cli && npm pack && mv frontguard-cli-*.tgz docker/frontguard-cli.tgz)
+#   docker compose -f packages/cli/docker/docker-compose.yml build
+#   docker compose -f packages/cli/docker/docker-compose.yml run --rm frontguard \
+#     run --url http://host.docker.internal:3000
+#
+# Build args
+# ----------
+# - FRONTGUARD_TAG       Image tag to build (default: latest)
+#
+# Runtime env (passed via -e or your shell)
+# -----------------------------------------
+# - FRONTGUARD_OPENAI_KEY      OpenAI API key, for --generate-fixes / --mode judge
+# - FRONTGUARD_ANTHROPIC_KEY   Anthropic API key (Claude provider)
+# - FRONTGUARD_GEMINI_KEY      Google Gemini API key
+# - FRONTGUARD_TELEMETRY       Set to "0" to disable anonymous telemetry
+#
+# The compose file exports these from the host shell — set them with
+# `export FRONTGUARD_OPENAI_KEY=...` before invoking, or put them in a
+# `.env` file in the directory you invoke compose from.
+# =============================================================================
+
+services:
+  frontguard:
+    # The image is not published to a registry yet — build it locally first:
+    #   docker build --platform linux/amd64 -t frontguard/render:latest ../packages/cli/docker
+    # (or `docker compose ... build`, which uses the build: block below).
+    image: frontguard/render:${FRONTGUARD_TAG:-latest}
+    # Pin the architecture so renders are byte-equivalent across an arm64-dev /
+    # amd64-CI fleet. Mirrors the `FROM --platform=linux/amd64` in the Dockerfile
+    # and the `--platform` the CLI injects into `docker run`.
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # The build context expects a local pack tarball; see the Dockerfile
+      # comments for how to produce it.
+    # The user's repo is mounted read-write so the renderer can write the
+    # baseline/report directories. Bind-mounting (not a named volume) is
+    # important: byte-equivalent baselines only matter if they land back in
+    # the user's working tree.
+    volumes:
+      - ../../..:/workspace:rw
+    working_dir: /workspace
+    # Linux: host.docker.internal isn't resolved by default. The
+    # extra_hosts line restores Docker Desktop's behavior on Linux so
+    # `--url http://host.docker.internal:3000` works everywhere.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # AI provider keys — exported from the host shell. Empty values are
+      # passed through and the CLI handles missing-key errors itself.
+      FRONTGUARD_OPENAI_KEY: ${FRONTGUARD_OPENAI_KEY:-}
+      FRONTGUARD_ANTHROPIC_KEY: ${FRONTGUARD_ANTHROPIC_KEY:-}
+      FRONTGUARD_GEMINI_KEY: ${FRONTGUARD_GEMINI_KEY:-}
+      # Telemetry: keep the in-image default of "0" unless the user
+      # explicitly opts in from the host.
+      FRONTGUARD_TELEMETRY: ${FRONTGUARD_TELEMETRY:-0}
+      # CI mode hints — the CLI uses this to format output for log streams.
+      CI: ${CI:-}
+    # Default invocation runs the renderer with no extra flags; override
+    # via `docker compose run --rm frontguard run --url ...`.
+    command: ["run"]
+    # The image owns no long-lived state; restarting it on failure would
+    # only mask config errors.
+    restart: "no"

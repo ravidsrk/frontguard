@@ -25,6 +25,18 @@ import type {
   TeamActivity,
   TeamUsage,
 } from './teams.js';
+import type { IgnoreMask, MaskStore } from './masks.js';
+import type { RunAttachment, AttachmentStore } from './attachments.js';
+
+/** A per-screenshot accept/reject decision recorded from the diff viewer. */
+export interface ScreenshotDecision {
+  id: string;
+  screenshotId: string;
+  runId: string;
+  userId: string;
+  decision: 'accepted' | 'rejected';
+  createdAt: string;
+}
 
 /** A user record. */
 export interface User {
@@ -66,9 +78,21 @@ export interface UsageRecord {
 }
 
 /**
+ * Tracks the highest spend-cap warning tier already emailed per (user, month).
+ * Tiers: 0 = none, 80 = 80%-warning sent, 95 = 95%-warning sent. We never
+ * re-send a tier we've already crossed; resets next month.
+ */
+export interface UsageAlertState {
+  userId: string;
+  month: string;
+  lastTier: 0 | 80 | 95;
+  lastAlertAt?: string;
+}
+
+/**
  * Persistent storage contract. All methods are async to accommodate D1.
  */
-export interface Store extends MonitorStore, TeamStore {
+export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentStore {
   // Users
   createUser(user: User): Promise<void>;
   getUser(id: string): Promise<User | null>;
@@ -97,6 +121,16 @@ export interface Store extends MonitorStore, TeamStore {
   // Usage
   incrementUsage(userId: string, month: string, runs: number, screenshots: number): Promise<void>;
   getUsage(userId: string, month: string): Promise<UsageRecord>;
+  /** Returns the spend-cap warning tier already alerted for (user, month), or null. */
+  getUsageAlertState(userId: string, month: string): Promise<UsageAlertState | null>;
+  /** Upserts the spend-cap warning tier for (user, month). */
+  setUsageAlertState(state: UsageAlertState): Promise<void>;
+
+  // Screenshot decisions (bulk approve/reject, Task 15.4) -------------------
+  /** Records a per-screenshot accept/reject decision. */
+  addScreenshotDecision(d: ScreenshotDecision): Promise<void>;
+  /** Lists decisions for a run, newest first. */
+  listScreenshotDecisions(runId: string): Promise<ScreenshotDecision[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +155,10 @@ export class InMemoryStore implements Store {
   private projects = new Map<string, TeamProject>();
   private approvals: BaselineApproval[] = [];
   private activity: TeamActivity[] = [];
+  private masks = new Map<string, IgnoreMask>();
+  private attachments = new Map<string, RunAttachment>();
+  private usageAlertState = new Map<string, UsageAlertState>(); // key: `${userId}:${month}`
+  private decisions: ScreenshotDecision[] = [];
 
   async createUser(user: User): Promise<void> {
     this.users.set(user.id, { ...user });
@@ -202,6 +240,58 @@ export class InMemoryStore implements Store {
     return (
       this.usage.get(`${userId}:${month}`) ?? { userId, month, runsCount: 0, screenshotsCount: 0 }
     );
+  }
+  async getUsageAlertState(userId: string, month: string): Promise<UsageAlertState | null> {
+    return this.usageAlertState.get(`${userId}:${month}`) ?? null;
+  }
+  async setUsageAlertState(state: UsageAlertState): Promise<void> {
+    this.usageAlertState.set(`${state.userId}:${state.month}`, { ...state });
+  }
+
+  // Masks --------------------------------------------------------------------
+  async createMask(m: IgnoreMask): Promise<void> {
+    this.masks.set(m.id, { ...m });
+  }
+  async listMasks(userId: string): Promise<IgnoreMask[]> {
+    return [...this.masks.values()]
+      .filter((m) => m.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+  async listMasksForTarget(userId: string, route: string, viewport: number): Promise<IgnoreMask[]> {
+    return [...this.masks.values()].filter(
+      (m) => m.userId === userId && m.route === route && m.viewport === viewport,
+    );
+  }
+  async deleteMask(id: string, userId: string): Promise<boolean> {
+    const m = this.masks.get(id);
+    if (m && m.userId === userId) return this.masks.delete(id);
+    return false;
+  }
+
+  // Attachments --------------------------------------------------------------
+  async addAttachment(att: RunAttachment): Promise<void> {
+    this.attachments.set(att.id, { ...att });
+  }
+  async listAttachments(runId: string): Promise<RunAttachment[]> {
+    return [...this.attachments.values()]
+      .filter((a) => a.runId === runId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+  async getAttachment(id: string): Promise<RunAttachment | null> {
+    return this.attachments.get(id) ?? null;
+  }
+  async deleteAttachment(id: string): Promise<boolean> {
+    return this.attachments.delete(id);
+  }
+
+  // Screenshot decisions -----------------------------------------------------
+  async addScreenshotDecision(d: ScreenshotDecision): Promise<void> {
+    this.decisions.push({ ...d });
+  }
+  async listScreenshotDecisions(runId: string): Promise<ScreenshotDecision[]> {
+    return this.decisions
+      .filter((d) => d.runId === runId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   // Monitors -----------------------------------------------------------------
@@ -412,6 +502,10 @@ export class InMemoryStore implements Store {
     this.projects.clear();
     this.approvals = [];
     this.activity = [];
+    this.masks.clear();
+    this.attachments.clear();
+    this.usageAlertState.clear();
+    this.decisions = [];
   }
 }
 
@@ -441,3 +535,5 @@ export type {
   TeamActivity,
   TeamUsage,
 } from './teams.js';
+export type { IgnoreMask, MaskStore } from './masks.js';
+export type { RunAttachment, AttachmentKind, AttachmentStore } from './attachments.js';

@@ -23,6 +23,7 @@ import type {
 } from '../core/types.js';
 import { logger } from '../utils/logger.js';
 import { cropToMaxHeight } from './crop.js';
+import { STORYBOOK_READY_SCRIPT } from '../discovery/storybook.js';
 
 // ---------------------------------------------------------------------------
 // Browser engine map
@@ -255,6 +256,33 @@ async function executeTask(
 
       // Wait for all web fonts to finish loading
       await page.evaluate(() => document.fonts.ready);
+    }
+
+    // --- Storybook integration: wait for play() to complete --------------------
+    // When the route was discovered from a Storybook server, the iframe URL
+    // boots the preview *and* runs the story's optional `play()` function.
+    // We need to wait for that to settle before screenshotting, otherwise we
+    // capture pre-interaction state and the test is meaningless.
+    if (task.route.discoveredVia === 'storybook') {
+      try {
+        const sbTimeout = Math.min(config.pageTimeout ?? 30_000, 30_000);
+        const result = (await page.evaluate(STORYBOOK_READY_SCRIPT, sbTimeout)) as {
+          ready: boolean;
+          reason: string;
+          elapsedMs: number;
+        };
+        logger.debug(
+          `Storybook ready (${result.reason}) for ${task.route.path} in ${result.elapsedMs}ms`,
+        );
+        // Belt-and-braces: a final RAF + tiny settle keeps any post-play
+        // re-renders (e.g. focus rings, error boundaries) from being missed.
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+        await page.waitForTimeout(50);
+      } catch (err) {
+        logger.warn(
+          `Storybook ready-wait failed for ${task.route.path}: ${(err as Error).message}`,
+        );
+      }
     }
 
     // --- Apply ignore rules (hide matching elements) ---------------------------

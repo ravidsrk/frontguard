@@ -1,0 +1,472 @@
+---
+title: Self-Host
+description: Run the entire Frontguard cloud stack on your own infrastructure — Docker, no Cloudflare account required.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+
+# Self-Host Frontguard
+
+Frontguard is MIT-licensed end to end. The hosted version at
+[frontguard.dev](https://frontguard.dev) is a convenience — every line of the
+cloud API, dashboard, scheduler, and storage layer is open source and runs
+identically on your own server.
+
+This page is the operator's manual: how to get `docker compose up` working,
+where to wire in Stripe / OpenAI / Anthropic / GitHub OAuth, how to swap the
+storage layer for something heavier than SQLite, and how to deploy the result
+to Fly.io, AWS, or GCP.
+
+<Callout type="info">
+  Self-hosting is supported as a first-class deployment target. If a feature
+  works on the hosted version but breaks on yours, [open an
+  issue](https://github.com/ravidsrk/frontguard/issues) — that's a bug, not
+  a feature gap.
+</Callout>
+
+## Why self-host
+
+There's a small set of reasons people pick self-host over the hosted version,
+and they tend to come up together:
+
+- **Data control.** Your screenshots, baselines, and run metadata never leave
+  your network. Useful for staging environments that include PII, regulated
+  domains (healthcare, finance), and pre-launch products that aren't public
+  yet.
+- **No per-screenshot pricing.** Frontguard's hosted tiers meter on captured
+  screenshots. Self-hosted has no meter — the only ceiling is your own disk.
+- **Compliance.** SOC 2 / ISO 27001 audit scope is dramatically smaller when
+  the CI tool runs inside the same VPC as your application.
+- **OSS preference.** Some teams prefer to run open-source tooling on
+  open-source infrastructure on principle. We respect that.
+- **Air-gapped environments.** The container has no required outbound calls
+  once it boots — perfect for behind-firewall enterprise deployments.
+
+The trade-off, candidly: **you own the operations.** Patching, backups, and
+the on-call pager are yours. If you'd rather pay us to do that, the hosted
+version exists.
+
+## What's in the box
+
+The self-host container bundles:
+
+| Component | What it does | Backed by |
+|-----------|--------------|-----------|
+| `cloud-api` (Hono) | REST endpoints for `/v1/run`, `/v1/keys`, `/dashboard/*`, OAuth callbacks | Workers runtime via Miniflare |
+| D1 (SQLite) | Users, API keys, runs, screenshots metadata, monitors, team membership | Local SQLite file on disk |
+| R2 emulator | Screenshot PNG storage (baseline / current / diff) | Flat files on disk |
+| Cron scheduler | Periodic monitor checks (every 15 min by default) | Wrangler's local scheduled trigger |
+| OTel exporter | Run-completion metrics over OTLP/HTTP | Any OTLP-compatible collector |
+
+The runtime model is `wrangler dev --local`, which uses
+[Miniflare](https://miniflare.dev) under the hood. That means the same Worker
+code that runs on Cloudflare's edge runs unmodified on your server — no
+fork, no parallel implementation to drift.
+
+## Quick start
+
+<Steps>
+
+<Step>
+### Prerequisites
+
+You need **Docker 24+** with the `compose` plugin (it ships with Docker
+Desktop). That's it — no Node.js, no Cloudflare account, no GitHub App
+required for the first boot.
+
+```bash
+docker --version    # → Docker version 24.x or newer
+docker compose version
+```
+
+</Step>
+
+<Step>
+### Clone the repo
+
+```bash
+git clone https://github.com/ravidsrk/frontguard.git
+cd frontguard/packages/cloud-api
+```
+
+</Step>
+
+<Step>
+### Boot the stack
+
+```bash
+docker compose up --build
+```
+
+The first build pulls `node:20-bookworm-slim`, installs npm dependencies,
+applies the D1 schema, and starts the API on `:8787`. Subsequent boots reuse
+the image and the persisted SQLite database — they take seconds.
+
+</Step>
+
+<Step>
+### Verify it's running
+
+In another terminal:
+
+```bash
+curl http://localhost:8787/health
+# → {"status":"ok","version":"0.1.0"}
+```
+
+Open [http://localhost:8787/dashboard](http://localhost:8787/dashboard) — you
+should see the login screen. (Sign-in requires GitHub OAuth credentials, set
+up in the next section.)
+
+</Step>
+
+</Steps>
+
+## Wiring up secrets
+
+Every secret is read from an environment variable. Compose picks them up from
+a `.env` file in the same directory as `docker-compose.yml`, or from your
+shell.
+
+Create `packages/cloud-api/.env`:
+
+```bash
+# --- Public URLs ---------------------------------------------------
+# Where clients reach the API. Use localhost for dev, your real host
+# in production. OAuth callback URLs must match exactly.
+PUBLIC_BASE_URL=https://frontguard.example.com
+API_BASE_URL=https://frontguard.example.com
+
+# --- GitHub OAuth (for /dashboard sign-in) -------------------------
+# Create at: https://github.com/settings/applications/new
+# Callback URL: ${PUBLIC_BASE_URL}/auth/github/callback
+GITHUB_CLIENT_ID=Iv1.xxxxxxxxxxxxxxxx
+GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# --- Dashboard session cookie --------------------------------------
+# Random 32+ char string — used to sign session cookies.
+# Generate with: openssl rand -hex 32
+DASHBOARD_SESSION_SECRET=replace_me_with_a_real_random_secret
+
+# --- AI captioning (optional) --------------------------------------
+# Powers the AI summaries on diffs. The API degrades gracefully when
+# both are absent — diffs still render, just without prose captions.
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+
+# --- Daytona sandboxes (optional) ----------------------------------
+# Required only if you want the cloud-side browser execution path.
+# Leave blank to use the local CLI flow.
+DAYTONA_API_KEY=
+
+# --- Email alerts (optional) ---------------------------------------
+RESEND_API_KEY=re_...
+ALERT_FROM_EMAIL=alerts@example.com
+
+# --- Stripe (optional — only if you want a paid tier on top) -------
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PRICE_PRO=
+STRIPE_PRICE_BUSINESS=
+
+# --- OpenTelemetry (optional) --------------------------------------
+# Point at any OTLP/HTTP collector — Honeycomb, Grafana Cloud, or an
+# in-cluster Otel collector. Both vars are optional.
+OTEL_EXPORTER_OTLP_ENDPOINT=https://api.honeycomb.io/v1/metrics
+OTEL_EXPORTER_OTLP_HEADERS=x-honeycomb-team=YOUR_KEY
+```
+
+<Callout type="warn">
+  `.env` is gitignored — keep it that way. For production deploys, use your
+  platform's secret manager (Fly secrets, AWS Secrets Manager, GCP Secret
+  Manager) and pass values as environment variables instead.
+</Callout>
+
+After editing `.env`, restart the stack:
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+## Storage strategy
+
+The self-host container ships with two backends out of the box: local
+**SQLite** for relational data and **local-disk** files for binary blobs.
+Both work for any single-node deployment up to roughly 10,000 runs / day.
+
+### Default: SQLite + local disk
+
+Pros: zero setup, atomic, ACID, fast, file-system-native backups, fits a
+laptop or a $5 VM.
+
+Cons: single-writer. Doesn't horizontally scale. A SQL query that locks the
+write path will queue every other writer.
+
+The state lives in the `frontguard-data` Docker volume, which Compose
+materialises somewhere like `/var/lib/docker/volumes/<project>_frontguard-data/_data`.
+Back it up with the usual `docker run --rm -v frontguard-data:/d busybox tar`
+incantation, or by running `sqlite3 .backup` inside the container.
+
+### Upgrade path: D1 (production Cloudflare)
+
+If you ever want to migrate to the hosted version (or to a Cloudflare-managed
+D1 even while self-hosting the worker), the schema is identical — D1 is
+SQLite. Export the local DB with `sqlite3 backup.db`, then `wrangler d1
+execute frontguard --file=backup.sql` against the remote D1.
+
+### Upgrade path: PostgreSQL
+
+Larger deployments will eventually want PostgreSQL. The `Store` interface in
+`packages/cloud-api/src/db/store.ts` is implementation-agnostic — write a
+`PostgresStore` against the same interface and swap it in via
+`db/factory.ts`. Pull requests welcome.
+
+### Blobs: local disk vs S3 / R2
+
+Screenshots are PNGs and they add up — a single 10-route × 4-viewport ×
+3-browser run captures 120 baselines + 120 current images + up to 120 diffs.
+At ~200 KB each, that's ~72 MB per run.
+
+| Volume | Recommended backend |
+|--------|--------------------|
+| < 1,000 runs / month | Local disk (the default). |
+| 1,000 – 10,000 / month | Local disk on an SSD-backed volume, with nightly rsync to S3 Glacier for archival. |
+| > 10,000 / month | Swap the `R2ScreenshotStore` for an `S3ScreenshotStore` (or use real Cloudflare R2). |
+
+The `ScreenshotStore` interface is in
+`packages/cloud-api/src/storage/screenshots.ts`. The R2 implementation is ~30
+lines — an S3 implementation is similar.
+
+## Production deploy recipes
+
+The same Docker image runs on any platform that accepts an OCI container.
+Three concrete recipes follow.
+
+### Fly.io
+
+Fly is the lightest-weight option — single-region, single-VM, one
+`fly.toml`, ten lines of config. Roughly $5/month for a 1× shared-CPU VM
+with a 10 GB persistent volume.
+
+<Tabs items={['fly.toml', 'commands']}>
+  <Tab value="fly.toml">
+    ```toml
+    app = "frontguard-self-host"
+    primary_region = "iad"
+
+    [build]
+      dockerfile = "Dockerfile"
+
+    [http_service]
+      internal_port = 8787
+      force_https = true
+      auto_stop_machines = false
+      min_machines_running = 1
+
+    [[mounts]]
+      source = "frontguard_data"
+      destination = "/data"
+      initial_size = "10gb"
+
+    [[vm]]
+      cpu_kind = "shared"
+      cpus = 1
+      memory_mb = 512
+    ```
+  </Tab>
+  <Tab value="commands">
+    ```bash
+    cd packages/cloud-api
+    fly launch --no-deploy            # generates fly.toml — replace with above
+    fly volume create frontguard_data --size 10
+    fly secrets set GITHUB_CLIENT_ID=... GITHUB_CLIENT_SECRET=... \
+      DASHBOARD_SESSION_SECRET=$(openssl rand -hex 32) \
+      OPENAI_API_KEY=...
+    fly deploy
+    fly open
+    ```
+  </Tab>
+</Tabs>
+
+### AWS — ECS Fargate + EFS
+
+For AWS-native shops. EFS provides persistent storage that survives task
+restarts; ECS Fargate runs the container without you managing EC2.
+
+High-level shape:
+
+1. Push the image to ECR: `docker push <account>.dkr.ecr.<region>.amazonaws.com/frontguard:latest`
+2. Create an EFS file system, mount target in your VPC subnets.
+3. Define a Fargate task with:
+   - The Frontguard image
+   - A volume backed by your EFS file system, mounted at `/data`
+   - Environment variables / secrets pulled from AWS Secrets Manager
+4. Front it with an Application Load Balancer + ACM cert for HTTPS.
+
+A complete CloudFormation / Terraform template is out of scope for this doc —
+the simple version is "any container-runner with a persistent volume."
+
+### GCP — Cloud Run + Filestore
+
+Cloud Run handles the container; Filestore (or a GCE persistent disk on GKE)
+handles `/data`. Cloud Run's stateless model means **single-instance only** —
+set `--min-instances=1 --max-instances=1` so concurrent writes to SQLite
+don't collide.
+
+```bash
+gcloud run deploy frontguard \
+  --source . \
+  --port 8787 \
+  --min-instances 1 \
+  --max-instances 1 \
+  --memory 1Gi \
+  --set-env-vars="$(cat .env | xargs)" \
+  --add-volume="name=data,type=cloud-storage,bucket=frontguard-data" \
+  --add-volume-mount="volume=data,mount-path=/data"
+```
+
+<Callout type="info">
+  Cloud Run + GCS Fuse is slower than a real disk. For production GCP
+  deployments, prefer GKE with a `ReadWriteOnce` PersistentVolumeClaim.
+</Callout>
+
+### Kubernetes (any provider)
+
+A minimal Deployment + StatefulSet + Service + Ingress works. The key bit is
+the PVC — SQLite needs `ReadWriteOnce` block storage, not `ReadWriteMany`
+NFS.
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: frontguard
+spec:
+  serviceName: frontguard
+  replicas: 1
+  selector:
+    matchLabels: { app: frontguard }
+  template:
+    metadata: { labels: { app: frontguard } }
+    spec:
+      containers:
+        - name: cloud-api
+          image: ghcr.io/ravidsrk/frontguard-cloud-api:latest
+          ports: [{ containerPort: 8787 }]
+          envFrom: [{ secretRef: { name: frontguard-secrets } }]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 20Gi } }
+```
+
+## HTTPS
+
+The container itself speaks HTTP. For HTTPS in production, put it behind a
+reverse proxy that handles TLS termination:
+
+- **Caddy** — auto-renews Let's Encrypt certs with zero config. Uncomment
+  the `caddy` block in `docker-compose.yml` and point a domain at the host.
+- **Cloudflare** — orange-cloud the DNS record; Cloudflare terminates TLS at
+  their edge and forwards to your origin over Flexible / Full / Full (Strict).
+- **Fly.io / Cloud Run** — TLS is automatic, no proxy needed.
+- **AWS ALB / GCP HTTPS LB** — terminate TLS at the load balancer.
+
+## Trade-offs vs hosted
+
+A direct comparison so you can make an informed call:
+
+| | Hosted | Self-host |
+|---|---|---|
+| **Setup time** | 90 seconds | 5–30 minutes |
+| **Pricing model** | Per-screenshot | $0 (your infra cost) |
+| **Updates** | Continuous, zero-touch | You pull + redeploy |
+| **Cron monitors** | Always-on, multi-region | Single node, your uptime |
+| **Browser execution** | Daytona sandboxes pre-warmed | Local CLI runs on your CI |
+| **Data residency** | Cloudflare global edge | Wherever you host |
+| **Backup / DR** | Managed | You own it |
+| **AI captions** | Bundled OpenAI / Anthropic | BYO API key |
+| **Support** | Email + Slack | GitHub issues |
+| **Scale ceiling** | Unbounded | ~10K runs / day per node |
+
+If you're a solo dev, a small team, or a hobby project — hosted is usually
+the right call. If you have a compliance requirement, an existing SRE
+practice, or a strong "no SaaS for build tooling" position — self-host fits.
+
+## Upgrading
+
+Each release publishes a tagged image at
+`ghcr.io/ravidsrk/frontguard-cloud-api:vX.Y.Z`. To upgrade:
+
+```bash
+cd packages/cloud-api
+git pull
+docker compose pull
+docker compose up -d --build
+```
+
+The D1 schema uses `CREATE TABLE IF NOT EXISTS` and additive migrations only
+— upgrading never destroys data. Major-version bumps will include any
+explicit migration steps in the release notes.
+
+## Troubleshooting
+
+### `docker compose up` exits immediately
+
+Check the logs: `docker compose logs cloud-api`. The most common cause is a
+port conflict on `:8787`. Override with `FRONTGUARD_PORT=9999 docker compose
+up`.
+
+### `/health` returns 200 but the dashboard 404s
+
+The dashboard mounts under `/dashboard` and requires
+`DASHBOARD_SESSION_SECRET` to be set. If it's missing, sign-in silently
+fails. Set it in `.env` and restart.
+
+### Screenshots aren't persisting across container restarts
+
+The `frontguard-data` named volume is what persists state. If you ran
+`docker compose down -v` (the `-v` flag deletes volumes), the data is gone.
+Use plain `docker compose down` to stop without nuking state.
+
+### OAuth callback errors
+
+The `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` you create on github.com
+must have the **exact** callback URL `${PUBLIC_BASE_URL}/auth/github/callback`.
+Mismatched scheme (http vs https), trailing slash, or port number all break
+the redirect.
+
+### "wrangler: command not found" in logs
+
+The runtime stage installs wrangler with `npm install --no-save`. If your
+build failed partway through, rebuild without cache:
+`docker compose build --no-cache cloud-api`.
+
+## Telemetry & privacy
+
+The container makes **no outbound network calls** by default. Specifically:
+
+- Wrangler's metrics telemetry is disabled (`WRANGLER_SEND_METRICS=false`).
+- Generic `DO_NOT_TRACK=1` is set.
+- OpenTelemetry export is **opt-in** — only fires when
+  `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+- AI captioning calls (OpenAI / Anthropic) only happen when you provide an
+  API key.
+- GitHub OAuth fires only when a user clicks sign-in.
+
+You can verify with `tcpdump` or your egress firewall — a freshly-booted
+self-host container with no secrets is silent.
+
+## Next steps
+
+- [Quick start guide →](/docs/quick-start) — run your first visual regression test.
+- [Playwright plugin →](/docs/playwright) — wire Frontguard into existing Playwright tests.
+- [CI/CD recipes →](/docs/ci-cd) — GitHub Actions, GitLab CI, CircleCI.
+- [GitHub issues](https://github.com/ravidsrk/frontguard/issues) — bug reports, feature requests, deploy recipes for other platforms.

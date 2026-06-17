@@ -30,6 +30,9 @@ export interface VercelWebhookPayload {
       target?: string | null; // "production" | "staging" | null (preview)
     };
     project?: { id: string; name?: string };
+    /** Owning team id (present on team-owned projects). */
+    team?: { id: string } | null;
+    teamId?: string | null;
     links?: { deployment?: string; project?: string };
   };
 }
@@ -40,6 +43,10 @@ export interface WebhookDecision {
   reason: string;
   /** Fully-qualified preview URL to test (when `trigger` is true). */
   previewUrl?: string;
+  /** The Vercel project id this event belongs to (used for authorization lookup). */
+  projectId?: string;
+  /** The Vercel team id, when the project is team-owned. */
+  teamId?: string;
   /** Git metadata extracted from the deployment, if present. */
   git?: {
     commitSha?: string;
@@ -88,20 +95,95 @@ export function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+/** Options controlling which deployment URLs are accepted. */
+export interface PreviewUrlOptions {
+  /**
+   * `true` when the project the deployment belongs to has been authorized via
+   * the Vercel OAuth install flow (i.e. an integration record exists in KV).
+   *
+   * Trust model: a Vercel webhook is HMAC-signed with our integration's client
+   * secret. A valid signature proves the event was emitted by Vercel for an
+   * installation we own — i.e. the project's owner consented to give Frontguard
+   * a deployment URL by installing the integration. Once consent is established,
+   * we trust whatever host Vercel reports as the preview URL for that project
+   * (custom domain, branch alias, or `*.vercel.app`).
+   *
+   * Defense-in-depth (always enforced, even when authorized):
+   * - https scheme only
+   * - block private / loopback / link-local hosts to mitigate cloud-metadata
+   *   and lateral-movement SSRF (169.254.169.254, 127.0.0.1, 10.0.0.0/8, …)
+   */
+  authorizedProject?: boolean;
+}
+
+/**
+ * Returns true if `host` resolves to a private, loopback, or link-local
+ * address — i.e. one we never want to hit from a server-side fetcher.
+ *
+ * Hostnames are checked literally (no DNS lookup) — we only need to block
+ * obvious SSRF targets passed inline. Production cloud-side fetchers are
+ * expected to do their own DNS-time SSRF guarding.
+ */
+export function isPrivateOrLoopbackHost(host: string): boolean {
+  const h = host.toLowerCase();
+  if (h === 'localhost' || h === 'localhost.localdomain') return true;
+  if (h === 'metadata.google.internal' || h === 'metadata') return true;
+  // IPv6 loopback / link-local / unique-local.
+  if (h === '::1' || h === '[::1]') return true;
+  if (h.startsWith('fe80:') || h.startsWith('[fe80:')) return true;
+  if (h.startsWith('fc') || h.startsWith('fd')) {
+    // fc00::/7 (unique local). Strip brackets for the check.
+    const stripped = h.startsWith('[') ? h.slice(1, -1) : h;
+    if (stripped.startsWith('fc') || stripped.startsWith('fd')) return true;
+  }
+  // IPv4 dotted-quad checks.
+  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const a = Number(v4[1]);
+    const b = Number(v4[2]);
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 0) return true;
+    if (a === 169 && b === 254) return true; // link-local / cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+    if (a >= 224) return true; // multicast / reserved
+  }
+  return false;
+}
+
 /**
  * Validates that a deployment preview URL is safe to forward to the Cloud API
- * for screenshotting, mitigating SSRF. A URL is allowed only when it uses
- * `https:` and its host ends with `.vercel.app` (or exactly `vercel.app`).
+ * for screenshotting.
+ *
+ * Two trust tiers:
+ * - **Always allowed**: https URLs on `*.vercel.app`. Vercel owns this suffix;
+ *   the host can't be a private address, and no install record is required.
+ * - **Allowed for authorized projects**: when the project is authorized
+ *   (see {@link PreviewUrlOptions.authorizedProject}), any https host is
+ *   accepted *except* private/loopback/link-local addresses (SSRF guard).
+ *   This is what makes custom-domain previews (e.g. `preview.acme.com`,
+ *   branch aliases) work end-to-end.
+ *
+ * Without authorization, custom domains are rejected — that's the closed
+ * default for the *.vercel.app-only mode the integration shipped with.
  *
  * @param previewUrl - The fully-qualified preview URL (e.g. `https://x.vercel.app`).
+ * @param opts - Authorization context derived from the webhook handler.
  */
-export function isAllowedPreviewUrl(previewUrl: string | undefined): boolean {
+export function isAllowedPreviewUrl(
+  previewUrl: string | undefined,
+  opts: PreviewUrlOptions = {},
+): boolean {
   if (!previewUrl) return false;
   try {
     const url = new URL(previewUrl);
     if (url.protocol !== 'https:') return false;
     const host = url.hostname.toLowerCase();
-    return host === 'vercel.app' || host.endsWith('.vercel.app');
+    if (isPrivateOrLoopbackHost(host)) return false;
+    if (host === 'vercel.app' || host.endsWith('.vercel.app')) return true;
+    return opts.authorizedProject === true;
   } catch {
     return false;
   }
@@ -132,10 +214,13 @@ export function decideFromWebhook(payload: VercelWebhookPayload): WebhookDecisio
   }
 
   const meta = dep.meta ?? {};
+  const teamId = payload.payload.team?.id ?? payload.payload.teamId ?? undefined;
   return {
     trigger: true,
     reason: 'Preview deployment succeeded',
     previewUrl: dep.url.startsWith('http') ? dep.url : `https://${dep.url}`,
+    projectId: payload.payload.project?.id,
+    teamId: teamId ?? undefined,
     git: {
       commitSha: meta.githubCommitSha ?? meta.gitCommitSha,
       pullRequestId: meta.githubPrId ?? meta.githubCommitRef,

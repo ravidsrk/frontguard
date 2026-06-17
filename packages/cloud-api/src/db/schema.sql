@@ -169,3 +169,61 @@ CREATE TABLE IF NOT EXISTS monitor_alert_state (
   last_alert_at TEXT,
   snoozed_until TEXT             -- ISO timestamp until which alerts are suppressed
 );
+
+-- Ignore-region masks (Task 15.5) ----------------------------------------
+-- A saved rectangle (in image coordinates relative to a route+viewport)
+-- that diff comparisons should ignore. Scoped to the owning user so private.
+CREATE TABLE IF NOT EXISTS masks (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  route TEXT NOT NULL,
+  viewport INTEGER NOT NULL,
+  x INTEGER NOT NULL,
+  y INTEGER NOT NULL,
+  width INTEGER NOT NULL,
+  height INTEGER NOT NULL,
+  label TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_masks_user ON masks(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_masks_match ON masks(user_id, route, viewport);
+
+-- Per-diff baseline decisions (Task 15.4) ---------------------------------
+-- Bulk-approve / reject decisions made in the diff viewer. One row per
+-- (screenshot, decision); the screenshot row already knows route/viewport.
+CREATE TABLE IF NOT EXISTS screenshot_decisions (
+  id TEXT PRIMARY KEY,
+  screenshot_id TEXT NOT NULL REFERENCES screenshots(id),
+  run_id TEXT NOT NULL REFERENCES runs(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  decision TEXT NOT NULL,        -- accepted, rejected
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_screenshot_decisions_run ON screenshot_decisions(run_id);
+CREATE INDEX IF NOT EXISTS idx_screenshot_decisions_shot ON screenshot_decisions(screenshot_id);
+
+-- Run attachments (Task 15.6) ---------------------------------------------
+-- Trace bundles, DOM snapshots, console logs, and other artifacts produced
+-- during a run. Bytes live in R2; this table is the metadata index.
+CREATE TABLE IF NOT EXISTS run_attachments (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id),
+  kind TEXT NOT NULL,            -- trace, dom-snapshot, console-log, video, other
+  name TEXT NOT NULL,
+  r2_key TEXT NOT NULL,
+  content_type TEXT,
+  size_bytes INTEGER,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_run_attachments_run ON run_attachments(run_id, created_at);
+
+-- Spend-cap alert state (Task 15.7) ---------------------------------------
+-- Tracks the highest usage-warning tier already emailed per (user, month)
+-- so we don't re-spam the user every cron tick. Tiers: 0=none, 80, 95.
+CREATE TABLE IF NOT EXISTS usage_alert_state (
+  user_id TEXT NOT NULL REFERENCES users(id),
+  month TEXT NOT NULL,
+  last_tier INTEGER NOT NULL DEFAULT 0,
+  last_alert_at TEXT,
+  PRIMARY KEY (user_id, month)
+);

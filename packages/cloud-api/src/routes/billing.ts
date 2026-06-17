@@ -65,14 +65,24 @@ async function resolveUser(env: BillingEnv | undefined, apiKey: string | undefin
 }
 
 // POST /v1/billing/webhook — Stripe → plan changes. No bearer auth.
+//
+// P0-7: unsigned events are NEVER accepted. When the webhook secret is unset
+// the endpoint returns 503 "billing unconfigured" — previously any
+// unauthenticated POST flipped a team to `business`. When the secret is set,
+// the signature is verified with HMAC-SHA256 (see `verifyStripeSignature`).
 billingRoutes.post('/webhook', async (c) => {
-  const config = stripeConfig(c.env);
-  const raw = await c.req.text();
-
-  if (config) {
-    const valid = await verifyStripeSignature(raw, c.req.header('stripe-signature') ?? null, config.webhookSecret);
-    if (!valid) return c.json({ error: 'Invalid signature' }, 401);
+  const webhookSecret = c.env?.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    return c.json({ error: 'Billing webhook is not configured' }, 503);
   }
+
+  const raw = await c.req.text();
+  const valid = await verifyStripeSignature(
+    raw,
+    c.req.header('stripe-signature') ?? null,
+    webhookSecret,
+  );
+  if (!valid) return c.json({ error: 'Invalid signature' }, 401);
 
   let event;
   try {

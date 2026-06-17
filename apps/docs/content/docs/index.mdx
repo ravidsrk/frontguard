@@ -1,13 +1,14 @@
 ---
 title: Getting Started
-description: AI-powered visual regression testing for frontend applications. Detect, understand, and fix visual bugs before production.
+description: AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
+import stats from '../stats.json';
 
 # Frontguard
 
-**AI-powered frontend visual regression testing.** Detect, understand, and fix visual bugs before production.
+**AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.**
 
 Backend has Datadog, Sentry, PagerDuty — a \$20B+ monitoring ecosystem. Frontend gets manual QA and hoping for the best. Frontguard changes that.
 
@@ -26,13 +27,13 @@ AI explains what changed and why → Suggests fixes → Posts PR comment
 
 ```bash title="Terminal"
 # Initialize config (auto-detects your framework)
-npx frontguard init
+npx -p @frontguard/cli frontguard init
 
 # Run visual regression tests
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 
 # Accept current screenshots as new baselines
-npx frontguard update-baselines
+npx -p @frontguard/cli frontguard update-baselines
 ```
 
 ## How It Works
@@ -69,14 +70,14 @@ The pipeline runs in stages: `discover → filter → render → diff → analyz
 - **Memory managed** — Streaming buffers, temp file cleanup, bounded concurrency
 
 <Callout type="info">
-  Frontguard ships with **395 tests**, **27 source files**, a **142KB bundle**, and **3 built-in plugins**.
+  Frontguard {stats.display.version} ships with <strong>{stats.display.tests}</strong>, <strong>{stats.display.sourceFiles}</strong>, a <strong>{stats.display.bundle} bundle</strong>, and <strong>{stats.display.plugins}</strong>. Numbers are regenerated from source on every build by <code>scripts/stats.ts</code>.
 </Callout>
 
 ## Packages
 
 | Package | Description |
 |---------|-------------|
-| [`frontguard`](./cli) | CLI tool for visual regression testing |
+| [`@frontguard/cli`](./cli) | CLI tool for visual regression testing |
 | [`@frontguard/playwright`](./playwright) | Playwright plugin for in-test visual assertions |
 
 ## Next Steps

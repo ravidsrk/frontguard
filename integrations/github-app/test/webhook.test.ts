@@ -181,12 +181,19 @@ describe('GitHub App handler', () => {
       const res = await postWebhook(app, 'pull_request', body, {
         FRONTGUARD_API_URL: 'https://api.frontguard.dev',
         FRONTGUARD_API_KEY: 'fg_x',
+        // Template fallback so the run can be triggered without a deployment
+        // event having fired first. Without this we'd correctly skip.
+        FRONTGUARD_PREVIEW_URL_TEMPLATE: 'https://pr-{prNumber}.preview.example.com',
       });
       const json = await res.json();
       expect(json.triggered).toBe(true);
       expect(json.runId).toBe('run_x');
       // The github linkage is forwarded as a nested object the Cloud API accepts.
       expect((sentBody as { github?: { owner?: string } } | null)?.github?.owner).toBe('acme');
+      // Preview URL must NOT be the github.com PR URL.
+      const runBody = sentBody as { url?: string } | null;
+      expect(runBody?.url).not.toContain('github.com');
+      expect(runBody?.url).toBe('https://pr-7.preview.example.com');
     } finally {
       globalThis.fetch = orig;
     }
@@ -243,6 +250,8 @@ describe('GitHub App handler — installation bootstrap', () => {
       { test: (u) => u.includes('/git/ref/heads/main'), res: () => new Response(JSON.stringify({ object: { sha: 'base' } }), { status: 200 }) },
       { test: (u, i) => u.includes('/git/refs') && i?.method === 'POST', res: () => new Response('{}', { status: 201 }) },
       { test: (u, i) => u.includes('/contents/frontguard.config.ts') && i?.method === 'PUT', res: () => new Response('{}', { status: 201 }) },
+      // Workflow file is also planted alongside the config.
+      { test: (u, i) => u.includes('/contents/') && u.includes('frontguard.yml') && i?.method === 'PUT', res: () => new Response('{}', { status: 201 }) },
       {
         test: (u, i) => u.includes('/pulls') && i?.method === 'POST',
         res: () => {
@@ -325,7 +334,13 @@ describe('GitHub App handler — per-repo config in run trigger', () => {
       const res = await app.request(
         '/webhook',
         { method: 'POST', body, headers: { 'x-github-event': 'pull_request', 'x-hub-signature-256': sign(body) } },
-        { GITHUB_WEBHOOK_SECRET: SECRET, ...APP_ENV, FRONTGUARD_API_URL: 'https://api.frontguard.dev', FRONTGUARD_API_KEY: 'fg_x' },
+        {
+          GITHUB_WEBHOOK_SECRET: SECRET,
+          ...APP_ENV,
+          FRONTGUARD_API_URL: 'https://api.frontguard.dev',
+          FRONTGUARD_API_KEY: 'fg_x',
+          FRONTGUARD_PREVIEW_URL_TEMPLATE: 'https://pr-{prNumber}.preview.example.com',
+        },
       );
       const json = await res.json();
       expect(json.triggered).toBe(true);
@@ -333,6 +348,8 @@ describe('GitHub App handler — per-repo config in run trigger', () => {
       expect(json.config).toBe('.github/frontguard.yml');
       expect((runRequestBody!.config as { path: string }).path).toBe('.github/frontguard.yml');
       expect(runRequestBody!.checkRunId).toBe(777);
+      // Preview URL was forwarded from the template, not the PR html_url.
+      expect(runRequestBody!.url).toBe('https://pr-7.preview.example.com');
     } finally {
       globalThis.fetch = orig;
     }

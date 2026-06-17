@@ -1,9 +1,9 @@
 /**
- * Vercel integration HTTP handler (Task 7.1).
+ * Vercel integration HTTP handler.
  *
  * A small Hono app exposing:
  * - `POST /api/webhook`  — receives Vercel deployment events.
- * - `GET  /api/install`  — OAuth-style installation landing (stub).
+ * - `GET  /api/install`  — Vercel OAuth install + callback handler.
  * - `GET  /health`       — health check.
  *
  * Deployable as a Vercel Serverless Function or any Workers/Node host.
@@ -37,6 +37,11 @@ export interface KVNamespace {
 
 /** TTL (seconds) for recorded webhook delivery ids used for idempotency. */
 const DELIVERY_ID_TTL_SECONDS = 60 * 60 * 24; // 24h
+
+/** Key used in KV to mark a Vercel project as authorized for custom-domain previews. */
+function projectAuthorizationKey(projectId: string): string {
+  return `project:${projectId}`;
+}
 
 export interface HandlerEnv {
   /** Vercel integration client secret (for signature verification + OAuth). */
@@ -127,6 +132,7 @@ export function createVercelApp() {
     // Persist the integration (access token, configurationId, team/user) to
     // durable storage keyed by configurationId. The token is never logged or
     // returned in the response body. No-ops gracefully when no KV is bound.
+    const installedAt = new Date().toISOString();
     if (c.env?.KV && callback.configurationId) {
       await c.env.KV.put(
         `integration:${callback.configurationId}`,
@@ -134,9 +140,41 @@ export function createVercelApp() {
           accessToken: integration.accessToken,
           teamId: integration.teamId,
           configurationId: callback.configurationId,
-          installedAt: new Date().toISOString(),
+          installedAt,
         }),
       );
+      // Also key by Vercel teamId so webhooks (which know the team but not the
+      // configurationId) can resolve an installation in O(1).
+      if (integration.teamId) {
+        await c.env.KV.put(
+          `team:${integration.teamId}`,
+          JSON.stringify({ configurationId: callback.configurationId, installedAt }),
+        );
+      }
+    }
+
+    // Best-effort: create a corresponding Frontguard team in the Cloud API so
+    // runs triggered by this integration are billed to the right workspace.
+    // Failure does NOT block install — the user can still attach the
+    // integration to an existing Frontguard team via env vars.
+    if (c.env?.FRONTGUARD_API_URL && c.env?.FRONTGUARD_API_KEY) {
+      try {
+        await fetch(`${c.env.FRONTGUARD_API_URL}/v1/integrations/vercel/install`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${c.env.FRONTGUARD_API_KEY}`,
+          },
+          body: JSON.stringify({
+            configurationId: callback.configurationId,
+            vercelTeamId: integration.teamId,
+            vercelUserId: integration.userId,
+            installationType: integration.installationType,
+          }),
+        });
+      } catch {
+        // Swallow — install still succeeds locally.
+      }
     }
 
     // If Vercel provided a `next` URL, complete the install by redirecting —
@@ -193,9 +231,45 @@ export function createVercelApp() {
       return c.json({ triggered: false, reason: decision.reason });
     }
 
-    // SSRF guard: only forward https URLs on the *.vercel.app allowlist to the
-    // Cloud API for screenshotting.
-    if (!isAllowedPreviewUrl(decision.previewUrl)) {
+    // Project authorization for custom-domain previews.
+    //
+    // Trust model (full details in webhook.ts and docs/integrations/vercel.mdx):
+    //  - A valid HMAC signature proves the event originated at Vercel for an
+    //    integration whose client secret we hold — i.e. someone installed
+    //    Frontguard. That alone is consent to receive preview URLs.
+    //  - We additionally require that the project (or its owning team) appear
+    //    in our KV install record. This lets users revoke an installation
+    //    (which deletes the KV record) and immediately stop the integration
+    //    from accepting custom-domain previews.
+    //  - `*.vercel.app` URLs bypass this check (Vercel owns that suffix), so
+    //    the integration keeps working before any project lookup is set up.
+    let authorizedProject = false;
+    if (c.env?.KV) {
+      const projectId = decision.projectId;
+      const teamId = decision.teamId;
+      if (projectId) {
+        const seen = await c.env.KV.get(projectAuthorizationKey(projectId));
+        if (seen) authorizedProject = true;
+      }
+      if (!authorizedProject && teamId) {
+        const installed = await c.env.KV.get(`team:${teamId}`);
+        if (installed) authorizedProject = true;
+      }
+      // Lazy first-time registration: signature is verified, so we know the
+      // event came from Vercel for our integration. Record the project so
+      // subsequent lookups are O(1).
+      if (authorizedProject && projectId) {
+        await c.env.KV.put(
+          projectAuthorizationKey(projectId),
+          JSON.stringify({ teamId: teamId ?? null, firstSeenAt: new Date().toISOString() }),
+        );
+      }
+    }
+
+    // SSRF guard. Custom hosts (e.g. `preview.acme.com`) are accepted only when
+    // the project is authorized (KV install record present); `*.vercel.app` is
+    // always allowed. Private/loopback/link-local hosts are always rejected.
+    if (!isAllowedPreviewUrl(decision.previewUrl, { authorizedProject })) {
       return c.json({ triggered: false, error: 'Preview URL not allowed' }, 400);
     }
 

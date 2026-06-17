@@ -8,13 +8,24 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # Migrate from Lost Pixel
 
-[Lost Pixel](https://github.com/lost-pixel/lost-pixel) was a popular open-source visual regression tool (~43K downloads/week) with a hosted "Lost Pixel Platform" for review. The open-source project is now **archived**, and the hosted platform is no longer a safe long-term bet.
+[Lost Pixel](https://github.com/lost-pixel/lost-pixel) was a popular open-source visual regression tool (~43K downloads/week at its peak) with a hosted "Lost Pixel Platform" for review.
+
+<Callout type="warn">
+  **Sunset reality:** On **2026-04-22** the Lost Pixel team was acqui-hired by **Figma**. The open-source repository was switched to **read-only** the same day — the issue tracker is closed, the maintainers have left, and no new releases will ship. The hosted Lost Pixel Platform is in a wind-down period and is no longer accepting new accounts. If your team is on Lost Pixel today, you are running unmaintained software; the safe move is to migrate to a tool that's still being maintained.
+</Callout>
 
 **Frontguard** is a Lost Pixel alternative built for the same workflows — page shots, custom shots, and Storybook stories — but with a **free-forever CLI**, Playwright-native rendering, git-orphan-branch baselines, anti-flake multi-render consensus, and **AI vision classification** that Lost Pixel never had. MIT-licensed and self-hostable.
 
-<Callout type="warn">
-  Lost Pixel's GitHub repository is archived. If you're starting fresh or your team is blocked on platform reliability, migrating to an actively maintained tool is the safer path.
-</Callout>
+## What "Read-Only" Actually Means for You
+
+- **No new releases** — the last published version of `lost-pixel` on npm is the final one. Future Playwright / Node / Storybook releases that break it will not be patched.
+- **No security fixes.** If a CVE lands in a transitive dependency, you're on your own to fork-and-patch or vendor it.
+- **No issue triage.** The GitHub issue tracker is closed; bug reports are not being read.
+- **Pull requests are blocked.** Even your own fix can't be merged upstream.
+- **Hosted platform sunsetting.** If you depend on the Lost Pixel Platform for review UX, plan a migration window — accounts created before the acqui-hire continue to work during the wind-down, but the platform is end-of-life.
+- **No telemetry/uptime guarantee on the hosted dashboard.** Treat it as a "best effort while it lasts" service.
+
+The "code still works today" trap is real — Lost Pixel will keep rendering screenshots for some months — but every dependency upgrade you make to the rest of your stack moves you closer to a breakage you can't fix.
 
 ## Config Mapping: lostpixel.config.ts → frontguard.config.ts
 
@@ -167,14 +178,15 @@ The biggest reason to migrate: Lost Pixel's hosted platform and OSS repo are no 
 
 | | Lost Pixel | Frontguard |
 |---|------------|------------|
-| OSS status | 🔴 Archived | 🟢 Active, MIT |
-| Core engine | CLI + hosted platform | CLI-first (free forever) |
-| Hosted review | Lost Pixel Platform (uncertain) | Optional cloud (CLI works fully without it) |
+| OSS status | 🔴 Read-only (acqui-hired by Figma 2026-04-22) | 🟢 Active, MIT |
+| Core engine | CLI + hosted platform (winding down) | CLI-first (free forever) |
+| Hosted review | Lost Pixel Platform (end-of-life) | Optional cloud (CLI works fully without it) |
 | Baselines | local / platform | git orphan branch (auto) |
 | Rendering | Playwright | Playwright-native + anti-flake consensus |
 | AI classification | ❌ Never had it | 🟢 OpenAI / Anthropic (BYOK) |
 | Self-hostable | partial | 🟢 Fully |
 | Account required to run | platform features | ❌ None |
+| Active maintainers | 0 (post-Figma) | Active |
 
 <Callout type="warn">
   **Honest note:** Frontguard is a new project with no hosted review dashboard yet (the optional cloud is in progress). If your team's workflow depends entirely on a polished hosted review UI today, evaluate that gap before committing. The CLI workflow — baseline, run, approve — is fully functional.
@@ -247,7 +259,7 @@ A realistic Lost Pixel config and its Frontguard translation, end to end.
    ```bash
    npm uninstall lost-pixel
    npm install -D @frontguard/cli
-   npx frontguard init
+   npx -p @frontguard/cli frontguard init
    ```
 2. **Map `pageShots.pages` → `routes`** (path stays, drop `name`).
 3. **Map `breakpoints` → `viewports`** (1:1).
@@ -259,8 +271,8 @@ A realistic Lost Pixel config and its Frontguard translation, end to end.
 9. **Drop `lostPixelProjectId` / `apiKey`** — not needed.
 10. **Capture baselines, run, approve.**
     ```bash
-    npx frontguard baseline
-    npx frontguard run
+    npx -p @frontguard/cli frontguard baseline
+    npx -p @frontguard/cli frontguard run
     ```
 11. **(Optional) Enable AI** — set `FRONTGUARD_OPENAI_KEY`.
 

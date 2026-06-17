@@ -1,49 +1,45 @@
-import { lazy, Suspense } from 'react';
-import Nav from './components/Nav';
-import Hero from './components/Hero';
+import type { RouteRecord } from 'vite-react-ssg';
+import { RootLayout } from './layouts/RootLayout';
+import { MarketingLayout } from './layouts/MarketingLayout';
+import { DocsLayout } from './layouts/DocsLayout';
+import { DOCS_SLUGS } from './lib/docs';
 
-const SocialProof = lazy(() => import('./components/SocialProof'));
-const Problem = lazy(() => import('./components/Problem'));
-const DemoSection = lazy(() => import('./components/DemoSection'));
-const HowItWorks = lazy(() => import('./components/HowItWorks'));
-const Features = lazy(() => import('./components/Features'));
-const Comparison = lazy(() => import('./components/Comparison'));
-const GettingStarted = lazy(() => import('./components/GettingStarted'));
-const FinalCTA = lazy(() => import('./components/FinalCTA'));
-const Footer = lazy(() => import('./components/Footer'));
+/**
+ * Route table shared by the SSG build and the client. Two shells nest under the
+ * root: the marketing layout (Nav + Footer) for the five marketing routes, and
+ * the docs layout (three-column shell) for /docs and /docs/:page. Pages are
+ * lazily imported to preserve code-splitting; the dynamic docs route enumerates
+ * its prerendered paths via getStaticPaths.
+ */
+export const routes: RouteRecord[] = [
+  {
+    path: '/',
+    element: <RootLayout />,
+    children: [
+      {
+        element: <MarketingLayout />,
+        children: [
+          { index: true, lazy: () => import('./routes/landing') },
+          { path: 'pricing', lazy: () => import('./routes/pricing') },
+          { path: 'comparisons', lazy: () => import('./routes/comparisons') },
+          { path: 'changelog', lazy: () => import('./routes/changelog') },
+          { path: 'brand', lazy: () => import('./routes/brand') },
+        ],
+      },
+      {
+        path: 'docs',
+        element: <DocsLayout />,
+        children: [
+          { index: true, lazy: () => import('./routes/docs-home') },
+          {
+            path: ':page',
+            lazy: () => import('./routes/docs-page'),
+            getStaticPaths: () => DOCS_SLUGS.map((slug) => `/docs/${slug}`),
+          },
+        ],
+      },
+    ],
+  },
+];
 
-const SectionSkeleton = () => (
-  <div className="min-h-[50vh] flex items-center justify-center">
-    <div className="w-8 h-8 rounded-full border-2 border-accent/30 border-t-accent animate-spin" />
-  </div>
-);
-
-export default function App() {
-return (
-<>
-<a
-href="#main-content"
-className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-lg focus:bg-[var(--color-accent)] focus:px-4 focus:py-2 focus:text-[var(--color-bg)] focus:font-semibold"
->
-Skip to main content
-</a>
-<Nav />
-<main id="main-content">
-<Hero />
-<Suspense fallback={<SectionSkeleton />}>
-<SocialProof />
-<Problem />
-<DemoSection />
-<HowItWorks />
-<Features />
-<Comparison />
-<GettingStarted />
-<FinalCTA />
-</Suspense>
-</main>
-<Suspense fallback={<SectionSkeleton />}>
-<Footer />
-</Suspense>
-</>
-);
-}
+export default routes;

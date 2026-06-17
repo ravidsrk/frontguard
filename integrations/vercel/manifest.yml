@@ -1,0 +1,67 @@
+# Vercel Integration Marketplace listing for Frontguard.
+#
+# This file is the source of truth for the listing on
+# https://vercel.com/integrations — the values here are mirrored into the
+# Vercel "Integration Console" (https://vercel.com/dashboard/integrations/console)
+# when the listing is published.
+#
+# Vercel doesn't yet ingest a YAML manifest automatically; until they do,
+# treat this as documentation + a paste-ready source for the console UI.
+
+name: Frontguard
+slug: frontguard
+tagline: AI-powered visual regression testing for every preview deployment.
+description: |
+  Frontguard runs visual regression checks against every Vercel preview
+  deployment and posts a pass/fail summary back to the linked pull request.
+  Custom domains, branch aliases, and `*.vercel.app` preview URLs are all
+  supported once the integration is installed on a team or project.
+
+categories:
+  - testing
+  - monitoring
+  - developer-tools
+
+# Vercel OAuth configuration. The redirect URL must match `VERCEL_REDIRECT_URI`
+# in the deployed integration's env. Scopes are the minimum required to receive
+# deployment webhooks for installed projects — Frontguard never reads source
+# code, env vars, or production deployments.
+oauth:
+  redirect_url: https://frontguard.dev/api/install
+  scopes:
+    - read:project
+    - read:deployment
+    - read:team
+
+# Webhook endpoint. Vercel signs each delivery with HMAC-SHA1 over the raw body
+# using the integration client secret (`x-vercel-signature` header). The handler
+# fails closed when no secret is configured.
+webhook:
+  url: https://frontguard.dev/api/webhook
+  events:
+    - deployment.created
+    - deployment.succeeded
+    - deployment.ready
+    - deployment.error
+    - integration-configuration.removed
+
+# Marketplace presentation.
+presentation:
+  homepage: https://frontguard.dev
+  documentation: https://frontguard.dev/docs/integrations/vercel
+  support: support@frontguard.dev
+  privacy_policy: https://frontguard.dev/privacy
+  terms_of_service: https://frontguard.dev/terms
+
+# What we touch on the user's account. Surface this in the listing so reviewers
+# (and users) understand the integration's blast radius.
+permissions:
+  - "Receive a webhook on every preview deployment for installed projects."
+  - "Read the deployment URL (custom domain or `*.vercel.app`) to take screenshots."
+  - "Read git metadata (commit sha, PR id, repo, branch) attached to the deployment."
+
+# What we explicitly do NOT do.
+permissions_not_used:
+  - "Read or modify source code, env vars, or build settings."
+  - "Trigger or roll back deployments."
+  - "Touch production deployments — only `target=null` (preview) is processed."

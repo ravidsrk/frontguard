@@ -1,8 +1,8 @@
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import { z } from 'zod';
 import type { Run } from './types.js';
-import { processRun } from './processor.js';
+import { processRun, type ProcessorEnv } from './processor.js';
 import { emitRunTelemetry, runMetricsFromRun, type OtelEnv } from './otel/index.js';
 import { getStore, isProduction, type Bindings } from './db/factory.js';
 import { currentMonth, type Store } from './db/store.js';
@@ -15,12 +15,22 @@ import { persistScreenshots, type PendingScreenshot } from './storage/persist-sc
 import { completeCheckRun } from './github-callback.js';
 import { monitorRoutes } from './routes/monitors.js';
 import { dashboardRoutes, sessionDashboardRoutes } from './routes/dashboard.js';
+import { hasValidSessionSecret } from './auth/session.js';
 import { teamRoutes } from './routes/teams.js';
 import { can } from './db/teams.js';
 import { billingRoutes } from './routes/billing.js';
 import { getPlan, checkLimit } from './billing/plans.js';
+import { evaluateSpendCap } from './billing/spend-cap.js';
 import { runScheduledChecks } from './scheduler.js';
 import type { AlertEnv } from './alerts/index.js';
+import pkg from '../package.json';
+
+/**
+ * Canonical product version reported by `/health`. Sourced from package.json
+ * so it tracks every release automatically — previously this was hardcoded
+ * to "0.1.0" and drifted from the canonical 0.2.x line (P2-3).
+ */
+const PACKAGE_VERSION: string = (pkg as { version: string }).version;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -120,7 +130,7 @@ app.use('*', async (c, next) => {
 // ---------------------------------------------------------------------------
 // Health check (outside /v1/* — no auth required)
 // ---------------------------------------------------------------------------
-app.get('/health', (c) => c.json({ status: 'ok', version: '0.1.0' }));
+app.get('/health', (c) => c.json({ status: 'ok', version: PACKAGE_VERSION }));
 
 // ---------------------------------------------------------------------------
 // Auth + API-key management routes (mounted before the /v1 guard so the OAuth
@@ -129,6 +139,25 @@ app.get('/health', (c) => c.json({ status: 'ok', version: '0.1.0' }));
 app.route('/auth', authRoutes);
 app.route('/v1/keys', keyRoutes);
 app.route('/v1/billing', billingRoutes);
+
+// Fail closed (sec-1, cloud-4): in production the dashboard session secret MUST
+// be configured (set + >= 32 chars). Without it we refuse to serve any
+// dashboard route rather than silently signing `fg_session` cookies with the
+// insecure fallback that ships in the published source — which would let anyone
+// reading the OSS repo forge a cookie for any user. Returns 503 so an operator
+// who forgot `wrangler secret put DASHBOARD_SESSION_SECRET` gets a clear signal.
+// Dev/tests (no D1 `DB` binding) are unaffected and keep their no-config UX.
+const requireDashboardSecret: MiddlewareHandler<{
+  Bindings: Bindings;
+  Variables: Variables;
+}> = async (c, next) => {
+  if (isProduction(c.env) && !hasValidSessionSecret(c.env)) {
+    return c.text('Dashboard not configured (DASHBOARD_SESSION_SECRET missing)', 503);
+  }
+  await next();
+};
+app.use('/dashboard', requireDashboardSecret);
+app.use('/dashboard/*', requireDashboardSecret);
 
 // Browser dashboard (session-cookie auth) — mounted before the /v1 guard so it
 // is NOT behind the API-key requirement.
@@ -287,6 +316,17 @@ app.post('/v1/run', async (c) => {
   await store.createRun(run, userId);
   await store.incrementUsage(userId, currentMonth(), 1, 0);
 
+  // Spend-cap check (Task 15.7): fire an 80%/95% warning email once per tier.
+  // Best-effort — failures must never block the run submission.
+  try {
+    const u = await store.getUser(userId);
+    if (u) {
+      await evaluateSpendCap(c.env ?? {}, store, u, plan, currentMonth());
+    }
+  } catch (err) {
+    console.warn('[spend-cap] evaluation failed', err);
+  }
+
   // Record project run submission to the team activity feed.
   if (data.projectId && projectTeamId) {
     await store.recordActivity({
@@ -307,8 +347,9 @@ app.post('/v1/run', async (c) => {
     persistedShots = await persistScreenshots(store, blobs, userId, runId, shots);
   };
 
-  // Process async — mutates `run`, then persists the final state.
-  processRun(run, onScreenshots)
+  // Process async — mutates `run`, then persists the final state. The env
+  // binding carries DAYTONA_API_KEY (Workers has no Node env).
+  processRun(run, (c.env ?? {}) as ProcessorEnv, onScreenshots)
     .catch((err: Error) => {
       run.status = 'failed';
       run.error = err.message;

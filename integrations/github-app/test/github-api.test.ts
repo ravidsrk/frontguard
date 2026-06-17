@@ -258,7 +258,8 @@ describe('bootstrapConfigPr', () => {
 
   it('opens a bootstrap PR with the default config when missing', async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
-    let writtenContent = '';
+    let writtenConfig = '';
+    let writtenWorkflow = '';
     const fetchImpl = mockFetch(
       [
         // config detection → not found (both candidates)
@@ -267,12 +268,21 @@ describe('bootstrapConfigPr', () => {
         { match: (u) => u.includes('/git/ref/heads/main'), respond: () => new Response(JSON.stringify({ object: { sha: 'base' } }), { status: 200 }) },
         // create branch
         { match: (u, i) => u.includes('/git/refs') && i?.method === 'POST', respond: () => new Response('{}', { status: 201 }) },
-        // write file
+        // write config file
         {
           match: (u, i) => u.includes('/contents/frontguard.config.ts') && i?.method === 'PUT',
           respond: (_u, i) => {
             const body = JSON.parse((i!.body as string) ?? '{}');
-            writtenContent = Buffer.from(body.content, 'base64').toString();
+            writtenConfig = Buffer.from(body.content, 'base64').toString();
+            return new Response('{}', { status: 201 });
+          },
+        },
+        // write workflow file
+        {
+          match: (u, i) => u.includes('/contents/') && u.includes('frontguard.yml') && i?.method === 'PUT',
+          respond: (_u, i) => {
+            const body = JSON.parse((i!.body as string) ?? '{}');
+            writtenWorkflow = Buffer.from(body.content, 'base64').toString();
             return new Response('{}', { status: 201 });
           },
         },
@@ -284,7 +294,14 @@ describe('bootstrapConfigPr', () => {
     const pr = await bootstrapConfigPr('tok', repo, fetchImpl);
     expect(pr).not.toBeNull();
     expect(pr!.number).toBe(1);
-    expect(writtenContent).toBe(DEFAULT_CONFIG_TS);
+    expect(writtenConfig).toBe(DEFAULT_CONFIG_TS);
+    // The workflow file pins to the tagged action ref (P1-11), not @main.
+    expect(writtenWorkflow).toContain('ravidsrk/frontguard@v1');
+    expect(writtenWorkflow).not.toContain('@main');
+    // The config file imports from @frontguard/cli, not the never-published
+    // @frontguard/core.
+    expect(writtenConfig).toContain("from '@frontguard/cli'");
+    expect(writtenConfig).not.toContain('@frontguard/core');
     expect(calls.some((c) => c.url.includes('/pulls'))).toBe(true);
   });
 });

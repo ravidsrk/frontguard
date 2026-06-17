@@ -1,0 +1,41 @@
+# Frontguard GitHub App — Cloudflare Worker deployment config.
+#
+# Deploy with:
+#   wrangler deploy
+#
+# The webhook URL is set on the GitHub App itself (via manifest.yml or the
+# GitHub UI) and must match the route served by this worker:
+#   https://github-app.frontguard.dev/webhook
+#
+# Custom domain → worker mapping is configured in the Cloudflare dashboard
+# (Workers → Routes) or by adding a `routes` block below.
+
+name = "frontguard-github-app"
+main = "src/handler.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Bind the public hostname. Replace with your own hostname when self-hosting.
+[[routes]]
+pattern = "github-app.frontguard.dev/*"
+zone_name = "frontguard.dev"
+
+# Non-secret variables. Override per-environment with `[env.<name>.vars]`.
+[vars]
+# Optional URL template used when no Vercel/Netlify/Cloudflare deployment
+# event has been observed for the PR's head commit. Supports the
+# `{owner}`, `{repo}`, `{prNumber}`, `{commitSha}`, `{commitShortSha}`
+# and `{branch}` placeholders.
+# FRONTGUARD_PREVIEW_URL_TEMPLATE = "https://pr-{prNumber}.preview.example.com"
+
+# ---------------------------------------------------------------------------
+# Secrets (set via `wrangler secret put`):
+#
+#   GITHUB_WEBHOOK_SECRET    — value GitHub HMACs webhook deliveries with.
+#   GITHUB_APP_ID            — numeric id from the App settings page.
+#   GITHUB_APP_PRIVATE_KEY   — PEM-encoded private key from the same page.
+#   FRONTGUARD_API_URL       — base URL of the Cloud API (e.g. https://api.frontguard.dev).
+#   FRONTGUARD_API_KEY       — API key used when triggering runs.
+#   FRONTGUARD_CALLBACK_SECRET — shared secret the Cloud API presents on
+#                                 `/runs/:id/complete` to close out a check run.
+# ---------------------------------------------------------------------------
