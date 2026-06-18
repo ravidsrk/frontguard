@@ -17,7 +17,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
       - run: npm ci
       - run: npm run build
       - name: Install Playwright browsers
@@ -36,7 +35,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
       - run: npm ci
       - run: npm run build
       - name: Install Playwright browsers
@@ -51,7 +49,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -63,7 +60,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
       - run: npm ci
       - run: npm run build
       - name: Check bundle size
