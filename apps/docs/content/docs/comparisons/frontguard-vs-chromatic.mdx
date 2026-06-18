@@ -95,7 +95,7 @@ Chromatic relies on human review (with good tooling) to dismiss noise. Frontguar
 Chromatic uses a deterministic pixel + perceptual diff and intentionally avoids LLM-driven classification — predictable, fast, no per-snapshot token cost. Frontguard sends baseline + current images to OpenAI/Anthropic (BYOK) only on pages that actually diffed, and returns a classification, severity, explanation, and optional suggested fix. See [AI Analysis](/docs/guides/ai-analysis).
 
 ### Review & approval
-Chromatic clearly wins today: branch-aware baselines, PR checks, multi-reviewer dashboard. Frontguard's review is CLI/report-based (`frontguard approve`); a hosted dashboard is **on the roadmap, not shipped**.
+Chromatic clearly wins today: branch-aware baselines, PR checks, multi-reviewer dashboard. Frontguard's review is CLI/report-based (`frontguard accept-fix <id>` for individual AI fixes, `frontguard update-baselines` to promote current screenshots in bulk); a hosted dashboard is **on the roadmap, not shipped**.
 
 ## Pricing Comparison
 

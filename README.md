@@ -98,8 +98,8 @@ npx -p @frontguard/cli frontguard update-baselines
 | Anti-flake rendering | ✅ | ◐ | ◐ | ❌ | ❌ | ◐ |
 | Self-hostable | ✅ | ❌ | ❌ | ✅ | ◐ | 🟡 |
 | Free tier | Forever (CLI) | Trial → $399/mo | Storybook hobby | Free | Sunset | Hobby + unlimited Playwright traces |
-| Pro entry | $29/mo (optional) | ~$399/mo | per-snapshot | n/a | n/a | $100/mo |
-| Actively maintained | ✅ | ✅ | ✅ | ❌ (6yr) | ❌ (Figma acqui-hire 2026-04-22) | ✅ |
+| Pro entry | $29/mo (optional) | ~$399/mo | $179/mo | n/a | n/a | $100/mo |
+| Actively maintained | ✅ | ✅ | ✅ | ❌ (low activity) | ❌ (Figma acqui-hire 2026-04-22) | ✅ |
 
 > Migrating? See the [BackstopJS](https://frontguard.dev/docs/guides/migrate-from-backstopjs), [Lost Pixel](https://frontguard.dev/docs/guides/migrate-from-lost-pixel), and [Argos](https://frontguard.dev/docs/comparisons/frontguard-vs-argos) guides. Comparisons: [Percy](https://frontguard.dev/docs/guides/frontguard-vs-percy) · [Chromatic](https://frontguard.dev/docs/guides/frontguard-vs-chromatic) · [Argos](https://frontguard.dev/docs/comparisons/frontguard-vs-argos).
 
