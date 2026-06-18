@@ -69,9 +69,14 @@ Two key Slack mechanics make this work without a Slack-side queue:
 
 ## Install the app (admins only)
 
-The app is in the [Slack App Directory](https://slack.com/apps) — search for
-**Frontguard** or click the install button on
-[frontguard.dev/integrations/slack](https://frontguard.dev/integrations/slack). Slack will:
+<Callout type="warn">
+  The Slack App Directory listing is **in review**. To use the app today,
+  install it from the in-repo manifest at
+  [`integrations/slack-app/manifest.yml`](https://github.com/ravidsrk/frontguard/blob/main/integrations/slack-app/manifest.yml)
+  — see [Self-hosting the Slack app](#self-hosting-the-slack-app) below.
+</Callout>
+
+Installing the app kicks off Slack's standard OAuth v2 flow. Slack will:
 
 1. Show the requested scopes (`chat:write`, `commands`).
 2. Redirect you to the Frontguard worker's OAuth callback.

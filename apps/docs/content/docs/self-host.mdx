@@ -113,8 +113,11 @@ In another terminal:
 
 ```bash
 curl http://localhost:8787/health
-# → {"status":"ok","version":"0.1.0"}
+# → {"status":"ok","version":"0.2.0"}
 ```
+
+The `version` field reflects the running build's `package.json`, so it tracks
+whichever release you deployed — confirm it matches the tag you expect.
 
 Open [http://localhost:8787/dashboard](http://localhost:8787/dashboard) — you
 should see the login screen. (Sign-in requires GitHub OAuth credentials, set
@@ -339,6 +342,17 @@ A minimal Deployment + StatefulSet + Service + Ingress works. The key bit is
 the PVC — SQLite needs `ReadWriteOnce` block storage, not `ReadWriteMany`
 NFS.
 
+<Callout type="warn">
+  A hosted `ghcr.io/ravidsrk/frontguard-cloud-api` image is not published yet,
+  so the manifest below references a locally-built tag. Build and push it to a
+  registry your cluster can reach first:
+
+  ```bash
+  npm run build --workspace=packages/cloud-api
+  docker build -t frontguard-cloud-api:local packages/cloud-api
+  ```
+</Callout>
+
 ```yaml
 apiVersion: apps/v1
 kind: StatefulSet
@@ -354,7 +368,7 @@ spec:
     spec:
       containers:
         - name: cloud-api
-          image: ghcr.io/ravidsrk/frontguard-cloud-api:latest
+          image: frontguard-cloud-api:local
           ports: [{ containerPort: 8787 }]
           envFrom: [{ secretRef: { name: frontguard-secrets } }]
           volumeMounts:
@@ -402,13 +416,12 @@ practice, or a strong "no SaaS for build tooling" position — self-host fits.
 
 ## Upgrading
 
-Each release publishes a tagged image at
-`ghcr.io/ravidsrk/frontguard-cloud-api:vX.Y.Z`. To upgrade:
+Self-host upgrades build from source — there's no published registry image to
+pull yet. Grab the latest code and rebuild the local image in place:
 
 ```bash
 cd packages/cloud-api
 git pull
-docker compose pull
 docker compose up -d --build
 ```
 

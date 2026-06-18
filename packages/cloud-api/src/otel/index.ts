@@ -15,6 +15,7 @@
  */
 
 import type { Run } from '../types.js';
+import { PACKAGE_VERSION } from '../version.js';
 
 /** Bindings needed for OTLP export (from Worker secrets). */
 export interface OtelEnv {
@@ -119,7 +120,7 @@ export function buildOtlpMetricsPayload(metrics: RunMetrics, nowMs: number): unk
         resource: { attributes: [attr('service.name', 'frontguard')] },
         scopeMetrics: [
           {
-            scope: { name: 'frontguard.cloud', version: '0.2.0' },
+            scope: { name: 'frontguard.cloud', version: PACKAGE_VERSION },
             metrics: [
               sum('frontguard.runs', 1),
               sum('frontguard.comparisons', metrics.total),

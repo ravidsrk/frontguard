@@ -123,7 +123,7 @@ export default {
 | Anti-flake | manual `delay` | multi-render consensus | ✨ New |
 | Why a diff happened | ❌ pixels only | AI vision classification | ✨ New |
 | Suggested fixes | ❌ | AI suggested CSS fix | ✨ New |
-| Approve baselines | `backstop approve` | `frontguard approve` | ✅ Maps |
+| Approve baselines | `backstop approve` | `frontguard update-baselines` | ✅ Maps |
 | License | MIT | MIT | ✅ Same |
 
 ## readySelector → smartRender + waitForSelector
@@ -197,7 +197,7 @@ This is the biggest mental-model shift. BackstopJS keeps two directories of PNGs
 |------------|------------|
 | `backstop reference` | `frontguard baseline` (capture baselines) |
 | `backstop test` | `frontguard run` (compare against baselines) |
-| `backstop approve` | `frontguard approve` (promote current → baseline) |
+| `backstop approve` | `frontguard update-baselines` (promote current → baseline) |
 | `bitmaps_reference/` (committed PNGs) | git orphan branch (auto-managed) |
 | `bitmaps_test/` (gitignored output) | `./frontguard-report` (gitignored) |
 

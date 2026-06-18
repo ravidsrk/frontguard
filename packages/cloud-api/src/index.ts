@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 import type { Run } from './types.js';
 import { processRun, type ProcessorEnv } from './processor.js';
+import type { BaselineRestore, BaselineBucket } from './daytona-runner.js';
 import { emitRunTelemetry, runMetricsFromRun, type OtelEnv } from './otel/index.js';
 import { getStore, isProduction, type Bindings } from './db/factory.js';
 import { currentMonth, type Store } from './db/store.js';
@@ -23,14 +24,7 @@ import { getPlan, checkLimit } from './billing/plans.js';
 import { evaluateSpendCap } from './billing/spend-cap.js';
 import { runScheduledChecks } from './scheduler.js';
 import type { AlertEnv } from './alerts/index.js';
-import pkg from '../package.json';
-
-/**
- * Canonical product version reported by `/health`. Sourced from package.json
- * so it tracks every release automatically — previously this was hardcoded
- * to "0.1.0" and drifted from the canonical 0.2.x line (P2-3).
- */
-const PACKAGE_VERSION: string = (pkg as { version: string }).version;
+import { PACKAGE_VERSION } from './version.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -347,9 +341,36 @@ app.post('/v1/run', async (c) => {
     persistedShots = await persistScreenshots(store, blobs, userId, runId, shots);
   };
 
+  // Resolve the project's prior approved baselines so the sandbox can detect
+  // regressions instead of always emitting new_baseline (cloud-1). The route
+  // metadata lives in D1 (the R2 key slug is lossy), so we read it from the
+  // baseline run's screenshot records. Only when a project scope and an R2
+  // binding both exist; otherwise the run proceeds baseline-free.
+  let baselineRestore: BaselineRestore | undefined;
+  const screenshotsBucket = c.env?.SCREENSHOTS as BaselineBucket | undefined;
+  if (run.projectId && screenshotsBucket) {
+    const baselineRun = await store.getProjectBaseline(run.projectId);
+    if (baselineRun) {
+      const baselineShots = (await store.listScreenshots(baselineRun.id)).filter(
+        (s) => s.type === 'baseline',
+      );
+      if (baselineShots.length > 0) {
+        baselineRestore = {
+          bucket: screenshotsBucket,
+          baselines: baselineShots.map((s) => ({
+            route: s.route,
+            viewport: s.viewport,
+            browser: s.browser,
+            r2Key: s.r2Key,
+          })),
+        };
+      }
+    }
+  }
+
   // Process async — mutates `run`, then persists the final state. The env
   // binding carries DAYTONA_API_KEY (Workers has no Node env).
-  processRun(run, (c.env ?? {}) as ProcessorEnv, onScreenshots)
+  processRun(run, (c.env ?? {}) as ProcessorEnv, onScreenshots, baselineRestore)
     .catch((err: Error) => {
       run.status = 'failed';
       run.error = err.message;
@@ -382,22 +403,54 @@ app.post('/v1/run', async (c) => {
 // ---------------------------------------------------------------------------
 app.get('/v1/runs/:id', async (c) => {
   const store = c.get('store');
+  const userId = c.get('userId');
   const id = c.req.param('id');
   const run = await store.getRun(id);
   if (!run) return c.json({ error: 'Run not found' }, 404);
-  if ((await store.getRunOwner(id)) !== c.get('userId')) {
-    return c.json({ error: 'Run not found' }, 404);
+
+  // Allow access if the user owns the run directly.
+  if ((await store.getRunOwner(id)) === userId) {
+    return c.json(run);
   }
-  return c.json(run);
+
+  // Allow access if the run belongs to a project in a team the user is a member of.
+  if (run.projectId) {
+    const project = await store.getProjectById(run.projectId);
+    if (project) {
+      const member = await store.getMember(project.teamId, userId);
+      if (member) {
+        return c.json(run);
+      }
+    }
+  }
+
+  return c.json({ error: 'Run not found' }, 404);
 });
 
 // ---------------------------------------------------------------------------
 // GET /v1/runs — List runs
+//
+// Team-scoped (mcp-7): mirrors POST /v1/run's team handling. By default the
+// caller sees their own runs plus runs from every team they belong to, so a
+// personal MCP key still finds the runs a CI service account submitted under a
+// shared team. An explicit `?teamId=` narrows to that team only and 403s for a
+// non-member.
 // ---------------------------------------------------------------------------
 app.get('/v1/runs', async (c) => {
   const store = c.get('store');
-  const allRuns = await store.listRuns(c.get('userId'), 50);
-  return c.json({ runs: allRuns, total: allRuns.length });
+  const userId = c.get('userId');
+  const teamId = c.req.query('teamId');
+
+  if (teamId) {
+    const member = await store.getMember(teamId, userId);
+    if (!member) return c.json({ error: 'Not a member of the requested team' }, 403);
+    const runs = await store.listRuns(userId, { teamIds: [teamId], includeOwn: false, limit: 50 });
+    return c.json({ runs, total: runs.length });
+  }
+
+  const teams = await store.listTeamsForUser(userId);
+  const runs = await store.listRuns(userId, { teamIds: teams.map((t) => t.id), limit: 50 });
+  return c.json({ runs, total: runs.length });
 });
 
 // ---------------------------------------------------------------------------
@@ -405,11 +458,22 @@ app.get('/v1/runs', async (c) => {
 // ---------------------------------------------------------------------------
 app.get('/v1/reports/:id', async (c) => {
   const store = c.get('store');
+  const userId = c.get('userId');
   const id = c.req.param('id');
   const run = await store.getRun(id);
-  if (!run || (await store.getRunOwner(id)) !== c.get('userId')) {
-    return c.json({ error: 'Run not found' }, 404);
+  if (!run) return c.json({ error: 'Run not found' }, 404);
+
+  // Check access: user must own the run or be a member of its project's team.
+  let hasAccess = (await store.getRunOwner(id)) === userId;
+  if (!hasAccess && run.projectId) {
+    const project = await store.getProjectById(run.projectId);
+    if (project) {
+      const member = await store.getMember(project.teamId, userId);
+      if (member) hasAccess = true;
+    }
   }
+  if (!hasAccess) return c.json({ error: 'Run not found' }, 404);
+
   if (run.status !== 'completed') {
     return c.json({ error: 'Run not yet completed', status: run.status }, 202);
   }
@@ -424,11 +488,22 @@ app.get('/v1/reports/:id', async (c) => {
 // ---------------------------------------------------------------------------
 app.post('/v1/baselines/:runId/approve', async (c) => {
   const store = c.get('store');
+  const userId = c.get('userId');
   const id = c.req.param('runId');
   const run = await store.getRun(id);
-  if (!run || (await store.getRunOwner(id)) !== c.get('userId')) {
-    return c.json({ error: 'Run not found' }, 404);
+  if (!run) return c.json({ error: 'Run not found' }, 404);
+
+  // Check access: user must own the run or be a member of its project's team.
+  let hasAccess = (await store.getRunOwner(id)) === userId;
+  if (!hasAccess && run.projectId) {
+    const project = await store.getProjectById(run.projectId);
+    if (project) {
+      const member = await store.getMember(project.teamId, userId);
+      if (member && can(member.role, 'run_tests')) hasAccess = true;
+    }
   }
+  if (!hasAccess) return c.json({ error: 'Run not found' }, 404);
+
   await store.updateRun(id, { baselinesApproved: true });
   return c.json({ approved: true, runId: id });
 });

@@ -28,7 +28,7 @@ jobs:
         # Frontguard auto-detects the preview URL
 
       - name: Run Frontguard
-        uses: ravidsrk/frontguard@main
+        uses: ravidsrk/frontguard@v0
         with:
           url: ${{ env.PREVIEW_URL }}  # Or let it auto-detect
         env:
@@ -79,7 +79,7 @@ jobs:
 
       - name: Run Frontguard
         id: frontguard
-        uses: ravidsrk/frontguard@main
+        uses: ravidsrk/frontguard@v0
         with:
           viewports: '375,768,1440'
           browsers: 'chromium'
@@ -120,7 +120,7 @@ The action runs these steps automatically:
     max_timeout: 300
 
 - name: Run Frontguard
-  uses: ravidsrk/frontguard@main
+  uses: ravidsrk/frontguard@v0
   with:
     url: ${{ steps.preview.outputs.url }}
 ```
@@ -131,7 +131,7 @@ Frontguard auto-detects `DEPLOY_PRIME_URL` set by Netlify's CI environment:
 
 ```yaml
 - name: Run Frontguard
-  uses: ravidsrk/frontguard@main
+  uses: ravidsrk/frontguard@v0
   # URL auto-detected from DEPLOY_PRIME_URL
 ```
 
@@ -154,7 +154,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Update Baselines
-        uses: ravidsrk/frontguard@main
+        uses: ravidsrk/frontguard@v0
         with:
           url: 'https://your-production-url.com'
           update-baselines: 'true'
