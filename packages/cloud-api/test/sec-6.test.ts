@@ -1,12 +1,14 @@
 /**
  * SEC-6 — production mode is explicit; misconfigured prod fails closed.
  */
-import { describe, it, expect } from 'vitest';
+import { describe as describeBase, it, expect } from 'vitest';
 import { app } from '../src/index.js';
 import { sessionSecret, SessionSecretMissingError } from '../src/auth/session.js';
 import { isProduction, isProductionMisconfigured } from '../src/db/factory.js';
 import type { D1Database } from '../src/db/d1-store.js';
-import { createNodeSqliteD1 } from './helpers/node-sqlite-d1.js';
+import { createNodeSqliteD1, nodeSqliteAvailable } from './helpers/node-sqlite-d1.js';
+// node:sqlite is absent on Node 20 (CI matrix); skip this shim-backed suite there.
+const describe = nodeSqliteAvailable ? describeBase : describeBase.skip;
 import { migrate } from '../src/db/migrate.js';
 import { hashKey } from '../src/auth/keys.js';
 

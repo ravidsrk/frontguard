@@ -6,11 +6,30 @@
  * {@link D1Database.batch} is emulated with BEGIN/COMMIT/ROLLBACK so migration
  * rollback tests exercise the same all-or-nothing semantics as Cloudflare D1.
  */
-import { DatabaseSync } from 'node:sqlite';
+import { createRequire } from 'node:module';
+import type { DatabaseSync } from 'node:sqlite';
 import type { D1Database, D1PreparedStatement } from '../../src/db/d1-store.js';
 
+// `node:sqlite` is a built-in only on Node >= 22.5. CI also runs Node 20, where
+// it is absent. Load it lazily (the `import type` above is erased at runtime) and
+// expose a flag so suites can skip on Node 20 — the real runtime is workerd, so
+// this shim only needs to back the unit tests on Node 22+.
+const nodeRequire = createRequire(import.meta.url);
+let DatabaseSyncCtor: typeof DatabaseSync | undefined;
+export const nodeSqliteAvailable: boolean = (() => {
+  try {
+    DatabaseSyncCtor = (nodeRequire('node:sqlite') as typeof import('node:sqlite')).DatabaseSync;
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
 export function createNodeSqliteD1(): { db: D1Database; raw: DatabaseSync } {
-  const raw = new DatabaseSync(':memory:');
+  if (!DatabaseSyncCtor) {
+    throw new Error('node:sqlite is unavailable on this runtime (requires Node >= 22.5)');
+  }
+  const raw = new DatabaseSyncCtor(':memory:');
 
   const prepare = (query: string): D1PreparedStatement => {
     let bound: unknown[] = [];
