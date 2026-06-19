@@ -38,6 +38,24 @@ export function createSqliteD1(): { db: D1Database; raw: Database.Database } {
       raw.exec(query);
       return {};
     },
+    async batch(statements: D1PreparedStatement[]) {
+      raw.exec('BEGIN');
+      try {
+        const results: unknown[] = [];
+        for (const stmt of statements) {
+          results.push(await stmt.run());
+        }
+        raw.exec('COMMIT');
+        return results;
+      } catch (err) {
+        try {
+          raw.exec('ROLLBACK');
+        } catch {
+          // Ignore rollback failures; surface the original error.
+        }
+        throw err;
+      }
+    },
   };
 
   return { db, raw };

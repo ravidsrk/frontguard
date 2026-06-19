@@ -4,6 +4,13 @@ import { MIGRATIONS } from '../src/db/migrations/index.js';
 import { SCHEMA_SQL } from '../src/db/schema.js';
 import { createNodeSqliteD1 } from './helpers/node-sqlite-d1.js';
 
+/** Test-scoped v2 migration — injected at runtime, not shipped in prod registry. */
+const TEST_V2_MIGRATION: Migration = {
+  version: '002',
+  name: 'acceptance_test_col',
+  sql: 'ALTER TABLE users ADD COLUMN dm1_test_col TEXT;',
+};
+
 /** Baseline tables from schema.sql (excludes the migration ledger). */
 const BASELINE_TABLES = [
   'users',
@@ -33,19 +40,21 @@ function listTables(raw: ReturnType<typeof createNodeSqliteD1>['raw']): Set<stri
   return new Set(rows.map((row) => row.name));
 }
 
-function assertBaselineConverged(raw: ReturnType<typeof createNodeSqliteD1>['raw']): void {
+function assertBaselineTables(raw: ReturnType<typeof createNodeSqliteD1>['raw']): void {
   const tables = listTables(raw);
   for (const table of BASELINE_TABLES) {
     expect(tables.has(table), `missing baseline table: ${table}`).toBe(true);
   }
+}
 
-  const columns = raw.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
-  expect(columns.some((col) => col.name === 'dm1_test_col')).toBe(true);
-
+function assertLedger(
+  raw: ReturnType<typeof createNodeSqliteD1>['raw'],
+  versions: readonly string[],
+): void {
   const ledger = raw.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as Array<{
     version: string;
   }>;
-  expect(ledger.map((row) => row.version)).toEqual(['001', '002']);
+  expect(ledger.map((row) => row.version)).toEqual([...versions]);
 }
 
 function applySqlDirect(raw: ReturnType<typeof createNodeSqliteD1>['raw'], sql: string): void {
@@ -55,38 +64,62 @@ function applySqlDirect(raw: ReturnType<typeof createNodeSqliteD1>['raw'], sql: 
 }
 
 describe('migrate (DM-1)', () => {
-  it('converges a fresh database via the production registry', async () => {
+  it('creates the full baseline on a fresh database and records v1', async () => {
     const { db, raw } = createNodeSqliteD1();
 
     const executed = await migrate(db);
     expect(executed).toBeGreaterThan(0);
-    assertBaselineConverged(raw);
+    assertBaselineTables(raw);
+    assertLedger(raw, ['001']);
 
     expect(await migrate(db)).toBe(0);
   });
 
-  it('converges a legacy database that already has the full baseline schema', async () => {
+  it('recognizes a legacy database with the full v1 schema and records v1', async () => {
     const { db, raw } = createNodeSqliteD1();
     applySqlDirect(raw, SCHEMA_SQL);
 
     const executed = await migrate(db);
     expect(executed).toBeGreaterThan(0);
-    assertBaselineConverged(raw);
+    assertBaselineTables(raw);
+    assertLedger(raw, ['001']);
 
     expect(await migrate(db)).toBe(0);
   });
 
-  it('converges a partially-migrated legacy database (users-only) to the full baseline', async () => {
+  it('applies an injectable v2 migration through the same runner path', async () => {
     const { db, raw } = createNodeSqliteD1();
-    raw.exec('CREATE TABLE users (id TEXT PRIMARY KEY)');
 
-    await migrate(db);
-    assertBaselineConverged(raw);
+    await migrate(db, { migrations: [...MIGRATIONS, TEST_V2_MIGRATION] });
+    assertBaselineTables(raw);
+    assertLedger(raw, ['001', '002']);
+
+    const columns = raw.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
+    expect(columns.some((col) => col.name === 'dm1_test_col')).toBe(true);
+
+    expect(await migrate(db, { migrations: [...MIGRATIONS, TEST_V2_MIGRATION] })).toBe(0);
   });
 
-  it('rolls back a failed migration and does not record it in the ledger', async () => {
+  it('applies pending v2 on a legacy full-v1 database via injectable registry', async () => {
+    const { db, raw } = createNodeSqliteD1();
+    applySqlDirect(raw, SCHEMA_SQL);
+
+    await migrate(db, { migrations: [...MIGRATIONS, TEST_V2_MIGRATION] });
+    assertBaselineTables(raw);
+    assertLedger(raw, ['001', '002']);
+
+    const columns = raw.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
+    expect(columns.some((col) => col.name === 'dm1_test_col')).toBe(true);
+  });
+
+  it('rolls back a failed batch without changing schema or ledger', async () => {
     const { db, raw } = createNodeSqliteD1();
     await migrate(db);
+
+    const ledgerBefore = raw.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as Array<{
+      version: string;
+    }>;
+    const columnsBefore = raw.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
 
     const failingMigration: Migration = {
       version: '099',
@@ -97,23 +130,23 @@ describe('migrate (DM-1)', () => {
       `,
     };
 
-    await expect(runMigrations(db, [failingMigration])).rejects.toThrow();
+    await expect(runMigrations(db, { migrations: [failingMigration] })).rejects.toThrow();
 
-    const ledger = raw.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as Array<{
+    const ledgerAfter = raw.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as Array<{
       version: string;
     }>;
-    expect(ledger.map((row) => row.version)).toEqual(['001', '002']);
-    expect(ledger.some((row) => row.version === '099')).toBe(false);
+    expect(ledgerAfter).toEqual(ledgerBefore);
+    expect(ledgerAfter.some((row) => row.version === '099')).toBe(false);
 
-    const columns = raw.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
-    expect(columns.some((col) => col.name === 'rollback_probe')).toBe(false);
+    const columnsAfter = raw.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
+    expect(columnsAfter).toEqual(columnsBefore);
+    expect(columnsAfter.some((col) => col.name === 'rollback_probe')).toBe(false);
   });
 
-  it('exposes an ordered production registry with per-version entries', () => {
-    expect(MIGRATIONS.map((m) => m.version)).toEqual(['001', '002']);
+  it('exposes a production registry with only the v1 baseline', () => {
+    expect(MIGRATIONS).toHaveLength(1);
+    expect(MIGRATIONS[0]?.version).toBe('001');
     expect(MIGRATIONS[0]?.name).toBe('baseline');
-    expect(MIGRATIONS[1]?.name).toBe('dm1_test_col');
     expect(MIGRATIONS[0]?.sql).toContain('CREATE TABLE IF NOT EXISTS users');
-    expect(MIGRATIONS[1]?.sql).toContain('dm1_test_col');
   });
 });
