@@ -25,9 +25,15 @@ import { processRun, type ProcessorEnv } from './processor.js';
 import { dispatchAlertsWithState, type MonitorAlert, type AlertEnv } from './alerts/index.js';
 import { getPlan, hasFeature } from './billing/plans.js';
 import type { Run } from './types.js';
-import { getScreenshotStore, parseScreenshotKey, type R2Bucket } from './storage/screenshots.js';
+import { getScreenshotStore, type R2Bucket } from './storage/screenshots.js';
 import { persistScreenshots, type PendingScreenshot } from './storage/persist-screenshots.js';
 import type { BaselineRestore } from './daytona-runner.js';
+import {
+  baselineRestoreFromRefs,
+  buildMonitorScreenshotRefs,
+  parseMonitorScreenshots,
+  type MonitorScreenshotRef,
+} from './monitor-screenshots.js';
 
 /** Summary of a single scheduler tick (returned for logging/tests). */
 export interface SchedulerTickResult {
@@ -68,7 +74,20 @@ export type SchedulerEnv = Bindings & AlertEnv & ProcessorEnv;
 
 interface CheckAttempt {
   run: Run;
-  screenshotKeys: string[];
+  screenshotRefs: MonitorScreenshotRef[];
+}
+
+/**
+ * Orders due monitors oldest-due-first so deferred monitors are prioritized on
+ * the next tick and cannot be starved by short-interval monitors (REL-4).
+ */
+export function sortMonitorsByDuePriority(monitors: Monitor[]): Monitor[] {
+  return [...monitors].sort((a, b) => {
+    const aLast = a.lastRunAt ? new Date(a.lastRunAt).getTime() : 0;
+    const bLast = b.lastRunAt ? new Date(b.lastRunAt).getTime() : 0;
+    if (aLast !== bLast) return aLast - bLast;
+    return a.id.localeCompare(b.id);
+  });
 }
 
 /** Builds a check-failure alert after the retry budget is exhausted (REL-6). */
@@ -97,17 +116,9 @@ async function resolveMonitorBaseline(
   if (!bucket) return undefined;
   const priorRuns = await store.listMonitorRuns(monitor.id, 20);
   for (const prior of priorRuns) {
-    if (!prior.screenshots?.length) continue;
-    const keyed = prior.screenshots
-      .map((r2Key) => {
-        const parsed = parseScreenshotKey(r2Key);
-        if (!parsed || parsed.type !== 'baseline') return null;
-        return { route: parsed.route, viewport: parsed.viewport, browser: parsed.browser, r2Key };
-      })
-      .filter((b): b is NonNullable<typeof b> => b != null);
-    if (keyed.length > 0) {
-      return { bucket, baselines: keyed };
-    }
+    const refs = parseMonitorScreenshots(prior.screenshots, monitor.routes);
+    const restore = baselineRestoreFromRefs(refs, bucket);
+    if (restore) return restore;
   }
   return undefined;
 }
@@ -141,8 +152,11 @@ async function attemptCheck(
 
   await processRun(run, env, onScreenshots, baselineRestore);
 
-  const screenshotKeys = (await store.listScreenshots(run.id)).map((s) => s.r2Key);
-  return { run, screenshotKeys };
+  const screenshotRefs = buildMonitorScreenshotRefs(
+    monitor.routes,
+    await store.listScreenshots(run.id),
+  );
+  return { run, screenshotRefs };
 }
 
 /**
@@ -161,14 +175,14 @@ export async function runMonitor(
   let lastError: string | undefined;
   let attempts = 0;
   let succeeded = false;
-  let screenshotKeys: string[] = [];
+  let screenshotRefs: MonitorScreenshotRef[] = [];
 
   while (attempts < MAX_ATTEMPTS && !succeeded) {
     attempts++;
     try {
       const attempt = await attemptCheck(monitor, now, env, store);
       const { run } = attempt;
-      screenshotKeys = attempt.screenshotKeys;
+      screenshotRefs = attempt.screenshotRefs;
 
       // processRun marks failures on the run without throwing (REL-6).
       if (run.status === 'failed') {
@@ -206,7 +220,7 @@ export async function runMonitor(
     status,
     regressionsCount: alerts.filter((a) => a.kind !== 'error').length,
     attempts,
-    screenshots: screenshotKeys.length > 0 ? screenshotKeys : undefined,
+    screenshots: screenshotRefs.length > 0 ? screenshotRefs : undefined,
     error: lastError,
     createdAt: now.toISOString(),
     completedAt: new Date().toISOString(),
@@ -297,7 +311,8 @@ export async function runScheduledChecks(
     eligible.push(monitor);
   }
 
-  const toProcess = eligible.slice(0, MONITORS_PER_TICK);
+  const ordered = sortMonitorsByDuePriority(eligible);
+  const toProcess = ordered.slice(0, MONITORS_PER_TICK);
   const deferred = eligible.length - toProcess.length;
 
   await mapWithConcurrency(toProcess, MONITOR_CONCURRENCY, async (monitor) => {

@@ -1,3 +1,5 @@
+import type { MonitorScreenshotRef } from '../monitor-screenshots.js';
+
 /**
  * Monitor records and the monitor-store mixin (Task 6.1).
  *
@@ -44,6 +46,8 @@ export type MonitorConfig = Monitor;
 /** The outcome status of a single monitor execution. */
 export type MonitorRunStatus = 'passed' | 'regression' | 'error';
 
+export type { MonitorScreenshotRef } from '../monitor-screenshots.js';
+
 /**
  * A single execution of a monitor. Persisted to `monitor_runs` so history is
  * retained per monitor (not just the latest status on the monitor row).
@@ -56,8 +60,12 @@ export interface MonitorRun {
   regressionsCount: number;
   /** How many attempts were made (1 = first try, 2 = one retry). */
   attempts: number;
-  /** R2 keys of screenshots captured during the run. */
-  screenshots?: string[];
+  /**
+   * Screenshots captured during the run. Each entry stores the original route
+   * alongside the R2 key so nested paths round-trip (REL-2). Legacy rows may
+   * still hold a bare `string[]` of R2 keys until rewritten.
+   */
+  screenshots?: MonitorScreenshotRef[] | string[];
   error?: string;
   createdAt: string;
   completedAt?: string;
