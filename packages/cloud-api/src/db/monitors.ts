@@ -24,6 +24,8 @@ export interface MonitorAlerts {
 export interface Monitor {
   id: string;
   userId: string;
+  /** When set, approved project baselines take priority over last-run drift detection. */
+  projectId?: string;
   name: string;
   url: string;
   routes: string[];

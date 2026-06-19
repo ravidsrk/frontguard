@@ -32,6 +32,8 @@ import {
   baselineRestoreFromRefs,
   buildMonitorScreenshotRefs,
   parseMonitorScreenshots,
+  promoteRefsForBaselineStorage,
+  runIdFromR2Key,
   type MonitorScreenshotRef,
 } from './monitor-screenshots.js';
 
@@ -104,9 +106,10 @@ function buildErrorAlert(monitor: Monitor, message: string): MonitorAlert {
 }
 
 /**
- * Resolves prior baseline screenshots from the monitor's run history so the
- * sandbox can detect regressions instead of always emitting `new_baseline`
- * (REL-2).
+ * Resolves baselines for the next monitor check (REL-2):
+ *   1. Approved project baseline, when the monitor is project-scoped.
+ *   2. Approved baseline via `baseline_approvals` on a prior process run.
+ *   3. Most recent successful run's persisted screenshots (last-run-as-baseline).
  */
 async function resolveMonitorBaseline(
   store: Store,
@@ -114,8 +117,35 @@ async function resolveMonitorBaseline(
   bucket: R2Bucket | undefined,
 ): Promise<BaselineRestore | undefined> {
   if (!bucket) return undefined;
+
+  if (monitor.projectId) {
+    const baselineRun = await store.getProjectBaseline(monitor.projectId);
+    if (baselineRun) {
+      const approvedRefs = buildMonitorScreenshotRefs(
+        monitor.routes,
+        (await store.listScreenshots(baselineRun.id)).filter((s) => s.type === 'baseline'),
+      );
+      const approved = baselineRestoreFromRefs(approvedRefs, bucket);
+      if (approved) return approved;
+    }
+  }
+
   const priorRuns = await store.listMonitorRuns(monitor.id, 20);
+
   for (const prior of priorRuns) {
+    const refs = parseMonitorScreenshots(prior.screenshots, monitor.routes);
+    const runIds = [...new Set(refs.map((r) => runIdFromR2Key(r.r2Key)).filter((id): id is string => id != null))];
+    for (const runId of runIds) {
+      const approvals = await store.listApprovals(runId);
+      if (approvals[0]?.status === 'approved') {
+        const restore = baselineRestoreFromRefs(refs, bucket);
+        if (restore) return restore;
+      }
+    }
+  }
+
+  for (const prior of priorRuns) {
+    if (prior.status === 'error') continue;
     const refs = parseMonitorScreenshots(prior.screenshots, monitor.routes);
     const restore = baselineRestoreFromRefs(refs, bucket);
     if (restore) return restore;
@@ -220,7 +250,8 @@ export async function runMonitor(
     status,
     regressionsCount: alerts.filter((a) => a.kind !== 'error').length,
     attempts,
-    screenshots: screenshotRefs.length > 0 ? screenshotRefs : undefined,
+    screenshots:
+      screenshotRefs.length > 0 ? promoteRefsForBaselineStorage(screenshotRefs) : undefined,
     error: lastError,
     createdAt: now.toISOString(),
     completedAt: new Date().toISOString(),

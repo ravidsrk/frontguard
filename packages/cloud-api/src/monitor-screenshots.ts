@@ -97,13 +97,32 @@ export function parseMonitorScreenshots(
   return raw as MonitorScreenshotRef[];
 }
 
+/** Screenshot types that may seed the sandbox baseline on the next tick. */
+const BASELINE_SOURCE_TYPES = new Set<MonitorScreenshotRef['type']>(['baseline', 'current']);
+
+/** Extracts the ephemeral process-run id embedded in an R2 object key. */
+export function runIdFromR2Key(key: string): string | null {
+  const parts = key.split('/');
+  return parts.length >= 3 ? parts[1]! : null;
+}
+
+/**
+ * Promotes first-run `current` screenshots to `baseline` in monitor-run history
+ * so the next tick's restore path accepts them without requiring approval.
+ */
+export function promoteRefsForBaselineStorage(refs: MonitorScreenshotRef[]): MonitorScreenshotRef[] {
+  return refs.map((r) =>
+    BASELINE_SOURCE_TYPES.has(r.type) ? { ...r, type: 'baseline' as const } : r,
+  );
+}
+
 /** Resolves a {@link BaselineRestore} from prior monitor-run screenshot refs. */
 export function baselineRestoreFromRefs(
   refs: MonitorScreenshotRef[],
   bucket: R2Bucket,
 ): BaselineRestore | undefined {
   const baselines = refs
-    .filter((r) => r.type === 'baseline')
+    .filter((r) => BASELINE_SOURCE_TYPES.has(r.type))
     .map((r) => ({
       route: r.route,
       viewport: r.viewport,

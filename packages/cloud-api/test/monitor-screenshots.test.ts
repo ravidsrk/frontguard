@@ -5,6 +5,7 @@ import {
   buildMonitorScreenshotRefs,
   parseMonitorScreenshots,
   baselineRestoreFromRefs,
+  promoteRefsForBaselineStorage,
 } from '../src/monitor-screenshots.js';
 import { screenshotKey } from '../src/storage/screenshots.js';
 
@@ -45,6 +46,36 @@ describe('monitor-screenshots (REL-2 route round-trip)', () => {
       bucket,
     );
     expect(restore?.baselines[0].route).toBe('/foo/bar');
+  });
+
+  it('baselineRestoreFromRefs accepts first-run current screenshots', () => {
+    const bucket = { get: async () => null };
+    const restore = baselineRestoreFromRefs(
+      [
+        {
+          r2Key: 'u1/r1/foo_bar-1440-chromium-current.png',
+          route: '/foo/bar',
+          viewport: 1440,
+          browser: 'chromium',
+          type: 'current',
+        },
+      ],
+      bucket,
+    );
+    expect(restore?.baselines[0].route).toBe('/foo/bar');
+  });
+
+  it('promoteRefsForBaselineStorage upgrades current to baseline for persistence', () => {
+    const promoted = promoteRefsForBaselineStorage([
+      {
+        r2Key: 'u1/r1/foo_bar-1440-chromium-current.png',
+        route: '/foo/bar',
+        viewport: 1440,
+        browser: 'chromium',
+        type: 'current',
+      },
+    ]);
+    expect(promoted[0].type).toBe('baseline');
   });
 
   it('buildMonitorScreenshotRefs maps store records to original monitor routes', () => {
