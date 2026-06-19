@@ -368,8 +368,9 @@ app.post('/v1/run', async (c) => {
   }
 
   // Process async — mutates `run`, then persists the final state. The env
-  // binding carries DAYTONA_API_KEY (Workers has no Node env).
-  processRun(run, (c.env ?? {}) as ProcessorEnv, onScreenshots, baselineRestore)
+  // binding carries DAYTONA_API_KEY (Workers has no Node env). Keep the
+  // promise alive past the 202 response via waitUntil (REL-1).
+  const processing = processRun(run, (c.env ?? {}) as ProcessorEnv, onScreenshots, baselineRestore)
     .catch((err: Error) => {
       run.status = 'failed';
       run.error = err.message;
@@ -385,6 +386,13 @@ app.post('/v1/run', async (c) => {
       // Export OTLP metrics (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
       void emitRunTelemetry((c.env ?? {}) as OtelEnv, runMetricsFromRun(run));
     });
+  try {
+    c.executionCtx.waitUntil(processing);
+  } catch {
+    // Dev/tests without a Workers ExecutionContext (app.request) — unchanged
+    // fire-and-forget path. Production fetch always supplies executionCtx.
+    void processing;
+  }
 
   return c.json(
     {
