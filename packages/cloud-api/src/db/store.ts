@@ -611,12 +611,12 @@ export class InMemoryStore implements Store {
     return false;
   }
 
-  async listProjectRuns(projectId: string, limit = 50): Promise<Run[]> {
+  async listProjectRuns(projectId: string, limit = 50, offset = 0): Promise<Run[]> {
     return [...this.runs.values()]
       .map((r) => r.run)
       .filter((r) => r.projectId === projectId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, limit);
+      .slice(offset, offset + limit);
   }
   async getProjectBaseline(projectId: string): Promise<Run | null> {
     const approved = [...this.runs.values()]

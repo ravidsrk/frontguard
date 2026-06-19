@@ -9,6 +9,7 @@ import { InMemoryStore } from '../src/db/store.js';
 import { migrate } from '../src/db/migrate.js';
 import { createNodeSqliteD1 } from './helpers/node-sqlite-d1.js';
 import { screenshotKey, resetMemoryScreenshotStore, getMemoryScreenshotStore } from '../src/storage/screenshots.js';
+import { purgeTeamRunBlobs } from '../src/storage/purge-team-blobs.js';
 import { resetMemoryStore, getMemoryStore } from '../src/db/factory.js';
 
 function demoUserId(token: string): string {
@@ -160,6 +161,44 @@ describe('DELETE /v1/runs/:id — R2 + metadata cleanup (DM-2)', () => {
     expect(await store.listApprovals(runId)).toHaveLength(0);
     expect(await blobs.get(key)).toBeNull();
     expect(await blobs.get(attKey)).toBeNull();
+  });
+});
+
+describe('purgeTeamRunBlobs pagination (DM-2)', () => {
+  beforeEach(() => resetMemoryScreenshotStore());
+
+  it('purges every run R2 prefix across multiple pages', async () => {
+    const store = new InMemoryStore();
+    const blobs = getMemoryScreenshotStore();
+    const pageSize = 2;
+    const runCount = 5;
+
+    await store.createUser({ id: 'u1', plan: 'free', createdAt: 'now' });
+    await store.createTeam({ id: 't1', name: 'A', plan: 'free', createdAt: 'now' }, 'u1');
+    await store.createProject({ id: 'p1', teamId: 't1', name: 'Web', createdAt: 'now' });
+
+    const keys: string[] = [];
+    for (let i = 0; i < runCount; i++) {
+      const runId = `r${i}`;
+      await store.createRun(
+        {
+          ...makeRun(runId, 'p1'),
+          createdAt: `2026-06-${String(i + 1).padStart(2, '0')}T00:00:00.000Z`,
+        },
+        'u1',
+      );
+      const key = screenshotKey('u1', runId, 'baseline', '/', 1440, 'chromium');
+      keys.push(key);
+      await blobs.put(key, new Uint8Array([i]));
+    }
+    expect(blobs.size()).toBe(runCount);
+
+    await purgeTeamRunBlobs(store, 't1', undefined, pageSize);
+
+    for (const key of keys) {
+      expect(await blobs.get(key)).toBeNull();
+    }
+    expect(blobs.size()).toBe(0);
   });
 });
 

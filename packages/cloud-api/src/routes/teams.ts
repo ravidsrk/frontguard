@@ -27,37 +27,12 @@ import { can, roleAtLeast, type Capability, type TeamRole } from '../db/teams.js
 import { sendInviteEmail } from '../teams/invite-email.js';
 import { getPlan, checkLimit } from '../billing/plans.js';
 import type { AlertEnv } from '../alerts/index.js';
-import { getScreenshotStore, type R2Bucket } from '../storage/screenshots.js';
+import { purgeTeamRunBlobs } from '../storage/purge-team-blobs.js';
+import type { R2Bucket } from '../storage/screenshots.js';
 
 type Variables = { store: Store; userId: string };
 
 export const teamRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
-
-/**
- * Best-effort purge of R2 screenshot/attachment blobs for every run scoped to a
- * team's projects (DM-2). Must run before {@link Store.deleteTeam} while run
- * rows still exist so owners can be resolved.
- */
-async function purgeTeamRunBlobs(
-  store: Store,
-  teamId: string,
-  bucket: R2Bucket | undefined,
-): Promise<void> {
-  const blobs = getScreenshotStore(bucket);
-  const projects = await store.listProjects(teamId);
-  for (const project of projects) {
-    const runs = await store.listProjectRuns(project.id, 10_000);
-    for (const run of runs) {
-      const ownerId = await store.getRunOwner(run.id);
-      if (!ownerId) continue;
-      try {
-        await blobs.deleteRun(ownerId, run.id);
-      } catch {
-        /* non-fatal */
-      }
-    }
-  }
-}
 
 /** Best-effort activity recorder — never blocks the request on failure. */
 async function logActivity(
