@@ -28,9 +28,12 @@ describe('apps/web smoke', () => {
     render(<RouterProvider router={router} />)
     expect(screen.getAllByText('frontguard').length).toBeGreaterThan(0)
     expect(screen.getByText('docs')).toBeInTheDocument()
-    expect(screen.getByText('★ Star')).toBeInTheDocument()
+    expect(screen.getAllByText('★ Star').length).toBeGreaterThan(0)
     expect(
-      screen.getByRole('heading', { name: /Catch the regression,\s*not the noise/i }),
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Catch the regression, not the noise.',
+      }),
     ).toBeInTheDocument()
     expect(screen.getByText(/MIT License/)).toBeInTheDocument()
   })
