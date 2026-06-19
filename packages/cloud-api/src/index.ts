@@ -5,7 +5,8 @@ import type { Run } from './types.js';
 import { processRun, type ProcessorEnv } from './processor.js';
 import type { BaselineRestore, BaselineBucket } from './daytona-runner.js';
 import { emitRunTelemetry, runMetricsFromRun, type OtelEnv } from './otel/index.js';
-import { getStore, isProduction, type Bindings } from './db/factory.js';
+import { getStore, isProduction, isProductionMisconfigured, type Bindings } from './db/factory.js';
+import { apiRateLimiter } from './rate-limit.js';
 import { currentMonth, type Store } from './db/store.js';
 import { hashKey } from './auth/keys.js';
 import { authRoutes } from './routes/auth.js';
@@ -47,11 +48,6 @@ type Variables = {
 };
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
-
-// ---------------------------------------------------------------------------
-// Simple rate limiter - 100 requests per minute per API key
-// ---------------------------------------------------------------------------
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 // ---------------------------------------------------------------------------
 // Zod validation schema for POST /v1/run
@@ -125,6 +121,16 @@ app.use('*', async (c, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// Middleware — Fail closed when production is declared but DB is missing (SEC-6)
+// ---------------------------------------------------------------------------
+app.use('*', async (c, next) => {
+  if (isProductionMisconfigured(c.env)) {
+    return c.text('Service misconfigured (DB binding missing in production)', 503);
+  }
+  await next();
+});
+
+// ---------------------------------------------------------------------------
 // Middleware — Resolve the store for every request (D1 in prod, memory in dev)
 // ---------------------------------------------------------------------------
 app.use('*', async (c, next) => {
@@ -151,7 +157,7 @@ app.route('/v1/billing', billingRoutes);
 // insecure fallback that ships in the published source — which would let anyone
 // reading the OSS repo forge a cookie for any user. Returns 503 so an operator
 // who forgot `wrangler secret put DASHBOARD_SESSION_SECRET` gets a clear signal.
-// Dev/tests (no D1 `DB` binding) are unaffected and keep their no-config UX.
+// Dev/tests (ENVIRONMENT not set to production) keep their no-config UX.
 const requireDashboardSecret: MiddlewareHandler<{
   Bindings: Bindings;
   Variables: Variables;
@@ -203,22 +209,14 @@ app.use('/v1/*', async (c, next) => {
 // ---------------------------------------------------------------------------
 app.use('/v1/*', async (c, next) => {
   const apiKey = c.get('apiKey');
-  const now = Date.now();
-  const window = 60_000; // 1 minute
-  const limit = 100;
+  const keyHash = await hashKey(apiKey);
+  const result = apiRateLimiter.check(keyHash);
 
-  let entry = rateLimitMap.get(apiKey);
-  if (!entry || now > entry.resetAt) {
-    entry = { count: 0, resetAt: now + window };
-    rateLimitMap.set(apiKey, entry);
-  }
+  c.header('X-RateLimit-Limit', String(result.limit));
+  c.header('X-RateLimit-Remaining', String(result.remaining));
+  c.header('X-RateLimit-Reset', String(Math.ceil(result.resetAt / 1000)));
 
-  entry.count++;
-  c.header('X-RateLimit-Limit', String(limit));
-  c.header('X-RateLimit-Remaining', String(Math.max(0, limit - entry.count)));
-  c.header('X-RateLimit-Reset', String(Math.ceil(entry.resetAt / 1000)));
-
-  if (entry.count > limit) {
+  if (!result.allowed) {
     return c.json({ error: 'Rate limit exceeded. Try again later.' }, 429);
   }
 
@@ -671,4 +669,4 @@ export default {
 };
 
 // Also export the Hono app for tests and embedding.
-export { app };
+export { app, apiRateLimiter };
