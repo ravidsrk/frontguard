@@ -71,6 +71,12 @@ export const MONITORS_PER_TICK = 3;
 /** Parallel monitor executions within a single tick. */
 export const MONITOR_CONCURRENCY = 2;
 
+/**
+ * Lease duration while a monitor executes (CONC-3). Covers two 5-minute sandbox
+ * attempts; overlapping cron ticks cannot reclaim until this expires.
+ */
+export const MONITOR_LEASE_TTL_MS = 10 * 60_000;
+
 /** Scheduler env: Worker bindings + alert delivery secrets. */
 export type SchedulerEnv = Bindings & AlertEnv & ProcessorEnv;
 
@@ -258,10 +264,11 @@ export async function runMonitor(
   };
   await store.addMonitorRun(monitorRun);
 
-  // Update the monitor's latest status.
+  // Update the monitor's latest status and release the execution lease (CONC-3).
   await store.updateMonitor(monitor.id, {
     lastRunAt: now.toISOString(),
     lastStatus: status,
+    leasedUntil: undefined,
   });
 
   // Meter usage against the owner's plan (the monitor run counts as one run).
@@ -343,7 +350,12 @@ export async function runScheduledChecks(
   }
 
   const ordered = sortMonitorsByDuePriority(eligible);
-  const toProcess = ordered.slice(0, MONITORS_PER_TICK);
+  const toProcess: Monitor[] = [];
+  for (const monitor of ordered) {
+    if (toProcess.length >= MONITORS_PER_TICK) break;
+    const claimed = await store.tryClaimDueMonitor(monitor.id, now, MONITOR_LEASE_TTL_MS);
+    if (claimed) toProcess.push(claimed);
+  }
   const deferred = eligible.length - toProcess.length;
 
   await mapWithConcurrency(toProcess, MONITOR_CONCURRENCY, async (monitor) => {
