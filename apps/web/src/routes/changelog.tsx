@@ -3,19 +3,17 @@ import { Footer } from '../components/Footer'
 import { Nav } from '../components/Nav'
 import { REPO_URL } from '../lib/site'
 import { s } from '../lib/style'
+import { buildSeoHead } from '../lib/seo'
 import { GROUP_COLORS, GROUP_LABELS, RELEASES } from './changelog/-releases'
 
 export const Route = createFileRoute('/changelog')({
-  head: () => ({
-    meta: [
-      { title: 'Changelog — Frontguard' },
-      {
-        name: 'description',
-        content:
-          "What's new in Frontguard: every notable release, what it added, and what changed — newest first, following Keep a Changelog.",
-      },
-    ],
-  }),
+  head: () =>
+    buildSeoHead({
+      title: 'Changelog — Frontguard',
+      description:
+        "What's new in Frontguard: every notable release, what it added, and what changed — newest first, following Keep a Changelog.",
+      path: '/changelog',
+    }),
   component: Changelog,
 })
 

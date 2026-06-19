@@ -4,22 +4,21 @@ import {
   Outlet,
   Scripts,
 } from '@tanstack/react-router'
+import { NotFound } from '../components/NotFound'
 import appCss from '../styles.css?url'
 
+// Workers SSR handles routing — no Cloudflare Pages _redirects SPA fallback needed.
+
 export const Route = createRootRoute({
+  notFoundComponent: NotFound,
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Frontguard — Catch the regression, not the noise' },
-      {
-        name: 'description',
-        content:
-          'AI-powered frontend visual regression testing. Frontguard renders every page, diffs it against your baselines, and uses AI vision to tell a real regression from noise. MIT licensed, self-hostable, free forever.',
-      },
     ],
     links: [
       { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+      { rel: 'icon', href: '/favicon.ico', type: 'image/x-icon' },
       { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
       {
         rel: 'preconnect',

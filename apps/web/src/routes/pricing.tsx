@@ -3,17 +3,16 @@ import { useState } from 'react'
 import { Footer } from '../components/Footer'
 import { Nav } from '../components/Nav'
 import { s } from '../lib/style'
+import { buildSeoHead } from '../lib/seo'
 
 export const Route = createFileRoute('/pricing')({
   head: () => ({
-    meta: [
-      { title: 'Pricing — Frontguard' },
-      {
-        name: 'description',
-        content:
-          'The CLI is free forever under MIT. Pro hosted cloud at $29/mo. No per-screenshot pricing cliff, no dashboard lock-in.',
-      },
-    ],
+    ...buildSeoHead({
+      title: 'Pricing — Frontguard',
+      description:
+        'The CLI is free forever under MIT. Pro hosted cloud at $29/mo. No per-screenshot pricing cliff, no dashboard lock-in.',
+      path: '/pricing',
+    }),
     scripts: [
       {
         type: 'application/ld+json',

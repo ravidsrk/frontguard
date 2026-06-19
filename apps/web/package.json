@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "generate:docs": "node scripts/generate-docs-content.mjs"
+    "generate:docs": "node scripts/generate-docs-content.mjs",
+    "generate:sitemap": "node scripts/generate-sitemap.mjs"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.170.16",
