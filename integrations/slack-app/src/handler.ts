@@ -18,6 +18,7 @@
  */
 
 import { Hono } from 'hono';
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { verifySlackSignature } from './verify.js';
 import {
   parseSlackEnvelope,
@@ -61,6 +62,12 @@ export interface SlackAppEnv {
 
 const TS_HEADER = 'x-slack-request-timestamp';
 const SIG_HEADER = 'x-slack-signature';
+/** Short-lived cookie holding the OAuth `state` for CSRF verification. */
+const STATE_COOKIE = 'fg_slack_oauth_state';
+
+function oauthCookieSecure(c: { req: { url: string } }): boolean {
+  return new URL(c.req.url).protocol === 'https:';
+}
 
 async function verified(
   c: { req: { header: (n: string) => string | undefined } },
@@ -189,9 +196,27 @@ export function createSlackApp() {
 
     const code = c.req.query('code');
     if (!code) {
-      // No code yet → kick off the authorize flow.
-      return c.redirect(buildSlackAuthorizeUrl(config, c.req.query('state')));
+      // A random state mitigates CSRF. Persist it in an httpOnly cookie and
+      // require an exact match on the callback to reject forged/replayed installs.
+      const state = crypto.randomUUID();
+      setCookie(c, STATE_COOKIE, state, {
+        httpOnly: true,
+        sameSite: 'Lax',
+        path: '/',
+        maxAge: 600,
+        secure: oauthCookieSecure(c),
+      });
+      return c.redirect(buildSlackAuthorizeUrl(config, state));
     }
+
+    // CSRF: the returned state must match the cookie we set before redirecting.
+    const returnedState = c.req.query('state');
+    const expectedState = getCookie(c, STATE_COOKIE);
+    deleteCookie(c, STATE_COOKIE, { path: '/' });
+    if (!expectedState || !returnedState || returnedState !== expectedState) {
+      return c.json({ error: 'Invalid OAuth state' }, 403);
+    }
+
     try {
       const install = await exchangeSlackCode(config, code);
 

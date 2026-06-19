@@ -217,15 +217,33 @@ describe('/slack/oauth/callback — install persistence', () => {
     };
   }
 
-  it('redirects to Slack authorize when no code is present', async () => {
+  async function startSlackOAuth(): Promise<{ state: string; cookie: string }> {
+    const res = await app.request('/slack/oauth/callback', {}, envWith({}));
+    const loc = res.headers.get('location')!;
+    const state = new URL(loc).searchParams.get('state')!;
+    const setCookie = res.headers.get('set-cookie') ?? '';
+    const match = setCookie.match(/fg_slack_oauth_state=([^;]+)/);
+    return { state, cookie: `fg_slack_oauth_state=${match ? match[1] : state}` };
+  }
+
+  it('redirects to Slack authorize with a CSRF state cookie when no code is present', async () => {
     const res = await app.request('/slack/oauth/callback', {}, envWith({}));
     expect(res.status).toBe(302);
-    expect(res.headers.get('location')).toContain('https://slack.com/oauth/v2/authorize');
+    const loc = res.headers.get('location')!;
+    expect(loc).toContain('https://slack.com/oauth/v2/authorize');
+    expect(loc).toMatch(/state=/);
+    expect(res.headers.get('set-cookie')).toMatch(/fg_slack_oauth_state=/);
   });
 
   it('returns 500 when OAuth env is not configured', async () => {
     const res = await app.request('/slack/oauth/callback', {}, {});
     expect(res.status).toBe(500);
+  });
+
+  it('rejects the callback when OAuth state is missing or mismatched', async () => {
+    const res = await app.request('/slack/oauth/callback?code=abc&state=forged', {}, envWith({}));
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toMatch(/Invalid OAuth state/);
   });
 
   it('persists the install to KV keyed by team id', async () => {
@@ -243,9 +261,10 @@ describe('/slack/oauth/callback — install persistence', () => {
         { status: 200 },
       )) as typeof fetch;
     try {
+      const { state, cookie } = await startSlackOAuth();
       const res = await app.request(
-        '/slack/oauth/callback?code=abc',
-        {},
+        `/slack/oauth/callback?code=abc&state=${state}`,
+        { headers: { Cookie: cookie } },
         envWith({ SLACK_TEAMS: kv }),
       );
       expect(res.status).toBe(200);
@@ -275,7 +294,12 @@ describe('/slack/oauth/callback — install persistence', () => {
         { status: 200 },
       )) as typeof fetch;
     try {
-      const res = await app.request('/slack/oauth/callback?code=abc', {}, envWith({}));
+      const { state, cookie } = await startSlackOAuth();
+      const res = await app.request(
+        `/slack/oauth/callback?code=abc&state=${state}`,
+        { headers: { Cookie: cookie } },
+        envWith({}),
+      );
       expect(res.status).toBe(200);
       const json = (await res.json()) as { team: string; persisted: boolean };
       expect(json.team).toBe('T02');
@@ -290,7 +314,12 @@ describe('/slack/oauth/callback — install persistence', () => {
     globalThis.fetch = (async () =>
       new Response(JSON.stringify({ ok: false, error: 'invalid_code' }), { status: 200 })) as typeof fetch;
     try {
-      const res = await app.request('/slack/oauth/callback?code=bad', {}, envWith({}));
+      const { state, cookie } = await startSlackOAuth();
+      const res = await app.request(
+        `/slack/oauth/callback?code=bad&state=${state}`,
+        { headers: { Cookie: cookie } },
+        envWith({}),
+      );
       expect(res.status).toBe(400);
     } finally {
       globalThis.fetch = orig;
