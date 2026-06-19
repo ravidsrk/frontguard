@@ -600,3 +600,55 @@ Correct patterns to preserve. Do not refactor these while fixing around them.
   (`packages/cli/src/sandbox/local.ts:58`-`:61`). Keep these boundaries.
 - The Vercel integration's SSRF allowlist (`integrations/vercel/src/webhook.ts:127`-`:190`) is the right
   model and should be promoted to a shared util (SEC-2), not removed.
+
+---
+
+## 5) SKEPTIC ADJUDICATION
+
+Independent @codex skeptic pass (`codex exec`, read-only, checked every finding against the cited source). All 31 findings CONFIRMED; zero refuted. Two severity narrows (SEC-3 P2→P3; scope-narrows on REL-5, REL-6, COU-1). The CONFIRMED SET below is the FROZEN Phase-1 fix spec.
+
+| ID | Verdict | Sev (orig -> final) | Reason (evidence file:line) |
+|----|---------|----------------------|------------------------------|
+| REL-1 | CONFIRMED | P0 -> P0 | `/v1/run` detaches `processRun` and returns `202` without `waitUntil`; cron shows the missing pattern at `packages/cloud-api/src/index.ts:372` and `:565`. |
+| REL-2 | CONFIRMED | P1 -> P1 | Scheduler calls `processRun(run, env)` without screenshots or baseline restore, while `/v1/run` wires both; `scheduler.ts:63`, `index.ts:337`. |
+| REL-3 | CONFIRMED | P2 -> P2 | Rate-limit state is a module `Map` keyed by raw API key, lazily resets active keys only; `index.ts:43`, `:198`. |
+| REL-4 | CONFIRMED | P2 -> P2 | Due monitors run sequentially, each sandbox command up to 300s under a 15-min cron; `scheduler.ts:175`, `daytona-runner.ts:197`, `wrangler.toml:33`. |
+| REL-5 | CONFIRMED-NARROWED | P3 -> P3 | Predictable `Date.now()` temp dir; cleanup before outer `finally`; narrowed (ms-based); `pipeline.ts:518`, `:902`. |
+| REL-6 | CONFIRMED-NARROWED | P3 -> P3 | Scheduler only alerts on regressions; swallowed `processRun` failures treated as passed; `scheduler.ts:88`,`:130`, `processor.ts:115`. |
+| CONC-1 | CONFIRMED | P1 -> P1 | Limit check reads usage before a later increment; only the increment is atomic; `index.ts:276`,`:310`, `d1-store.ts:277`. |
+| CONC-2 | CONFIRMED | P2 -> P2 | D1 updates read full rows, merge in JS, rewrite whole rows (runs/monitors/teams); `d1-store.ts:221`,`:454`,`:570`. |
+| CONC-3 | CONFIRMED | P2 -> P2 | Due monitors selected without a lease; `lastRunAt` updated only after execution; `d1-store.ts:481`, `scheduler.ts:122`. |
+| SEC-1 | CONFIRMED | P1 -> P1 | Composite actions interpolate inputs into shell/command args; `action.yml:88`,`:134`, `packages/cli/action.yml:67`,`:113`. |
+| SEC-2 | CONFIRMED | P2 -> P2 | `/v1/run` sends any Zod URL to Daytona; only Vercel-local hostname guard exists; `index.ts:48`, `daytona-runner.ts:159`, `vercel/src/webhook.ts:127`. |
+| SEC-3 | CONFIRMED-NARROWED | P2 -> P3 | OAuth mints a key before redirect and never returns it; narrowed (plaintext discarded → credential sprawl); `routes/auth.ts:119`,`:132`. |
+| SEC-4 | CONFIRMED | P2 -> P2 | Invitation accept uses only the bearer token, no invitee identity / expiry; `routes/teams.ts:219`, `schema.sql:84`, `d1-store.ts:672`. |
+| SEC-5 | CONFIRMED | P3 -> P3 | Slack OAuth exchanges `code` without stored state verification; GitHub has the reference flow; `slack-app/src/handler.ts:178`, `oauth.ts:38`, `routes/auth.ts:88`. |
+| SEC-6 | CONFIRMED | P3 -> P3 | Production mode is `!!env.DB`; without DB, `/v1` accepts dev bearer tokens + dev session fallback; `db/factory.ts:72`, `index.ts:176`, `auth/session.ts:78`. |
+| SEC-7 | CONFIRMED | P3 -> P3 | Cloud report escapes route but not `status`/`classification`; `RunResult` are plain strings; `report-html.ts:9`,`:12`, `types.ts:58`. |
+| DM-1 | CONFIRMED | P1 -> P1 | Migration runner replays create-only schema with no ledger/transaction; `db/migrate.ts:41`, `schema.sql:5`. |
+| DM-2 | CONFIRMED | P2 -> P2 | `deleteRun` deletes only the run row; child FKs lack cascade; team delete omits runs/activity; `d1-store.ts:245`, `schema.sql:42`, `d1-store.ts:579`. |
+| DM-3 | CONFIRMED | P2 -> P2 | Plans team-scoped but enforcement/metering per-user; team usage only reported; `routes/billing.ts:120`, `index.ts:276`, `d1-store.ts:774`. |
+| COST-1 | CONFIRMED | P1 -> P1 | Request schema bounds values but not array lengths; screenshot metering after the async run; `index.ts:50`,`:58`,`:380`. |
+| COST-2 | CONFIRMED | P1 -> P1 | Checkout metadata is session-level only; subscription events derive `teamId` from subscription metadata; `billing/stripe.ts:46`,`:154`, `routes/billing.ts:98`. |
+| COST-3 | CONFIRMED | P3 -> P3 | `POST /v1/keys` creates a key without counting existing user keys; `routes/keys.ts:63`. |
+| COU-1 | CONFIRMED-NARROWED | P3 -> P3 | Root + package action manifests duplicate security-sensitive logic; narrowed (not byte-identical); `action.yml:1`, `packages/cli/action.yml:1`. |
+| DEP-1 | CONFIRMED | P1 -> P1 | Runtime installs use floating `@frontguard/cli@latest` (Action, root Dockerfile, Daytona fallback); `action.yml:84`, `packages/cli/Dockerfile:6`, `daytona-runner.ts:150`. |
+| DEP-2 | CONFIRMED | P2 -> P2 | Root Dockerfile pins Playwright 1.48 while maintained Dockerfile + dep are 1.59; `packages/cli/Dockerfile:1`, `docker/Dockerfile:48`, `package.json:73`. |
+| DEP-3 | CONFIRMED | P3 -> P3 | Engine floors conflict: root/MCP/Netlify `>=18` vs CLI `>=20`; `package.json:33`, `mcp/package.json:58`, `netlify/package.json:32`, `cli/package.json:63`. |
+| DEP-4 | CONFIRMED | P3 -> P3 | Playwright caret-pinned despite deterministic rendering requirement; `packages/cli/package.json:73`. |
+| OPS-1 | CONFIRMED | P2 -> P2 | `.gitignore` ignores `.env` but not Wrangler `.dev.vars`; `.gitignore:6`. |
+| OPS-2 | CONFIRMED | P3 -> P3 | Tracked wrangler configs contain placeholder binding IDs; `cloud-api/wrangler.toml:23`, `slack-app/wrangler.toml:18`. |
+| OPS-3 | CONFIRMED | P2 -> P2 | Background failures depend on detached promise path; several paths warn/swallow; `index.ts:373`,`:319`, `scheduler.ts:185`, `processor.ts:79`. |
+| OPS-4 | CONFIRMED | P3 -> P3 | Action writes JSON to `$GITHUB_OUTPUT` as single-line `key=value`, merges stderr into JSON file; `action.yml:155`,`:158`,`:160`. |
+
+### CONFIRMED SET (Phase-1 fix spec — FROZEN)
+
+Final severities — P0×1, P1×7, P2×11, P3×12 (31 total, all to fix):
+- P0: REL-1
+- P1: REL-2, CONC-1, SEC-1, DM-1, COST-1, COST-2, DEP-1
+- P2: REL-3, REL-4, CONC-2, CONC-3, SEC-2, SEC-4, DM-2, DM-3, DEP-2, OPS-1, OPS-3
+- P3: REL-5 (narrowed: predictable ms temp dir + cleanup gap), REL-6 (narrowed: silent monitor/processRun failures), SEC-3 (narrowed: orphaned unmanaged key rows), SEC-5, SEC-6, SEC-7, COST-3, COU-1 (narrowed: duplicated action logic, not byte-identical), DEP-3, DEP-4, OPS-2, OPS-4
+
+### REFUTED / DO-NOT-FIX
+
+- None. Every finding survived adjudication against the source.
