@@ -163,6 +163,59 @@ describe('DELETE /v1/runs/:id — R2 + metadata cleanup (DM-2)', () => {
   });
 });
 
+describe('DELETE /v1/teams/:id — R2 cleanup (DM-2)', () => {
+  beforeEach(() => {
+    resetMemoryStore();
+    resetMemoryScreenshotStore();
+  });
+
+  const auth = (t: string) => ({ Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' });
+
+  it('empties R2 prefixes for all project runs when the team is deleted', async () => {
+    const token = 'team-owner';
+    const userId = demoUserId(token);
+    const blobs = getMemoryScreenshotStore();
+
+    const teamRes = await app.request('/v1/teams', {
+      method: 'POST',
+      headers: auth(token),
+      body: JSON.stringify({ name: 'Acme' }),
+    });
+    expect(teamRes.status).toBe(201);
+    const teamId = (await teamRes.json()).id as string;
+
+    const projRes = await app.request(`/v1/teams/${teamId}/projects`, {
+      method: 'POST',
+      headers: auth(token),
+      body: JSON.stringify({ name: 'Web' }),
+    });
+    expect(projRes.status).toBe(201);
+    const projectId = (await projRes.json()).id as string;
+
+    const runRes = await app.request('/v1/run', {
+      method: 'POST',
+      headers: auth(token),
+      body: JSON.stringify({ url: 'https://example.com', projectId }),
+    });
+    expect(runRes.status).toBe(202);
+    const { id: runId } = (await runRes.json()) as { id: string };
+
+    const key = screenshotKey(userId, runId, 'baseline', '/', 1440, 'chromium');
+    const attKey = `${userId}/${runId}/attachments/trace.zip`;
+    await blobs.put(key, new Uint8Array([1, 2, 3]));
+    await blobs.put(attKey, new Uint8Array([4, 5]));
+    expect(blobs.size()).toBe(2);
+
+    const del = await app.request(`/v1/teams/${teamId}`, { method: 'DELETE', headers: auth(token) });
+    expect(del.status).toBe(200);
+    expect((await del.json()).deleted).toBe(true);
+
+    expect(await blobs.get(key)).toBeNull();
+    expect(await blobs.get(attKey)).toBeNull();
+    expect(blobs.size()).toBe(0);
+  });
+});
+
 describe('InMemoryStore deleteTeam (DM-2)', () => {
   it('removes project-scoped runs and activity', async () => {
     const store = new InMemoryStore();
