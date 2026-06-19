@@ -467,11 +467,11 @@ app.post('/v1/run', async (c) => {
       run.status = 'failed';
       run.error = err.message;
     })
-    .finally(() => {
+    .finally(async () => {
       // Screenshots were reserved at submit time (COST-1).
-      void store.updateRun(runId, run);
+      await store.updateRun(runId, run);
       if (run.status === 'failed') {
-        void recordDeadLetter(store, {
+        await recordDeadLetter(store, {
           kind: 'run',
           sourceId: runId,
           userId,
