@@ -42,6 +42,8 @@ export interface ScreenshotDecision {
 export interface User {
   id: string;
   githubId?: string;
+  /** GitHub handle (login) — used for githubLogin invitation binding (SEC-4). */
+  githubLogin?: string;
   email?: string;
   plan: string;
   createdAt: string;
@@ -112,6 +114,7 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
   getUser(id: string): Promise<User | null>;
   getUserByGithubId(githubId: string): Promise<User | null>;
   updateUserPlan(id: string, plan: string): Promise<void>;
+  updateUserIdentity(id: string, patch: { email?: string; githubLogin?: string }): Promise<void>;
 
   // API keys
   createApiKey(key: ApiKeyRecord): Promise<void>;
@@ -193,6 +196,9 @@ export class InMemoryStore implements Store {
   private users = new Map<string, User>();
   private apiKeys = new Map<string, ApiKeyRecord>();
   private runs = new Map<string, { run: Run; userId: string }>();
+  private runVersions = new Map<string, number>();
+  private monitorVersions = new Map<string, number>();
+  private teamVersions = new Map<string, number>();
   private screenshots = new Map<string, ScreenshotRecord[]>();
   private usage = new Map<string, UsageRecord>();
   private teamUsage = new Map<string, { teamId: string; month: string; runsCount: number; screenshotsCount: number }>();
@@ -224,6 +230,12 @@ export class InMemoryStore implements Store {
     const u = this.users.get(id);
     if (u) u.plan = plan;
   }
+  async updateUserIdentity(id: string, patch: { email?: string; githubLogin?: string }): Promise<void> {
+    const u = this.users.get(id);
+    if (!u) return;
+    if (patch.email !== undefined) u.email = patch.email;
+    if (patch.githubLogin !== undefined) u.githubLogin = patch.githubLogin;
+  }
 
   async createApiKey(key: ApiKeyRecord): Promise<void> {
     this.apiKeys.set(key.keyHash, { ...key });
@@ -246,6 +258,7 @@ export class InMemoryStore implements Store {
 
   async createRun(run: Run, userId: string): Promise<void> {
     this.runs.set(run.id, { run: { ...run }, userId });
+    this.runVersions.set(run.id, 0);
   }
   async getRun(id: string): Promise<Run | null> {
     return this.runs.get(id)?.run ?? null;
@@ -270,8 +283,18 @@ export class InMemoryStore implements Store {
       .slice(0, limit);
   }
   async updateRun(id: string, patch: Partial<Run>): Promise<void> {
-    const entry = this.runs.get(id);
-    if (entry) Object.assign(entry.run, patch);
+    const maxRetries = 5;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const entry = this.runs.get(id);
+      if (!entry) return;
+      const expected = this.runVersions.get(id) ?? 0;
+      await Promise.resolve();
+      if ((this.runVersions.get(id) ?? 0) !== expected) continue;
+      Object.assign(entry.run, patch);
+      this.runVersions.set(id, expected + 1);
+      return;
+    }
+    throw new Error(`optimistic concurrency conflict: run ${id}`);
   }
   async deleteRun(id: string, userId: string): Promise<boolean> {
     const entry = this.runs.get(id);
@@ -461,6 +484,7 @@ export class InMemoryStore implements Store {
   // Monitors -----------------------------------------------------------------
   async createMonitor(m: Monitor): Promise<void> {
     this.monitors.set(m.id, { ...m });
+    this.monitorVersions.set(m.id, 0);
   }
   async getMonitor(id: string): Promise<Monitor | null> {
     return this.monitors.get(id) ?? null;
@@ -469,8 +493,18 @@ export class InMemoryStore implements Store {
     return [...this.monitors.values()].filter((m) => m.userId === userId);
   }
   async updateMonitor(id: string, patch: Partial<Monitor>): Promise<void> {
-    const m = this.monitors.get(id);
-    if (m) Object.assign(m, patch);
+    const maxRetries = 5;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const m = this.monitors.get(id);
+      if (!m) return;
+      const expected = this.monitorVersions.get(id) ?? 0;
+      await Promise.resolve();
+      if ((this.monitorVersions.get(id) ?? 0) !== expected) continue;
+      Object.assign(m, patch);
+      this.monitorVersions.set(id, expected + 1);
+      return;
+    }
+    throw new Error(`optimistic concurrency conflict: monitor ${id}`);
   }
   async deleteMonitor(id: string, userId: string): Promise<boolean> {
     const m = this.monitors.get(id);
@@ -507,6 +541,7 @@ export class InMemoryStore implements Store {
   // Teams --------------------------------------------------------------------
   async createTeam(team: Team, ownerUserId: string): Promise<void> {
     this.teams.set(team.id, { ...team });
+    this.teamVersions.set(team.id, 0);
     const member: TeamMember = {
       teamId: team.id,
       userId: ownerUserId,
@@ -519,8 +554,18 @@ export class InMemoryStore implements Store {
     return this.teams.get(id) ?? null;
   }
   async updateTeam(id: string, patch: Partial<Team>): Promise<void> {
-    const t = this.teams.get(id);
-    if (t) Object.assign(t, patch);
+    const maxRetries = 5;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const t = this.teams.get(id);
+      if (!t) return;
+      const expected = this.teamVersions.get(id) ?? 0;
+      await Promise.resolve();
+      if ((this.teamVersions.get(id) ?? 0) !== expected) continue;
+      Object.assign(t, patch);
+      this.teamVersions.set(id, expected + 1);
+      return;
+    }
+    throw new Error(`optimistic concurrency conflict: team ${id}`);
   }
   async deleteTeam(id: string): Promise<boolean> {
     const projectIds = new Set(
@@ -592,6 +637,7 @@ export class InMemoryStore implements Store {
   async acceptInvitation(token: string, at: string): Promise<TeamInvitation | null> {
     const inv = this.invitations.get(token);
     if (!inv || inv.acceptedAt) return null;
+    if (!inv.expiresAt || new Date(inv.expiresAt) <= new Date(at)) return null;
     inv.acceptedAt = at;
     return inv;
   }
