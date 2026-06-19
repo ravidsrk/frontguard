@@ -184,7 +184,7 @@ describe('scheduler', () => {
     expect(slackCalls).toBe(0);
   });
 
-  it('REL-2: persists screenshot refs with original nested routes and restores them for regression', async () => {
+  it('REL-2: tick 1 establishes baseline from current screenshots; tick 2 detects regression', async () => {
     const nestedRoutes = ['/foo/bar', '/a/b/c', '/search?q=1'];
     const store = getMemoryStore();
     const monitor = makeMonitor({
@@ -201,30 +201,38 @@ describe('scheduler', () => {
     const env = { SCREENSHOTS: bucket };
     const t1 = new Date('2026-01-01T12:00:00Z');
 
-    vi.spyOn(processor, 'processRun').mockImplementation(async (run, _env, onScreenshots) => {
-      if (onScreenshots) {
-        await onScreenshots(
-          nestedRoutes.map((route) => ({
-            name: `${routeToSlug(route)}_1440_chromium_0_baseline`,
-            type: 'baseline' as const,
-            bytes: new Uint8Array([1, 2, 3]),
-          })),
-        );
-      }
-      run.status = 'completed';
-      run.results = nestedRoutes.map((route) => ({
-        route,
-        viewport: 1440,
-        status: 'new_baseline',
-        diffPercentage: 0,
-        timestamp: t1.toISOString(),
-      }));
-    });
+    const tick1 = vi.spyOn(processor, 'processRun').mockImplementation(
+      async (run, _env, onScreenshots, baselineRestore) => {
+        expect(baselineRestore).toBeUndefined();
+        if (onScreenshots) {
+          await onScreenshots(
+            nestedRoutes.map((route) => ({
+              name: `${routeToSlug(route)}_1440_chromium_0_current`,
+              type: 'current' as const,
+              bytes: new Uint8Array([1, 2, 3]),
+            })),
+          );
+        }
+        run.status = 'completed';
+        run.results = nestedRoutes.map((route) => ({
+          route,
+          viewport: 1440,
+          status: 'new_baseline',
+          diffPercentage: 0,
+          timestamp: t1.toISOString(),
+        }));
+      },
+    );
 
     const first = await runMonitor(env, store, monitor, t1);
+    expect(first.alerts).toEqual([]);
+    expect(first.run.status).toBe('passed');
     expect(first.run.screenshots).toHaveLength(nestedRoutes.length);
     for (const route of nestedRoutes) {
-      expect(first.run.screenshots!.some((s) => s.route === route && s.type === 'baseline')).toBe(true);
+      const ref = first.run.screenshots!.find((s) => s.route === route);
+      expect(ref).toBeDefined();
+      expect(ref!.type).toBe('baseline');
+      expect(ref!.r2Key).toContain('-current.png');
     }
 
     const dispatchSpy = vi.spyOn(alerts, 'dispatchAlertsWithState').mockResolvedValue({
@@ -233,35 +241,38 @@ describe('scheduler', () => {
     });
 
     const t2 = new Date('2026-01-01T13:00:00Z');
-    let capturedRestore: { baselines: Array<{ route: string }> } | undefined;
-    vi.spyOn(processor, 'processRun').mockImplementation(
+    let capturedRestore: { baselines: Array<{ route: string; r2Key: string }> } | undefined;
+    const tick2 = vi.spyOn(processor, 'processRun').mockImplementation(
       async (run, _env, _sink, baselineRestore) => {
         capturedRestore = baselineRestore;
         expect(baselineRestore).toBeDefined();
         for (const route of nestedRoutes) {
-          expect(baselineRestore!.baselines.some((b) => b.route === route)).toBe(true);
+          const match = baselineRestore!.baselines.find((b) => b.route === route);
+          expect(match).toBeDefined();
+          expect(match!.r2Key).toBe(
+            first.run.screenshots!.find((s) => s.route === route)!.r2Key,
+          );
         }
         run.status = 'completed';
-        run.results = [
-          {
-            route: '/foo/bar',
-            viewport: 1440,
-            status: 'regression',
-            diffPercentage: 0.2,
-            timestamp: t2.toISOString(),
-          },
-        ];
+        run.results = nestedRoutes.map((route, i) => ({
+          route,
+          viewport: 1440,
+          status: i === 0 ? 'regression' : 'unchanged',
+          diffPercentage: i === 0 ? 0.2 : 0,
+          timestamp: t2.toISOString(),
+        }));
       },
     );
 
     const second = await runMonitor(env, store, monitor, t2);
+    expect(tick1).toHaveBeenCalled();
+    expect(tick2).toHaveBeenCalled();
     expect(capturedRestore?.baselines.map((b) => b.route)).toEqual(
       expect.arrayContaining(nestedRoutes),
     );
     expect(second.alerts.length).toBeGreaterThan(0);
     expect(second.alerts[0].route).toBe('/foo/bar');
     expect(dispatchSpy).toHaveBeenCalled();
-    expect(first.run.screenshots!.every((s) => s.r2Key.length > 0)).toBe(true);
   });
 
   it('sortMonitorsByDuePriority orders oldest-due monitors first', () => {
