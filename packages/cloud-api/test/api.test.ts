@@ -347,8 +347,9 @@ describe('POST /v1/baselines/:runId/approve', () => {
 // value. Otherwise cookies would be signed with the insecure fallback that
 // ships in published source — a forge-any-user's-session vulnerability.
 describe('GET /dashboard — production session-secret fail-closed', () => {
-  // A real D1 binding makes isProduction(env) → true.
+  // SEC-6: production requires ENVIRONMENT=production (not DB presence alone).
   const prodEnv = (secret?: string) => ({
+    ENVIRONMENT: 'production' as const,
     DB: createSqliteD1().db,
     ...(secret ? { DASHBOARD_SESSION_SECRET: secret } : {}),
   });
@@ -376,7 +377,7 @@ describe('GET /dashboard — production session-secret fail-closed', () => {
     expect(res.headers.get('content-type')).toContain('text/html');
   });
 
-  it('serves the dashboard in dev (no D1 binding) without any secret configured', async () => {
+  it('serves the dashboard in dev (ENVIRONMENT unset) without any secret configured', async () => {
     const res = await app.request('/dashboard');
     expect(res.status).toBe(200);
   });
