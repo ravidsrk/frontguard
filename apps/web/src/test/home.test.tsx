@@ -56,7 +56,7 @@ describe('home route — real product content', () => {
 })
 
 describe('home route — SEO head', () => {
-  it('sets the product SEO title, description, and SoftwareApplication JSON-LD', async () => {
+  it('sets the product SEO title, description, canonical, social tags, and JSON-LD', async () => {
     const head = await Route.options.head?.({} as never)
     const meta = head?.meta ?? []
 
@@ -68,7 +68,12 @@ describe('home route — SEO head', () => {
           content:
             'AI-powered visual regression testing. AI vision tells a real regression from an intentional change or content, so a red run means something again. Open-source CLI under MIT.',
         },
+        { property: 'og:url', content: 'https://frontguard.dev' },
+        { name: 'twitter:card', content: 'summary_large_image' },
       ]),
+    )
+    expect(head?.links).toEqual(
+      expect.arrayContaining([{ rel: 'canonical', href: 'https://frontguard.dev' }]),
     )
 
     const jsonLdEntry = meta.find((m): m is Record<string, unknown> => !!m && 'script:ld+json' in m)

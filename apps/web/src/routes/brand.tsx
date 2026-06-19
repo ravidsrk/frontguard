@@ -1,19 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Nav } from '../components/Nav'
 import { Shield } from '../components/Shield'
+import { buildSeoHead } from '../lib/seo'
 import { s } from '../lib/style'
 
 export const Route = createFileRoute('/brand')({
-  head: () => ({
-    meta: [
-      { title: 'Brand — The Frontguard brand system' },
-      {
-        name: 'description',
-        content:
-          'The Frontguard brand system: shield mark, warm neutral palette, Space Grotesk + JetBrains Mono typography, and terminal-native voice.',
-      },
-    ],
-  }),
+  head: () =>
+    buildSeoHead({
+      title: 'Brand — The Frontguard brand system',
+      description:
+        'The Frontguard brand system: shield mark, warm neutral palette, Space Grotesk + JetBrains Mono typography, and terminal-native voice.',
+      path: '/brand',
+    }),
   component: Brand,
 })
 

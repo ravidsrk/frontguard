@@ -1,8 +1,29 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { s } from '../../lib/style'
 import { articles, FIRST_DOC_SLUG } from '../../lib/docs-content'
+import { buildSeoHead } from '../../lib/seo'
+import { s } from '../../lib/style'
 
-export const Route = createFileRoute('/docs/$')({ component: DocArticle })
+export const Route = createFileRoute('/docs/$')({
+  head: ({ params }) => {
+    const slug = params._splat
+    const article = articles.find((a) => a.id === slug)
+    if (!article) {
+      return buildSeoHead({
+        title: 'Page not found — Frontguard Docs',
+        description: 'No docs article matches this path.',
+        path: `/docs/${slug}`,
+        robots: 'noindex',
+      })
+    }
+    return buildSeoHead({
+      title: `${article.label} — Frontguard Docs`,
+      description: `Frontguard documentation: ${article.label}. ${article.section} guide for visual regression testing.`,
+      path: `/docs/${slug}`,
+      ogType: 'article',
+    })
+  },
+  component: DocArticle,
+})
 
 const MONO = "'JetBrains Mono', monospace"
 

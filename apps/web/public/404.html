@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page not found — Frontguard</title>
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#0d0c0b" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <style>
+    /* Brand-matched 404: warm near-black canvas, single amber accent,
+       Space Grotesk + JetBrains Mono, sharp corners (radius 0). Mirrors the
+       design tokens in src/index.css and the CSS shield from ui/Logo.tsx. */
+    :root {
+      --canvas: #0d0c0b;
+      --panel: #131210;
+      --ink-hi: #f5f1ea;
+      --ink-mid: #b8b0a6;
+      --ink-dim: #6b645c;
+      --amber: #e8862e;
+      --amber-hover: #f59b45;
+      --border-card: #2a2622;
+      --border: #322d28;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink-mid);
+      font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    main {
+      width: 100%;
+      max-width: 32rem;
+      text-align: center;
+    }
+    /* CSS shield mark (no SVG) — five-point polygon with a canvas-colored
+       center seam, matching ui/Logo.tsx. */
+    .mark {
+      position: relative;
+      display: inline-block;
+      width: 47px;   /* 56 * 0.846, rounded */
+      height: 56px;
+      margin-bottom: 1.75rem;
+    }
+    .mark .base, .mark .seam {
+      position: absolute;
+      clip-path: polygon(0% 0%, 100% 0%, 100% 62%, 50% 100%, 0% 62%);
+    }
+    .mark .base { inset: 0; background: var(--amber); }
+    .mark .seam {
+      top: 0; bottom: 0; left: 50%;
+      width: 3px;
+      transform: translateX(-50%);
+      background: var(--canvas);
+    }
+    .code {
+      font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 0.8rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin: 0 0 0.75rem;
+    }
+    h1 {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      color: var(--ink-hi);
+      font-size: clamp(1.75rem, 6vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin: 0 0 0.85rem;
+    }
+    p {
+      color: var(--ink-mid);
+      font-size: 1rem;
+      margin: 0 auto 2rem;
+      max-width: 26rem;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+    }
+    a {
+      font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 0.9rem;
+      text-decoration: none;
+      padding: 0.7rem 1.4rem;
+      display: inline-block;
+    }
+    a.primary {
+      background: var(--amber);
+      color: var(--canvas);
+      font-weight: 700;
+    }
+    a.primary:hover { background: var(--amber-hover); }
+    a.secondary {
+      border: 1px solid var(--border);
+      color: var(--ink-hi);
+    }
+    a.secondary:hover { border-color: var(--amber); color: var(--ink-hi); }
+    a:focus-visible {
+      outline: 2px solid var(--amber);
+      outline-offset: 2px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <span class="mark" aria-hidden="true">
+      <span class="base"></span>
+      <span class="seam"></span>
+    </span>
+    <p class="code">Error 404</p>
+    <h1>This page didn't render.</h1>
+    <p>The address you followed doesn't exist. Frontguard catches the visual regressions that do — head back and pick up where you left off.</p>
+    <div class="actions">
+      <a class="primary" href="/">Back to home</a>
+      <a class="secondary" href="/docs">Read the docs</a>
+    </div>
+  </main>
+</body>
+</html>
