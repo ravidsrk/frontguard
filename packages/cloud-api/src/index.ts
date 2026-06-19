@@ -37,6 +37,7 @@ import {
   SafeRenderTargetError,
   assertSafeRenderTarget,
 } from './security/render-target.js';
+import { recordDeadLetter } from './dead-letter.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -466,9 +467,18 @@ app.post('/v1/run', async (c) => {
       run.status = 'failed';
       run.error = err.message;
     })
-    .finally(() => {
+    .finally(async () => {
       // Screenshots were reserved at submit time (COST-1).
-      void store.updateRun(runId, run);
+      await store.updateRun(runId, run);
+      if (run.status === 'failed') {
+        await recordDeadLetter(store, {
+          kind: 'run',
+          sourceId: runId,
+          userId,
+          error: run.error ?? 'background run failed',
+          attempt: 1,
+        });
+      }
       // Complete the originating GitHub Check Run, if this run came from CI.
       if (run.github) void completeCheckRun(c.env ?? {}, run);
       // Export OTLP metrics (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).

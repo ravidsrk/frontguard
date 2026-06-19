@@ -36,6 +36,7 @@ import {
   runIdFromR2Key,
   type MonitorScreenshotRef,
 } from './monitor-screenshots.js';
+import { recordDeadLetter } from './dead-letter.js';
 
 /** Summary of a single scheduler tick (returned for logging/tests). */
 export interface SchedulerTickResult {
@@ -277,6 +278,18 @@ export async function runMonitor(
   if (alerts.length > 0) {
     await dispatchAlertsWithState(env, store, monitor, alerts, now, fetchImpl);
   }
+
+  if (status === 'error' && lastError) {
+    await recordDeadLetter(store, {
+      kind: 'monitor',
+      sourceId: monitor.id,
+      userId: monitor.userId,
+      error: lastError,
+      attempt: attempts,
+      context: { monitorRunId: monitorRun.id },
+    });
+  }
+
   return { alerts, run: monitorRun };
 }
 
@@ -363,8 +376,21 @@ export async function runScheduledChecks(
       const { alerts, run } = await runMonitor(env, store, monitor, now, fetchImpl);
       if (alerts.length > 0) alerted++;
       if (run.status === 'error') errors++;
-    } catch {
+    } catch (err) {
       errors++;
+      const message = err instanceof Error ? err.message : String(err);
+      try {
+        await recordDeadLetter(store, {
+          kind: 'monitor',
+          sourceId: monitor.id,
+          userId: monitor.userId,
+          error: message,
+          attempt: 0,
+          context: { phase: 'runScheduledChecks' },
+        });
+      } catch (dlErr) {
+        console.warn('[scheduler] dead-letter write failed', dlErr);
+      }
     }
     // Prune each owner's history at most once per tick.
     if (!prunedUsers.has(monitor.userId)) {
