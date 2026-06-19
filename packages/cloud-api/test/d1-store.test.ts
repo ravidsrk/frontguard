@@ -190,9 +190,8 @@ describe('D1Store (SQLite-backed)', () => {
     expect(activity.length).toBe(2);
     expect(activity[0].action).toBe('project.created'); // newest first
 
-    // Team usage aggregation.
-    await store.incrementUsage('u1', '2026-05', 3, 10);
-    await store.incrementUsage('u2', '2026-05', 2, 5);
+    // Team usage pool (DM-3).
+    await store.incrementTeamUsage('t1', '2026-05', 5, 15);
     const teamUsage = await store.getTeamUsage('t1', '2026-05');
     expect(teamUsage.memberCount).toBe(2);
     expect(teamUsage.runsCount).toBe(5);

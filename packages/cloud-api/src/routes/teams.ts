@@ -27,6 +27,8 @@ import { can, roleAtLeast, type Capability, type TeamRole } from '../db/teams.js
 import { sendInviteEmail } from '../teams/invite-email.js';
 import { getPlan, checkLimit } from '../billing/plans.js';
 import type { AlertEnv } from '../alerts/index.js';
+import { purgeTeamRunBlobs } from '../storage/purge-team-blobs.js';
+import type { R2Bucket } from '../storage/screenshots.js';
 
 type Variables = { store: Store; userId: string };
 
@@ -146,6 +148,7 @@ teamRoutes.delete('/:id', async (c) => {
   const id = c.req.param('id');
   const guard = await requireCap(store, id, c.get('userId'), 'manage_team');
   if (!guard.ok) return c.json({ error: 'Forbidden' }, guard.status);
+  await purgeTeamRunBlobs(store, id, c.env?.SCREENSHOTS as R2Bucket | undefined);
   const deleted = await store.deleteTeam(id);
   return c.json({ deleted });
 });

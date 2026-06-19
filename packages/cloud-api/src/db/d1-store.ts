@@ -325,6 +325,57 @@ export class D1Store implements Store {
     const update = results[1] as { meta?: { changes?: number } };
     return (update.meta?.changes ?? 0) > 0;
   }
+
+  async tryReserveTeamRun(teamId: string, month: string, limit: number): Promise<boolean> {
+    const result = await this.db
+      .prepare(
+        `INSERT INTO team_usage (team_id, month, runs_count, screenshots_count) VALUES (?, ?, 1, 0)
+         ON CONFLICT(team_id, month) DO UPDATE SET
+           runs_count = runs_count + 1
+         WHERE runs_count < ?`,
+      )
+      .bind(teamId, month, limit)
+      .run();
+    return (result.meta?.changes ?? 0) > 0;
+  }
+
+  async tryReserveTeamScreenshots(
+    teamId: string,
+    month: string,
+    limit: number,
+    amount: number,
+  ): Promise<boolean> {
+    if (amount <= 0) return true;
+    const results = await this.db.batch([
+      this.db
+        .prepare(
+          `INSERT OR IGNORE INTO team_usage (team_id, month, runs_count, screenshots_count)
+           VALUES (?, ?, 0, 0)`,
+        )
+        .bind(teamId, month),
+      this.db
+        .prepare(
+          `UPDATE team_usage SET screenshots_count = screenshots_count + ?
+           WHERE team_id = ? AND month = ? AND screenshots_count + ? <= ?`,
+        )
+        .bind(amount, teamId, month, amount, limit),
+    ]);
+    const update = results[1] as { meta?: { changes?: number } };
+    return (update.meta?.changes ?? 0) > 0;
+  }
+
+  async incrementTeamUsage(teamId: string, month: string, runs: number, screenshots: number): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO team_usage (team_id, month, runs_count, screenshots_count) VALUES (?, ?, ?, ?)
+         ON CONFLICT(team_id, month) DO UPDATE SET
+           runs_count = runs_count + excluded.runs_count,
+           screenshots_count = screenshots_count + excluded.screenshots_count`,
+      )
+      .bind(teamId, month, runs, screenshots)
+      .run();
+  }
+
   async getUsage(userId: string, month: string): Promise<UsageRecord> {
     const row = await this.db
       .prepare(`SELECT * FROM usage WHERE user_id = ? AND month = ?`)
@@ -617,9 +668,11 @@ export class D1Store implements Store {
       .run();
   }
   async deleteTeam(id: string): Promise<boolean> {
+    await this.db.prepare(`DELETE FROM team_activity WHERE team_id = ?`).bind(id).run();
     await this.db.prepare(`DELETE FROM team_members WHERE team_id = ?`).bind(id).run();
-    await this.db.prepare(`DELETE FROM team_projects WHERE team_id = ?`).bind(id).run();
     await this.db.prepare(`DELETE FROM team_invitations WHERE team_id = ?`).bind(id).run();
+    // CASCADE (DM-2): deleting projects removes project-scoped runs and children.
+    await this.db.prepare(`DELETE FROM team_projects WHERE team_id = ?`).bind(id).run();
     const res = await this.db.prepare(`DELETE FROM teams WHERE id = ?`).bind(id).run();
     return (res.meta?.changes ?? 0) > 0;
   }
@@ -744,10 +797,10 @@ export class D1Store implements Store {
     return (res.meta?.changes ?? 0) > 0;
   }
 
-  async listProjectRuns(projectId: string, limit = 50): Promise<Run[]> {
+  async listProjectRuns(projectId: string, limit = 50, offset = 0): Promise<Run[]> {
     const { results } = await this.db
-      .prepare(`SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ?`)
-      .bind(projectId, limit)
+      .prepare(`SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+      .bind(projectId, limit, offset)
       .all<RunRow>();
     return results.map(rowToRun);
   }
@@ -819,10 +872,14 @@ export class D1Store implements Store {
         return { userId: m.userId, runsCount: u.runsCount, screenshotsCount: u.screenshotsCount };
       }),
     );
+    const row = await this.db
+      .prepare(`SELECT * FROM team_usage WHERE team_id = ? AND month = ?`)
+      .bind(teamId, month)
+      .first<Record<string, unknown>>();
     return {
       month,
-      runsCount: perMember.reduce((s, m) => s + m.runsCount, 0),
-      screenshotsCount: perMember.reduce((s, m) => s + m.screenshotsCount, 0),
+      runsCount: Number(row?.runs_count ?? 0),
+      screenshotsCount: Number(row?.screenshots_count ?? 0),
       memberCount: members.length,
       perMember,
     };
