@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 28">
+  <defs>
+    <clipPath id="shield"><path d="M0 0 H24 V17.36 L12 28 L0 17.36 Z"></path></clipPath>
+  </defs>
+  <path d="M0 0 H24 V17.36 L12 28 L0 17.36 Z" fill="#e8862e"></path>
+  <rect x="11.25" y="0" width="1.5" height="28" fill="#0d0c0b" clip-path="url(#shield)"></rect>
+</svg>
