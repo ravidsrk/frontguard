@@ -144,7 +144,7 @@ export interface TeamStore {
   deleteProject(id: string, teamId: string): Promise<boolean>;
 
   // Project-scoped runs & baselines
-  listProjectRuns(projectId: string, limit?: number): Promise<Run[]>;
+  listProjectRuns(projectId: string, limit?: number, offset?: number): Promise<Run[]>;
   getProjectBaseline(projectId: string): Promise<Run | null>;
 
   // Baseline approvals / review workflow

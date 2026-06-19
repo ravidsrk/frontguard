@@ -797,10 +797,10 @@ export class D1Store implements Store {
     return (res.meta?.changes ?? 0) > 0;
   }
 
-  async listProjectRuns(projectId: string, limit = 50): Promise<Run[]> {
+  async listProjectRuns(projectId: string, limit = 50, offset = 0): Promise<Run[]> {
     const { results } = await this.db
-      .prepare(`SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ?`)
-      .bind(projectId, limit)
+      .prepare(`SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+      .bind(projectId, limit, offset)
       .all<RunRow>();
     return results.map(rowToRun);
   }
