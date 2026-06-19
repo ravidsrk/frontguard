@@ -32,6 +32,10 @@ import { evaluateSpendCap } from './billing/spend-cap.js';
 import { runScheduledChecks } from './scheduler.js';
 import type { AlertEnv } from './alerts/index.js';
 import { PACKAGE_VERSION } from './version.js';
+import {
+  SafeRenderTargetError,
+  assertSafeRenderTarget,
+} from './security/render-target.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -249,6 +253,16 @@ app.post('/v1/run', async (c) => {
   }
 
   const data = parsed.data;
+
+  try {
+    await assertSafeRenderTarget(data.url);
+  } catch (err) {
+    if (err instanceof SafeRenderTargetError) {
+      return c.json({ error: err.message }, 400);
+    }
+    throw err;
+  }
+
   const store = c.get('store');
   const userId = c.get('userId');
 
