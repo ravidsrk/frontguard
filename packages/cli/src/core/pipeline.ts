@@ -9,7 +9,7 @@
  * @module core/pipeline
  */
 
-import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type {
@@ -334,6 +334,9 @@ export async function runPipeline(
     await pluginManager.setup(pluginCtx);
   }
 
+  let tempDir: string | undefined;
+  const diffs: DiffResult[] = [];
+
   try {
 
   // -----------------------------------------------------------------------
@@ -511,12 +514,9 @@ export async function runPipeline(
   // -----------------------------------------------------------------------
   // Stage 4: COMPARE (with memory management)
   // -----------------------------------------------------------------------
-  const diffs: DiffResult[] = [];
-
   // Create a temp directory for persisting images of changed pages
   // so we can free memory during comparison and restore lazily for reports.
-  const tempDir = join(tmpdir(), `frontguard-${Date.now()}`);
-  mkdirSync(tempDir, { recursive: true });
+  tempDir = mkdtempSync(join(tmpdir(), 'frontguard-'));
 
   // Track temp file paths for changed diffs so we can restore buffers for reporting
   const tempPaths = new Map<number, { baseline: string; current: string; diff: string }>();
@@ -893,18 +893,6 @@ export async function runPipeline(
     logger.error(`Reporter failed: ${msg}`);
   }
 
-  // -----------------------------------------------------------------------
-  // Cleanup: free buffers and remove temp directory
-  // -----------------------------------------------------------------------
-  for (const diff of diffs) {
-    disposeBuffers(diff);
-  }
-  try {
-    rmSync(tempDir, { recursive: true, force: true });
-  } catch {
-    logger.debug(`Could not clean up temp directory: ${tempDir}`);
-  }
-
   return result;
 
   } catch (pipelineError) {
@@ -922,6 +910,16 @@ export async function runPipeline(
     timing.total = Math.round(performance.now() - totalStart);
     return buildResult([], timing, totalStart, config);
   } finally {
+    for (const diff of diffs) {
+      disposeBuffers(diff);
+    }
+    if (tempDir) {
+      try {
+        rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        logger.debug(`Could not clean up temp directory: ${tempDir}`);
+      }
+    }
     // Plugin hook: teardown — always called, even on error
     await pluginManager.teardown();
   }
