@@ -27,6 +27,11 @@ import type {
 } from './teams.js';
 import type { IgnoreMask, MaskStore } from './masks.js';
 import type { RunAttachment, AttachmentStore } from './attachments.js';
+import type {
+  BackgroundFailure,
+  BackgroundFailureStore,
+  ListBackgroundFailuresOptions,
+} from './background-failures.js';
 
 /** A per-screenshot accept/reject decision recorded from the diff viewer. */
 export interface ScreenshotDecision {
@@ -108,7 +113,7 @@ export interface UsageAlertState {
 /**
  * Persistent storage contract. All methods are async to accommodate D1.
  */
-export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentStore {
+export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentStore, BackgroundFailureStore {
   // Users
   createUser(user: User): Promise<void>;
   getUser(id: string): Promise<User | null>;
@@ -217,6 +222,7 @@ export class InMemoryStore implements Store {
   private attachments = new Map<string, RunAttachment>();
   private usageAlertState = new Map<string, UsageAlertState>(); // key: `${userId}:${month}`
   private decisions: ScreenshotDecision[] = [];
+  private backgroundFailures: BackgroundFailure[] = [];
 
   async createUser(user: User): Promise<void> {
     this.users.set(user.id, { ...user });
@@ -566,6 +572,18 @@ export class InMemoryStore implements Store {
   }
   async setAlertState(state: MonitorAlertState): Promise<void> {
     this.alertState.set(state.monitorId, { ...state });
+  }
+
+  // Background failures (OPS-3) ----------------------------------------------
+  async recordBackgroundFailure(failure: BackgroundFailure): Promise<void> {
+    this.backgroundFailures.push({ ...failure, context: failure.context ? { ...failure.context } : undefined });
+  }
+  async listBackgroundFailures(opts: ListBackgroundFailuresOptions = {}): Promise<BackgroundFailure[]> {
+    const { kind, sourceId, limit = 50 } = opts;
+    return this.backgroundFailures
+      .filter((f) => (kind == null || f.kind === kind) && (sourceId == null || f.sourceId === sourceId))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
   }
 
   // Teams --------------------------------------------------------------------
