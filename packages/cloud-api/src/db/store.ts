@@ -149,6 +149,21 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
     limit: number,
     amount: number,
   ): Promise<boolean>;
+  /**
+   * Atomically reserves one monthly run against a team pool (DM-3).
+   * Returns false when the team limit is already reached.
+   */
+  tryReserveTeamRun(teamId: string, month: string, limit: number): Promise<boolean>;
+  /**
+   * Atomically reserves screenshots against a team pool (DM-3).
+   */
+  tryReserveTeamScreenshots(
+    teamId: string,
+    month: string,
+    limit: number,
+    amount: number,
+  ): Promise<boolean>;
+  incrementTeamUsage(teamId: string, month: string, runs: number, screenshots: number): Promise<void>;
   getUsage(userId: string, month: string): Promise<UsageRecord>;
   /** Returns the spend-cap warning tier already alerted for (user, month), or null. */
   getUsageAlertState(userId: string, month: string): Promise<UsageAlertState | null>;
@@ -172,12 +187,15 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
 export class InMemoryStore implements Store {
   /** Serializes usage mutations per (userId, month) for atomic reservations. */
   private usageLocks = new Map<string, Promise<void>>();
+  /** Serializes team usage mutations per (teamId, month) (DM-3). */
+  private teamUsageLocks = new Map<string, Promise<void>>();
 
   private users = new Map<string, User>();
   private apiKeys = new Map<string, ApiKeyRecord>();
   private runs = new Map<string, { run: Run; userId: string }>();
   private screenshots = new Map<string, ScreenshotRecord[]>();
   private usage = new Map<string, UsageRecord>();
+  private teamUsage = new Map<string, { teamId: string; month: string; runsCount: number; screenshotsCount: number }>();
   private monitors = new Map<string, Monitor>();
   private monitorRuns: MonitorRun[] = [];
   private alertState = new Map<string, MonitorAlertState>();
@@ -257,8 +275,15 @@ export class InMemoryStore implements Store {
   }
   async deleteRun(id: string, userId: string): Promise<boolean> {
     const entry = this.runs.get(id);
-    if (entry && entry.userId === userId) return this.runs.delete(id);
-    return false;
+    if (!entry || entry.userId !== userId) return false;
+    this.runs.delete(id);
+    this.screenshots.delete(id);
+    for (const [attId, att] of this.attachments) {
+      if (att.runId === id) this.attachments.delete(attId);
+    }
+    this.decisions = this.decisions.filter((d) => d.runId !== id);
+    this.approvals = this.approvals.filter((a) => a.runId !== id);
+    return true;
   }
 
   async addScreenshot(rec: ScreenshotRecord): Promise<void> {
@@ -277,6 +302,21 @@ export class InMemoryStore implements Store {
       release = resolve;
     });
     this.usageLocks.set(key, prev.then(() => gate));
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
+  private async withTeamUsageLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.teamUsageLocks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.teamUsageLocks.set(key, prev.then(() => gate));
     await prev;
     try {
       return await fn();
@@ -322,6 +362,44 @@ export class InMemoryStore implements Store {
       return true;
     });
   }
+  async tryReserveTeamRun(teamId: string, month: string, limit: number): Promise<boolean> {
+    const key = `${teamId}:${month}`;
+    return this.withTeamUsageLock(key, async () => {
+      const cur = this.teamUsage.get(key) ?? { teamId, month, runsCount: 0, screenshotsCount: 0 };
+      if (cur.runsCount >= limit) return false;
+      cur.runsCount += 1;
+      this.teamUsage.set(key, cur);
+      return true;
+    });
+  }
+
+  async tryReserveTeamScreenshots(
+    teamId: string,
+    month: string,
+    limit: number,
+    amount: number,
+  ): Promise<boolean> {
+    if (amount <= 0) return true;
+    const key = `${teamId}:${month}`;
+    return this.withTeamUsageLock(key, async () => {
+      const cur = this.teamUsage.get(key) ?? { teamId, month, runsCount: 0, screenshotsCount: 0 };
+      if (cur.screenshotsCount + amount > limit) return false;
+      cur.screenshotsCount += amount;
+      this.teamUsage.set(key, cur);
+      return true;
+    });
+  }
+
+  async incrementTeamUsage(teamId: string, month: string, runs: number, screenshots: number): Promise<void> {
+    const key = `${teamId}:${month}`;
+    await this.withTeamUsageLock(key, async () => {
+      const cur = this.teamUsage.get(key) ?? { teamId, month, runsCount: 0, screenshotsCount: 0 };
+      cur.runsCount += runs;
+      cur.screenshotsCount += screenshots;
+      this.teamUsage.set(key, cur);
+    });
+  }
+
   async getUsage(userId: string, month: string): Promise<UsageRecord> {
     return (
       this.usage.get(`${userId}:${month}`) ?? { userId, month, runsCount: 0, screenshotsCount: 0 }
@@ -445,6 +523,18 @@ export class InMemoryStore implements Store {
     if (t) Object.assign(t, patch);
   }
   async deleteTeam(id: string): Promise<boolean> {
+    const projectIds = new Set(
+      [...this.projects.values()].filter((p) => p.teamId === id).map((p) => p.id),
+    );
+    for (const [runId, entry] of this.runs) {
+      if (entry.run.projectId != null && projectIds.has(entry.run.projectId)) {
+        await this.deleteRun(runId, entry.userId);
+      }
+    }
+    this.activity = this.activity.filter((a) => a.teamId !== id);
+    for (const key of [...this.teamUsage.keys()]) {
+      if (key.startsWith(`${id}:`)) this.teamUsage.delete(key);
+    }
     for (const [key, m] of this.members) if (m.teamId === id) this.members.delete(key);
     for (const [key, p] of this.projects) if (p.teamId === id) this.projects.delete(key);
     for (const [key, inv] of this.invitations) if (inv.teamId === id) this.invitations.delete(key);
@@ -563,10 +653,11 @@ export class InMemoryStore implements Store {
         return { userId: m.userId, runsCount: u.runsCount, screenshotsCount: u.screenshotsCount };
       }),
     );
+    const pooled = this.teamUsage.get(`${teamId}:${month}`);
     return {
       month,
-      runsCount: perMember.reduce((s, m) => s + m.runsCount, 0),
-      screenshotsCount: perMember.reduce((s, m) => s + m.screenshotsCount, 0),
+      runsCount: pooled?.runsCount ?? 0,
+      screenshotsCount: pooled?.screenshotsCount ?? 0,
       memberCount: members.length,
       perMember,
     };
@@ -579,6 +670,7 @@ export class InMemoryStore implements Store {
     this.runs.clear();
     this.screenshots.clear();
     this.usage.clear();
+    this.teamUsage.clear();
     this.monitors.clear();
     this.monitorRuns = [];
     this.alertState.clear();

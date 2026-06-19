@@ -4,9 +4,9 @@ import { MIGRATIONS } from '../src/db/migrations/index.js';
 import { SCHEMA_SQL } from '../src/db/schema.js';
 import { createNodeSqliteD1 } from './helpers/node-sqlite-d1.js';
 
-/** Test-scoped v2 migration — injected at runtime, not shipped in prod registry. */
+/** Test-scoped migration — injected at runtime, not shipped in prod registry. */
 const TEST_V2_MIGRATION: Migration = {
-  version: '002',
+  version: '099',
   name: 'acceptance_test_col',
   sql: 'ALTER TABLE users ADD COLUMN dm1_test_col TEXT;',
 };
@@ -31,6 +31,7 @@ const BASELINE_TABLES = [
   'screenshot_decisions',
   'run_attachments',
   'usage_alert_state',
+  'team_usage',
 ] as const;
 
 function listTables(raw: ReturnType<typeof createNodeSqliteD1>['raw']): Set<string> {
@@ -64,25 +65,25 @@ function applySqlDirect(raw: ReturnType<typeof createNodeSqliteD1>['raw'], sql: 
 }
 
 describe('migrate (DM-1)', () => {
-  it('creates the full baseline on a fresh database and records v1', async () => {
+  it('creates the full baseline on a fresh database and records all migrations', async () => {
     const { db, raw } = createNodeSqliteD1();
 
     const executed = await migrate(db);
     expect(executed).toBeGreaterThan(0);
     assertBaselineTables(raw);
-    assertLedger(raw, ['001']);
+    assertLedger(raw, ['001', '002']);
 
     expect(await migrate(db)).toBe(0);
   });
 
-  it('recognizes a legacy database with the full v1 schema and records v1', async () => {
+  it('recognizes a legacy database with the full v1 schema and applies pending migrations', async () => {
     const { db, raw } = createNodeSqliteD1();
     applySqlDirect(raw, SCHEMA_SQL);
 
     const executed = await migrate(db);
     expect(executed).toBeGreaterThan(0);
     assertBaselineTables(raw);
-    assertLedger(raw, ['001']);
+    assertLedger(raw, ['001', '002']);
 
     expect(await migrate(db)).toBe(0);
   });
@@ -92,7 +93,7 @@ describe('migrate (DM-1)', () => {
 
     await migrate(db, { migrations: [...MIGRATIONS, TEST_V2_MIGRATION] });
     assertBaselineTables(raw);
-    assertLedger(raw, ['001', '002']);
+    assertLedger(raw, ['001', '002', '099']);
 
     const columns = raw.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
     expect(columns.some((col) => col.name === 'dm1_test_col')).toBe(true);
@@ -106,7 +107,7 @@ describe('migrate (DM-1)', () => {
 
     await migrate(db, { migrations: [...MIGRATIONS, TEST_V2_MIGRATION] });
     assertBaselineTables(raw);
-    assertLedger(raw, ['001', '002']);
+    assertLedger(raw, ['001', '002', '099']);
 
     const columns = raw.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
     expect(columns.some((col) => col.name === 'dm1_test_col')).toBe(true);
@@ -143,10 +144,24 @@ describe('migrate (DM-1)', () => {
     expect(columnsAfter.some((col) => col.name === 'rollback_probe')).toBe(false);
   });
 
-  it('exposes a production registry with only the v1 baseline', () => {
-    expect(MIGRATIONS).toHaveLength(1);
+  it('exposes a production registry with baseline and DM-2/DM-3 migration', () => {
+    expect(MIGRATIONS).toHaveLength(2);
     expect(MIGRATIONS[0]?.version).toBe('001');
     expect(MIGRATIONS[0]?.name).toBe('baseline');
     expect(MIGRATIONS[0]?.sql).toContain('CREATE TABLE IF NOT EXISTS users');
+    expect(MIGRATIONS[1]?.version).toBe('002');
+    expect(MIGRATIONS[1]?.name).toBe('cascade_team_usage');
+    expect(MIGRATIONS[1]?.sql).toContain('team_usage');
+  });
+
+  it('applies v2 on a fresh database and records both versions', async () => {
+    const { db, raw } = createNodeSqliteD1();
+    const executed = await migrate(db);
+    expect(executed).toBeGreaterThan(0);
+    assertBaselineTables(raw);
+    assertLedger(raw, ['001', '002']);
+    const tables = listTables(raw);
+    expect(tables.has('team_usage')).toBe(true);
+    expect(await migrate(db)).toBe(0);
   });
 });
