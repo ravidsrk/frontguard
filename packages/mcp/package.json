@@ -56,7 +56,7 @@
     "url": "https://github.com/ravidsrk/frontguard/issues"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
