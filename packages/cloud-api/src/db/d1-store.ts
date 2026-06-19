@@ -32,6 +32,10 @@ import type {
 import type { IgnoreMask } from './masks.js';
 import type { RunAttachment, AttachmentKind } from './attachments.js';
 import type { Run } from '../types.js';
+import type {
+  BackgroundFailure,
+  ListBackgroundFailuresOptions,
+} from './background-failures.js';
 
 /** Minimal D1 typings (avoids depending on @cloudflare/workers-types). */
 export interface D1PreparedStatement {
@@ -723,6 +727,45 @@ export class D1Store implements Store {
       .run();
   }
 
+  // Background failures (OPS-3) ----------------------------------------------
+  async recordBackgroundFailure(failure: BackgroundFailure): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO background_failures (id, kind, source_id, user_id, error, attempt, context, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        failure.id,
+        failure.kind,
+        failure.sourceId,
+        failure.userId ?? null,
+        failure.error,
+        failure.attempt,
+        failure.context ? JSON.stringify(failure.context) : null,
+        failure.createdAt,
+      )
+      .run();
+  }
+  async listBackgroundFailures(opts: ListBackgroundFailuresOptions = {}): Promise<BackgroundFailure[]> {
+    const { kind, sourceId, limit = 50 } = opts;
+    let query = `SELECT * FROM background_failures`;
+    const binds: unknown[] = [];
+    const clauses: string[] = [];
+    if (kind != null) {
+      clauses.push('kind = ?');
+      binds.push(kind);
+    }
+    if (sourceId != null) {
+      clauses.push('source_id = ?');
+      binds.push(sourceId);
+    }
+    if (clauses.length > 0) query += ` WHERE ${clauses.join(' AND ')}`;
+    query += ` ORDER BY created_at DESC LIMIT ?`;
+    binds.push(limit);
+    const { results } = await this.db.prepare(query).bind(...binds).all<Record<string, unknown>>();
+    return results.map(backgroundFailureFromRow);
+  }
+
   // Teams --------------------------------------------------------------------
   async createTeam(team: Team, ownerUserId: string): Promise<void> {
     await this.db
@@ -1090,6 +1133,19 @@ function monitorRunFromRow(row: Record<string, unknown>): MonitorRun {
     error: row.error != null ? String(row.error) : undefined,
     createdAt: String(row.created_at),
     completedAt: row.completed_at != null ? String(row.completed_at) : undefined,
+  };
+}
+
+function backgroundFailureFromRow(row: Record<string, unknown>): BackgroundFailure {
+  return {
+    id: String(row.id),
+    kind: String(row.kind) as BackgroundFailure['kind'],
+    sourceId: String(row.source_id),
+    userId: row.user_id != null ? String(row.user_id) : undefined,
+    error: String(row.error),
+    attempt: Number(row.attempt ?? 1),
+    context: row.context != null ? (JSON.parse(String(row.context)) as Record<string, unknown>) : undefined,
+    createdAt: String(row.created_at),
   };
 }
 
