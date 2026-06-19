@@ -9,9 +9,9 @@ export function generateReportHtml(run: Run): string {
         <td>${escapeHtml(r.route)}</td>
         <td>${r.viewport}px</td>
         <td class="${r.diffPercentage > (run.threshold * 100) ? 'diff-fail' : 'diff-pass'}">${r.diffPercentage.toFixed(2)}%</td>
-        <td><span class="badge badge-${r.status === 'captured' ? 'ok' : 'warn'}">${r.status}</span></td>
-        <td>${r.classification || '—'}</td>
-        <td>${r.timestamp}</td>
+        <td><span class="badge badge-${r.status === 'captured' ? 'ok' : 'warn'}">${escapeHtml(r.status)}</span></td>
+        <td>${escapeHtml(r.classification || '—')}</td>
+        <td>${escapeHtml(r.timestamp)}</td>
       </tr>`
     )
     .join('\n');
