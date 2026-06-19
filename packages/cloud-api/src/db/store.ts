@@ -134,6 +134,21 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
 
   // Usage
   incrementUsage(userId: string, month: string, runs: number, screenshots: number): Promise<void>;
+  /**
+   * Atomically reserves one monthly run if usage is below `limit`.
+   * Returns false when the limit is already reached (CONC-1).
+   */
+  tryReserveRun(userId: string, month: string, limit: number): Promise<boolean>;
+  /**
+   * Atomically reserves `amount` monthly screenshots if usage + amount ≤ `limit`.
+   * Returns false when the reservation would exceed the limit (COST-1).
+   */
+  tryReserveScreenshots(
+    userId: string,
+    month: string,
+    limit: number,
+    amount: number,
+  ): Promise<boolean>;
   getUsage(userId: string, month: string): Promise<UsageRecord>;
   /** Returns the spend-cap warning tier already alerted for (user, month), or null. */
   getUsageAlertState(userId: string, month: string): Promise<UsageAlertState | null>;
@@ -155,6 +170,9 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
  * In-memory store. Data is lost on restart — used for local dev and tests.
  */
 export class InMemoryStore implements Store {
+  /** Serializes usage mutations per (userId, month) for atomic reservations. */
+  private usageLocks = new Map<string, Promise<void>>();
+
   private users = new Map<string, User>();
   private apiKeys = new Map<string, ApiKeyRecord>();
   private runs = new Map<string, { run: Run; userId: string }>();
@@ -252,12 +270,57 @@ export class InMemoryStore implements Store {
     return this.screenshots.get(runId) ?? [];
   }
 
+  private async withUsageLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.usageLocks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.usageLocks.set(key, prev.then(() => gate));
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
   async incrementUsage(userId: string, month: string, runs: number, screenshots: number): Promise<void> {
     const key = `${userId}:${month}`;
-    const cur = this.usage.get(key) ?? { userId, month, runsCount: 0, screenshotsCount: 0 };
-    cur.runsCount += runs;
-    cur.screenshotsCount += screenshots;
-    this.usage.set(key, cur);
+    await this.withUsageLock(key, async () => {
+      const cur = this.usage.get(key) ?? { userId, month, runsCount: 0, screenshotsCount: 0 };
+      cur.runsCount += runs;
+      cur.screenshotsCount += screenshots;
+      this.usage.set(key, cur);
+    });
+  }
+
+  async tryReserveRun(userId: string, month: string, limit: number): Promise<boolean> {
+    const key = `${userId}:${month}`;
+    return this.withUsageLock(key, async () => {
+      const cur = this.usage.get(key) ?? { userId, month, runsCount: 0, screenshotsCount: 0 };
+      if (cur.runsCount >= limit) return false;
+      cur.runsCount += 1;
+      this.usage.set(key, cur);
+      return true;
+    });
+  }
+
+  async tryReserveScreenshots(
+    userId: string,
+    month: string,
+    limit: number,
+    amount: number,
+  ): Promise<boolean> {
+    if (amount <= 0) return true;
+    const key = `${userId}:${month}`;
+    return this.withUsageLock(key, async () => {
+      const cur = this.usage.get(key) ?? { userId, month, runsCount: 0, screenshotsCount: 0 };
+      if (cur.screenshotsCount + amount > limit) return false;
+      cur.screenshotsCount += amount;
+      this.usage.set(key, cur);
+      return true;
+    });
   }
   async getUsage(userId: string, month: string): Promise<UsageRecord> {
     return (

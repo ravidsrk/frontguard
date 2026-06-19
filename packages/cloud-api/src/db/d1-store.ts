@@ -287,6 +287,44 @@ export class D1Store implements Store {
       .bind(userId, month, runs, screenshots)
       .run();
   }
+
+  async tryReserveRun(userId: string, month: string, limit: number): Promise<boolean> {
+    const result = await this.db
+      .prepare(
+        `INSERT INTO usage (user_id, month, runs_count, screenshots_count) VALUES (?, ?, 1, 0)
+         ON CONFLICT(user_id, month) DO UPDATE SET
+           runs_count = runs_count + 1
+         WHERE runs_count < ?`,
+      )
+      .bind(userId, month, limit)
+      .run();
+    return (result.meta?.changes ?? 0) > 0;
+  }
+
+  async tryReserveScreenshots(
+    userId: string,
+    month: string,
+    limit: number,
+    amount: number,
+  ): Promise<boolean> {
+    if (amount <= 0) return true;
+    const results = await this.db.batch([
+      this.db
+        .prepare(
+          `INSERT OR IGNORE INTO usage (user_id, month, runs_count, screenshots_count)
+           VALUES (?, ?, 0, 0)`,
+        )
+        .bind(userId, month),
+      this.db
+        .prepare(
+          `UPDATE usage SET screenshots_count = screenshots_count + ?
+           WHERE user_id = ? AND month = ? AND screenshots_count + ? <= ?`,
+        )
+        .bind(amount, userId, month, amount, limit),
+    ]);
+    const update = results[1] as { meta?: { changes?: number } };
+    return (update.meta?.changes ?? 0) > 0;
+  }
   async getUsage(userId: string, month: string): Promise<UsageRecord> {
     const row = await this.db
       .prepare(`SELECT * FROM usage WHERE user_id = ? AND month = ?`)
