@@ -1,0 +1,62 @@
+/* ============================================================
+   Frontguard — global stylesheet
+   Reset, fonts, palette tokens, and the hover/animation classes
+   shared across every route. All layout/typography lives inline
+   (via the s() helper) to stay faithful to the source design.
+   ============================================================ */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: #0d0c0b;
+  color: #b8b0a6;
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: #e8862e; color: #0d0c0b; }
+
+a { color: inherit; }
+
+/* ---- keyframes ---- */
+@keyframes fg-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes fg-scan  { 0% { transform: translateY(0); } 100% { transform: translateY(340px); } }
+@keyframes fg-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+/* ---- shared hover states ---- */
+.fg-link { transition: color .15s ease; }
+.fg-link:hover { color: #f5f1ea !important; }
+.fg-navlink { transition: color .15s ease; }
+.fg-navlink:hover { color: #f5f1ea !important; }
+.fg-link:hover .fg-link-title { color: #f5f1ea !important; }
+
+.fg-card-hover { transition: border-color .18s ease, transform .18s ease, background .18s ease; }
+.fg-card-hover:hover { border-color: #54493f !important; transform: translateY(-2px); }
+
+.fg-card:hover { border-color: #54493f !important; }
+.fg-faq:hover { border-color: #54493f !important; }
+.fg-vs:hover  { border-color: #54493f !important; }
+.fg-sb-item:hover { color: #f5f1ea !important; }
+.fg-toc:hover { color: #d8d0c5 !important; }
+
+.fg-btn-primary { white-space: nowrap; transition: background .18s ease; }
+.fg-btn-primary:hover { background: #f59b45 !important; }
+.fg-btn-ghost { white-space: nowrap; transition: border-color .18s ease, background .18s ease; }
+.fg-btn-ghost:hover { border-color: #54493f !important; background: #1f1c19 !important; }
+
+.fg-cmp-row { transition: background .18s ease; }
+.fg-cmp-row:hover { background: #161412 !important; }
+
+/* ---- scrollbar ---- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: #2a2622; }
+::-webkit-scrollbar-track { background: #0d0c0b; }
+
+/* ---- reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation: none !important; }
+}
