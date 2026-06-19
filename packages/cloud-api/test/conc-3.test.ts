@@ -2,13 +2,15 @@
  * CONC-3: overlapping cron ticks must not double-run the same due monitor.
  * Atomic lease/claim on due rows ensures exactly one tick executes each monitor.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe as describeBase, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { runScheduledChecks } from '../src/scheduler.js';
 import { resetMemoryStore, getMemoryStore } from '../src/db/factory.js';
 import { InMemoryStore } from '../src/db/store.js';
 import { D1Store, type D1Database } from '../src/db/d1-store.js';
 import { migrate } from '../src/db/migrate.js';
-import { createNodeSqliteD1 } from './helpers/node-sqlite-d1.js';
+import { createNodeSqliteD1, nodeSqliteAvailable } from './helpers/node-sqlite-d1.js';
+// node:sqlite is absent on Node 20 (CI matrix); skip this shim-backed suite there.
+const describe = nodeSqliteAvailable ? describeBase : describeBase.skip;
 import type { Monitor } from '../src/db/monitors.js';
 import * as processor from '../src/processor.js';
 
