@@ -16,7 +16,7 @@ import { Hono } from 'hono';
 import type { Bindings } from '../db/factory.js';
 import { getStore, isProduction } from '../db/factory.js';
 import type { Store } from '../db/store.js';
-import { generateApiKey, hashKey } from '../auth/keys.js';
+import { generateApiKey, hashKey, MAX_KEYS_PER_USER } from '../auth/keys.js';
 
 type Variables = { store: Store; userId: string };
 
@@ -64,6 +64,14 @@ keyRoutes.post('/', async (c) => {
   const store = c.get('store');
   const body = (await c.req.json().catch(() => ({}))) as { name?: string };
   const name = (body.name ?? 'API key').slice(0, 100);
+
+  const existingKeys = await store.listApiKeys(c.get('userId'));
+  if (existingKeys.length >= MAX_KEYS_PER_USER) {
+    return c.json(
+      { error: 'API key limit reached', limit: MAX_KEYS_PER_USER },
+      429,
+    );
+  }
 
   const apiKey = generateApiKey();
   const keyHash = await hashKey(apiKey);

@@ -11,6 +11,9 @@
 /** Prefix for all Frontguard API keys. */
 export const KEY_PREFIX = 'fg_';
 
+/** Maximum active API keys a single user may hold. */
+export const MAX_KEYS_PER_USER = 10;
+
 /**
  * Generates a new API key using the Web Crypto API (available in Workers and
  * modern Node). Returns the plaintext key — hash it with {@link hashKey} for
