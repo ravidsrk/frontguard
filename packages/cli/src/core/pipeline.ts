@@ -9,7 +9,7 @@
  * @module core/pipeline
  */
 
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type {
@@ -516,7 +516,7 @@ export async function runPipeline(
   // -----------------------------------------------------------------------
   // Create a temp directory for persisting images of changed pages
   // so we can free memory during comparison and restore lazily for reports.
-  tempDir = mkdtempSync(join(tmpdir(), 'frontguard-'));
+  tempDir = mkdtempSync(join(tmpdir(), 'frontguard-compare-'));
   const compareTempDir: string = tempDir;
 
   // Track temp file paths for changed diffs so we can restore buffers for reporting
