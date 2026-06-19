@@ -1,6 +1,11 @@
 /**
  * Edge/Worker-safe SSRF guard for render targets. No Node built-ins — runs on
  * Cloudflare Workers and Vercel edge unchanged.
+ *
+ * DNS-rebinding residual: submit-time resolve+check cannot stop the Daytona
+ * renderer from re-resolving the hostname to a different address at render time.
+ * Fully closing that gap requires pinning the sandbox fetcher to the validated
+ * IP (Daytona/infra change) — out of scope for cloud-api; track as OPS follow-up.
  */
 
 function stripBrackets(host: string): string {
@@ -58,7 +63,6 @@ function parseDottedIpv4(host: string): number[] | null {
     const isLast = i === parts.length - 1;
 
     if (isLast && remainingSlots > 1) {
-      // Last component may encode multiple trailing octets (e.g. 127.1 → 127.0.0.1).
       let value: number;
       if (/^0x[0-9a-f]+$/i.test(part)) {
         value = Number.parseInt(part.slice(2), 16);
@@ -106,13 +110,81 @@ function unwrapIpv4MappedIpv6(host: string): number[] | null {
   return null;
 }
 
+function parseHextet(part: string): number | null {
+  if (part.length === 0 || part.length > 4) return null;
+  const value = Number.parseInt(part, 16);
+  if (!Number.isFinite(value) || value < 0 || value > 0xffff) return null;
+  return value;
+}
+
+/** Expand an IPv6 literal (no embedded IPv4) into eight 16-bit hextets. */
+function expandIpv6Hextets(host: string): number[] | null {
+  const h = stripBrackets(host);
+  if (!h.includes(':')) return null;
+  if (h.includes('.')) return null;
+  if (h === '::') return [0, 0, 0, 0, 0, 0, 0, 0];
+
+  const doubleColon = h.indexOf('::');
+  if (doubleColon === -1) {
+    const parts = h.split(':');
+    if (parts.length !== 8) return null;
+    const hextets = parts.map((p) => parseHextet(p));
+    if (hextets.some((v) => v === null)) return null;
+    return hextets as number[];
+  }
+
+  const left = h.slice(0, doubleColon);
+  const right = h.slice(doubleColon + 2);
+  const leftParts = left.length > 0 ? left.split(':') : [];
+  const rightParts = right.length > 0 ? right.split(':') : [];
+  if (leftParts.length + rightParts.length > 7) return null;
+
+  const leftHextets = leftParts.map((p) => parseHextet(p));
+  const rightHextets = rightParts.map((p) => parseHextet(p));
+  if (leftHextets.some((v) => v === null) || rightHextets.some((v) => v === null)) {
+    return null;
+  }
+
+  const missing = 8 - leftParts.length - rightParts.length;
+  return [...(leftHextets as number[]), ...Array<number>(missing).fill(0), ...(rightHextets as number[])];
+}
+
+function isLoopbackIpv6(host: string): boolean {
+  const hextets = expandIpv6Hextets(host);
+  if (!hextets) return stripBrackets(host) === '::1';
+  return hextets.slice(0, 7).every((v) => v === 0) && hextets[7] === 1;
+}
+
+function isUnspecifiedIpv6(host: string): boolean {
+  const h = stripBrackets(host);
+  if (h === '::') return true;
+  const hextets = expandIpv6Hextets(h);
+  return hextets !== null && hextets.every((v) => v === 0);
+}
+
+/** fe80::/10 — IPv6 link-local (fe80:: through febf::) */
+function isLinkLocalIpv6(host: string): boolean {
+  const hextets = expandIpv6Hextets(host);
+  if (!hextets) return false;
+  const first = hextets[0]!;
+  return first >= 0xfe80 && first <= 0xfebf;
+}
+
+/** fc00::/7 — IPv6 unique-local (fc00:: through fdff::) */
+function isUniqueLocalIpv6(host: string): boolean {
+  const hextets = expandIpv6Hextets(host);
+  if (!hextets) return false;
+  const first = hextets[0]!;
+  return first >= 0xfc00 && first <= 0xfdff;
+}
+
 function isPrivateOrLoopbackIpv4Octets(octets: number[]): boolean {
   const [a, b] = octets;
   if (a === 10) return true;
   if (a === 127) return true;
   if (a === 0) return true;
   if (a === 169 && b === 254) return true;
-  if (a === 172 && b! >= 16 && b! <= 31) return true;
+  if (a === 172 && b! >= 16 && b <= 31) return true;
   if (a === 192 && b === 168) return true;
   if (a === 100 && b! >= 64 && b! <= 127) return true;
   if (a! >= 224) return true;
@@ -121,16 +193,14 @@ function isPrivateOrLoopbackIpv4Octets(octets: number[]): boolean {
 
 function isPrivateOrLoopbackIpv6Literal(host: string): boolean {
   const h = stripBrackets(host);
-  if (h === '::1') return true;
-  if (h.startsWith('fe80:')) return true;
-
-  const firstHextet = h.split(':').find((p) => p.length > 0);
-  if (firstHextet && (firstHextet.startsWith('fc') || firstHextet.startsWith('fd'))) {
-    return true;
-  }
 
   const mapped = unwrapIpv4MappedIpv6(h);
   if (mapped) return isPrivateOrLoopbackIpv4Octets(mapped);
+
+  if (isUnspecifiedIpv6(h)) return true;
+  if (isLoopbackIpv6(h)) return true;
+  if (isLinkLocalIpv6(h)) return true;
+  if (isUniqueLocalIpv6(h)) return true;
 
   return false;
 }
@@ -191,8 +261,21 @@ type DohAnswer = { data?: string };
 async function queryDoh(hostname: string, type: 'A' | 'AAAA'): Promise<string[]> {
   const typeNum = type === 'A' ? 1 : 28;
   const url = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${typeNum}`;
-  const res = await fetch(url, { headers: { Accept: 'application/dns-json' } });
-  if (!res.ok) return [];
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { Accept: 'application/dns-json' } });
+  } catch {
+    throw new SafeRenderTargetError(
+      'dns_resolution_failed',
+      `could not resolve host: ${hostname}`,
+    );
+  }
+  if (!res.ok) {
+    throw new SafeRenderTargetError(
+      'dns_resolution_failed',
+      `could not resolve host: ${hostname}`,
+    );
+  }
   const body = (await res.json()) as { Answer?: DohAnswer[] };
   return (body.Answer ?? [])
     .map((a) => (a.data ?? '').replace(/\.$/, ''))
@@ -207,7 +290,14 @@ export async function resolveHostAddresses(hostname: string): Promise<string[]> 
     queryDoh(hostname, 'A'),
     queryDoh(hostname, 'AAAA'),
   ]);
-  return [...aRecords, ...aaaaRecords];
+  const addresses = [...aRecords, ...aaaaRecords];
+  if (addresses.length === 0) {
+    throw new SafeRenderTargetError(
+      'dns_resolution_failed',
+      `could not resolve host: ${hostname}`,
+    );
+  }
+  return addresses;
 }
 
 /**
@@ -249,7 +339,8 @@ export async function assertSafeRenderTarget(
   let addresses: string[];
   try {
     addresses = await resolveHost(host);
-  } catch {
+  } catch (err) {
+    if (err instanceof SafeRenderTargetError) throw err;
     throw new SafeRenderTargetError(
       'dns_resolution_failed',
       `could not resolve host: ${host}`,
