@@ -19,13 +19,9 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "dev:landing": "npm run dev --workspace=apps/landing",
-    "dev:docs": "npm run dev --workspace=apps/docs",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run dev --workspace=packages/cloud-api",
     "build:cli": "npm run build --workspace=packages/cli",
-    "build:landing": "npm run build --workspace=apps/landing",
-    "build:docs": "npm run stats && npm run build --workspace=apps/docs",
     "build:web": "npm run build --workspace=apps/web",
     "stats": "npx tsx scripts/stats.ts",
     "lint": "npm run lint --workspaces --if-present",
@@ -46,8 +42,8 @@
     "packages/cli/src/**/*.ts": [
       "eslint --fix --config packages/cli/eslint.config.js"
     ],
-    "apps/landing/src/**/*.{ts,tsx}": [
-      "eslint --fix --config apps/landing/eslint.config.js"
+    "apps/web/src/**/*.{ts,tsx}": [
+      "eslint --fix --config apps/web/eslint.config.js"
     ]
   }
 }
