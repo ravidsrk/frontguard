@@ -2,6 +2,9 @@ import { Daytona } from '@daytonaio/sdk';
 import type { SuggestedFix } from './types.js';
 import { orphanBaselinePath } from './storage/screenshots.js';
 
+/** Pinned CLI release — must match packages/cli/package.json and repo VERSION. */
+const FRONTGUARD_CLI_VERSION = '0.2.0';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -147,7 +150,7 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
         120,
       );
       await sandbox.process.executeCommand(
-        'npm install -g @frontguard/cli@latest',
+        `npm install -g @frontguard/cli@${FRONTGUARD_CLI_VERSION}`,
         undefined,
         undefined,
         60,
