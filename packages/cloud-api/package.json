@@ -13,6 +13,16 @@
     "url": "https://github.com/ravidsrk/frontguard/issues"
   },
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./render-target": {
+      "import": "./src/security/render-target.ts",
+      "types": "./src/security/render-target.ts"
+    }
+  },
   "scripts": {
     "dev": "wrangler dev",
     "dev:node": "tsx watch src/index.ts",
