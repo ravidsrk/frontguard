@@ -1,13 +1,16 @@
 /**
- * Test helper: adapts `better-sqlite3` to the minimal D1 interface used by
- * {@link D1Store}. Lets us exercise the real SQL against an in-process SQLite
- * database without a Cloudflare runtime.
+ * Test helper: adapts Node's built-in `node:sqlite` to the minimal D1
+ * interface used by {@link D1Store} and {@link migrate}. Avoids the
+ * `better-sqlite3` native addon (which fails to build on Node 26).
+ *
+ * {@link D1Database.batch} is emulated with BEGIN/COMMIT/ROLLBACK so migration
+ * rollback tests exercise the same all-or-nothing semantics as Cloudflare D1.
  */
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import type { D1Database, D1PreparedStatement } from '../../src/db/d1-store.js';
 
-export function createSqliteD1(): { db: D1Database; raw: Database.Database } {
-  const raw = new Database(':memory:');
+export function createNodeSqliteD1(): { db: D1Database; raw: DatabaseSync } {
+  const raw = new DatabaseSync(':memory:');
 
   const prepare = (query: string): D1PreparedStatement => {
     let bound: unknown[] = [];
