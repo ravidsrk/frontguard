@@ -1,9 +1,19 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Daytona } from '@daytonaio/sdk';
 import type { SuggestedFix } from './types.js';
 import { orphanBaselinePath } from './storage/screenshots.js';
 
-/** Pinned CLI release — must match packages/cli/package.json and repo VERSION. */
-const FRONTGUARD_CLI_VERSION = '0.2.0';
+/** Pinned CLI release — read from packages/cli/package.json so it cannot drift from VERSION. */
+const FRONTGUARD_CLI_VERSION = (
+  JSON.parse(
+    readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../../cli/package.json'),
+      'utf8',
+    ),
+  ) as { version: string }
+).version;
 
 // ---------------------------------------------------------------------------
 // Types
