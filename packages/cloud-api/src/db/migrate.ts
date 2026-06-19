@@ -46,12 +46,6 @@ export function splitStatements(sql: string): string[] {
     .filter((s) => s.length > 0);
 }
 
-/** Options for {@link migrate}. */
-export interface MigrateOptions {
-  /** Override the default migration list (tests may append versions). */
-  migrations?: readonly Migration[];
-}
-
 async function ensureLedger(db: D1Database): Promise<void> {
   for (const stmt of splitStatements(LEDGER_SQL)) {
     await db.prepare(stmt).run();
@@ -63,14 +57,6 @@ async function getAppliedVersions(db: D1Database): Promise<Set<string>> {
     .prepare('SELECT version FROM schema_migrations')
     .all<{ version: string }>();
   return new Set(results.map((row) => row.version));
-}
-
-/** True when the v1 baseline tables already exist (pre-ledger databases). */
-async function hasBaselineSchema(db: D1Database): Promise<boolean> {
-  const row = await db
-    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'")
-    .first<{ name: string }>();
-  return row !== null;
 }
 
 async function recordMigration(db: D1Database, version: string): Promise<void> {
@@ -108,46 +94,32 @@ async function applyMigration(db: D1Database, migration: Migration): Promise<num
 }
 
 /**
- * Stamps a migration as applied without executing SQL (legacy baseline adopt).
- */
-async function stampMigration(db: D1Database, version: string): Promise<void> {
-  await db.exec('BEGIN');
-  try {
-    await recordMigration(db, version);
-    await db.exec('COMMIT');
-  } catch (err) {
-    try {
-      await db.exec('ROLLBACK');
-    } catch {
-      // Ignore rollback failures; surface the original error.
-    }
-    throw err;
-  }
-}
-
-/**
- * Runs pending migrations against the given D1 database.
+ * Runs pending migrations from the given registry against a D1 database.
  *
  * @returns The number of SQL statements executed across newly applied migrations.
  */
-export async function migrate(db: D1Database, options?: MigrateOptions): Promise<number> {
-  const migrations = options?.migrations ?? MIGRATIONS;
+export async function runMigrations(
+  db: D1Database,
+  migrations: readonly Migration[],
+): Promise<number> {
   await ensureLedger(db);
   const applied = await getAppliedVersions(db);
 
   let executed = 0;
   for (const migration of migrations) {
     if (applied.has(migration.version)) continue;
-
-    if (migration.version === '001' && (await hasBaselineSchema(db))) {
-      await stampMigration(db, migration.version);
-      applied.add(migration.version);
-      continue;
-    }
-
     executed += await applyMigration(db, migration);
     applied.add(migration.version);
   }
 
   return executed;
+}
+
+/**
+ * Runs pending migrations from the production registry against a D1 database.
+ *
+ * @returns The number of SQL statements executed across newly applied migrations.
+ */
+export async function migrate(db: D1Database): Promise<number> {
+  return runMigrations(db, MIGRATIONS);
 }
