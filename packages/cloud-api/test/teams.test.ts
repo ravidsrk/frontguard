@@ -8,6 +8,19 @@ import { sendInviteEmail, buildAcceptUrl, buildInviteHtml } from '../src/teams/i
 
 const demoId = (token: string) => `demo:${createHash('sha256').update(token).digest('hex')}`;
 
+async function seedInvitee(
+  store: ReturnType<typeof getMemoryStore>,
+  token: string,
+  identity: { email?: string; githubLogin?: string },
+): Promise<void> {
+  await store.createUser({
+    id: demoId(token),
+    plan: 'free',
+    createdAt: new Date().toISOString(),
+    ...identity,
+  });
+}
+
 describe('role capabilities', () => {
   it('owner can do everything', () => {
     expect(can('owner', 'manage_team')).toBe(true);
@@ -58,11 +71,18 @@ describe('InMemoryStore teams', () => {
 
   it('handles invitations: create → accept once', async () => {
     await store.createTeam({ id: 't1', name: 'A', plan: 'free', createdAt: 'now' }, 'owner');
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
     await store.createInvitation({
-      id: 'i1', teamId: 't1', email: 'x@y.com', role: 'member', token: 'tok', createdAt: 'now',
+      id: 'i1',
+      teamId: 't1',
+      email: 'x@y.com',
+      role: 'member',
+      token: 'tok',
+      createdAt: 'now',
+      expiresAt,
     });
     expect((await store.listInvitations('t1')).length).toBe(1);
-    const accepted = await store.acceptInvitation('tok', 'now');
+    const accepted = await store.acceptInvitation('tok', new Date().toISOString());
     expect(accepted?.teamId).toBe('t1');
     // Second accept fails.
     expect(await store.acceptInvitation('tok', 'now')).toBeNull();
@@ -117,6 +137,7 @@ describe('/v1/teams routes (dev mode)', () => {
     expect(inviteRes.status).toBe(201);
     const { token } = await inviteRes.json();
 
+    await seedInvitee(getMemoryStore(), 'bob', { email: 'bob@x.com' });
     const acceptRes = await app.request('/v1/teams/invitations/accept', {
       method: 'POST', headers: auth('bob'), body: JSON.stringify({ token }),
     });
@@ -135,6 +156,7 @@ describe('/v1/teams routes (dev mode)', () => {
     const inv = await app.request(`/v1/teams/${id}/invitations`, {
       method: 'POST', headers: auth('alice'), body: JSON.stringify({ email: 'b@x.com', role: 'member' }),
     });
+    await seedInvitee(getMemoryStore(), 'bob', { email: 'b@x.com' });
     await app.request('/v1/teams/invitations/accept', {
       method: 'POST', headers: auth('bob'), body: JSON.stringify({ token: (await inv.json()).token }),
     });
@@ -168,6 +190,7 @@ describe('/v1/teams routes (dev mode)', () => {
     const inv = await app.request(`/v1/teams/${teamId}/invitations`, {
       method: 'POST', headers: auth('alice'), body: JSON.stringify({ email: 'bob@x.com', role }),
     });
+    await seedInvitee(getMemoryStore(), 'bob', { email: 'bob@x.com' });
     await app.request('/v1/teams/invitations/accept', {
       method: 'POST', headers: auth('bob'), body: JSON.stringify({ token: (await inv.json()).token }),
     });
@@ -284,9 +307,9 @@ describe('/v1/teams routes (dev mode)', () => {
     await app.request(`/v1/teams/${id}/members/${bobId}`, {
       method: 'PATCH', headers: auth('alice'), body: JSON.stringify({ role: 'admin' }),
     });
-    // A new viewer invite is forwarded to bob (already admin); accepting it must not downgrade him.
+    // A viewer invite for bob (already admin); accepting it must not downgrade him.
     const inv = await app.request(`/v1/teams/${id}/invitations`, {
-      method: 'POST', headers: auth('alice'), body: JSON.stringify({ email: 'b2@x.com', role: 'viewer' }),
+      method: 'POST', headers: auth('alice'), body: JSON.stringify({ email: 'bob@x.com', role: 'viewer' }),
     });
     const acc = await app.request('/v1/teams/invitations/accept', {
       method: 'POST', headers: auth('bob'), body: JSON.stringify({ token: (await inv.json()).token }),
@@ -348,8 +371,9 @@ describe('GitHub-handle invitations', () => {
     expect(body.emailed).toBe(false);
     expect(typeof body.token).toBe('string');
 
+    await seedInvitee(getMemoryStore(), 'octocat', { githubLogin: 'octocat' });
     const accept = await app.request('/v1/teams/invitations/accept', {
-      method: 'POST', headers: auth('bob'), body: JSON.stringify({ token: body.token }),
+      method: 'POST', headers: auth('octocat'), body: JSON.stringify({ token: body.token }),
     });
     expect(accept.status).toBe(200);
     expect((await accept.json()).role).toBe('member');
@@ -528,6 +552,7 @@ describe('baseline review workflow', () => {
     const inv = await app.request(`/v1/teams/${teamId}/invitations`, {
       method: 'POST', headers: auth('alice'), body: JSON.stringify({ email: 'bob@x.com', role: 'member' }),
     });
+    await seedInvitee(getMemoryStore(), 'bob', { email: 'bob@x.com' });
     await app.request('/v1/teams/invitations/accept', {
       method: 'POST', headers: auth('bob'), body: JSON.stringify({ token: (await inv.json()).token }),
     });
@@ -604,6 +629,7 @@ describe('team activity feed', () => {
     const inv = await app.request(`/v1/teams/${teamId}/invitations`, {
       method: 'POST', headers: auth('alice'), body: JSON.stringify({ email: 'bob@x.com', role: 'member' }),
     });
+    await seedInvitee(getMemoryStore(), 'bob', { email: 'bob@x.com' });
     await app.request('/v1/teams/invitations/accept', {
       method: 'POST', headers: auth('bob'), body: JSON.stringify({ token: (await inv.json()).token }),
     });
@@ -651,6 +677,7 @@ describe('team usage aggregation', () => {
     const inv = await app.request(`/v1/teams/${teamId}/invitations`, {
       method: 'POST', headers: auth('alice'), body: JSON.stringify({ email: 'bob@x.com', role: 'member' }),
     });
+    await seedInvitee(getMemoryStore(), 'bob', { email: 'bob@x.com' });
     await app.request('/v1/teams/invitations/accept', {
       method: 'POST', headers: auth('bob'), body: JSON.stringify({ token: (await inv.json()).token }),
     });

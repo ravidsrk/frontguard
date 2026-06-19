@@ -109,11 +109,22 @@ authRoutes.get('/github/callback', async (c) => {
     user = {
       id: crypto.randomUUID(),
       githubId,
+      githubLogin: ghUser.login,
       email: ghUser.email ?? undefined,
       plan: 'free',
       createdAt: new Date().toISOString(),
     };
     await store.createUser(user);
+  } else {
+    await store.updateUserIdentity(user.id, {
+      githubLogin: ghUser.login,
+      email: user.email ?? ghUser.email ?? undefined,
+    });
+    user = {
+      ...user,
+      githubLogin: ghUser.login,
+      email: user.email ?? ghUser.email ?? undefined,
+    };
   }
 
   // If this login was initiated for the browser dashboard, set a session cookie
