@@ -61,6 +61,16 @@ interface RunRow {
   error: string | null;
   created_at: string;
   completed_at: string | null;
+  version?: number;
+}
+
+const OPTIMISTIC_MAX_RETRIES = 5;
+
+class OptimisticConflictError extends Error {
+  constructor(entity: string, id: string) {
+    super(`optimistic concurrency conflict: ${entity} ${id}`);
+    this.name = 'OptimisticConflictError';
+  }
 }
 
 /** Serialises a Run's mutable, JSON-friendly config fields. */
@@ -111,8 +121,17 @@ export class D1Store implements Store {
 
   async createUser(user: User): Promise<void> {
     await this.db
-      .prepare(`INSERT INTO users (id, github_id, email, plan, created_at) VALUES (?, ?, ?, ?, ?)`)
-      .bind(user.id, user.githubId ?? null, user.email ?? null, user.plan, user.createdAt)
+      .prepare(
+        `INSERT INTO users (id, github_id, github_login, email, plan, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        user.id,
+        user.githubId ?? null,
+        user.githubLogin ?? null,
+        user.email ?? null,
+        user.plan,
+        user.createdAt,
+      )
       .run();
   }
   async getUser(id: string): Promise<User | null> {
@@ -128,6 +147,17 @@ export class D1Store implements Store {
   }
   async updateUserPlan(id: string, plan: string): Promise<void> {
     await this.db.prepare(`UPDATE users SET plan = ? WHERE id = ?`).bind(plan, id).run();
+  }
+  async updateUserIdentity(id: string, patch: { email?: string; githubLogin?: string }): Promise<void> {
+    if (patch.email !== undefined) {
+      await this.db.prepare(`UPDATE users SET email = ? WHERE id = ?`).bind(patch.email, id).run();
+    }
+    if (patch.githubLogin !== undefined) {
+      await this.db
+        .prepare(`UPDATE users SET github_login = ? WHERE id = ?`)
+        .bind(patch.githubLogin, id)
+        .run();
+    }
   }
 
   async createApiKey(key: ApiKeyRecord): Promise<void> {
@@ -221,28 +251,33 @@ export class D1Store implements Store {
     return results.map(rowToRun);
   }
   async updateRun(id: string, patch: Partial<Run>): Promise<void> {
-    // Read-modify-write to keep the JSON config consistent.
-    const current = await this.getRun(id);
-    if (!current) return;
-    const merged = { ...current, ...patch };
-    await this.db
-      .prepare(
-        `UPDATE runs SET project_id = ?, status = ?, config = ?, results = ?, report_html = ?, routes_count = ?, regressions_count = ?, baselines_approved = ?, error = ?, completed_at = ? WHERE id = ?`,
-      )
-      .bind(
-        merged.projectId ?? null,
-        merged.status,
-        runConfig(merged),
-        merged.results ? JSON.stringify(merged.results) : null,
-        merged.reportHtml ?? null,
-        merged.routes.length,
-        merged.results?.filter((r) => r.classification === 'regression').length ?? 0,
-        merged.baselinesApproved ? 1 : 0,
-        merged.error ?? null,
-        merged.completedAt ?? null,
-        id,
-      )
-      .run();
+    for (let attempt = 0; attempt < OPTIMISTIC_MAX_RETRIES; attempt++) {
+      const row = await this.db.prepare(`SELECT * FROM runs WHERE id = ?`).bind(id).first<RunRow>();
+      if (!row) return;
+      const version = Number(row.version ?? 0);
+      const merged = { ...rowToRun(row), ...patch };
+      const res = await this.db
+        .prepare(
+          `UPDATE runs SET project_id = ?, status = ?, config = ?, results = ?, report_html = ?, routes_count = ?, regressions_count = ?, baselines_approved = ?, error = ?, completed_at = ?, version = version + 1 WHERE id = ? AND version = ?`,
+        )
+        .bind(
+          merged.projectId ?? null,
+          merged.status,
+          runConfig(merged),
+          merged.results ? JSON.stringify(merged.results) : null,
+          merged.reportHtml ?? null,
+          merged.routes.length,
+          merged.results?.filter((r) => r.classification === 'regression').length ?? 0,
+          merged.baselinesApproved ? 1 : 0,
+          merged.error ?? null,
+          merged.completedAt ?? null,
+          id,
+          version,
+        )
+        .run();
+      if ((res.meta?.changes ?? 0) > 0) return;
+    }
+    throw new OptimisticConflictError('run', id);
   }
   async deleteRun(id: string, userId: string): Promise<boolean> {
     const res = await this.db.prepare(`DELETE FROM runs WHERE id = ? AND user_id = ?`).bind(id, userId).run();
@@ -543,27 +578,37 @@ export class D1Store implements Store {
     return results.map(monitorFromRow);
   }
   async updateMonitor(id: string, patch: Partial<Monitor>): Promise<void> {
-    const current = await this.getMonitor(id);
-    if (!current) return;
-    const m = { ...current, ...patch };
-    await this.db
-      .prepare(
-        `UPDATE monitors SET name = ?, url = ?, routes = ?, viewports = ?, interval_minutes = ?, alert_threshold = ?, alerts = ?, enabled = ?, last_run_at = ?, last_status = ? WHERE id = ?`,
-      )
-      .bind(
-        m.name,
-        m.url,
-        JSON.stringify(m.routes),
-        JSON.stringify(m.viewports),
-        m.intervalMinutes,
-        m.alertThreshold,
-        m.alerts ? JSON.stringify(m.alerts) : null,
-        m.enabled ? 1 : 0,
-        m.lastRunAt ?? null,
-        m.lastStatus ?? null,
-        id,
-      )
-      .run();
+    for (let attempt = 0; attempt < OPTIMISTIC_MAX_RETRIES; attempt++) {
+      const row = await this.db
+        .prepare(`SELECT * FROM monitors WHERE id = ?`)
+        .bind(id)
+        .first<Record<string, unknown>>();
+      if (!row) return;
+      const version = Number(row.version ?? 0);
+      const current = monitorFromRow(row);
+      const m = { ...current, ...patch };
+      const res = await this.db
+        .prepare(
+          `UPDATE monitors SET name = ?, url = ?, routes = ?, viewports = ?, interval_minutes = ?, alert_threshold = ?, alerts = ?, enabled = ?, last_run_at = ?, last_status = ?, version = version + 1 WHERE id = ? AND version = ?`,
+        )
+        .bind(
+          m.name,
+          m.url,
+          JSON.stringify(m.routes),
+          JSON.stringify(m.viewports),
+          m.intervalMinutes,
+          m.alertThreshold,
+          m.alerts ? JSON.stringify(m.alerts) : null,
+          m.enabled ? 1 : 0,
+          m.lastRunAt ?? null,
+          m.lastStatus ?? null,
+          id,
+          version,
+        )
+        .run();
+      if ((res.meta?.changes ?? 0) > 0) return;
+    }
+    throw new OptimisticConflictError('monitor', id);
   }
   async deleteMonitor(id: string, userId: string): Promise<boolean> {
     const res = await this.db.prepare(`DELETE FROM monitors WHERE id = ? AND user_id = ?`).bind(id, userId).run();
@@ -659,13 +704,21 @@ export class D1Store implements Store {
     return row ? teamFromRow(row) : null;
   }
   async updateTeam(id: string, patch: Partial<Team>): Promise<void> {
-    const current = await this.getTeam(id);
-    if (!current) return;
-    const t = { ...current, ...patch };
-    await this.db
-      .prepare(`UPDATE teams SET name = ?, plan = ?, stripe_customer_id = ?, stripe_subscription_id = ? WHERE id = ?`)
-      .bind(t.name, t.plan, t.stripeCustomerId ?? null, t.stripeSubscriptionId ?? null, id)
-      .run();
+    for (let attempt = 0; attempt < OPTIMISTIC_MAX_RETRIES; attempt++) {
+      const row = await this.db.prepare(`SELECT * FROM teams WHERE id = ?`).bind(id).first<Record<string, unknown>>();
+      if (!row) return;
+      const version = Number(row.version ?? 0);
+      const current = teamFromRow(row);
+      const t = { ...current, ...patch };
+      const res = await this.db
+        .prepare(
+          `UPDATE teams SET name = ?, plan = ?, stripe_customer_id = ?, stripe_subscription_id = ?, version = version + 1 WHERE id = ? AND version = ?`,
+        )
+        .bind(t.name, t.plan, t.stripeCustomerId ?? null, t.stripeSubscriptionId ?? null, id, version)
+        .run();
+      if ((res.meta?.changes ?? 0) > 0) return;
+    }
+    throw new OptimisticConflictError('team', id);
   }
   async deleteTeam(id: string): Promise<boolean> {
     await this.db.prepare(`DELETE FROM team_activity WHERE team_id = ?`).bind(id).run();
@@ -733,8 +786,8 @@ export class D1Store implements Store {
   async createInvitation(inv: TeamInvitation): Promise<void> {
     await this.db
       .prepare(
-        `INSERT INTO team_invitations (id, team_id, email, github_login, role, token, created_at, accepted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO team_invitations (id, team_id, email, github_login, role, token, created_at, expires_at, accepted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         inv.id,
@@ -744,6 +797,7 @@ export class D1Store implements Store {
         inv.role,
         inv.token,
         inv.createdAt,
+        inv.expiresAt ?? null,
         inv.acceptedAt ?? null,
       )
       .run();
@@ -765,7 +819,14 @@ export class D1Store implements Store {
   async acceptInvitation(token: string, at: string): Promise<TeamInvitation | null> {
     const inv = await this.getInvitationByToken(token);
     if (!inv || inv.acceptedAt) return null;
-    await this.db.prepare(`UPDATE team_invitations SET accepted_at = ? WHERE token = ?`).bind(at, token).run();
+    if (!inv.expiresAt || new Date(inv.expiresAt) <= new Date(at)) return null;
+    const res = await this.db
+      .prepare(
+        `UPDATE team_invitations SET accepted_at = ? WHERE token = ? AND accepted_at IS NULL AND expires_at > ?`,
+      )
+      .bind(at, token, at)
+      .run();
+    if ((res.meta?.changes ?? 0) === 0) return null;
     return { ...inv, acceptedAt: at };
   }
 
@@ -916,6 +977,7 @@ function invitationFromRow(row: Record<string, unknown>): TeamInvitation {
     role: String(row.role) as TeamRole,
     token: String(row.token),
     createdAt: String(row.created_at),
+    expiresAt: row.expires_at != null ? String(row.expires_at) : undefined,
     acceptedAt: row.accepted_at != null ? String(row.accepted_at) : undefined,
   };
 }
@@ -992,6 +1054,7 @@ function userFromRow(row: Record<string, unknown>): User {
   return {
     id: String(row.id),
     githubId: row.github_id != null ? String(row.github_id) : undefined,
+    githubLogin: row.github_login != null ? String(row.github_login) : undefined,
     email: row.email != null ? String(row.email) : undefined,
     plan: String(row.plan ?? 'free'),
     createdAt: String(row.created_at),
