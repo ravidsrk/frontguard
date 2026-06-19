@@ -50,6 +50,8 @@ describe('createCheckoutSession', () => {
     expect(body).toContain('price_pro');
     expect(body).toContain('mode=subscription');
     expect(body).toContain('metadata%5Bteam_id%5D=team1');
+    expect(body).toContain('subscription_data%5Bmetadata%5D%5Bteam_id%5D=team1');
+    expect(body).toContain('subscription_data%5Bmetadata%5D%5Bplan%5D=pro');
   });
 
   it('throws for a plan without a configured price', async () => {
