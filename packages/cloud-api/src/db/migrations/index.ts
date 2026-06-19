@@ -1,28 +1,27 @@
 /**
- * Ordered schema migrations (DM-1).
+ * Ordered schema migrations registry (DM-1).
  *
- * v1 is the canonical baseline from {@link ../schema.sql}. To add a migration:
+ * Production code iterates {@link MIGRATIONS} in version order. To add a
+ * migration (DM-2, DM-3, SEC-4, …):
  * 1. Create `migrations/NNN_description.sql` with additive DDL.
- * 2. Export its SQL as a string constant (Workers cannot import `.sql` files).
- * 3. Append `{ version: 'NNN', sql: ... }` below in numeric order.
+ * 2. Add `migrations/NNN_description.ts` exporting a {@link Migration} constant
+ *    (Workers cannot import `.sql` files at runtime).
+ * 3. Import and append it below in numeric order.
  *
  * @module db/migrations
  */
 
-import { SCHEMA_SQL } from '../schema.js';
+import { migration001Baseline } from './001-baseline.js';
+import { migration002Dm1TestCol } from './002-dm1-test-col.js';
+import type { Migration } from './types.js';
 
-/** A single versioned migration script. */
-export interface Migration {
-  /** Numeric version id, e.g. `001`, `002`. */
-  readonly version: string;
-  /** SQL statements executed atomically when this version is pending. */
-  readonly sql: string;
-}
+export type { Migration } from './types.js';
 
 /**
  * All migrations in apply order. Only pending versions are run; applied
  * versions are recorded in `schema_migrations`.
  */
 export const MIGRATIONS: readonly Migration[] = [
-  { version: '001', sql: SCHEMA_SQL },
+  migration001Baseline,
+  migration002Dm1TestCol,
 ];
