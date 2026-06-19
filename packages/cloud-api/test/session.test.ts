@@ -14,9 +14,13 @@ import { createSqliteD1 } from './helpers/sqlite-d1.js';
 
 const SECRET = INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD;
 
-/** A production-like env — a real D1 `DB` binding flips isProduction → true. */
+/** A production-like env — explicit ENVIRONMENT=production (SEC-6). */
 function prodEnv(secret?: string): Bindings {
-  return { DB: createSqliteD1().db, DASHBOARD_SESSION_SECRET: secret };
+  return {
+    ENVIRONMENT: 'production',
+    DB: createSqliteD1().db,
+    DASHBOARD_SESSION_SECRET: secret,
+  };
 }
 
 describe('session cookie', () => {

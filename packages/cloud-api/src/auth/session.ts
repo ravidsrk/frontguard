@@ -33,8 +33,8 @@ export const MIN_SESSION_SECRET_LENGTH = 32;
 
 /**
  * Dev/test-only fallback secret. Used ONLY when `DASHBOARD_SESSION_SECRET` is
- * unset AND the runtime is not production (no D1 `DB` binding — see
- * {@link isProduction}). The name is self-documenting by design: it ships in
+ * unset AND the runtime is not production (see {@link isProduction}). The name
+ * is self-documenting by design: it ships in
  * the published source, so it must read as obviously unusable in production.
  * Its value mirrors its name so any accidental leak is instantly recognisable
  * as the insecure dev placeholder rather than a real secret.
@@ -69,7 +69,7 @@ export function hasValidSessionSecret(env: Bindings | undefined): boolean {
 /**
  * Resolves the session signing secret from env.
  *
- * In production ({@link isProduction} — a real D1 `DB` binding present) this
+ * In production ({@link isProduction} — `ENVIRONMENT=production`) this
  * fails closed: if `DASHBOARD_SESSION_SECRET` is unset or shorter than
  * {@link MIN_SESSION_SECRET_LENGTH}, it throws {@link SessionSecretMissingError}
  * rather than signing cookies with a public fallback. In dev/tests it falls
