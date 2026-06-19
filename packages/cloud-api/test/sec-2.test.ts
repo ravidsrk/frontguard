@@ -54,6 +54,11 @@ describe('POST /v1/run — SSRF guard (SEC-2)', () => {
       'https://localhost/',
       'https://metadata.google.internal/',
       'https://[::1]/',
+      'https://[::ffff:127.0.0.1]/',
+      'https://[::ffff:169.254.169.254]/',
+      'https://[::ffff:7f00:1]/',
+      'https://2130706433/',
+      'https://0.0.0.0/',
       'file:///etc/passwd',
     ]) {
       processRunStarted.mockClear();
