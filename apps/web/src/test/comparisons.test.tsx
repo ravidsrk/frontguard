@@ -67,4 +67,12 @@ describe('/comparisons', () => {
     const link = screen.getByRole('link', { name: /docs\/research\.md/i })
     expect(link).toHaveAttribute('href', expect.stringContaining('/blob/main/docs/research.md'))
   })
+
+  it('renders vendor column headers and price cells in the page output', async () => {
+    const { container } = await renderComparisons()
+    expect(screen.getByRole('columnheader', { name: 'Chromatic' })).toBeInTheDocument()
+    expect(screen.getByText('$179/mo')).toBeInTheDocument()
+    expect(container.textContent).toContain('Percy')
+    expect(container.textContent).toContain('$0.008')
+  })
 })
