@@ -21,7 +21,7 @@ vi.mock('node:fs', async (importOriginal) => {
     ...actual,
     mkdtempSync(prefix: string, options?: Parameters<typeof actual.mkdtempSync>[1]) {
       const dir = actual.mkdtempSync(prefix, options);
-      if (String(prefix).includes('frontguard-')) {
+      if (String(prefix).includes('frontguard-compare-')) {
         tempDirs.created.push(dir);
       }
       return dir;
@@ -113,6 +113,6 @@ describe('REL-5: compare temp directory', () => {
   it('uses mkdtemp under os.tmpdir with a frontguard- prefix', async () => {
     await runPipeline(makeConfig(), makeReporter());
     expect(tempDirs.created).toHaveLength(1);
-    expect(tempDirs.created[0]!.startsWith(join(tmpdir(), 'frontguard-'))).toBe(true);
+    expect(tempDirs.created[0]!.startsWith(join(tmpdir(), 'frontguard-compare-'))).toBe(true);
   });
 });
