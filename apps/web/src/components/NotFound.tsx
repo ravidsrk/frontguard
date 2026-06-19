@@ -4,7 +4,7 @@ import { s } from '../lib/style'
 
 const MONO = "'JetBrains Mono', monospace"
 
-/** Amber-branded 404 — mirrors apps/landing/public/404.html design tokens. */
+/** Amber-branded 404 page for unmatched routes. */
 export function NotFound() {
   return (
     <div

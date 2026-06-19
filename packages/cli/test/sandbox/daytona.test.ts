@@ -107,7 +107,7 @@ describe('DaytonaSandbox.create — configuration errors', () => {
       const sb = new DaytonaSandbox();
       // The wording is verbatim what verify-fix surfaces, and what the docs
       // page on sandboxes calls out. Don't loosen this assertion without
-      // updating apps/docs/content/docs/guides/sandbox.mdx.
+      // updating apps/web/src/lib/docs-content.ts (guides/sandbox article).
       await expect(sb.create()).rejects.toThrow(/Daytona fix verification unconfigured/i);
       await expect(sb.create()).rejects.toThrow(/Falling back to local sandbox/i);
       await expect(sb.create()).rejects.toThrow(/DAYTONA_API_KEY/);

@@ -29,7 +29,7 @@ Backend has Datadog, Sentry, PagerDuty — a $20B+ monitoring ecosystem. Fronten
 
 Every line of Frontguard is MIT-licensed and lives in this repo. The CLI, the AI vision pipeline, the cloud-api (Cloudflare Workers + D1 + R2), the four integrations (Slack / GitHub / Vercel / Netlify), the MCP server, the Dockerised cross-OS renderer, and the self-host docker-compose are all here. The 21 PRs that built v0.2.0 are all on `main` — you can read the [adversarial review](./docs/adversarial-review.md) we audited the prior state against, the [competitive research](./docs/research.md) that anchored the boundary, and the [product-completion plan](./docs/product-completion-plan.md) that defined what "complete" meant. Nothing is hidden behind a "request a demo."
 
-If you'd rather not run your own AI keys, the cloud is opt-in. If you'd rather not use the cloud, the CLI is free forever. If you'd rather run the whole stack on your own machines, [`docs/self-host.mdx`](./apps/docs/content/docs/self-host.mdx) is the recipe.
+If you'd rather not run your own AI keys, the cloud is opt-in. If you'd rather not use the cloud, the CLI is free forever. If you'd rather run the whole stack on your own machines, the [self-host guide](https://frontguard.dev/docs/self-host) is the recipe.
 
 ## Why Frontguard?
 
@@ -37,7 +37,7 @@ If you'd rather not run your own AI keys, the cloud is opt-in. If you'd rather n
 - **🎯 Anti-flake rendering** — Multi-render consensus eliminates the flaky-screenshot noise that makes teams disable their visual suites.
 - **🤖 In-IDE agents via MCP** — [`@frontguard/mcp`](https://www.npmjs.com/package/@frontguard/mcp) exposes "what regressed on this PR" and "give me the suggested fix for diff N" to Claude Code / Cursor / Copilot.
 - **🐳 Cross-OS byte-equivalent baselines** — pinned Docker renderer so a fix that closes the diff on macOS closes it on Linux CI too. No more 428-day flake debugging.
-- **🔓 Open-source & self-hostable** — CLI-first, free forever. No per-screenshot pricing cliff, no dashboard lock-in, BYO AI key. [`docs/self-host.mdx`](./apps/docs/content/docs/self-host.mdx) is a one-command recipe.
+- **🔓 Open-source & self-hostable** — CLI-first, free forever. No per-screenshot pricing cliff, no dashboard lock-in, BYO AI key. The [self-host guide](https://frontguard.dev/docs/self-host) is a one-command recipe.
 
 ## What It Does
 
@@ -71,7 +71,7 @@ npx -p @frontguard/cli frontguard run --url http://localhost:3000
 npx -p @frontguard/cli frontguard update-baselines
 ```
 
-> **Full documentation:** [frontguard.dev](https://frontguard.dev) · [`docs/`](./docs/) folder
+> **Full documentation:** [frontguard.dev/docs](https://frontguard.dev/docs) · internal notes in [`docs/`](./docs/)
 
 ## Features
 

@@ -7,7 +7,7 @@ checks. Custom-domain previews (e.g. `https://preview.acme.com`) are
 accepted out of the box once a user installs the integration on their team.
 
 The user-facing docs live at
-[`apps/docs/content/docs/integrations/vercel.mdx`](../../apps/docs/content/docs/integrations/vercel.mdx).
+[frontguard.dev/docs/integrations/vercel](https://frontguard.dev/docs/integrations/vercel).
 This README is the contributor / deployer reference.
 
 ## What's in here

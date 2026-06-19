@@ -90,7 +90,6 @@ app.use(
       const allowed = [
         'https://frontguard.dev',
         'https://www.frontguard.dev',
-        'https://docs.frontguard.dev',
       ];
       if (!origin) return origin;
       if (origin.startsWith('http://localhost:')) return origin;

@@ -13,10 +13,23 @@ import { join } from 'node:path';
 
 const repoRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 
+function installationHtml(): string {
+  const docsContent = readFileSync(
+    join(repoRoot, 'apps/web/src/lib/docs-content.ts'),
+    'utf8',
+  );
+  const match = docsContent.match(
+    /\{\s*id:\s*"installation"[\s\S]*?html:\s*"((?:\\.|[^"\\])*)"/,
+  );
+  expect(match, 'installation article must exist in docs-content.ts').toBeTruthy();
+  // Unescape the TS string literal back to HTML for assertions.
+  return JSON.parse(`"${match![1]}"`);
+}
+
 describe('docs: no bare `npx frontguard` invocations', () => {
   it('matches zero occurrences of the bare unscoped `npx <bin>` form', () => {
     const hits = execSync(
-      "git grep -nE 'npx[[:space:]]+frontguard[[:space:]]' -- 'apps/docs/**/*.mdx' 'README.md' 'packages/cli/README.md' || true",
+      "git grep -nE 'npx[[:space:]]+frontguard[[:space:]]' -- 'apps/web/src/lib/docs-content.ts' 'README.md' 'packages/cli/README.md' || true",
       { encoding: 'utf8', cwd: repoRoot },
     ).trim();
     expect(
@@ -27,43 +40,34 @@ describe('docs: no bare `npx frontguard` invocations', () => {
 });
 
 describe('docs: installation page documents the scoped package', () => {
-  const installationMdx = readFileSync(
-    join(repoRoot, 'apps/docs/content/docs/installation.mdx'),
-    'utf8',
-  );
+  const installation = installationHtml();
 
   it('does not document an install of the unscoped `frontguard` package (404 on npm)', () => {
-    // Every dev-install must read `-D @frontguard/cli`; the bare `-D frontguard`
-    // form only appears if a snippet has regressed.
-    expect(installationMdx).not.toContain('-D frontguard');
+    expect(installation).not.toContain('-D frontguard');
   });
 
   it('documents the scoped `@frontguard/cli` install', () => {
-    expect(installationMdx).toContain('@frontguard/cli');
+    expect(installation).toContain('@frontguard/cli');
   });
 });
 
-describe('docs-10: installation.mdx --version expected output is the real SemVer', () => {
-  const installationMdx = readFileSync(
-    join(repoRoot, 'apps/docs/content/docs/installation.mdx'),
-    'utf8',
-  );
+describe('docs-10: installation verify section expected output is the real SemVer', () => {
+  const installation = installationHtml();
 
-  // Isolate the `## Verify Installation` section up to the next h2, then grab the
-  // fenced block shown after "You should see" — that is the expected CLI output.
-  const sectionStart = installationMdx.indexOf('## Verify Installation');
-  const section = installationMdx.slice(sectionStart);
-  const verifySection = section.slice(0, section.indexOf('\n## ', 1));
-  const afterHint = verifySection.slice(verifySection.indexOf('You should see'));
-  const outputBlock = (afterHint.match(/```[a-z]*\n([\s\S]*?)```/)?.[1] ?? '').trim();
+  const sectionStart = installation.indexOf('Verify Installation');
+  const section = installation.slice(sectionStart);
+  const verifySection = section.slice(0, section.search(/<h2[^>]*>(?!Verify)/i));
+  const preBlocks = [...verifySection.matchAll(/<pre[^>]*>([\s\S]*?)<\/pre>/g)].map((m) =>
+    m[1].replace(/<[^>]+>/g, '').trim(),
+  );
+  const outputBlock = preBlocks.find((b) => /\d+\.\d+\.\d+/.test(b)) ?? '';
 
   it('locates the expected-output block', () => {
-    expect(sectionStart, '## Verify Installation section must exist').toBeGreaterThan(-1);
-    expect(outputBlock, 'expected-output fenced block must be present').not.toBe('');
+    expect(sectionStart, 'Verify Installation section must exist').toBeGreaterThan(-1);
+    expect(outputBlock, 'expected-output pre block must be present').not.toBe('');
   });
 
   it('shows a SemVer version, not the literal word `frontguard`', () => {
-    // The CLI prints SemVer (e.g. `0.2.0`); the old docs claimed it prints `frontguard`.
     expect(outputBlock).toMatch(/\d+\.\d+\.\d+/);
     for (const line of outputBlock.split('\n').map((l) => l.trim()).filter(Boolean)) {
       expect(line, `expected-output line should be a version, not "${line}"`).not.toMatch(
@@ -72,4 +76,3 @@ describe('docs-10: installation.mdx --version expected output is the real SemVer
     }
   });
 });
-

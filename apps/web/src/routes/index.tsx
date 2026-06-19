@@ -221,7 +221,7 @@ const INSTALL_TABS: InstallTab[] = [
     filename: '.github/workflows/visual.yml',
     code: [
       '- name: Frontguard',
-      '  uses: ravidsrk/frontguard@v1',
+      '  uses: ravidsrk/frontguard@v0',
       '  with:',
       '    url: ${{ steps.preview.outputs.url }}',
       '  env:',
@@ -232,7 +232,7 @@ const INSTALL_TABS: InstallTab[] = [
       <>
         <span style={s('color: #564f48;')}>- </span>name:{' '}
         <span style={s('color: #98c379;')}>Frontguard</span>
-        {'\n  '}uses: <span style={s('color: #98c379;')}>ravidsrk/frontguard@v1</span>
+        {'\n  '}uses: <span style={s('color: #98c379;')}>ravidsrk/frontguard@v0</span>
         {'\n  '}with:
         {'\n    '}url: <span style={s('color: #e8862e;')}>{'${{ steps.preview.outputs.url }}'}</span>
         {'\n  '}env:

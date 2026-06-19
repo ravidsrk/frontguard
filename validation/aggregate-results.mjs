@@ -203,7 +203,7 @@ function renderMarkdown(a) {
 }
 
 function buildLandingPayload(a, runDate, cliVersion) {
-  // Compact shape consumed by apps/landing/src/components/Validation.tsx —
+  // Compact shape consumed by apps/web validation section —
   // pre-computed so the marketing build has no runtime dependency on the
   // raw per-repo JSONs.
   const repoEntries = a.summaries.map((s) => ({
