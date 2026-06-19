@@ -106,7 +106,7 @@ export const RELEASES: Release[] = [
               ' — generateFixes produces minimal CSS patches; verifyFixes applies them in a sandbox, re-renders, and re-compares against baseline.',
           },
           {
-            term: 'Fix-pattern database',
+            term: 'Fix-pattern database (reuse patterns accepted ≥3 times)',
             detail:
               ' — a SQLite store with accept-fix / reject-fix / export-patterns; the pipeline reuses patterns accepted ≥3 times before calling the AI.',
           },
@@ -116,17 +116,17 @@ export const RELEASES: Release[] = [
               ' — axe-core WCAG audits and LCP/CLS/TTFB budgets, both correlated inline with the visual diff.',
           },
           {
-            term: 'Cloud platform',
+            term: 'Cloud platform (Hono, D1+R2+GitHub OAuth)',
             detail:
               ' — a Hono service with run submission, baseline approval and usage metering; Cloudflare D1 + R2 + GitHub OAuth.',
           },
           {
-            term: 'Teams & billing',
+            term: 'Teams & billing (Stripe)',
             detail:
               ' — multi-tenant teams with roles, invitations, approvals, an activity feed, and Stripe billing.',
           },
           {
-            term: 'Integrations',
+            term: 'Integrations (Vercel OAuth, Netlify Build Plugin, GitHub App)',
             detail: ' — real Vercel OAuth app, Netlify Build Plugin, and a GitHub App with Check Runs.',
           },
         ],
@@ -135,13 +135,12 @@ export const RELEASES: Release[] = [
         kind: 'changed',
         items: [
           {
-            term: 'Documentation site',
-            detail: ' migrated from VitePress to Fumadocs (Next.js + MDX).',
+            term: 'docs migrated VitePress → Fumadocs',
+            detail: '',
           },
           {
-            term: 'Reporters',
-            detail:
-              ' now render accessibility, performance and third-party-script sections alongside visual diffs.',
+            term: 'reporters render a11y/perf/3rd-party sections',
+            detail: '',
           },
         ],
       },
@@ -165,23 +164,26 @@ export const RELEASES: Release[] = [
         items: [
           { term: 'CLI', detail: ' — frontguard init and run with proper flow control and exit codes.' },
           {
-            term: 'Route discovery',
+            term: 'route discovery',
             detail:
               ' — auto-crawl plus filesystem detection for Next.js, Nuxt, SvelteKit, Astro and Remix.',
           },
-          { term: 'Multi-browser capture', detail: ' — Chromium, Firefox and WebKit via Playwright.' },
+          { term: 'multi-browser capture', detail: ' — Chromium, Firefox and WebKit via Playwright.' },
           {
-            term: 'Visual comparison',
+            term: 'pixelmatch diffing (0–100%)',
             detail: ' — pixel-level diffing via pixelmatch with a standardized 0–100 diff percentage.',
           },
           {
-            term: 'AI analysis',
+            term: 'AI analysis (BYOK)',
             detail:
               ' — BYOK support for OpenAI and Anthropic vision models on a unified confidence scale.',
           },
-          { term: 'Git baselines', detail: ' — orphan-branch storage for baseline screenshots via worktrees.' },
           {
-            term: 'Plugin architecture',
+            term: 'Git baselines (orphan branch)',
+            detail: ' — orphan-branch storage for baseline screenshots via worktrees.',
+          },
+          {
+            term: 'plugin architecture (6 hooks + Figma/perf/monitor)',
             detail:
               ' — 6 lifecycle hooks with error isolation, plus Figma, perf-budgets and monitoring plugins.',
           },
@@ -191,7 +193,7 @@ export const RELEASES: Release[] = [
         kind: 'security',
         items: [
           {
-            term: 'Hardened by default',
+            term: 'hardened by default',
             detail:
               ' — shell-injection prevention, path-traversal guards, API-key redaction, and XSS-escaped HTML reports.',
           },
@@ -201,9 +203,9 @@ export const RELEASES: Release[] = [
         kind: 'testing',
         items: [
           {
-            term: '395 tests',
+            term: '395 tests across 26 test files',
             detail:
-              ' across 26 test files covering 27 source files — vision, crawler, Playwright, plugins, reporters, storage and E2E.',
+              ' covering 27 source files — vision, crawler, Playwright, plugins, reporters, storage and E2E.',
           },
         ],
       },

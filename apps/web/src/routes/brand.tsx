@@ -1,5 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Footer } from '../components/Footer'
 import { Nav } from '../components/Nav'
 import { Shield } from '../components/Shield'
 import { s } from '../lib/style'
@@ -576,8 +575,6 @@ function Brand() {
           </div>
         </div>
       </div>
-
-      <Footer />
     </div>
   )
 }

@@ -40,13 +40,22 @@ describe('/changelog', () => {
     expect(screen.getByText('CHANGED')).toBeInTheDocument()
     expect(screen.getByText('SECURITY')).toBeInTheDocument()
     expect(screen.getByText('TESTING')).toBeInTheDocument()
-    expect(screen.getByText('395 tests')).toBeInTheDocument()
+    expect(screen.getByText('395 tests across 26 test files')).toBeInTheDocument()
     expect(screen.getByText('Storybook integration')).toBeInTheDocument()
     expect(screen.getByText('frontguard doctor')).toBeInTheDocument()
+    expect(screen.getByText('pixelmatch diffing (0–100%)')).toBeInTheDocument()
 
     const initial = screen.getByRole('article', { name: /the core engine/i })
     expect(within(initial).getByText('SECURITY')).toBeInTheDocument()
     expect(within(initial).getByText('TESTING')).toBeInTheDocument()
     expect(within(initial).queryByText('CHANGED')).not.toBeInTheDocument()
+  })
+
+  it('renders version labels and changed items in the page output', async () => {
+    const { container } = await renderChangelog()
+    expect(screen.getByText('0.2.0')).toBeInTheDocument()
+    expect(screen.getByText('docs migrated VitePress → Fumadocs')).toBeInTheDocument()
+    expect(container.textContent).toContain('Unreleased')
+    expect(container.textContent).toContain('reporters render a11y/perf/3rd-party sections')
   })
 })
