@@ -7,7 +7,7 @@ import {
 } from '../src/auth/github.js';
 import { splitStatements } from '../src/db/migrate.js';
 import { app } from '../src/index.js';
-import { resetMemoryStore } from '../src/db/factory.js';
+import { getMemoryStore, resetMemoryStore } from '../src/db/factory.js';
 
 describe('API keys', () => {
   it('generates keys with the fg_ prefix and valid format', () => {
@@ -233,8 +233,49 @@ describe('/auth/github routes', () => {
     ).json();
     // Same underlying user id across logins.
     expect(first.user.id).toBe(second.user.id);
-    // But a fresh key is minted each time.
-    expect(first.apiKey).not.toBe(second.apiKey);
+    // SEC-3: repeat JSON logins do not mint additional keys.
+    expect(first.apiKey).toMatch(/^fg_/);
+    expect(second.apiKey).toBeUndefined();
+    const store = getMemoryStore();
+    const user = await store.getUserByGithubId('7');
+    expect((await store.listApiKeys(user!.id)).length).toBe(1);
+  });
+
+  // SEC-3: dashboard OAuth login must not create orphaned api_keys rows.
+  it('GET /auth/github/callback dashboard logins do not create api_keys rows', async () => {
+    globalThis.fetch = (async (url: string) => {
+      if (url.includes('oauth/access_token')) {
+        return new Response(JSON.stringify({ access_token: 'gho_tok' }), { status: 200 });
+      }
+      if (url.endsWith('/user')) {
+        return new Response(JSON.stringify({ id: 55, login: 'dashrepeat', email: 'd@x.com' }), { status: 200 });
+      }
+      return new Response('[]', { status: 200 });
+    }) as typeof fetch;
+
+    const store = getMemoryStore();
+    const countKeys = async () => {
+      const user = await store.getUserByGithubId('55');
+      return user ? (await store.listApiKeys(user.id)).length : 0;
+    };
+
+    const h1 = await startOAuth();
+    const first = await app.request(
+      `/auth/github/callback?code=one&redirect=/dashboard&state=${h1.state}`,
+      { headers: { Cookie: h1.cookie } },
+      oauthEnv,
+    );
+    expect(first.status).toBe(302);
+    expect(await countKeys()).toBe(0);
+
+    const h2 = await startOAuth();
+    const second = await app.request(
+      `/auth/github/callback?code=two&redirect=/dashboard&state=${h2.state}`,
+      { headers: { Cookie: h2.cookie } },
+      oauthEnv,
+    );
+    expect(second.status).toBe(302);
+    expect(await countKeys()).toBe(0);
   });
 });
 
