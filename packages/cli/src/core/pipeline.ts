@@ -517,6 +517,7 @@ export async function runPipeline(
   // Create a temp directory for persisting images of changed pages
   // so we can free memory during comparison and restore lazily for reports.
   tempDir = mkdtempSync(join(tmpdir(), 'frontguard-'));
+  const compareTempDir: string = tempDir;
 
   // Track temp file paths for changed diffs so we can restore buffers for reporting
   const tempPaths = new Map<number, { baseline: string; current: string; diff: string }>();
@@ -594,9 +595,9 @@ export async function runPipeline(
             const _shot = screenshots[diffIndex] ?? diff;
             const key = `${storedIndex}_${diff.route.path}_${diff.viewport}_${diff.browser}`;
             tempPaths.set(storedIndex, {
-              baseline: persistBufferToTemp(tempDir, `${key}_baseline`, diff.baselineImage),
-              current: persistBufferToTemp(tempDir, `${key}_current`, diff.currentImage),
-              diff: persistBufferToTemp(tempDir, `${key}_diff`, diff.diffImage),
+              baseline: persistBufferToTemp(compareTempDir, `${key}_baseline`, diff.baselineImage),
+              current: persistBufferToTemp(compareTempDir, `${key}_current`, diff.currentImage),
+              diff: persistBufferToTemp(compareTempDir, `${key}_diff`, diff.diffImage),
             });
             // Free in-memory buffers now that they're persisted to disk
             disposeBuffers(diff);
