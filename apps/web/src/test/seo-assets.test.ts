@@ -10,6 +10,7 @@ import { Route as DocsRoute } from '../routes/docs'
 import { Route as DocArticleRoute } from '../routes/docs/$'
 import { Route as HomeRoute } from '../routes/index'
 import { Route as PricingRoute } from '../routes/pricing'
+import { Route as RootRoute } from '../routes/__root'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC = path.resolve(__dirname, '../../public')
@@ -32,6 +33,8 @@ function expectSeoHead(head: { meta?: unknown[]; links?: unknown[] } | undefined
     expect.arrayContaining([
       { property: 'og:url', content: canonical },
       { property: 'og:image', content: OG_IMAGE },
+      { property: 'og:image:width', content: '1200' },
+      { property: 'og:image:height', content: '630' },
       { property: 'og:type', content: expect.any(String) },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:site', content: '@ravidsrk' },
@@ -60,6 +63,8 @@ describe('public SEO assets', () => {
 
   it('sitemap.xml lists all marketing routes and doc slugs', () => {
     const sitemap = readPublic('sitemap.xml')
+    const locCount = (sitemap.match(/<loc>/g) ?? []).length
+    expect(locCount).toBe(43)
     for (const route of MARKETING_PATHS) {
       const loc = route === '/' ? `${SITE}/` : `${SITE}${route}`
       expect(sitemap, `missing ${loc}`).toContain(`<loc>${loc}</loc>`)
@@ -70,6 +75,35 @@ describe('public SEO assets', () => {
     expect(sitemap).not.toContain('docs.frontguard.dev')
     expect(sitemap).not.toContain('/docs/introduction')
     expect(sitemap).not.toContain('/docs/self-hosting')
+  })
+})
+
+describe('root route — global head', () => {
+  it('includes sized favicons, apple-touch-icon, and global meta tags', async () => {
+    const head = await RootRoute.options.head?.({} as never)
+    const meta = (head?.meta ?? []) as Array<Record<string, string>>
+    const links = (head?.links ?? []) as Array<Record<string, string>>
+
+    expect(links).toEqual(
+      expect.arrayContaining([
+        { rel: 'icon', href: '/logo-16.png', type: 'image/png', sizes: '16x16' },
+        { rel: 'icon', href: '/logo-32.png', type: 'image/png', sizes: '32x32' },
+        { rel: 'apple-touch-icon', href: '/logo-180.png' },
+      ]),
+    )
+    expect(meta).toEqual(
+      expect.arrayContaining([
+        { name: 'theme-color', content: '#0d0c0b' },
+        { name: 'author', content: 'Ravindra Kumar' },
+        {
+          name: 'keywords',
+          content:
+            'visual regression testing, AI visual testing, Playwright, Storybook visual testing, frontend testing, CSS regression, screenshot testing, open source visual testing, MCP server',
+        },
+        { name: 'referrer', content: 'strict-origin-when-cross-origin' },
+        { httpEquiv: 'X-Content-Type-Options', content: 'nosniff' },
+      ]),
+    )
   })
 })
 
