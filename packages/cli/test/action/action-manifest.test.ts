@@ -10,6 +10,7 @@ import { join } from 'node:path';
 const repoRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 const rootAction = join(repoRoot, 'action.yml');
 const cliAction = join(repoRoot, 'packages/cli/action.yml');
+const templateAction = join(repoRoot, 'packages/cli/action.template.yml');
 const version = readFileSync(join(repoRoot, 'VERSION'), 'utf8').trim();
 
 function readAction(path: string): string {
@@ -49,6 +50,10 @@ describe('COU-1: root shim stays synced with canonical action manifest', () => {
     execSync('node packages/cli/scripts/sync-root-action.mjs', { cwd: repoRoot, stdio: 'pipe' });
     const after = readAction(rootAction);
     expect(rootActionBody(after)).toBe(readAction(cliAction));
+  });
+
+  it('action.template.yml retains the @@FRONTGUARD_VERSION@@ placeholder', () => {
+    expect(readAction(templateAction)).toContain("@@FRONTGUARD_VERSION@@");
   });
 });
 
@@ -91,6 +96,20 @@ describe('DEP-1: CLI version is pinned, not @latest', () => {
       expect(yml).toContain(`"@frontguard/cli@\${FRONTGUARD_CLI_VERSION}"`);
     }
   });
+
+  it('packages/cli/Dockerfile pins @frontguard/cli to repo VERSION', () => {
+    const dockerfile = readFileSync(join(repoRoot, 'packages/cli/Dockerfile'), 'utf8');
+    expect(dockerfile).toContain(`@frontguard/cli@${version}`);
+  });
+
+  it('daytona-runner derives CLI version from packages/cli/package.json', () => {
+    const src = readFileSync(
+      join(repoRoot, 'packages/cloud-api/src/daytona-runner.ts'),
+      'utf8',
+    );
+    expect(src).toContain('../../cli/package.json');
+    expect(src).not.toMatch(/FRONTGUARD_CLI_VERSION = '[0-9]/);
+  });
 });
 
 describe('DEP-2: root Dockerfile Playwright matches package.json', () => {
@@ -111,15 +130,28 @@ describe('DEP-4: Playwright is exact-pinned for deterministic renders', () => {
   });
 });
 
-describe('OPS-4: multi-line JSON uses heredoc GITHUB_OUTPUT form', () => {
+describe('OPS-4: all GITHUB_OUTPUT writes use random-delimiter heredoc form', () => {
   for (const [label, path] of [
     ['root', rootAction],
     ['packages/cli', cliAction],
   ] as const) {
-    it(`${label}: writes result via heredoc delimiter`, () => {
+    it(`${label}: defines write_github_output with openssl rand delimiter`, () => {
       const yml = readAction(path);
-      expect(yml).toContain('result<<EOF');
-      expect(yml).not.toMatch(/echo "result=\$\(cat \/tmp\/frontguard-result\.json\)"/);
+      expect(yml).toContain('ghadelim_$(openssl rand -hex 8)');
+      expect(yml).toContain('write_github_output');
+      expect(yml).not.toContain('<<EOF');
+    });
+
+    it(`${label}: does not use single-line key=value GITHUB_OUTPUT writes`, () => {
+      const yml = readAction(path);
+      for (const body of runScriptBodies(yml)) {
+        expect(body, `single-line output write in ${path}`).not.toMatch(
+          /echo\s+["']?[a-z]+=/,
+        );
+        expect(body, `legacy GITHUB_OUTPUT redirect in ${path}`).not.toMatch(
+          />>\s*\$GITHUB_OUTPUT/,
+        );
+      }
     });
 
     it(`${label}: keeps stderr out of the JSON capture file`, () => {
@@ -128,10 +160,12 @@ describe('OPS-4: multi-line JSON uses heredoc GITHUB_OUTPUT form', () => {
       expect(yml).toContain('2>/tmp/frontguard-stderr.log');
     });
 
-    it(`${label}: defaults regressions to 0 when jq fails`, () => {
+    it(`${label}: surfaces run failures instead of silently passing`, () => {
       const yml = readAction(path);
-      expect(yml).toContain("REGRESSIONS=$(jq -r '.summary.regressions // 0'");
-      expect(yml).toContain('REGRESSIONS="${REGRESSIONS:-0}"');
+      expect(yml).not.toContain('|| true');
+      expect(yml).toContain('RUN_FAILED=1');
+      expect(yml).toContain('write_github_output status "error"');
+      expect(yml).not.toContain('REGRESSIONS="${REGRESSIONS:-0}"');
     });
   }
 });
