@@ -29,6 +29,18 @@ jobs:
       - name: Assert repo-root action.yml exists (int-3 regression guard)
         run: test -f ./action.yml
 
+      - name: Materialize and assert action manifest parity (COU-1, DEP-1)
+        run: |
+          node packages/cli/scripts/sync-root-action.mjs
+          git diff --exit-code action.yml packages/cli/action.yml packages/cli/Dockerfile
+
+      - name: Reject floating @frontguard/cli@latest (DEP-1)
+        run: |
+          if git grep -n '@frontguard/cli@latest' -- action.yml packages/cli/action.yml packages/cli/Dockerfile packages/cloud-api/src/daytona-runner.ts; then
+            echo 'Floating @latest installs are not allowed — pin to repo VERSION'
+            exit 1
+          fi
+
       - name: Run repo-root composite action
         # Equivalent to what `ravidsrk/frontguard@v0` resolves to once OPS tags
         # v0. Proves GitHub resolves the repo-root action.yml and begins running
@@ -46,6 +58,32 @@ jobs:
 
       - name: Assert sub-path action.yml exists
         run: test -f ./packages/cli/action.yml
+
+      - name: Assert action run blocks do not interpolate inputs (SEC-1)
+        run: |
+          for f in action.yml packages/cli/action.yml; do
+            if awk '/run: \|/{p=1} p && /\$\{\{ inputs\./{found=1; print FILENAME":"NR":"$0} /^ {4}- name:/{p=0}' "$f" | grep -q .; then
+              awk '/run: \|/{p=1} p && /\$\{\{ inputs\./{print FILENAME":"NR":"$0} /^ {4}- name:/{p=0}' "$f"
+              exit 1
+            fi
+          done
+
+      - name: Assert all GITHUB_OUTPUT writes use random-delimiter heredoc (OPS-4)
+        run: |
+          for f in action.yml packages/cli/action.yml; do
+            if grep -q '<<EOF' "$f"; then
+              echo "Hardcoded EOF delimiter found in $f"
+              exit 1
+            fi
+            if grep -E 'echo "(url|result|status|regressions)=' "$f"; then
+              echo "Single-line GITHUB_OUTPUT write found in $f"
+              exit 1
+            fi
+            if ! grep -q 'ghadelim_.*openssl rand -hex 8' "$f"; then
+              echo "Missing random-delimiter helper in $f"
+              exit 1
+            fi
+          done
 
       - name: Run sub-path composite action
         # Verifies the historical 'ravidsrk/frontguard/packages/cli@<ref>'
