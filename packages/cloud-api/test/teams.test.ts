@@ -655,7 +655,7 @@ describe('team usage aggregation', () => {
       method: 'POST', headers: auth('bob'), body: JSON.stringify({ token: (await inv.json()).token }),
     });
 
-    // Alice submits 2 runs, bob 1 run (each increments usage by 1).
+    // Alice submits 2 runs, bob 1 run — pooled against the business team plan (DM-3).
     for (let i = 0; i < 2; i++) {
       await app.request('/v1/run', { method: 'POST', headers: auth('alice'), body: JSON.stringify({ url: 'https://example.com', projectId }) });
     }
@@ -667,7 +667,6 @@ describe('team usage aggregation', () => {
     expect(body.memberCount).toBe(2);
     expect(body.runsCount).toBe(3);
     expect(body.perMember.length).toBe(2);
-    expect(body.perMember.reduce((s: number, m: { runsCount: number }) => s + m.runsCount, 0)).toBe(3);
   });
 
   it('non-members cannot read usage (404)', async () => {
@@ -729,11 +728,10 @@ describe('InMemoryStore new methods', () => {
     expect(list[0].action).toBe('project.created');
   });
 
-  it('getTeamUsage sums members', async () => {
+  it('getTeamUsage reads the team_usage pool', async () => {
     await store.createTeam({ id: 't1', name: 'A', plan: 'free', createdAt: 'now' }, 'u1');
     await store.addMember({ teamId: 't1', userId: 'u2', role: 'member', createdAt: 'now' });
-    await store.incrementUsage('u1', '2026-05', 3, 10);
-    await store.incrementUsage('u2', '2026-05', 2, 5);
+    await store.incrementTeamUsage('t1', '2026-05', 5, 15);
     const usage = await store.getTeamUsage('t1', '2026-05');
     expect(usage.memberCount).toBe(2);
     expect(usage.runsCount).toBe(5);
