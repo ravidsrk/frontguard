@@ -3,6 +3,7 @@ import {
   runMonitor,
   runScheduledChecks,
   MONITORS_PER_TICK,
+  sortMonitorsByDuePriority,
 } from '../src/scheduler.js';
 import { resetMemoryStore, getMemoryStore } from '../src/db/factory.js';
 import type { Monitor } from '../src/db/monitors.js';
@@ -11,6 +12,7 @@ import * as alerts from '../src/alerts/index.js';
 import { currentMonth } from '../src/db/store.js';
 import { screenshotKey } from '../src/storage/screenshots.js';
 import { resetMemoryScreenshotStore } from '../src/storage/screenshots.js';
+import { routeToSlug } from '../src/monitor-screenshots.js';
 
 function makeMonitor(over: Partial<Monitor> = {}): Monitor {
   return {
@@ -182,52 +184,93 @@ describe('scheduler', () => {
     expect(slackCalls).toBe(0);
   });
 
-  it('REL-2: restores baselines and alerts on regression when prior screenshots exist', async () => {
+  it('REL-2: persists screenshot refs with original nested routes and restores them for regression', async () => {
+    const nestedRoutes = ['/foo/bar', '/a/b/c', '/search?q=1'];
     const store = getMemoryStore();
-    const monitor = makeMonitor({ alerts: { slack: 'https://hook' } });
-    await store.createMonitor(monitor);
-    const baselineKey = screenshotKey('u1', 'prior-run', 'baseline', '/', 1440, 'chromium');
-    await store.addMonitorRun({
-      id: 'prior-run',
-      monitorId: 'm1',
-      userId: 'u1',
-      status: 'passed',
-      regressionsCount: 0,
-      attempts: 1,
-      screenshots: [baselineKey],
-      createdAt: '2026-01-01T10:00:00Z',
+    const monitor = makeMonitor({
+      routes: nestedRoutes,
+      alerts: { slack: 'https://hook' },
     });
+    await store.createMonitor(monitor);
+    const bucket = {
+      get: async () => ({ arrayBuffer: async () => new ArrayBuffer(8) }),
+      put: async () => {},
+      delete: async () => {},
+      list: async () => ({ objects: [] }),
+    };
+    const env = { SCREENSHOTS: bucket };
+    const t1 = new Date('2026-01-01T12:00:00Z');
+
+    vi.spyOn(processor, 'processRun').mockImplementation(async (run, _env, onScreenshots) => {
+      if (onScreenshots) {
+        await onScreenshots(
+          nestedRoutes.map((route) => ({
+            name: `${routeToSlug(route)}_1440_chromium_0_baseline`,
+            type: 'baseline' as const,
+            bytes: new Uint8Array([1, 2, 3]),
+          })),
+        );
+      }
+      run.status = 'completed';
+      run.results = nestedRoutes.map((route) => ({
+        route,
+        viewport: 1440,
+        status: 'new_baseline',
+        diffPercentage: 0,
+        timestamp: t1.toISOString(),
+      }));
+    });
+
+    const first = await runMonitor(env, store, monitor, t1);
+    expect(first.run.screenshots).toHaveLength(nestedRoutes.length);
+    for (const route of nestedRoutes) {
+      expect(first.run.screenshots!.some((s) => s.route === route && s.type === 'baseline')).toBe(true);
+    }
 
     const dispatchSpy = vi.spyOn(alerts, 'dispatchAlertsWithState').mockResolvedValue({
       reason: 'sent',
       deliveries: [],
     });
 
-    const now = new Date('2026-01-01T12:00:00Z');
-
-    const processSpy = vi.spyOn(processor, 'processRun').mockImplementation(
+    const t2 = new Date('2026-01-01T13:00:00Z');
+    let capturedRestore: { baselines: Array<{ route: string }> } | undefined;
+    vi.spyOn(processor, 'processRun').mockImplementation(
       async (run, _env, _sink, baselineRestore) => {
+        capturedRestore = baselineRestore;
         expect(baselineRestore).toBeDefined();
-        expect(baselineRestore!.baselines).toHaveLength(1);
+        for (const route of nestedRoutes) {
+          expect(baselineRestore!.baselines.some((b) => b.route === route)).toBe(true);
+        }
         run.status = 'completed';
         run.results = [
           {
-            route: '/',
+            route: '/foo/bar',
             viewport: 1440,
             status: 'regression',
-            diffPercentage: 0.12,
-            timestamp: now.toISOString(),
+            diffPercentage: 0.2,
+            timestamp: t2.toISOString(),
           },
         ];
       },
     );
-    const env = { SCREENSHOTS: { get: async () => null } };
-    const { alerts: fired } = await runMonitor(env, store, monitor, now);
 
-    expect(processSpy).toHaveBeenCalled();
-    expect(fired.length).toBeGreaterThan(0);
-    expect(fired[0].route).toBe('/');
+    const second = await runMonitor(env, store, monitor, t2);
+    expect(capturedRestore?.baselines.map((b) => b.route)).toEqual(
+      expect.arrayContaining(nestedRoutes),
+    );
+    expect(second.alerts.length).toBeGreaterThan(0);
+    expect(second.alerts[0].route).toBe('/foo/bar');
     expect(dispatchSpy).toHaveBeenCalled();
+    expect(first.run.screenshots!.every((s) => s.r2Key.length > 0)).toBe(true);
+  });
+
+  it('sortMonitorsByDuePriority orders oldest-due monitors first', () => {
+    const sorted = sortMonitorsByDuePriority([
+      makeMonitor({ id: 'new', lastRunAt: '2026-01-01T11:00:00Z' }),
+      makeMonitor({ id: 'old', lastRunAt: '2026-01-01T09:00:00Z' }),
+      makeMonitor({ id: 'never' }),
+    ]);
+    expect(sorted.map((m) => m.id)).toEqual(['never', 'old', 'new']);
   });
 
   it('REL-4: defers overflow monitors to the next tick instead of dropping them', async () => {
@@ -264,6 +307,54 @@ describe('scheduler', () => {
       const m = await store.getMonitor(id);
       expect(m?.lastRunAt).not.toBe('2026-01-01T10:00:00Z');
     }
+  });
+
+  it('REL-4: fair scheduling prevents short-interval monitors from starving deferred ones', async () => {
+    const store = getMemoryStore();
+    await store.createUser({ id: 'u1', plan: 'business', createdAt: '2026-01-01T00:00:00Z' });
+
+    const slowIds = ['slow0', 'slow1', 'slow2', 'slow3', 'slow4'];
+    for (const id of slowIds) {
+      await store.createMonitor(
+        makeMonitor({
+          id,
+          intervalMinutes: 60,
+          lastRunAt: '2026-01-01T08:00:00Z',
+        }),
+      );
+    }
+    await store.createMonitor(
+      makeMonitor({
+        id: 'fast',
+        intervalMinutes: 5,
+        lastRunAt: '2026-01-01T11:58:00Z',
+      }),
+    );
+
+    const ran = new Set<string>();
+    const ticks = [
+      '2026-01-01T12:00:00Z',
+      '2026-01-01T12:05:00Z',
+      '2026-01-01T12:10:00Z',
+      '2026-01-01T12:15:00Z',
+    ];
+
+    for (const iso of ticks) {
+      const before = new Map<string, string | undefined>();
+      for (const id of [...slowIds, 'fast']) {
+        before.set(id, (await store.getMonitor(id))?.lastRunAt);
+      }
+      await runScheduledChecks({}, new Date(iso));
+      for (const [id, prev] of before) {
+        const next = (await store.getMonitor(id))?.lastRunAt;
+        if (next !== prev) ran.add(id);
+      }
+    }
+
+    for (const id of slowIds) {
+      expect(ran.has(id), `expected ${id} to run`).toBe(true);
+    }
+    expect(ran.has('fast')).toBe(true);
   });
 
   it('REL-6: surfaces a failed processRun as an error alert, not a pass', async () => {
