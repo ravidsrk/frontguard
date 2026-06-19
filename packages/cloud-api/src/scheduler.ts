@@ -388,8 +388,8 @@ export async function runScheduledChecks(
           attempt: 0,
           context: { phase: 'runScheduledChecks' },
         });
-      } catch {
-        /* dead-letter must not mask the tick error count */
+      } catch (dlErr) {
+        console.warn('[scheduler] dead-letter write failed', dlErr);
       }
     }
     // Prune each owner's history at most once per tick.
