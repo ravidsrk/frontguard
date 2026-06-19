@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { app } from '../src/index.js';
 import { resetMemoryStore } from '../src/db/factory.js';
-import { hashKey } from '../src/auth/keys.js';
+import { hashKey, MAX_KEYS_PER_USER } from '../src/auth/keys.js';
 import { migrate } from '../src/db/migrate.js';
 import { createSqliteD1 } from './helpers/sqlite-d1.js';
 
@@ -48,6 +48,31 @@ describe('/v1/keys (dev mode)', () => {
     const listRes = await app.request('/v1/keys', { headers: auth() });
     expect((await listRes.json()).total).toBe(0);
   });
+
+  // COST-3: per-user key cap rejects creation beyond the limit.
+  it('rejects key creation when the per-user cap is reached', async () => {
+    for (let i = 0; i < MAX_KEYS_PER_USER; i++) {
+      const res = await app.request('/v1/keys', {
+        method: 'POST',
+        headers: auth('cap-user'),
+        body: JSON.stringify({ name: `key-${i}` }),
+      });
+      expect(res.status).toBe(201);
+    }
+
+    const overRes = await app.request('/v1/keys', {
+      method: 'POST',
+      headers: auth('cap-user'),
+      body: JSON.stringify({ name: 'one-too-many' }),
+    });
+    expect(overRes.status).toBe(429);
+    const body = await overRes.json();
+    expect(body.error).toMatch(/limit reached/i);
+    expect(body.limit).toBe(MAX_KEYS_PER_USER);
+
+    const listRes = await app.request('/v1/keys', { headers: auth('cap-user') });
+    expect((await listRes.json()).total).toBe(MAX_KEYS_PER_USER);
+  });
 });
 
 describe('/auth/github (not configured in dev)', () => {
@@ -66,7 +91,7 @@ describe('/auth/github (not configured in dev)', () => {
 
 // IN-2 / P0-6 auth hardening: the legacy app/src/index.js shim accepted any
 // Bearer token ≥10 chars. Now that the Hono entry is what deploys, any
-// unknown token in production mode (D1 binding present) must 401, while a
+// unknown token in production mode (ENVIRONMENT=production) must 401, while a
 // hashed-and-stored key returns 200.
 describe('production auth — bearer tokens are validated against the store', () => {
   it('rejects a bogus 11-char Bearer with 401 even though the shim used to accept it', async () => {
@@ -76,7 +101,7 @@ describe('production auth — bearer tokens are validated against the store', ()
     const bogus = 'bogus-token'; // 11 chars — used to slip past the shim.
     const res = await app.request('/v1/usage', {
       headers: { Authorization: `Bearer ${bogus}` },
-    }, { DB: db });
+    }, { ENVIRONMENT: 'production', DB: db });
     expect(res.status).toBe(401);
     raw.close();
   });
@@ -97,7 +122,7 @@ describe('production auth — bearer tokens are validated against the store', ()
 
     const res = await app.request('/v1/usage', {
       headers: { Authorization: `Bearer ${plaintext}` },
-    }, { DB: db });
+    }, { ENVIRONMENT: 'production', DB: db });
     expect(res.status).toBe(200);
     raw.close();
   });

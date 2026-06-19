@@ -5,7 +5,8 @@ import type { Run } from './types.js';
 import { processRun, type ProcessorEnv } from './processor.js';
 import type { BaselineRestore, BaselineBucket } from './daytona-runner.js';
 import { emitRunTelemetry, runMetricsFromRun, type OtelEnv } from './otel/index.js';
-import { getStore, isProduction, type Bindings } from './db/factory.js';
+import { getStore, isProduction, isProductionMisconfigured, type Bindings } from './db/factory.js';
+import { apiRateLimiter } from './rate-limit.js';
 import { currentMonth, type Store } from './db/store.js';
 import { hashKey } from './auth/keys.js';
 import { authRoutes } from './routes/auth.js';
@@ -20,11 +21,23 @@ import { hasValidSessionSecret } from './auth/session.js';
 import { teamRoutes } from './routes/teams.js';
 import { can } from './db/teams.js';
 import { billingRoutes } from './routes/billing.js';
-import { getPlan, checkLimit } from './billing/plans.js';
+import { getPlan } from './billing/plans.js';
+import {
+  MAX_ROUTES,
+  MAX_VIEWPORTS,
+  MAX_BROWSERS,
+  MAX_FAN_OUT,
+  plannedScreenshotCount,
+} from './limits.js';
 import { evaluateSpendCap } from './billing/spend-cap.js';
 import { runScheduledChecks } from './scheduler.js';
 import type { AlertEnv } from './alerts/index.js';
 import { PACKAGE_VERSION } from './version.js';
+import {
+  SafeRenderTargetError,
+  assertSafeRenderTarget,
+} from './security/render-target.js';
+import { recordDeadLetter } from './dead-letter.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,11 +51,6 @@ type Variables = {
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // ---------------------------------------------------------------------------
-// Simple rate limiter - 100 requests per minute per API key
-// ---------------------------------------------------------------------------
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-// ---------------------------------------------------------------------------
 // Zod validation schema for POST /v1/run
 // ---------------------------------------------------------------------------
 const runRequestSchema = z.object({
@@ -54,9 +62,10 @@ const runRequestSchema = z.object({
         name: z.string().optional(),
       }),
     )
+    .max(MAX_ROUTES)
     .optional(),
-  viewports: z.array(z.number().int().min(320).max(3840)).optional(),
-  browsers: z.array(z.enum(['chromium', 'firefox', 'webkit'])).optional(),
+  viewports: z.array(z.number().int().min(320).max(3840)).max(MAX_VIEWPORTS).optional(),
+  browsers: z.array(z.enum(['chromium', 'firefox', 'webkit'])).max(MAX_BROWSERS).optional(),
   threshold: z.number().min(0).max(1).optional(),
   ai: z
     .object({
@@ -113,6 +122,16 @@ app.use('*', async (c, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// Middleware — Fail closed when production is declared but DB is missing (SEC-6)
+// ---------------------------------------------------------------------------
+app.use('*', async (c, next) => {
+  if (isProductionMisconfigured(c.env)) {
+    return c.text('Service misconfigured (DB binding missing in production)', 503);
+  }
+  await next();
+});
+
+// ---------------------------------------------------------------------------
 // Middleware — Resolve the store for every request (D1 in prod, memory in dev)
 // ---------------------------------------------------------------------------
 app.use('*', async (c, next) => {
@@ -139,7 +158,7 @@ app.route('/v1/billing', billingRoutes);
 // insecure fallback that ships in the published source — which would let anyone
 // reading the OSS repo forge a cookie for any user. Returns 503 so an operator
 // who forgot `wrangler secret put DASHBOARD_SESSION_SECRET` gets a clear signal.
-// Dev/tests (no D1 `DB` binding) are unaffected and keep their no-config UX.
+// Dev/tests (ENVIRONMENT not set to production) keep their no-config UX.
 const requireDashboardSecret: MiddlewareHandler<{
   Bindings: Bindings;
   Variables: Variables;
@@ -191,22 +210,14 @@ app.use('/v1/*', async (c, next) => {
 // ---------------------------------------------------------------------------
 app.use('/v1/*', async (c, next) => {
   const apiKey = c.get('apiKey');
-  const now = Date.now();
-  const window = 60_000; // 1 minute
-  const limit = 100;
+  const keyHash = await hashKey(apiKey);
+  const result = apiRateLimiter.check(keyHash);
 
-  let entry = rateLimitMap.get(apiKey);
-  if (!entry || now > entry.resetAt) {
-    entry = { count: 0, resetAt: now + window };
-    rateLimitMap.set(apiKey, entry);
-  }
+  c.header('X-RateLimit-Limit', String(result.limit));
+  c.header('X-RateLimit-Remaining', String(result.remaining));
+  c.header('X-RateLimit-Reset', String(Math.ceil(result.resetAt / 1000)));
 
-  entry.count++;
-  c.header('X-RateLimit-Limit', String(limit));
-  c.header('X-RateLimit-Remaining', String(Math.max(0, limit - entry.count)));
-  c.header('X-RateLimit-Reset', String(Math.ceil(entry.resetAt / 1000)));
-
-  if (entry.count > limit) {
+  if (!result.allowed) {
     return c.json({ error: 'Rate limit exceeded. Try again later.' }, 429);
   }
 
@@ -241,8 +252,33 @@ app.post('/v1/run', async (c) => {
   }
 
   const data = parsed.data;
+
+  try {
+    await assertSafeRenderTarget(data.url);
+  } catch (err) {
+    if (err instanceof SafeRenderTargetError) {
+      return c.json({ error: err.message }, 400);
+    }
+    throw err;
+  }
+
   const store = c.get('store');
   const userId = c.get('userId');
+
+  const routes = data.routes ?? [{ path: '/' }];
+  const viewports = data.viewports ?? [1440];
+  const browsers = data.browsers ?? ['chromium'];
+  const plannedScreenshots = plannedScreenshotCount(routes, viewports, browsers);
+  if (plannedScreenshots > MAX_FAN_OUT) {
+    return c.json(
+      {
+        error: `Fan-out exceeds maximum (${plannedScreenshots} screenshots; limit is ${MAX_FAN_OUT}).`,
+        fanOut: plannedScreenshots,
+        maxFanOut: MAX_FAN_OUT,
+      },
+      400,
+    );
+  }
 
   // Project scoping (Task 8.1): if a projectId is supplied, the caller must be
   // a member of the project's team with run_tests capability.
@@ -257,34 +293,92 @@ app.post('/v1/run', async (c) => {
     projectTeamId = project.teamId;
   }
 
-  // Plan enforcement (Task 8.2): block runs that exceed the monthly limit.
-  // Plan is resolved from the optional team scope, else the user's default.
-  // A team's plan may only be claimed by an actual member of that team —
-  // otherwise any user could pass ?teamId=<business-team> to bypass limits.
-  const teamId = c.req.query('teamId');
+  // Plan enforcement (Task 8.2, DM-3): resolve plan from team scope when present.
+  // Paid team plans meter against a shared team_usage pool; personal/free runs
+  // stay on the per-user counter. A team's plan may only be claimed by a member.
+  const queryTeamId = c.req.query('teamId');
+  const billingTeamId = queryTeamId ?? projectTeamId;
   let planId = 'free';
-  if (teamId) {
-    const member = await store.getMember(teamId, userId);
+  if (billingTeamId) {
+    const member = await store.getMember(billingTeamId, userId);
     if (!member) return c.json({ error: 'Not a member of the requested team' }, 403);
-    const team = await store.getTeam(teamId);
+    const team = await store.getTeam(billingTeamId);
     if (team) planId = team.plan;
   } else {
     const user = await store.getUser(userId);
     if (user) planId = user.plan;
   }
   const plan = getPlan(planId);
-  const usage = await store.getUsage(userId, currentMonth());
-  const limitCheck = checkLimit(plan, 'runsPerMonth', usage.runsCount, 1);
-  if (!limitCheck.allowed) {
+  if (plan.id !== 'free' && !billingTeamId) {
     return c.json(
       {
-        error: `Monthly run limit reached (${limitCheck.limit} on the ${plan.name} plan).`,
-        limit: limitCheck.limit,
-        current: limitCheck.current,
-        upgradeUrl: 'https://frontguard.dev/pricing',
+        error: 'Paid plan runs require a team scope (?teamId= or projectId on a team project).',
       },
-      402,
+      400,
     );
+  }
+  const month = currentMonth();
+  const meterTeam = billingTeamId != null && plan.id !== 'free';
+
+  // Atomic monthly reservations (CONC-1, COST-1, DM-3): reserve the run and
+  // planned screenshot count up front so concurrent submissions cannot overshoot
+  // limits and giant fan-out cannot spend compute before metering.
+  const runLimit = plan.limits.runsPerMonth;
+  if (runLimit !== null) {
+    const reserved = meterTeam
+      ? await store.tryReserveTeamRun(billingTeamId!, month, runLimit)
+      : await store.tryReserveRun(userId, month, runLimit);
+    if (!reserved) {
+      const usage = meterTeam
+        ? await store.getTeamUsage(billingTeamId!, month)
+        : await store.getUsage(userId, month);
+      return c.json(
+        {
+          error: `Monthly run limit reached (${runLimit} on the ${plan.name} plan).`,
+          limit: runLimit,
+          current: usage.runsCount,
+          upgradeUrl: 'https://frontguard.dev/pricing',
+        },
+        402,
+      );
+    }
+  } else if (meterTeam) {
+    await store.incrementTeamUsage(billingTeamId!, month, 1, 0);
+  } else {
+    await store.incrementUsage(userId, month, 1, 0);
+  }
+
+  const screenshotLimit = plan.limits.screenshotsPerMonth;
+  if (screenshotLimit !== null) {
+    const reserved = meterTeam
+      ? await store.tryReserveTeamScreenshots(billingTeamId!, month, screenshotLimit, plannedScreenshots)
+      : await store.tryReserveScreenshots(userId, month, screenshotLimit, plannedScreenshots);
+    if (!reserved) {
+      if (meterTeam) {
+        await store.incrementTeamUsage(billingTeamId!, month, -1, 0);
+      } else {
+        await store.incrementUsage(userId, month, -1, 0);
+      }
+      const usage = meterTeam
+        ? await store.getTeamUsage(billingTeamId!, month)
+        : await store.getUsage(userId, month);
+      return c.json(
+        {
+          error: `Monthly screenshot limit reached (${screenshotLimit} on the ${plan.name} plan).`,
+          limit: screenshotLimit,
+          current: usage.screenshotsCount,
+          requested: plannedScreenshots,
+          upgradeUrl: 'https://frontguard.dev/pricing',
+        },
+        402,
+      );
+    }
+  } else if (plannedScreenshots > 0) {
+    if (meterTeam) {
+      await store.incrementTeamUsage(billingTeamId!, month, 0, plannedScreenshots);
+    } else {
+      await store.incrementUsage(userId, month, 0, plannedScreenshots);
+    }
   }
 
   const runId = crypto.randomUUID();
@@ -292,9 +386,9 @@ app.post('/v1/run', async (c) => {
     id: runId,
     status: 'queued',
     url: data.url,
-    routes: data.routes || [{ path: '/' }],
-    viewports: data.viewports || [1440],
-    browsers: data.browsers || ['chromium'],
+    routes,
+    viewports,
+    browsers,
     threshold: data.threshold || 0.01,
     ai: data.ai ? { provider: data.ai.provider, model: data.ai.model ?? '' } : null,
     createdAt: new Date().toISOString(),
@@ -307,7 +401,6 @@ app.post('/v1/run', async (c) => {
   };
 
   await store.createRun(run, userId);
-  await store.incrementUsage(userId, currentMonth(), 1, 0);
 
   // Spend-cap check (Task 15.7): fire an 80%/95% warning email once per tier.
   // Best-effort — failures must never block the run submission.
@@ -335,9 +428,8 @@ app.post('/v1/run', async (c) => {
 
   // Persist screenshots produced by the sandbox to R2 + metadata store.
   const blobs = getScreenshotStore(c.env?.SCREENSHOTS as R2Bucket | undefined);
-  let persistedShots = 0;
   const onScreenshots = async (shots: PendingScreenshot[]): Promise<void> => {
-    persistedShots = await persistScreenshots(store, blobs, userId, runId, shots);
+    await persistScreenshots(store, blobs, userId, runId, shots);
   };
 
   // Resolve the project's prior approved baselines so the sandbox can detect
@@ -368,23 +460,37 @@ app.post('/v1/run', async (c) => {
   }
 
   // Process async — mutates `run`, then persists the final state. The env
-  // binding carries DAYTONA_API_KEY (Workers has no Node env).
-  processRun(run, (c.env ?? {}) as ProcessorEnv, onScreenshots, baselineRestore)
+  // binding carries DAYTONA_API_KEY (Workers has no Node env). Keep the
+  // promise alive past the 202 response via waitUntil (REL-1).
+  const processing = processRun(run, (c.env ?? {}) as ProcessorEnv, onScreenshots, baselineRestore)
     .catch((err: Error) => {
       run.status = 'failed';
       run.error = err.message;
     })
-    .finally(() => {
-      // Meter the number of screenshots actually persisted, falling back to the
-      // result count when no screenshots were captured (e.g. simulated runs).
-      const screenshots = persistedShots || (run.results?.length ?? 0);
-      void store.updateRun(runId, run);
-      if (screenshots > 0) void store.incrementUsage(userId, currentMonth(), 0, screenshots);
+    .finally(async () => {
+      // Screenshots were reserved at submit time (COST-1).
+      await store.updateRun(runId, run);
+      if (run.status === 'failed') {
+        await recordDeadLetter(store, {
+          kind: 'run',
+          sourceId: runId,
+          userId,
+          error: run.error ?? 'background run failed',
+          attempt: 1,
+        });
+      }
       // Complete the originating GitHub Check Run, if this run came from CI.
       if (run.github) void completeCheckRun(c.env ?? {}, run);
       // Export OTLP metrics (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
       void emitRunTelemetry((c.env ?? {}) as OtelEnv, runMetricsFromRun(run));
     });
+  try {
+    c.executionCtx.waitUntil(processing);
+  } catch {
+    // Dev/tests without a Workers ExecutionContext (app.request) — unchanged
+    // fire-and-forget path. Production fetch always supplies executionCtx.
+    void processing;
+  }
 
   return c.json(
     {
@@ -565,7 +671,7 @@ export default {
     ctx.waitUntil(
       runScheduledChecks(env).then((res) => {
         console.log(
-          `[scheduler] checked=${res.checked} alerted=${res.alerted} errors=${res.errors}`,
+          `[scheduler] checked=${res.checked} processed=${res.processed} deferred=${res.deferred} alerted=${res.alerted} errors=${res.errors}`,
         );
       }),
     );
@@ -573,4 +679,4 @@ export default {
 };
 
 // Also export the Hono app for tests and embedding.
-export { app };
+export { app, apiRateLimiter };

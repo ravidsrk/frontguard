@@ -25,8 +25,11 @@ import type { Store } from '../db/store.js';
 import { currentMonth } from '../db/store.js';
 import { can, roleAtLeast, type Capability, type TeamRole } from '../db/teams.js';
 import { sendInviteEmail } from '../teams/invite-email.js';
+import { INVITE_TTL_MS, invitationIsExpired, userMatchesInvitation } from '../teams/invitation-match.js';
 import { getPlan, checkLimit } from '../billing/plans.js';
 import type { AlertEnv } from '../alerts/index.js';
+import { purgeTeamRunBlobs } from '../storage/purge-team-blobs.js';
+import type { R2Bucket } from '../storage/screenshots.js';
 
 type Variables = { store: Store; userId: string };
 
@@ -146,6 +149,7 @@ teamRoutes.delete('/:id', async (c) => {
   const id = c.req.param('id');
   const guard = await requireCap(store, id, c.get('userId'), 'manage_team');
   if (!guard.ok) return c.json({ error: 'Forbidden' }, guard.status);
+  await purgeTeamRunBlobs(store, id, c.env?.SCREENSHOTS as R2Bucket | undefined);
   const deleted = await store.deleteTeam(id);
   return c.json({ deleted });
 });
@@ -176,6 +180,7 @@ teamRoutes.post('/:id/invitations', async (c) => {
     );
   }
 
+  const createdAt = new Date();
   const invitation = {
     id: crypto.randomUUID(),
     teamId: id,
@@ -183,7 +188,8 @@ teamRoutes.post('/:id/invitations', async (c) => {
     githubLogin: parsed.data.githubLogin,
     role: parsed.data.role as TeamRole,
     token: crypto.randomUUID().replace(/-/g, ''),
-    createdAt: new Date().toISOString(),
+    createdAt: createdAt.toISOString(),
+    expiresAt: new Date(createdAt.getTime() + INVITE_TTL_MS).toISOString(),
   };
   await store.createInvitation(invitation);
 
@@ -221,6 +227,19 @@ teamRoutes.post('/invitations/accept', async (c) => {
   const userId = c.get('userId');
   const body = (await c.req.json().catch(() => ({}))) as { token?: string };
   if (!body.token) return c.json({ error: 'Missing token' }, 400);
+
+  const pending = await store.getInvitationByToken(body.token);
+  if (!pending || pending.acceptedAt) {
+    return c.json({ error: 'Invalid or already-accepted invitation' }, 404);
+  }
+  if (invitationIsExpired(pending)) {
+    return c.json({ error: 'Invitation expired' }, 404);
+  }
+  const user = await store.getUser(userId);
+  if (!userMatchesInvitation(user, pending)) {
+    return c.json({ error: 'Invitation is not for this user' }, 403);
+  }
+
   const inv = await store.acceptInvitation(body.token, new Date().toISOString());
   if (!inv) return c.json({ error: 'Invalid or already-accepted invitation' }, 404);
 

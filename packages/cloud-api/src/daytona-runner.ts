@@ -1,6 +1,19 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Daytona } from '@daytonaio/sdk';
 import type { SuggestedFix } from './types.js';
 import { orphanBaselinePath } from './storage/screenshots.js';
+
+/** Pinned CLI release — read from packages/cli/package.json so it cannot drift from VERSION. */
+const FRONTGUARD_CLI_VERSION = (
+  JSON.parse(
+    readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../../cli/package.json'),
+      'utf8',
+    ),
+  ) as { version: string }
+).version;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -147,7 +160,7 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
         120,
       );
       await sandbox.process.executeCommand(
-        'npm install -g @frontguard/cli@latest',
+        `npm install -g @frontguard/cli@${FRONTGUARD_CLI_VERSION}`,
         undefined,
         undefined,
         60,

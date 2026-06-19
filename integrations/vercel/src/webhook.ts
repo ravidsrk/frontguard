@@ -1,3 +1,5 @@
+import { isPrivateOrLoopbackHost } from '@frontguard/cloud-api/render-target';
+
 /**
  * Vercel integration webhook handler (Task 7.1).
  *
@@ -116,42 +118,7 @@ export interface PreviewUrlOptions {
   authorizedProject?: boolean;
 }
 
-/**
- * Returns true if `host` resolves to a private, loopback, or link-local
- * address — i.e. one we never want to hit from a server-side fetcher.
- *
- * Hostnames are checked literally (no DNS lookup) — we only need to block
- * obvious SSRF targets passed inline. Production cloud-side fetchers are
- * expected to do their own DNS-time SSRF guarding.
- */
-export function isPrivateOrLoopbackHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (h === 'localhost' || h === 'localhost.localdomain') return true;
-  if (h === 'metadata.google.internal' || h === 'metadata') return true;
-  // IPv6 loopback / link-local / unique-local.
-  if (h === '::1' || h === '[::1]') return true;
-  if (h.startsWith('fe80:') || h.startsWith('[fe80:')) return true;
-  if (h.startsWith('fc') || h.startsWith('fd')) {
-    // fc00::/7 (unique local). Strip brackets for the check.
-    const stripped = h.startsWith('[') ? h.slice(1, -1) : h;
-    if (stripped.startsWith('fc') || stripped.startsWith('fd')) return true;
-  }
-  // IPv4 dotted-quad checks.
-  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (v4) {
-    const a = Number(v4[1]);
-    const b = Number(v4[2]);
-    if (a === 10) return true;
-    if (a === 127) return true;
-    if (a === 0) return true;
-    if (a === 169 && b === 254) return true; // link-local / cloud metadata
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-    if (a >= 224) return true; // multicast / reserved
-  }
-  return false;
-}
+export { isPrivateOrLoopbackHost } from '@frontguard/cloud-api/render-target';
 
 /**
  * Validates that a deployment preview URL is safe to forward to the Cloud API

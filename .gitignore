@@ -5,6 +5,8 @@ dist
 auth.json
 .env
 .env.*
+.dev.vars
+.dev.vars.*
 *.log
 # Core dumps — match the dump files at repo/package/app roots only, never the
 # `src/core/` or `test/core/` source directories (the old bare `core` pattern

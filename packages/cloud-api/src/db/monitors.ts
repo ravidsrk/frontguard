@@ -1,3 +1,5 @@
+import type { MonitorScreenshotRef } from '../monitor-screenshots.js';
+
 /**
  * Monitor records and the monitor-store mixin (Task 6.1).
  *
@@ -22,6 +24,8 @@ export interface MonitorAlerts {
 export interface Monitor {
   id: string;
   userId: string;
+  /** When set, approved project baselines take priority over last-run drift detection. */
+  projectId?: string;
   name: string;
   url: string;
   routes: string[];
@@ -32,6 +36,8 @@ export interface Monitor {
   enabled: boolean;
   lastRunAt?: string;
   lastStatus?: string;
+  /** ISO timestamp until which this monitor is leased for execution (CONC-3). */
+  leasedUntil?: string;
   createdAt: string;
 }
 
@@ -43,6 +49,8 @@ export type MonitorConfig = Monitor;
 
 /** The outcome status of a single monitor execution. */
 export type MonitorRunStatus = 'passed' | 'regression' | 'error';
+
+export type { MonitorScreenshotRef } from '../monitor-screenshots.js';
 
 /**
  * A single execution of a monitor. Persisted to `monitor_runs` so history is
@@ -56,8 +64,12 @@ export interface MonitorRun {
   regressionsCount: number;
   /** How many attempts were made (1 = first try, 2 = one retry). */
   attempts: number;
-  /** R2 keys of screenshots captured during the run. */
-  screenshots?: string[];
+  /**
+   * Screenshots captured during the run. Each entry stores the original route
+   * alongside the R2 key so nested paths round-trip (REL-2). Legacy rows may
+   * still hold a bare `string[]` of R2 keys until rewritten.
+   */
+  screenshots?: MonitorScreenshotRef[] | string[];
   error?: string;
   createdAt: string;
   completedAt?: string;
@@ -87,6 +99,12 @@ export interface MonitorStore {
    * older than `intervalMinutes` relative to `now`.
    */
   listDueMonitors(now: Date): Promise<Monitor[]>;
+  /**
+   * Atomically claims a due monitor for execution (CONC-3). Returns the monitor
+   * when the lease was acquired; null when another tick holds a valid lease or
+   * the monitor is not due.
+   */
+  tryClaimDueMonitor(id: string, now: Date, leaseTtlMs: number): Promise<Monitor | null>;
 
   // Monitor run history (Task 6.1) ------------------------------------------
   /** Records a completed monitor execution. */

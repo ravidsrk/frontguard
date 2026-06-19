@@ -33,6 +33,8 @@ bucket_name = "frontguard-screenshots"
 crons = ["*/15 * * * *"]
 
 [vars]
+# SEC-6: production mode is explicit — never infer from DB binding presence.
+ENVIRONMENT = "production"
 API_BASE_URL = "https://api.frontguard.dev"
 PUBLIC_BASE_URL = "https://api.frontguard.dev"
 
