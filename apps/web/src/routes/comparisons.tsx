@@ -3,19 +3,17 @@ import { Footer } from '../components/Footer'
 import { Nav } from '../components/Nav'
 import { docsUrl } from '../lib/site'
 import { s } from '../lib/style'
+import { buildSeoHead } from '../lib/seo'
 import { ALTERNATIVES, MATRIX, MIGRATIONS, VENDORS, VERSUS } from './comparisons/-data'
 
 export const Route = createFileRoute('/comparisons')({
-  head: () => ({
-    meta: [
-      { title: 'Comparisons — Frontguard vs. everyone else' },
-      {
-        name: 'description',
-        content:
-          'How Frontguard compares to Percy, Chromatic, BackstopJS, Lost Pixel, and Argos — capability by capability, with sources you can check.',
-      },
-    ],
-  }),
+  head: () =>
+    buildSeoHead({
+      title: 'Comparisons — Frontguard vs. everyone else',
+      description:
+        'How Frontguard compares to Percy, Chromatic, BackstopJS, Lost Pixel, and Argos — capability by capability, with sources you can check.',
+      path: '/comparisons',
+    }),
   component: Comparisons,
 })
 

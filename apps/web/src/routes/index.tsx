@@ -12,6 +12,7 @@ import {
   formatPercent,
   partitionRepos,
 } from '../lib/validation-data'
+import { buildSeoHead } from '../lib/seo'
 
 const SEO_TITLE = 'Frontguard — Catch the regression, not the noise'
 const SEO_DESCRIPTION =
@@ -54,13 +55,13 @@ const SOFTWARE_JSON_LD = {
 }
 
 export const Route = createFileRoute('/')({
-  head: () => ({
-    meta: [
-      { title: SEO_TITLE },
-      { name: 'description', content: SEO_DESCRIPTION },
-      { 'script:ld+json': SOFTWARE_JSON_LD },
-    ],
-  }),
+  head: () =>
+    buildSeoHead({
+      title: SEO_TITLE,
+      description: SEO_DESCRIPTION,
+      path: '/',
+      extraMeta: [{ 'script:ld+json': SOFTWARE_JSON_LD }],
+    }),
   component: Home,
 })
 
