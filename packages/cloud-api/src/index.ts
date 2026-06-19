@@ -20,7 +20,14 @@ import { hasValidSessionSecret } from './auth/session.js';
 import { teamRoutes } from './routes/teams.js';
 import { can } from './db/teams.js';
 import { billingRoutes } from './routes/billing.js';
-import { getPlan, checkLimit } from './billing/plans.js';
+import { getPlan } from './billing/plans.js';
+import {
+  MAX_ROUTES,
+  MAX_VIEWPORTS,
+  MAX_BROWSERS,
+  MAX_FAN_OUT,
+  plannedScreenshotCount,
+} from './limits.js';
 import { evaluateSpendCap } from './billing/spend-cap.js';
 import { runScheduledChecks } from './scheduler.js';
 import type { AlertEnv } from './alerts/index.js';
@@ -54,9 +61,10 @@ const runRequestSchema = z.object({
         name: z.string().optional(),
       }),
     )
+    .max(MAX_ROUTES)
     .optional(),
-  viewports: z.array(z.number().int().min(320).max(3840)).optional(),
-  browsers: z.array(z.enum(['chromium', 'firefox', 'webkit'])).optional(),
+  viewports: z.array(z.number().int().min(320).max(3840)).max(MAX_VIEWPORTS).optional(),
+  browsers: z.array(z.enum(['chromium', 'firefox', 'webkit'])).max(MAX_BROWSERS).optional(),
   threshold: z.number().min(0).max(1).optional(),
   ai: z
     .object({
@@ -244,6 +252,21 @@ app.post('/v1/run', async (c) => {
   const store = c.get('store');
   const userId = c.get('userId');
 
+  const routes = data.routes ?? [{ path: '/' }];
+  const viewports = data.viewports ?? [1440];
+  const browsers = data.browsers ?? ['chromium'];
+  const plannedScreenshots = plannedScreenshotCount(routes, viewports, browsers);
+  if (plannedScreenshots > MAX_FAN_OUT) {
+    return c.json(
+      {
+        error: `Fan-out exceeds maximum (${plannedScreenshots} screenshots; limit is ${MAX_FAN_OUT}).`,
+        fanOut: plannedScreenshots,
+        maxFanOut: MAX_FAN_OUT,
+      },
+      400,
+    );
+  }
+
   // Project scoping (Task 8.1): if a projectId is supplied, the caller must be
   // a member of the project's team with run_tests capability.
   let projectTeamId: string | undefined;
@@ -273,18 +296,54 @@ app.post('/v1/run', async (c) => {
     if (user) planId = user.plan;
   }
   const plan = getPlan(planId);
-  const usage = await store.getUsage(userId, currentMonth());
-  const limitCheck = checkLimit(plan, 'runsPerMonth', usage.runsCount, 1);
-  if (!limitCheck.allowed) {
-    return c.json(
-      {
-        error: `Monthly run limit reached (${limitCheck.limit} on the ${plan.name} plan).`,
-        limit: limitCheck.limit,
-        current: limitCheck.current,
-        upgradeUrl: 'https://frontguard.dev/pricing',
-      },
-      402,
+  const month = currentMonth();
+
+  // Atomic monthly reservations (CONC-1, COST-1): reserve the run and planned
+  // screenshot count up front so concurrent submissions cannot overshoot limits
+  // and giant fan-out cannot spend compute before metering.
+  const runLimit = plan.limits.runsPerMonth;
+  if (runLimit !== null) {
+    const reserved = await store.tryReserveRun(userId, month, runLimit);
+    if (!reserved) {
+      const usage = await store.getUsage(userId, month);
+      return c.json(
+        {
+          error: `Monthly run limit reached (${runLimit} on the ${plan.name} plan).`,
+          limit: runLimit,
+          current: usage.runsCount,
+          upgradeUrl: 'https://frontguard.dev/pricing',
+        },
+        402,
+      );
+    }
+  } else {
+    await store.incrementUsage(userId, month, 1, 0);
+  }
+
+  const screenshotLimit = plan.limits.screenshotsPerMonth;
+  if (screenshotLimit !== null) {
+    const reserved = await store.tryReserveScreenshots(
+      userId,
+      month,
+      screenshotLimit,
+      plannedScreenshots,
     );
+    if (!reserved) {
+      await store.incrementUsage(userId, month, -1, 0);
+      const usage = await store.getUsage(userId, month);
+      return c.json(
+        {
+          error: `Monthly screenshot limit reached (${screenshotLimit} on the ${plan.name} plan).`,
+          limit: screenshotLimit,
+          current: usage.screenshotsCount,
+          requested: plannedScreenshots,
+          upgradeUrl: 'https://frontguard.dev/pricing',
+        },
+        402,
+      );
+    }
+  } else if (plannedScreenshots > 0) {
+    await store.incrementUsage(userId, month, 0, plannedScreenshots);
   }
 
   const runId = crypto.randomUUID();
@@ -292,9 +351,9 @@ app.post('/v1/run', async (c) => {
     id: runId,
     status: 'queued',
     url: data.url,
-    routes: data.routes || [{ path: '/' }],
-    viewports: data.viewports || [1440],
-    browsers: data.browsers || ['chromium'],
+    routes,
+    viewports,
+    browsers,
     threshold: data.threshold || 0.01,
     ai: data.ai ? { provider: data.ai.provider, model: data.ai.model ?? '' } : null,
     createdAt: new Date().toISOString(),
@@ -307,7 +366,6 @@ app.post('/v1/run', async (c) => {
   };
 
   await store.createRun(run, userId);
-  await store.incrementUsage(userId, currentMonth(), 1, 0);
 
   // Spend-cap check (Task 15.7): fire an 80%/95% warning email once per tier.
   // Best-effort — failures must never block the run submission.
@@ -335,9 +393,8 @@ app.post('/v1/run', async (c) => {
 
   // Persist screenshots produced by the sandbox to R2 + metadata store.
   const blobs = getScreenshotStore(c.env?.SCREENSHOTS as R2Bucket | undefined);
-  let persistedShots = 0;
   const onScreenshots = async (shots: PendingScreenshot[]): Promise<void> => {
-    persistedShots = await persistScreenshots(store, blobs, userId, runId, shots);
+    await persistScreenshots(store, blobs, userId, runId, shots);
   };
 
   // Resolve the project's prior approved baselines so the sandbox can detect
@@ -376,11 +433,8 @@ app.post('/v1/run', async (c) => {
       run.error = err.message;
     })
     .finally(() => {
-      // Meter the number of screenshots actually persisted, falling back to the
-      // result count when no screenshots were captured (e.g. simulated runs).
-      const screenshots = persistedShots || (run.results?.length ?? 0);
+      // Screenshots were reserved at submit time (COST-1).
       void store.updateRun(runId, run);
-      if (screenshots > 0) void store.incrementUsage(userId, currentMonth(), 0, screenshots);
       // Complete the originating GitHub Check Run, if this run came from CI.
       if (run.github) void completeCheckRun(c.env ?? {}, run);
       // Export OTLP metrics (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
