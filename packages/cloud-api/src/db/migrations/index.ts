@@ -12,6 +12,7 @@
  */
 
 import { migration001Baseline } from './001-baseline.js';
+import { migration002CascadeTeamUsage } from './002-cascade-team-usage.js';
 import type { Migration } from './types.js';
 
 export type { Migration } from './types.js';
@@ -20,4 +21,4 @@ export type { Migration } from './types.js';
  * Production migrations in apply order. Only pending versions are run; applied
  * versions are recorded in `schema_migrations`.
  */
-export const MIGRATIONS: readonly Migration[] = [migration001Baseline];
+export const MIGRATIONS: readonly Migration[] = [migration001Baseline, migration002CascadeTeamUsage];
