@@ -20,10 +20,38 @@ describe('isPrivateOrLoopbackHost', () => {
       'metadata.google.internal',
       '::1',
       '[::1]',
+      '0.0.0.0',
     ]) {
       expect(isPrivateOrLoopbackHost(host)).toBe(true);
     }
     expect(isPrivateOrLoopbackHost('example.com')).toBe(false);
+  });
+
+  it('blocks IPv4-mapped IPv6 loopback, metadata, and private ranges', () => {
+    for (const host of [
+      '::ffff:127.0.0.1',
+      '[::ffff:127.0.0.1]',
+      '::ffff:7f00:1',
+      '[::ffff:7f00:1]',
+      '::ffff:169.254.169.254',
+      '::ffff:10.0.0.1',
+      '0:0:0:0:0:ffff:127.0.0.1',
+      '0:0:0:0:0:ffff:7f00:1',
+    ]) {
+      expect(isPrivateOrLoopbackHost(host)).toBe(true);
+    }
+  });
+
+  it('blocks obfuscated IPv4 literal forms', () => {
+    for (const host of [
+      '2130706433', // 127.0.0.1 decimal
+      '0x7f000001', // 127.0.0.1 hex
+      '0177.0.0.1', // octal first octet
+      '127.1', // non-canonical dotted
+      '0',
+    ]) {
+      expect(isPrivateOrLoopbackHost(host)).toBe(true);
+    }
   });
 });
 
@@ -34,6 +62,11 @@ describe('assertSafeRenderTarget', () => {
       'file:///etc/passwd',
       'https://127.0.0.1',
       'https://169.254.169.254',
+      'https://[::ffff:127.0.0.1]',
+      'https://[::ffff:169.254.169.254]',
+      'https://[::ffff:7f00:1]',
+      'https://2130706433',
+      'https://0.0.0.0',
     ]) {
       await expect(assertSafeRenderTarget(url)).rejects.toBeInstanceOf(SafeRenderTargetError);
     }
@@ -43,6 +76,12 @@ describe('assertSafeRenderTarget', () => {
     await expect(
       assertSafeRenderTarget('https://rebind.example', {
         resolveHost: async () => ['10.0.0.1'],
+      }),
+    ).rejects.toMatchObject({ code: 'dns_private' });
+
+    await expect(
+      assertSafeRenderTarget('https://rebind.example', {
+        resolveHost: async () => ['::ffff:127.0.0.1'],
       }),
     ).rejects.toMatchObject({ code: 'dns_private' });
   });
