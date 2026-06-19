@@ -95,14 +95,20 @@ billingRoutes.post('/webhook', async (c) => {
   if (!billing) return c.json({ handled: false });
 
   const store = getStore(c.env);
-  if (billing.teamId && billing.plan) {
-    await store.updateTeam(billing.teamId, {
+  let teamId = billing.teamId;
+  if (!teamId && billing.subscriptionId) {
+    const team = await store.getTeamByStripeSubscriptionId(billing.subscriptionId);
+    teamId = team?.id;
+  }
+
+  if (teamId && billing.plan) {
+    await store.updateTeam(teamId, {
       plan: billing.plan,
       stripeCustomerId: billing.customerId,
-      stripeSubscriptionId: billing.subscriptionId,
+      stripeSubscriptionId: billing.cancel ? undefined : billing.subscriptionId,
     });
   }
-  return c.json({ handled: true, type: billing.type, plan: billing.plan });
+  return c.json({ handled: true, type: billing.type, plan: billing.plan, teamId });
 });
 
 // POST /v1/billing/checkout — create a Stripe Checkout Session.

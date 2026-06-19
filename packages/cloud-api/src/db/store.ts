@@ -518,6 +518,12 @@ export class InMemoryStore implements Store {
   async getTeam(id: string): Promise<Team | null> {
     return this.teams.get(id) ?? null;
   }
+  async getTeamByStripeSubscriptionId(subscriptionId: string): Promise<Team | null> {
+    for (const team of this.teams.values()) {
+      if (team.stripeSubscriptionId === subscriptionId) return team;
+    }
+    return null;
+  }
   async updateTeam(id: string, patch: Partial<Team>): Promise<void> {
     const t = this.teams.get(id);
     if (t) Object.assign(t, patch);
