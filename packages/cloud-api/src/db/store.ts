@@ -539,6 +539,8 @@ export class InMemoryStore implements Store {
       if (m.leasedUntil && new Date(m.leasedUntil).getTime() > now.getTime()) return null;
       const leasedUntil = new Date(now.getTime() + leaseTtlMs).toISOString();
       m.leasedUntil = leasedUntil;
+      const version = this.monitorVersions.get(id) ?? 0;
+      this.monitorVersions.set(id, version + 1);
       return { ...m };
     });
   }

@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { runScheduledChecks } from '../src/scheduler.js';
 import { resetMemoryStore, getMemoryStore } from '../src/db/factory.js';
 import { InMemoryStore } from '../src/db/store.js';
-import { D1Store } from '../src/db/d1-store.js';
+import { D1Store, type D1Database } from '../src/db/d1-store.js';
 import { migrate } from '../src/db/migrate.js';
 import { createNodeSqliteD1 } from './helpers/node-sqlite-d1.js';
 import type { Monitor } from '../src/db/monitors.js';
@@ -47,6 +47,23 @@ describe('tryClaimDueMonitor — store primitive (CONC-3)', () => {
     expect(after?.leasedUntil).toBe(claimed[0]?.leasedUntil);
   });
 
+  it('stale updateMonitor concurrent with claim does not erase the active lease', async () => {
+    const store = new InMemoryStore();
+    const now = new Date('2026-01-01T12:00:00Z');
+    await store.createMonitor(makeMonitor({ lastRunAt: '2026-01-01T10:00:00Z' }));
+
+    await Promise.all([
+      store.tryClaimDueMonitor('m1', now, 60_000),
+      store.updateMonitor('m1', { lastStatus: 'running' }),
+    ]);
+
+    const after = await store.getMonitor('m1');
+    expect(after?.leasedUntil).toBeDefined();
+    expect(new Date(after!.leasedUntil!).getTime()).toBeGreaterThan(now.getTime());
+    expect(after?.lastStatus).toBe('running');
+    expect(await store.tryClaimDueMonitor('m1', now, 60_000)).toBeNull();
+  });
+
   it('rejects a second claim while the lease is still valid', async () => {
     const store = new InMemoryStore();
     const now = new Date('2026-01-01T12:00:00Z');
@@ -62,9 +79,11 @@ describe('tryClaimDueMonitor — store primitive (CONC-3)', () => {
 
 describe('tryClaimDueMonitor — D1Store (CONC-3)', () => {
   let store: D1Store;
+  let db: D1Database;
 
   beforeEach(async () => {
-    const { db } = createNodeSqliteD1();
+    const created = createNodeSqliteD1();
+    db = created.db;
     await migrate(db);
     store = new D1Store(db);
     await store.createUser({ id: 'u1', plan: 'business', createdAt: 'now' });
@@ -81,6 +100,40 @@ describe('tryClaimDueMonitor — D1Store (CONC-3)', () => {
     const claimed = [first, second].filter((m) => m != null);
     expect(claimed).toHaveLength(1);
     expect(claimed[0]?.leasedUntil).toBeDefined();
+  });
+
+  it('stale version-0 CAS cannot erase a lease after claim bumps version', async () => {
+    const now = new Date('2026-01-01T12:00:00Z');
+    const claimed = await store.tryClaimDueMonitor('m1', now, 60_000);
+    expect(claimed).not.toBeNull();
+
+    const staleWrite = await db
+      .prepare(
+        `UPDATE monitors SET last_status = ?, leased_until = NULL, version = version + 1
+         WHERE id = ? AND version = ?`,
+      )
+      .bind('stale', 'm1', 0)
+      .run();
+    expect(staleWrite.meta?.changes ?? 0).toBe(0);
+
+    const after = await store.getMonitor('m1');
+    expect(after?.leasedUntil).toBeDefined();
+    expect(new Date(after!.leasedUntil!).getTime()).toBeGreaterThan(now.getTime());
+  });
+
+  it('stale updateMonitor concurrent with claim does not erase the active lease', async () => {
+    const now = new Date('2026-01-01T12:00:00Z');
+
+    await Promise.all([
+      store.tryClaimDueMonitor('m1', now, 60_000),
+      store.updateMonitor('m1', { lastStatus: 'running' }),
+    ]);
+
+    const after = await store.getMonitor('m1');
+    expect(after?.leasedUntil).toBeDefined();
+    expect(new Date(after!.leasedUntil!).getTime()).toBeGreaterThan(now.getTime());
+    expect(after?.lastStatus).toBe('running');
+    expect(await store.tryClaimDueMonitor('m1', now, 60_000)).toBeNull();
   });
 });
 
