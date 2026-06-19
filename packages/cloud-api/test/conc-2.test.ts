@@ -2,11 +2,13 @@
  * CONC-2: lost-update protection via optimistic concurrency on
  * updateRun / updateMonitor / updateTeam.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe as describeBase, it, expect, beforeEach } from 'vitest';
 import { D1Store } from '../src/db/d1-store.js';
 import { InMemoryStore } from '../src/db/store.js';
 import { migrate } from '../src/db/migrate.js';
-import { createNodeSqliteD1 } from './helpers/node-sqlite-d1.js';
+import { createNodeSqliteD1, nodeSqliteAvailable } from './helpers/node-sqlite-d1.js';
+// node:sqlite is absent on Node 20 (CI matrix); skip this shim-backed suite there.
+const describe = nodeSqliteAvailable ? describeBase : describeBase.skip;
 import type { Monitor } from '../src/db/monitors.js';
 import type { Run } from '../src/types.js';
 

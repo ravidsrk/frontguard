@@ -1,14 +1,16 @@
 /**
  * DM-3: team-scoped usage pool — combined member runs enforce team plan limit.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe as describeBase, it, expect, beforeEach } from 'vitest';
 import { createHash } from 'node:crypto';
 import { app } from '../src/index.js';
 import { getMemoryStore, resetMemoryStore } from '../src/db/factory.js';
 import { InMemoryStore } from '../src/db/store.js';
 import { D1Store } from '../src/db/d1-store.js';
 import { migrate } from '../src/db/migrate.js';
-import { createNodeSqliteD1 } from './helpers/node-sqlite-d1.js';
+import { createNodeSqliteD1, nodeSqliteAvailable } from './helpers/node-sqlite-d1.js';
+// node:sqlite is absent on Node 20 (CI matrix); skip this shim-backed suite there.
+const describe = nodeSqliteAvailable ? describeBase : describeBase.skip;
 
 function demoUserId(token: string): string {
   return `demo:${createHash('sha256').update(token).digest('hex')}`;

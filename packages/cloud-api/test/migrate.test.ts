@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe as describeBase, it, expect } from 'vitest';
 import { migrate, runMigrations, splitStatements, type Migration } from '../src/db/migrate.js';
 import { MIGRATIONS } from '../src/db/migrations/index.js';
 import { SCHEMA_SQL } from '../src/db/schema.js';
-import { createNodeSqliteD1 } from './helpers/node-sqlite-d1.js';
+import { createNodeSqliteD1, nodeSqliteAvailable } from './helpers/node-sqlite-d1.js';
+// node:sqlite is absent on Node 20 (CI matrix); skip this shim-backed suite there.
+const describe = nodeSqliteAvailable ? describeBase : describeBase.skip;
 
 /** Test-scoped migration — injected at runtime, not shipped in prod registry. */
 const TEST_V2_MIGRATION: Migration = {
