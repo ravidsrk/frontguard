@@ -122,6 +122,8 @@ export function roleAtLeast(a: TeamRole, b: TeamRole): boolean {
 export interface TeamStore {
   createTeam(team: Team, ownerUserId: string): Promise<void>;
   getTeam(id: string): Promise<Team | null>;
+  /** Resolves a team by its Stripe subscription id (fallback when webhook metadata is absent). */
+  getTeamByStripeSubscriptionId(subscriptionId: string): Promise<Team | null>;
   updateTeam(id: string, patch: Partial<Team>): Promise<void>;
   deleteTeam(id: string): Promise<boolean>;
   listTeamsForUser(userId: string): Promise<Array<Team & { role: TeamRole }>>;
