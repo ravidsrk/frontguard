@@ -43,9 +43,11 @@ export async function createCheckoutSession(
   form.set('cancel_url', config.cancelUrl);
   form.set('client_reference_id', params.clientReferenceId);
   if (params.customerEmail) form.set('customer_email', params.customerEmail);
-  // Carry plan + team through to the webhook.
+  // Carry plan + team through checkout and onto the resulting Subscription.
   form.set('metadata[plan]', params.plan);
   form.set('metadata[team_id]', params.clientReferenceId);
+  form.set('subscription_data[metadata][plan]', params.plan);
+  form.set('subscription_data[metadata][team_id]', params.clientReferenceId);
 
   const res = await fetchImpl('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',

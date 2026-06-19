@@ -658,6 +658,13 @@ export class D1Store implements Store {
     const row = await this.db.prepare(`SELECT * FROM teams WHERE id = ?`).bind(id).first<Record<string, unknown>>();
     return row ? teamFromRow(row) : null;
   }
+  async getTeamByStripeSubscriptionId(subscriptionId: string): Promise<Team | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM teams WHERE stripe_subscription_id = ?`)
+      .bind(subscriptionId)
+      .first<Record<string, unknown>>();
+    return row ? teamFromRow(row) : null;
+  }
   async updateTeam(id: string, patch: Partial<Team>): Promise<void> {
     const current = await this.getTeam(id);
     if (!current) return;
