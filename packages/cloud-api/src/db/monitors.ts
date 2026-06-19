@@ -36,6 +36,8 @@ export interface Monitor {
   enabled: boolean;
   lastRunAt?: string;
   lastStatus?: string;
+  /** ISO timestamp until which this monitor is leased for execution (CONC-3). */
+  leasedUntil?: string;
   createdAt: string;
 }
 
@@ -97,6 +99,12 @@ export interface MonitorStore {
    * older than `intervalMinutes` relative to `now`.
    */
   listDueMonitors(now: Date): Promise<Monitor[]>;
+  /**
+   * Atomically claims a due monitor for execution (CONC-3). Returns the monitor
+   * when the lease was acquired; null when another tick holds a valid lease or
+   * the monitor is not due.
+   */
+  tryClaimDueMonitor(id: string, now: Date, leaseTtlMs: number): Promise<Monitor | null>;
 
   // Monitor run history (Task 6.1) ------------------------------------------
   /** Records a completed monitor execution. */

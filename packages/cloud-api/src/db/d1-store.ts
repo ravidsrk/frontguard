@@ -587,9 +587,11 @@ export class D1Store implements Store {
       const version = Number(row.version ?? 0);
       const current = monitorFromRow(row);
       const m = { ...current, ...patch };
+      const leasedUntil =
+        'leasedUntil' in patch ? (patch.leasedUntil ?? null) : (m.leasedUntil ?? null);
       const res = await this.db
         .prepare(
-          `UPDATE monitors SET name = ?, url = ?, routes = ?, viewports = ?, interval_minutes = ?, alert_threshold = ?, alerts = ?, enabled = ?, last_run_at = ?, last_status = ?, version = version + 1 WHERE id = ? AND version = ?`,
+          `UPDATE monitors SET name = ?, url = ?, routes = ?, viewports = ?, interval_minutes = ?, alert_threshold = ?, alerts = ?, enabled = ?, last_run_at = ?, last_status = ?, leased_until = ?, version = version + 1 WHERE id = ? AND version = ?`,
         )
         .bind(
           m.name,
@@ -602,6 +604,7 @@ export class D1Store implements Store {
           m.enabled ? 1 : 0,
           m.lastRunAt ?? null,
           m.lastStatus ?? null,
+          leasedUntil,
           id,
           version,
         )
@@ -621,6 +624,24 @@ export class D1Store implements Store {
       .prepare(`SELECT * FROM monitors WHERE enabled = 1`)
       .all<Record<string, unknown>>();
     return results.map(monitorFromRow).filter((m) => isMonitorDue(m, now));
+  }
+  async tryClaimDueMonitor(id: string, now: Date, leaseTtlMs: number): Promise<Monitor | null> {
+    const nowIso = now.toISOString();
+    const leasedUntil = new Date(now.getTime() + leaseTtlMs).toISOString();
+    const result = await this.db
+      .prepare(
+        `UPDATE monitors SET leased_until = ?
+         WHERE id = ? AND enabled = 1
+           AND (leased_until IS NULL OR leased_until < ?)
+           AND (
+             last_run_at IS NULL
+             OR (julianday(?) - julianday(last_run_at)) * 1440 >= interval_minutes
+           )`,
+      )
+      .bind(leasedUntil, id, nowIso, nowIso)
+      .run();
+    if ((result.meta?.changes ?? 0) === 0) return null;
+    return this.getMonitor(id);
   }
   async addMonitorRun(run: MonitorRun): Promise<void> {
     await this.db
@@ -1038,6 +1059,7 @@ function monitorFromRow(row: Record<string, unknown>): Monitor {
     enabled: row.enabled === 1 || row.enabled === true,
     lastRunAt: row.last_run_at != null ? String(row.last_run_at) : undefined,
     lastStatus: row.last_status != null ? String(row.last_status) : undefined,
+    leasedUntil: row.leased_until != null ? String(row.leased_until) : undefined,
     createdAt: String(row.created_at),
   };
 }
