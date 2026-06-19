@@ -46,6 +46,8 @@ export interface TeamInvitation {
   role: TeamRole;
   token: string;
   createdAt: string;
+  /** ISO timestamp after which the token is no longer valid (SEC-4). */
+  expiresAt?: string;
   acceptedAt?: string;
 }
 

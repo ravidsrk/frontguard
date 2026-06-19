@@ -115,12 +115,20 @@ describe('D1Store (SQLite-backed)', () => {
     expect((await store.getMember('t1', 'u2'))?.role).toBe('admin');
     expect((await store.listMembers('t1')).length).toBe(2);
 
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
     await store.createInvitation({
-      id: 'i1', teamId: 't1', email: 'x@y.com', role: 'viewer', token: 'tok1', createdAt: 'now',
+      id: 'i1',
+      teamId: 't1',
+      email: 'x@y.com',
+      role: 'viewer',
+      token: 'tok1',
+      createdAt: 'now',
+      expiresAt,
     });
     expect((await store.getInvitationByToken('tok1'))?.email).toBe('x@y.com');
-    expect((await store.acceptInvitation('tok1', 'now'))?.role).toBe('viewer');
-    expect(await store.acceptInvitation('tok1', 'now')).toBeNull();
+    const acceptedAt = new Date().toISOString();
+    expect((await store.acceptInvitation('tok1', acceptedAt))?.role).toBe('viewer');
+    expect(await store.acceptInvitation('tok1', acceptedAt)).toBeNull();
 
     await store.createProject({ id: 'p1', teamId: 't1', name: 'Web', repoUrl: 'https://x', createdAt: 'now' });
     expect((await store.listProjects('t1'))[0].repoUrl).toBe('https://x');
@@ -157,7 +165,13 @@ describe('D1Store (SQLite-backed)', () => {
 
     // GitHub-handle invite (nullable email).
     await store.createInvitation({
-      id: 'i1', teamId: 't1', githubLogin: 'octocat', role: 'member', token: 'ghtok', createdAt: 'now',
+      id: 'i1',
+      teamId: 't1',
+      githubLogin: 'octocat',
+      role: 'member',
+      token: 'ghtok',
+      createdAt: 'now',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
     });
     const inv = await store.getInvitationByToken('ghtok');
     expect(inv?.githubLogin).toBe('octocat');
