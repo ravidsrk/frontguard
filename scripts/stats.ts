@@ -2,16 +2,14 @@
  * scripts/stats.ts — Derive canonical product stats at build time.
  *
  * Source of truth for: "N tests", "N source files", "vX.Y.Z", "N built-in plugins",
- * and "NKB bundle" — the numbers that appear in the README, the landing page, and
- * the docs site.
+ * and "NKB bundle" — the numbers that appear in the README and the web app.
  *
  * Run with:  npx tsx scripts/stats.ts
  * Output:    scripts/stats.json (canonical)
- *            apps/docs/content/stats.json (copy consumed by MDX imports)
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -147,15 +145,8 @@ function main(): void {
   };
 
   const canonicalPath = join(SCRIPT_DIR, 'stats.json');
-  const docsCopyPath = join(ROOT, 'apps/docs/content/stats.json');
 
   writeFileSync(canonicalPath, JSON.stringify(payload, null, 2) + '\n');
-
-  // Mirror to the docs site so MDX imports resolve without crossing the
-  // workspace boundary. The canonical file at scripts/stats.json remains
-  // the source of truth.
-  mkdirSync(dirname(docsCopyPath), { recursive: true });
-  writeFileSync(docsCopyPath, JSON.stringify(payload, null, 2) + '\n');
 
   // eslint-disable-next-line no-console
   console.log(
@@ -166,7 +157,6 @@ function main(): void {
       `  plugins:      ${plugins}`,
       `  bundle:       ${bundle.tarballKB}KB (tarball) / ${bundle.unpackedKB}KB (unpacked)`,
       `  → ${canonicalPath}`,
-      `  → ${docsCopyPath}`,
     ].join('\n'),
   );
 }
