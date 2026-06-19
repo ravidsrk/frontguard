@@ -21,8 +21,10 @@ import {
   createCheckoutSession,
   verifyStripeSignature,
   interpretStripeEvent,
+  type BillingEvent,
   type StripeConfig,
 } from '../billing/stripe.js';
+import type { Store } from '../db/store.js';
 import { currentMonth } from '../db/store.js';
 
 /** Billing-specific env. */
@@ -47,6 +49,23 @@ function stripeConfig(env: BillingEnv | undefined): StripeConfig | null {
     successUrl: env.BILLING_SUCCESS_URL ?? 'https://frontguard.dev/billing/success',
     cancelUrl: env.BILLING_CANCEL_URL ?? 'https://frontguard.dev/billing/cancel',
   };
+}
+
+/**
+ * Resolves the team a Stripe billing event applies to.
+ * Prefers metadata team_id when it points at an existing team; otherwise
+ * falls back to stripe_subscription_id linkage.
+ */
+async function resolveBillingTeamId(store: Store, billing: BillingEvent): Promise<string | undefined> {
+  if (billing.teamId) {
+    const team = await store.getTeam(billing.teamId);
+    if (team) return billing.teamId;
+  }
+  if (billing.subscriptionId) {
+    const team = await store.getTeamByStripeSubscriptionId(billing.subscriptionId);
+    if (team) return team.id;
+  }
+  return undefined;
 }
 
 /** Resolves the caller's userId (mirrors the main guard, dev + prod). */
@@ -95,14 +114,25 @@ billingRoutes.post('/webhook', async (c) => {
   if (!billing) return c.json({ handled: false });
 
   const store = getStore(c.env);
-  if (billing.teamId && billing.plan) {
-    await store.updateTeam(billing.teamId, {
+  const teamId = await resolveBillingTeamId(store, billing);
+
+  if (!teamId) {
+    console.warn('[billing/webhook] could not resolve team for Stripe event', {
+      type: billing.type,
+      metadataTeamId: billing.teamId,
+      subscriptionId: billing.subscriptionId,
+    });
+    return c.json({ handled: false, reason: 'team_not_resolved', type: billing.type });
+  }
+
+  if (billing.plan) {
+    await store.updateTeam(teamId, {
       plan: billing.plan,
       stripeCustomerId: billing.customerId,
-      stripeSubscriptionId: billing.subscriptionId,
+      stripeSubscriptionId: billing.cancel ? undefined : billing.subscriptionId,
     });
   }
-  return c.json({ handled: true, type: billing.type, plan: billing.plan });
+  return c.json({ handled: true, type: billing.type, plan: billing.plan, teamId });
 });
 
 // POST /v1/billing/checkout — create a Stripe Checkout Session.
