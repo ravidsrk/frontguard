@@ -1,0 +1,248 @@
+# Frontguard
+
+> AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.
+
+Frontguard is an open-source CLI + cloud platform. The CLI is MIT-licensed and free forever; the hosted cloud (team baselines, history, flake-score badges) is the paid tier at $29/month per user.
+
+## Key Pages
+
+- [Home](https://frontguard.dev) — Product overview, install paths, comparison vs Percy / Chromatic / Argos
+- [Pricing](https://frontguard.dev/pricing) — Free CLI ($0, MIT), Pro ($29/mo), Team/Enterprise; compare-plans matrix and the 8-question FAQ
+- [Comparisons](https://frontguard.dev/comparisons) — Capability-by-capability vs Percy, Chromatic, BackstopJS, Lost Pixel, Argos, with sources
+- [Changelog](https://frontguard.dev/changelog) — Notable releases, newest first (Keep a Changelog)
+- [Brand](https://frontguard.dev/brand) — The amber shield mark, lockups, color tokens, typography, voice
+- [Docs](https://frontguard.dev/docs) — New-brand docs surface: install, CLI, configuration, AI analysis, CI/CD, self-hosting
+- [Docs articles](https://frontguard.dev/docs/index) — 37 guides at `/docs/<slug>` (install, CLI, CI/CD, self-host, comparisons)
+- [GitHub](https://github.com/ravidsrk/frontguard) — Source code, issues, contributing
+- [npm: @frontguard/cli](https://www.npmjs.com/package/@frontguard/cli)
+- [npm: @frontguard/playwright](https://www.npmjs.com/package/@frontguard/playwright)
+- [Validation results](https://github.com/ravidsrk/frontguard/blob/main/validation/results-v0.2.md)
+
+## What Frontguard Does
+
+- Anti-flake consensus — three captures per route, majority wins; SSIM perceptual matching as fallback
+- AI classification — diff goes to GPT-4o or Claude Sonnet with DOM + axe-core findings inline; structured `{category, confidence, cause}` output
+- Sandbox-verified fixes — every AI patch is applied in a local Playwright sandbox (or Daytona snapshot), re-rendered, and only shipped if the diff clears
+- Plugin architecture — six lifecycle hooks; built-ins for accessibility (axe-core), Figma compare, perf budgets, monitor, third-party-script drift
+- CI-native — composite GitHub Action, PR comment with baseline / current / diff thumbnails; GitLab CI, CircleCI, Jenkins via the same CLI
+- Self-hostable — Cloudflare Workers + D1 + R2, or docker-compose on your laptop with miniflare + SQLite + local-disk adapters
+
+## Author
+
+Ravindra Kumar — https://github.com/ravidsrk · https://x.com/ravidsrk
+
+## License
+
+MIT
+
+---
+
+## Installation
+
+### CLI
+
+```bash
+npm install @frontguard/cli
+npx frontguard init
+npx frontguard run --url http://localhost:3000
+```
+
+### Playwright plugin
+
+```bash
+npm install -D @frontguard/cli @frontguard/playwright
+```
+
+```ts
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
+test('checkout @ 375px', async ({ page }) => {
+  await page.goto('http://localhost:3000/checkout');
+  const result = await visualTest(page, 'checkout');
+  expect(result.passed).toBe(true);
+});
+```
+
+### GitHub Action
+
+```yaml
+- name: Frontguard
+  uses: ravidsrk/frontguard@v0
+  with:
+    url: ${{ steps.preview.outputs.url }}
+  env:
+    FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+---
+
+## Configuration
+
+`frontguard.config.ts`:
+
+```ts
+import { defineConfig } from '@frontguard/cli';
+
+export default defineConfig({
+  baseUrl: 'http://localhost:3000',
+  viewports: [375, 768, 1440],
+  browsers: ['chromium', 'firefox', 'webkit'],
+  antiFlakeRenders: 3,
+  consensus: 'majority',
+  ai: { provider: 'auto' }, // 'openai' | 'anthropic' | 'auto'
+  baselineDir: '.frontguard/baselines',
+  outputDir: '.frontguard/results',
+});
+```
+
+### Environment variables
+
+- `FRONTGUARD_OPENAI_KEY` / `FRONTGUARD_ANTHROPIC_KEY` — AI provider key. The Playwright plugin also accepts unprefixed `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` when present. `frontguard doctor` reads exactly the same names the runtime reads.
+- `FRONTGUARD_API_URL` / `FRONTGUARD_API_KEY` — hosted or self-hosted cloud endpoint.
+
+---
+
+## Pricing
+
+- **Free CLI** — $0 forever, MIT, BYO AI key. Unlimited local screenshots, anti-flake consensus, GitHub Action + PR comment, git-orphan baselines, docker-compose self-host of the cloud.
+- **Pro** — $29 per user / month. Everything in Free CLI plus hosted team baselines, run history, flake-score badges, GitHub App one-click baseline accept, spend-cap alerts at 80% / 95%, Slack and GitHub notifications.
+- **Enterprise** — custom annual. SAML SSO, SCIM, audit log, on-prem deployment, dedicated support + SLA, custom Git / CI integrations.
+
+---
+
+## Comparison
+
+Pulled from each vendor's documented pricing and release notes; full sources in `docs/research.md`.
+
+| Feature | Frontguard | Percy | Chromatic | Argos |
+|---|---|---|---|---|
+| Free tier | CLI free forever (MIT, BYO AI key) | 5,000 screenshots/mo | 5,000 snapshots/mo · Chrome-only · no a11y | 5,000 screenshots/mo · unlimited Playwright traces |
+| Paid entry | Pro $29/mo | Desktop ≈ $199/mo | Starter $179/mo | Pro from $100/mo |
+| Snapshot overage | Spend cap | Quote-walled | $0.008 / snapshot | $0.004 extra screenshot |
+| AI diff explanation | Plain-English category + confidence + cause | Visual Review Agent (NL summaries) | No diff-classification AI | Markets "no AI overhead" |
+| Sandbox-verified fixes | Patch + re-render in local Playwright / Daytona | Not advertised | Not advertised | Not advertised |
+| Self-host | docker-compose recipe · MIT cloud | SaaS only | SaaS only | MIT, self-host possible from source |
+| MCP server | @frontguard/mcp | Not shipped | Per-branch /mcp · Storybook 10.3+ · React | Not shipped |
+
+---
+
+## CI/CD examples
+
+### GitHub Actions
+
+```yaml
+name: Visual Regression
+on: [pull_request]
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npm run build && npm start &
+      - uses: ravidsrk/frontguard@v0
+        with:
+          url: http://localhost:3000
+        env:
+          FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+### GitLab CI
+
+```yaml
+visual:
+  image: mcr.microsoft.com/playwright:focal
+  script:
+    - npm ci
+    - npm run build
+    - npm start &
+    - npx frontguard run --url http://localhost:3000
+  variables:
+    FRONTGUARD_OPENAI_KEY: $OPENAI_KEY
+  artifacts:
+    when: on_failure
+    paths:
+      - .frontguard/results/
+```
+
+---
+
+## MCP server
+
+`@frontguard/mcp` exposes the following tools to in-IDE agents (Claude Code, Cursor, Cline, Copilot):
+
+- `list_regressions(pr_id)`
+- `get_suggested_fix(diff_id)`
+- `accept_baseline(diff_id)`
+- `recent_runs(repo, branch)`
+
+```bash
+npx @frontguard/mcp
+```
+
+Drop into `mcp.json` per the docs at https://frontguard.dev/docs/integrations/mcp.
+
+---
+
+## Self-host
+
+Cloud stack runs locally:
+
+```bash
+docker compose -f packages/cloud-api/docker-compose.yml up
+```
+
+Maps to miniflare for the Worker runtime, SQLite in place of D1, and a local-disk adapter in place of R2.
+
+---
+
+## FAQ
+
+### How do I install Frontguard?
+
+`npm install @frontguard/cli`, then `npx frontguard init`, then `npx frontguard run --url <your URL>`.
+
+### How does Frontguard handle cross-OS rendering differences?
+
+Playwright's own docs warn rendering varies by OS and hardware. Frontguard ships a pinned Docker renderer image (Chromium / Firefox / WebKit + system fonts). Enable with `frontguard run --docker`.
+
+### Can I self-host the cloud?
+
+Yes. The cloud is MIT-licensed and runs locally via `docker-compose up`.
+
+### What env vars does Frontguard read?
+
+`FRONTGUARD_OPENAI_KEY` / `FRONTGUARD_ANTHROPIC_KEY` for AI. `FRONTGUARD_API_URL` / `FRONTGUARD_API_KEY` for the cloud.
+
+### Does Frontguard work with Storybook?
+
+Yes. `frontguard init` detects `.storybook/main.ts` and scaffolds a Storybook-aware config. The adapter runs each story's `play()` function.
+
+### Is there an MCP server?
+
+`@frontguard/mcp` exposes `list_regressions`, `get_suggested_fix`, `accept_baseline`, `recent_runs`.
+
+### Data retention?
+
+CLI sends screenshots only to your configured AI provider. On the hosted cloud, default retention is 30 days on Pro; configurable up to 1 year on Enterprise.
+
+---
+
+## Links
+
+- Website: https://frontguard.dev
+- Pricing: https://frontguard.dev/pricing
+- Comparisons: https://frontguard.dev/comparisons
+- Changelog: https://frontguard.dev/changelog
+- Brand: https://frontguard.dev/brand
+- Docs (new-brand surface): https://frontguard.dev/docs
+- Docs articles: https://frontguard.dev/docs/index
+- GitHub: https://github.com/ravidsrk/frontguard
+- npm: https://www.npmjs.com/package/@frontguard/cli
+- Author: Ravindra Kumar — https://github.com/ravidsrk · https://x.com/ravidsrk

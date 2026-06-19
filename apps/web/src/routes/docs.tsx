@@ -2,8 +2,18 @@ import { createFileRoute, Link, Outlet, useParams } from '@tanstack/react-router
 import { s } from '../lib/style'
 import { Shield } from '../components/Shield'
 import { articles, navGroups, type Article } from '../lib/docs-content'
+import { buildSeoHead } from '../lib/seo'
 
-export const Route = createFileRoute('/docs')({ component: DocsLayout })
+export const Route = createFileRoute('/docs')({
+  head: () =>
+    buildSeoHead({
+      title: 'Documentation — Frontguard',
+      description:
+        'Frontguard docs: install the CLI, configure visual regression tests, run AI analysis, wire up CI/CD, and self-host the cloud.',
+      path: '/docs',
+    }),
+  component: DocsLayout,
+})
 
 const MONO = "'JetBrains Mono', monospace"
 const byId = (id: string): Article => articles.find((a) => a.id === id) ?? articles[0]
