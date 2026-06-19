@@ -138,7 +138,7 @@ worker. Mock fetches via `globalThis.fetch = …` in the test scope — see
 
 ## Marketplace listing
 
-The public listing copy and screenshots live in `apps/docs/content/docs/integrations/github.mdx`.
+The public listing copy and screenshots live in `apps/web/src/lib/docs-content.ts` (integrations/github article).
 The marketplace flow uses this app's `manifest.yml` for the listing fields:
 
 - `name: Frontguard`

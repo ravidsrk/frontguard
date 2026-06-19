@@ -49,8 +49,7 @@ integrations/
 └── vercel/                       # Vercel OAuth + custom-domain preview support
 
 apps/
-├── docs/                         # frontguard.dev/docs — Fumadocs on Next.js 16 Turbopack
-└── landing/                      # frontguard.dev — Vite + React landing
+└── web/                          # frontguard.dev — TanStack Start on Cloudflare Workers
 
 demo/                             # VHS tape + rendered demo GIF + fg-demo recording wrapper
 validation/                       # OSS-repo harness + measured results (results-v0.2.md)
@@ -60,14 +59,18 @@ scripts/                          # stats.ts, release.sh, build-daytona-snapshot
 ## Running in development
 
 ```bash
-# Watch mode — rebuilds on changes
-npm run dev
+# Web app (marketing + docs) — TanStack Start dev server
+npm run dev:web
 
-# Run against a local app
-node dist/cli/index.js run --url http://localhost:3000
+# Cloud API worker
+npm run dev:api
 
-# Type checking
+# CLI against a local app (after npm run build:cli)
+node packages/cli/dist/cli/index.js run --url http://localhost:3000
+
+# Lint + typecheck across workspaces
 npm run lint
+npm run typecheck
 ```
 
 ## Tests

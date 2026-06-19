@@ -138,7 +138,7 @@ export class DockerImageUnavailableError extends Error {
           'build the image locally:\n\n' +
           `    docker build --platform linux/amd64 -t ${image} packages/cli/docker\n\n` +
           'Or point the CLI at a pre-built image you control via the FRONTGUARD_DOCKER_IMAGE env var.\n\n' +
-          'See packages/cli/docker/Dockerfile and apps/docs/content/docs/cross-os-rendering.mdx\n' +
+          'See packages/cli/docker/Dockerfile and https://frontguard.dev/docs/cross-os-rendering\n' +
           'for the full build recipe and the planned registry tags.',
     );
     this.name = 'DockerImageUnavailableError';
