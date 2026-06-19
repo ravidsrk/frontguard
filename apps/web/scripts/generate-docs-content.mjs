@@ -23,7 +23,6 @@ const STYLES = {
   h3: 'font-size: 20px; letter-spacing: -0.015em; font-weight: 600; color: #f5f1ea; margin: 28px 0 12px;',
   h4: 'font-size: 17px; font-weight: 600; color: #f5f1ea; margin: 22px 0 10px;',
   p: 'font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;',
-  lead: 'font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 30px;',
   ul: 'font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px; padding-left: 24px;',
   ol: 'font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px; padding-left: 24px;',
   li: 'margin-bottom: 8px;',
@@ -78,11 +77,123 @@ function stepBlock(n, content) {
   </div>`
 }
 
+let firstH2 = true
+let parseMarkdown
+let currentArticleId = ''
+
+function createRenderer() {
+  return {
+    heading(token) {
+      const text = this.parser.parseInline(token.tokens)
+      if (token.depth === 1) {
+        firstH2 = true
+        return `<h1 style="${STYLES.h1}">${text}</h1>`
+      }
+      if (token.depth === 2) {
+        const style = firstH2 ? STYLES.h2first : STYLES.h2
+        firstH2 = false
+        return `<h2 style="${style}">${text}</h2>`
+      }
+      if (token.depth === 3) return `<h3 style="${STYLES.h3}">${text}</h3>`
+      if (token.depth === 4) return `<h4 style="${STYLES.h4}">${text}</h4>`
+      return `<h${token.depth}>${text}</h${token.depth}>`
+    },
+    paragraph(token) {
+      const inner = this.parser.parseInline(token.tokens)
+      if (inner.startsWith('%%') || inner.includes('%%CALLOUT:') || inner.includes('%%TAB:') || inner.includes('%%STEP:')) {
+        return inner
+      }
+      return `<p style="${STYLES.p}">${inner}</p>`
+    },
+    strong(token) {
+      return `<strong style="${STYLES.strong}">${this.parser.parseInline(token.tokens)}</strong>`
+    },
+    em(token) {
+      return `<em style="${STYLES.em}">${this.parser.parseInline(token.tokens)}</em>`
+    },
+    codespan(token) {
+      return `<code style="${STYLES.ic}">${escapeHtml(token.text)}</code>`
+    },
+    link(token) {
+      const resolved = resolveLink(token.href, currentArticleId)
+      const text = this.parser.parseInline(token.tokens)
+      return `<a href="${resolved}" style="${STYLES.a}">${text}</a>`
+    },
+    list(token) {
+      const tag = token.ordered ? 'ol' : 'ul'
+      const style = token.ordered ? STYLES.ol : STYLES.ul
+      const body = token.items
+        .map((item) => `<li style="${STYLES.li}">${this.parser.parse(item.tokens)}</li>`)
+        .join('')
+      return `<${tag} style="${style}">${body}</${tag}>`
+    },
+    hr() {
+      return `<hr style="${STYLES.hr}" />`
+    },
+    blockquote(token) {
+      return `<blockquote style="${STYLES.blockquote}">${this.parser.parse(token.tokens)}</blockquote>`
+    },
+    code(token) {
+      const label = token.lang || 'code'
+      const meta = token.meta || ''
+      const titleMatch = meta.match(/title="([^"]+)"/)
+      const labelText = titleMatch ? titleMatch[1] : label
+      return codeBlock(labelText, escapeHtml(token.text))
+    },
+    table(token) {
+      const header = token.header
+        .map(
+          (cell, i) =>
+            `<th style="font-family: ${MONO}; font-size: 12px; color: #e8862e; text-align: left; padding: 12px 16px; border-bottom: 1px solid #211e1b;${i === 0 ? ' width: 200px;' : ''}">${this.parser.parseInline(cell.tokens)}</th>`,
+        )
+        .join('')
+      const rows = token.rows
+        .map(
+          (row) =>
+            `<tr>${row
+              .map(
+                (cell, i) =>
+                  `<td style="font-size: 13.5px; color: #b8b0a6; line-height: 1.5; padding: 12px 16px; border-bottom: 1px solid #211e1b; vertical-align: top;${i === 0 ? ' font-family: ' + MONO + '; color: #d8d0c5;' : ''}">${this.parser.parseInline(cell.tokens)}</td>`,
+              )
+              .join('')}</tr>`,
+        )
+        .join('')
+      return `<div style="border: 1px solid #2a2622; margin-bottom: 28px; overflow-x: auto;"><table style="width: 100%; border-collapse: collapse;"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table></div>`
+    },
+    html(token) {
+      // Drop stray MDX/JSX tags that leaked through preprocessing.
+      if (/^<\/?(script|Tab|Tabs|Steps|Step|Callout)\b/i.test(token.raw.trim())) return ''
+      return ''
+    },
+  }
+}
+
+marked.use({ renderer: createRenderer(), gfm: true, breaks: false })
+
+parseMarkdown = (md, articleId = currentArticleId) => {
+  firstH2 = true
+  const prev = currentArticleId
+  currentArticleId = articleId
+  const html = marked.parse(md)
+  currentArticleId = prev
+  return html
+}
+
 function preprocessMdx(raw) {
   let s = raw
 
   // Drop imports
   s = s.replace(/^import\s+.+$/gm, '')
+
+  // Drop MDX JSON-LD / script blocks (comparison articles)
+  s = s.replace(/<script[\s\S]*?<\/script>/gi, '')
+  s = s.replace(/<script[^>]*\/>/gi, '')
+
+  // Drop any remaining self-closing or paired JSX components
+  s = s.replace(/<\/?(?:Tab|Tabs|Steps|Step|Callout)\b[^>]*\/?>/gi, '')
+
+  // Fumadocs code fences: ```lang title="Label"
+  s = s.replace(/```(\w+)\s+title="([^"]+)"\s*\n/g, '```$1 title="$2"\n')
 
   // Stats placeholders
   s = s.replace(/\{stats\.display\.version\}/g, stats.display.version)
@@ -129,114 +240,66 @@ function preprocessMdx(raw) {
   return s.trim()
 }
 
-function resolveLink(href) {
+const FOLDER_INDEX_SLUGS = new Set(['cli', 'playwright', 'ci-cd'])
+const SHORT_ALIASES = {
+  'cloud-api': 'guides/cloud-api',
+  guides: 'guides/ai-analysis',
+}
+
+function resolveRelativePath(href, articleId) {
+  const dirParts = articleId.includes('/') ? articleId.split('/').slice(0, -1) : []
+  let rel = href
+  const base = [...dirParts]
+  while (rel.startsWith('../')) {
+    rel = rel.slice(3)
+    if (base.length) base.pop()
+  }
+  if (rel.startsWith('./')) rel = rel.slice(2)
+  return [...base, rel].filter(Boolean).join('/')
+}
+
+function normalizeDocSlug(h) {
+  let slug = h.replace(/\/$/, '')
+  if (SHORT_ALIASES[slug]) slug = SHORT_ALIASES[slug]
+  if (FOLDER_INDEX_SLUGS.has(slug)) slug = `${slug}/index`
+  return slug
+}
+
+function resolveLink(href, articleId = '') {
   if (!href || href.startsWith('http') || href.startsWith('#') || href.startsWith('mailto:')) return href
+
   let h = href
-  if (h.startsWith('./')) h = h.slice(2)
-  if (h.startsWith('/docs/')) return h
+  if (h.startsWith('/docs/')) {
+    return `/docs/${normalizeDocSlug(h.slice('/docs/'.length))}`
+  }
   if (h.startsWith('/')) return h
-  // relative doc link → /docs/<path>
-  return `/docs/${h.replace(/\/$/, '')}`
+
+  if (h.startsWith('./') || h.startsWith('../')) {
+    h = resolveRelativePath(h, articleId)
+  }
+
+  return `/docs/${normalizeDocSlug(h)}`
 }
 
-let firstH2 = true
-
-const renderer = {
-  heading({ text, depth }) {
-    const t = text
-    if (depth === 1) {
-      firstH2 = true
-      return `<h1 style="${STYLES.h1}">${t}</h1>`
-    }
-    if (depth === 2) {
-      const style = firstH2 ? STYLES.h2first : STYLES.h2
-      firstH2 = false
-      return `<h2 style="${style}">${t}</h2>`
-    }
-    if (depth === 3) return `<h3 style="${STYLES.h3}">${t}</h3>`
-    if (depth === 4) return `<h4 style="${STYLES.h4}">${t}</h4>`
-    return `<h${depth}>${t}</h${depth}>`
-  },
-  paragraph({ text }) {
-    return `<p style="${STYLES.p}">${text}</p>`
-  },
-  strong({ text }) {
-    return `<strong style="${STYLES.strong}">${text}</strong>`
-  },
-  em({ text }) {
-    return `<em style="${STYLES.em}">${text}</em>`
-  },
-  codespan({ text }) {
-    return `<code style="${STYLES.ic}">${text}</code>`
-  },
-  link({ href, text }) {
-    const resolved = resolveLink(href)
-    return `<a href="${resolved}" style="${STYLES.a}">${text}</a>`
-  },
-  list(token) {
-    const tag = token.ordered ? 'ol' : 'ul'
-    const style = token.ordered ? STYLES.ol : STYLES.ul
-    const body = token.items.map((item) => `<li style="${STYLES.li}">${item.text}</li>`).join('')
-    return `<${tag} style="${style}">${body}</${tag}>`
-  },
-  hr() {
-    return `<hr style="${STYLES.hr}" />`
-  },
-  blockquote({ text }) {
-    return `<blockquote style="${STYLES.blockquote}">${text}</blockquote>`
-  },
-  code({ text, lang }) {
-    const label = lang || 'code'
-    const escaped = escapeHtml(text)
-    return codeBlock(label, escaped)
-  },
-  table(token) {
-    const header = token.header
-      .map(
-        (cell, i) =>
-          `<th style="font-family: ${MONO}; font-size: 12px; color: #e8862e; text-align: left; padding: 12px 16px; border-bottom: 1px solid #211e1b;${i === 0 ? ' width: 200px;' : ''}">${cell.text}</th>`,
-      )
-      .join('')
-    const rows = token.rows
-      .map(
-        (row) =>
-          `<tr>${row
-            .map(
-              (cell, i) =>
-                `<td style="font-size: 13.5px; color: #b8b0a6; line-height: 1.5; padding: 12px 16px; border-bottom: 1px solid #211e1b; vertical-align: top;${i === 0 ? ' font-family: ' + MONO + '; color: #d8d0c5;' : ''}">${cell.text}</td>`,
-            )
-            .join('')}</tr>`,
-      )
-      .join('')
-    return `<div style="border: 1px solid #2a2622; margin-bottom: 28px; overflow-x: auto;"><table style="width: 100%; border-collapse: collapse;"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table></div>`
-  },
-}
-
-marked.use({ renderer, gfm: true, breaks: false })
-
-function postprocessHtml(html) {
+function postprocessHtml(html, articleId) {
   let out = html
 
-  // Callout markers
   out = out.replace(
     /%%CALLOUT:([^:]+):([^%]+)%%([\s\S]*?)%%\/CALLOUT%%/g,
-    (_, type, label, body) => {
-      const inner = marked.parse(body.trim())
-      return callout(label, inner, type)
-    },
+    (_, type, label, body) => callout(label, parseMarkdown(body.trim(), articleId), type),
   )
 
-  // Tab markers
-  out = out.replace(/%%TAB:([^%]+)%%([\s\S]*?)%%\/TAB%%/g, (_, label, body) => {
-    const inner = marked.parse(body.trim())
-    return tabPanel(label, inner)
-  })
+  out = out.replace(/%%TAB:([^%]+)%%([\s\S]*?)%%\/TAB%%/g, (_, label, body) =>
+    tabPanel(label, parseMarkdown(body.trim(), articleId)),
+  )
 
-  // Step markers
-  out = out.replace(/%%STEP:(\d+)%%([\s\S]*?)%%\/STEP%%/g, (_, n, body) => {
-    const inner = marked.parse(body.trim())
-    return stepBlock(n, inner)
-  })
+  out = out.replace(/%%STEP:(\d+)%%([\s\S]*?)%%\/STEP%%/g, (_, n, body) =>
+    stepBlock(n, parseMarkdown(body.trim(), articleId)),
+  )
+
+  // Unwrap block elements erroneously wrapped in <p> by the parser
+  out = out.replace(/<p style="[^"]*">(\s*(?:%%|<div))/g, '$1')
+  out = out.replace(/(<\/div>)\s*<\/p>/g, '$1')
 
   // Wrap consecutive step blocks
   out = out.replace(
@@ -244,6 +307,31 @@ function postprocessHtml(html) {
     (match) =>
       `<div style="display: grid; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 30px;">${match}</div>`,
   )
+
+  return cleanupArtifacts(out, articleId)
+}
+
+function cleanupArtifacts(html, articleId) {
+  let out = html
+
+  // Convert any leftover fenced code blocks
+  out = out.replace(/```(\w*)(?:\s+title="([^"]+)")?\s*\n([\s\S]*?)```/g, (_, lang, title, body) =>
+    codeBlock(title || lang || 'code', escapeHtml(body.trimEnd())),
+  )
+
+  // Convert leftover markdown links [text](url)
+  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) => {
+    const resolved = resolveLink(href, articleId)
+    return `<a href="${resolved}" style="${STYLES.a}">${text}</a>`
+  })
+
+  // Convert leftover **bold** and `code`
+  out = out.replace(/\*\*([^*]+)\*\*/g, `<strong style="${STYLES.strong}">$1</strong>`)
+  out = out.replace(/`([^`]+)`/g, `<code style="${STYLES.ic}">$1</code>`)
+
+  // Strip any script tags that survived
+  out = out.replace(/<script[\s\S]*?<\/script>/gi, '')
+  out = out.replace(/<script[^>]*\/?>/gi, '')
 
   return out
 }
@@ -278,40 +366,15 @@ function loadMeta(metaPath) {
   return JSON.parse(fs.readFileSync(metaPath, 'utf8'))
 }
 
-function expandPages(pages, prefix = '') {
-  const ids = []
-  for (const page of pages) {
-    if (page.startsWith('---')) continue
-    const full = prefix ? `${prefix}/${page}` : page
-    const folderMeta = path.join(DOCS_ROOT, full, 'meta.json')
-    if (fs.existsSync(folderMeta)) {
-      const sub = loadMeta(folderMeta)
-      for (const subPage of sub.pages) {
-        if (subPage.startsWith('---')) continue
-        ids.push(`${full}/${subPage}`)
-      }
-    } else {
-      ids.push(full)
-    }
-  }
-  return ids
-}
-
-function expandFolder(folder, parentSection) {
-  const folderMetaPath = path.join(DOCS_ROOT, folder, 'meta.json')
-  if (!fs.existsSync(folderMetaPath)) return null
-  const sub = loadMeta(folderMetaPath)
+function expandGuidesFolder() {
+  const sub = loadMeta(path.join(DOCS_ROOT, 'guides/meta.json'))
   const groups = []
-  let subSection = sub.title || parentSection
+  let subSection = 'Features'
   let ids = []
 
   const flushSub = () => {
     if (!ids.length) return
-    const label =
-      sub.pages.some((p) => p.startsWith('---')) && subSection !== sub.title
-        ? `${sub.title || parentSection} — ${subSection}`
-        : sub.title || parentSection
-    groups.push({ label: label.toUpperCase(), ids: [...ids] })
+    groups.push({ label: `GUIDES — ${subSection.toUpperCase()}`, ids: [...ids] })
     ids = []
   }
 
@@ -321,71 +384,113 @@ function expandFolder(folder, parentSection) {
       subSection = subPage.replace(/^---|---$/g, '').trim()
       continue
     }
-    ids.push(`${folder}/${subPage}`)
+    ids.push(`guides/${subPage}`)
   }
   flushSub()
   return groups
+}
+
+function expandSimpleFolder(folder) {
+  const sub = loadMeta(path.join(DOCS_ROOT, folder, 'meta.json'))
+  const ids = []
+  for (const subPage of sub.pages) {
+    if (subPage.startsWith('---')) continue
+    ids.push(`${folder}/${subPage}`)
+  }
+  const title = sub.title || folder
+  return [{ label: title.toUpperCase(), ids }]
 }
 
 function buildNav() {
   const rootMeta = loadMeta(path.join(DOCS_ROOT, 'meta.json'))
   const navGroups = []
   let currentSection = 'Docs'
-  let currentIds = []
+  let sectionIds = []
 
-  const flush = () => {
-    if (currentIds.length) {
-      navGroups.push({ label: currentSection.toUpperCase(), ids: [...currentIds] })
-      currentIds = []
+  const flushFlat = () => {
+    if (sectionIds.length) {
+      navGroups.push({ label: currentSection.toUpperCase(), ids: [...sectionIds] })
+      sectionIds = []
     }
   }
 
   for (const page of rootMeta.pages) {
     if (page.startsWith('---')) {
-      flush()
+      flushFlat()
       currentSection = page.replace(/^---|---$/g, '').trim()
       continue
     }
+
     const folderMeta = path.join(DOCS_ROOT, page, 'meta.json')
     if (fs.existsSync(folderMeta)) {
-      flush()
-      const expanded = expandFolder(page, currentSection)
-      if (expanded) navGroups.push(...expanded)
+      if (currentSection === 'Reference') {
+        const sub = loadMeta(folderMeta)
+        for (const subPage of sub.pages) {
+          if (subPage.startsWith('---')) continue
+          sectionIds.push(`${page}/${subPage}`)
+        }
+      } else if (page === 'guides') {
+        navGroups.push(...expandGuidesFolder())
+      } else if (page === 'ci-cd') {
+        navGroups.push(...expandSimpleFolder('ci-cd'))
+      } else if (page === 'integrations') {
+        navGroups.push(...expandSimpleFolder('integrations'))
+      } else if (page === 'comparisons') {
+        navGroups.push(...expandSimpleFolder('comparisons'))
+      } else {
+        navGroups.push(...expandSimpleFolder(page))
+      }
     } else {
-      currentIds.push(page)
+      sectionIds.push(page)
     }
   }
-  flush()
+  flushFlat()
   return navGroups
-}
-
-function convertArticle(filePath) {
-  const raw = fs.readFileSync(filePath, 'utf8')
-  const { data, content } = matter(raw)
-  firstH2 = true
-  const preprocessed = preprocessMdx(content)
-  const html = postprocessHtml(marked.parse(preprocessed))
-  const toc = extractToc(html)
-  const id = slugFromFile(filePath)
-  return {
-    id,
-    label: data.title || id,
-    section: '', // filled later from nav
-    toc,
-    html,
-  }
 }
 
 function sectionForId(id, navGroups) {
   for (const g of navGroups) {
     if (g.ids.includes(id)) {
       const label = g.label
-      const dash = label.indexOf(' — ')
-      const base = dash === -1 ? label : label.slice(0, dash)
-      return base.charAt(0) + base.slice(1).toLowerCase()
+      if (label.startsWith('GUIDES — ')) return 'Guides'
+      if (label === 'CI/CD') return 'CI/CD'
+      if (label === 'CLI' || label === 'PLAYWRIGHT PLUGIN') return 'Reference'
+      const normalized =
+        label.charAt(0) + label.slice(1).toLowerCase().replace(' & sandboxing', ' & Sandboxing')
+      return normalized
     }
   }
   return 'Docs'
+}
+
+function convertArticle(filePath) {
+  const raw = fs.readFileSync(filePath, 'utf8')
+  const { data, content } = matter(raw)
+  const id = slugFromFile(filePath)
+  const preprocessed = preprocessMdx(content)
+  const html = postprocessHtml(parseMarkdown(preprocessed, id), id)
+  const toc = extractToc(html)
+  return {
+    id,
+    label: data.title || id,
+    section: '',
+    toc,
+    html,
+  }
+}
+
+function validateArticles(articles) {
+  const errors = []
+  for (const a of articles) {
+    if (a.html.includes('```')) errors.push(`${a.id}: contains triple-backtick`)
+    if (a.html.includes('<script')) errors.push(`${a.id}: contains <script`)
+    if (/\[[^\]]+\]\([^)]+\)/.test(a.html)) errors.push(`${a.id}: contains markdown link`)
+  }
+  if (errors.length) {
+    console.error('Validation failed:')
+    for (const e of errors) console.error('  -', e)
+    process.exit(1)
+  }
 }
 
 function tsString(s) {
@@ -403,7 +508,6 @@ function main() {
     articlesById.set(article.id, article)
   }
 
-  // Order articles by nav, append any orphans
   const articles = []
   for (const id of navIds) {
     const a = articlesById.get(id)
@@ -422,6 +526,8 @@ function main() {
     console.warn(`Expected 37 articles, got ${articles.length}`)
     console.warn('IDs:', articles.map((a) => a.id).join(', '))
   }
+
+  validateArticles(articles)
 
   const parts = [
     `// AUTO-GENERATED by scripts/generate-docs-content.mjs — do not edit by hand.`,
@@ -455,6 +561,7 @@ function main() {
 
   fs.writeFileSync(OUT_PATH, parts.join('\n'))
   console.log(`Wrote ${articles.length} articles to ${OUT_PATH}`)
+  console.log('Nav groups:', navGroups.map((g) => g.label).join(', '))
 }
 
 main()

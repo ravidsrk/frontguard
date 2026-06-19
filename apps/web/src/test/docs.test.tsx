@@ -8,6 +8,19 @@ import {
   navGroups,
 } from '../lib/docs-content'
 
+const EXPECTED_NAV_LABELS = [
+  'GETTING STARTED',
+  'REFERENCE',
+  'CI/CD',
+  'GUIDES — FEATURES',
+  'GUIDES — EXTENDING',
+  'GUIDES — MIGRATION',
+  'INTEGRATIONS',
+  'COMPARISONS',
+  'DEPLOYMENT & SANDBOXING',
+  'TRUST',
+]
+
 async function renderAt(path: string) {
   const router = getRouter()
   await act(async () => {
@@ -17,21 +30,56 @@ async function renderAt(path: string) {
   return { ...view, router }
 }
 
+async function renderArticle(slug: string) {
+  const router = getRouter()
+  await act(async () => {
+    await router.navigate({ to: '/docs/$', params: { _splat: slug } })
+  })
+  const view = render(<RouterProvider router={router} />)
+  const article = view.container.querySelector('article')
+  return { ...view, article, html: article?.innerHTML ?? '' }
+}
+
+function assertNoRawMarkdownArtifacts(html: string, slug: string) {
+  expect(html, `${slug}: triple-backtick`).not.toContain('```')
+  expect(html, `${slug}: <script`).not.toMatch(/<script/i)
+  expect(html, `${slug}: markdown link`).not.toMatch(/\[[^\]]+\]\([^)]+\)/)
+  expect(html, `${slug}: raw **bold**`).not.toMatch(/\*\*[^*]+\*\*/)
+}
+
 describe('docs content store', () => {
   it('has all 37 articles with unique ids', () => {
     expect(articles).toHaveLength(37)
     expect(new Set(DOC_SLUGS).size).toBe(37)
   })
 
-  it('exposes nav groups covering every article', () => {
+  it('exposes nav groups matching the real docs section tree', () => {
     const navIds = navGroups.flatMap((g) => g.ids)
     expect(navIds).toHaveLength(37)
+    expect(navGroups.map((g) => g.label)).toEqual(EXPECTED_NAV_LABELS)
+
+    const reference = navGroups.find((g) => g.label === 'REFERENCE')
+    expect(reference?.ids).toEqual([
+      'cli/index',
+      'cli/commands',
+      'cli/configuration',
+      'playwright/index',
+      'playwright/setup',
+      'playwright/api',
+    ])
+
+    const comparisons = navGroups.find((g) => g.label === 'COMPARISONS')
+    expect(comparisons?.ids).toHaveLength(3)
+
     for (const slug of DOC_SLUGS) {
       expect(navIds).toContain(slug)
     }
-    expect(navGroups.some((g) => g.label === 'GETTING STARTED')).toBe(true)
-    expect(navGroups.some((g) => g.label === 'CLI')).toBe(true)
-    expect(navGroups.some((g) => g.label === 'INTEGRATIONS')).toBe(true)
+  })
+
+  it('has no raw-markdown artifacts in any article body', () => {
+    for (const article of articles) {
+      assertNoRawMarkdownArtifacts(article.html, article.id)
+    }
   })
 
   it('has no broken internal doc links', () => {
@@ -59,6 +107,35 @@ describe('docs content store', () => {
   })
 })
 
+describe('docs article HTML quality', () => {
+  it('installation article has table, code blocks, and converted inline code', () => {
+    const article = articles.find((a) => a.id === 'installation')!
+    expect(article.html).toContain('<table')
+    expect(article.html).toContain('<pre')
+    expect(article.html).toContain('<code')
+    expect(article.html).toContain('<h2')
+    expect(article.html).not.toContain('`@frontguard/cli`')
+  })
+
+  it('cli/commands article has styled headings and code fences', () => {
+    const article = articles.find((a) => a.id === 'cli/commands')!
+    expect(article.html).toContain('<h2')
+    expect(article.html).toContain('<pre')
+    expect(article.html).toContain('<table')
+    expect(article.html).toContain('<strong')
+  })
+
+  it('comparison article has no script tag and renders FAQ content as HTML', () => {
+    const article = articles.find((a) => a.id === 'comparisons/frontguard-vs-argos')!
+    expect(article.html).not.toMatch(/<script/i)
+    expect(article.html).toContain('<h1')
+    expect(article.html).toContain('<h2')
+    expect(article.html).toContain('<table')
+    expect(article.html).toContain('<strong')
+    expect(article.html).toContain('Argos')
+  })
+})
+
 describe('docs routes', () => {
   it('redirects /docs to the first article', async () => {
     const router = getRouter()
@@ -68,20 +145,31 @@ describe('docs routes', () => {
     expect(router.state.location.pathname).toBe(`/docs/${FIRST_DOC_SLUG}`)
   })
 
-  it('renders every article slug', async () => {
+  it('renders every article slug with real HTML elements', async () => {
     for (const slug of DOC_SLUGS) {
-      const router = getRouter()
-      await act(async () => {
-        await router.navigate({ to: '/docs/$', params: { _splat: slug } })
-      })
-      const article = articles.find((a) => a.id === slug)!
-      const { container } = render(<RouterProvider router={router} />)
-      const el = container.querySelector('article')
-      expect(el).toBeTruthy()
-      expect(el?.innerHTML.length).toBeGreaterThan(50)
-      expect(article.html.length).toBeGreaterThan(50)
+      const { html } = await renderArticle(slug)
+      expect(html.length).toBeGreaterThan(50)
+      expect(html).toContain('<h1')
+      assertNoRawMarkdownArtifacts(html, slug)
       cleanup()
     }
+  })
+
+  it('renders representative articles with expected DOM structure', async () => {
+    const { html: installHtml } = await renderArticle('installation')
+    expect(installHtml).toContain('<table')
+    expect(installHtml).toContain('<pre')
+    cleanup()
+
+    const { html: compareHtml } = await renderArticle('comparisons/frontguard-vs-argos')
+    expect(compareHtml).toContain('<h2')
+    expect(compareHtml).not.toMatch(/<script/i)
+    cleanup()
+
+    const { html: cliHtml } = await renderArticle('cli/commands')
+    expect(cliHtml).toContain('<code')
+    expect(cliHtml).toContain('<table')
+    cleanup()
   })
 
   it('shows 404 fallback for unknown slug', async () => {
@@ -107,10 +195,11 @@ describe('docs routes', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders sidebar nav groups', async () => {
+  it('renders sidebar nav groups from the corrected structure', async () => {
     await renderAt(`/docs/${FIRST_DOC_SLUG}`)
-    expect(screen.getByText('GETTING STARTED')).toBeInTheDocument()
-    expect(screen.getByText('CLI')).toBeInTheDocument()
+    for (const label of ['GETTING STARTED', 'REFERENCE', 'CI/CD', 'COMPARISONS', 'TRUST']) {
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
     expect(screen.getByText('ON THIS PAGE')).toBeInTheDocument()
   })
 })
