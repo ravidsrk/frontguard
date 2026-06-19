@@ -27,7 +27,7 @@
     "dev": "wrangler dev",
     "dev:node": "tsx watch src/index.ts",
     "build": "tsup src/index.ts --format esm --dts",
-    "deploy": "wrangler deploy",
+    "deploy": "tsx scripts/check-wrangler-placeholders.ts && wrangler deploy",
     "db:migrate": "wrangler d1 execute frontguard --file=src/db/schema.sql",
     "db:migrate:local": "wrangler d1 execute frontguard --local --file=src/db/schema.sql",
     "test": "vitest run",
