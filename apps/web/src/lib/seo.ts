@@ -50,6 +50,8 @@ export function buildSeoHead(input: SeoHeadInput) {
     { property: 'og:type', content: ogType },
     { property: 'og:site_name', content: 'Frontguard' },
     { property: 'og:image', content: OG_IMAGE },
+    { property: 'og:image:width', content: '1200' },
+    { property: 'og:image:height', content: '630' },
     ...(description ? [{ property: 'og:description', content: description }] : []),
     { name: 'twitter:card', content: 'summary_large_image' },
     { name: 'twitter:site', content: TWITTER_SITE },
