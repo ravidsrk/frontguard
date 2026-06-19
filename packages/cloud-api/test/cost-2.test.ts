@@ -184,4 +184,50 @@ describe('POST /v1/billing/webhook — subscription lifecycle (COST-2)', () => {
     const team = await getMemoryStore().getTeam(teamId);
     expect(team?.plan).toBe('free');
   });
+
+  it('falls back to stripeSubscriptionId when metadata team_id is stale', async () => {
+    const { teamId, subscriptionId } = await seedProTeam();
+
+    const res = await postWebhook({
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: subscriptionId,
+          customer: 'cus_cost2',
+          metadata: { team_id: 'team_deleted_or_stale', plan: 'business' },
+        },
+      },
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.handled).toBe(true);
+    expect(json.teamId).toBe(teamId);
+    expect(json.plan).toBe('business');
+
+    const team = await getMemoryStore().getTeam(teamId);
+    expect(team?.plan).toBe('business');
+  });
+
+  it('falls back to stripeSubscriptionId on deleted when metadata team_id is invalid', async () => {
+    const { teamId, subscriptionId } = await seedProTeam();
+
+    const res = await postWebhook({
+      type: 'customer.subscription.deleted',
+      data: {
+        object: {
+          id: subscriptionId,
+          customer: 'cus_cost2',
+          metadata: { team_id: 'team_does_not_exist' },
+        },
+      },
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.handled).toBe(true);
+    expect(json.teamId).toBe(teamId);
+    expect(json.plan).toBe('free');
+
+    const team = await getMemoryStore().getTeam(teamId);
+    expect(team?.plan).toBe('free');
+  });
 });
