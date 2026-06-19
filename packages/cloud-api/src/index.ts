@@ -280,32 +280,45 @@ app.post('/v1/run', async (c) => {
     projectTeamId = project.teamId;
   }
 
-  // Plan enforcement (Task 8.2): block runs that exceed the monthly limit.
-  // Plan is resolved from the optional team scope, else the user's default.
-  // A team's plan may only be claimed by an actual member of that team —
-  // otherwise any user could pass ?teamId=<business-team> to bypass limits.
-  const teamId = c.req.query('teamId');
+  // Plan enforcement (Task 8.2, DM-3): resolve plan from team scope when present.
+  // Paid team plans meter against a shared team_usage pool; personal/free runs
+  // stay on the per-user counter. A team's plan may only be claimed by a member.
+  const queryTeamId = c.req.query('teamId');
+  const billingTeamId = queryTeamId ?? projectTeamId;
   let planId = 'free';
-  if (teamId) {
-    const member = await store.getMember(teamId, userId);
+  if (billingTeamId) {
+    const member = await store.getMember(billingTeamId, userId);
     if (!member) return c.json({ error: 'Not a member of the requested team' }, 403);
-    const team = await store.getTeam(teamId);
+    const team = await store.getTeam(billingTeamId);
     if (team) planId = team.plan;
   } else {
     const user = await store.getUser(userId);
     if (user) planId = user.plan;
   }
   const plan = getPlan(planId);
+  if (plan.id !== 'free' && !billingTeamId) {
+    return c.json(
+      {
+        error: 'Paid plan runs require a team scope (?teamId= or projectId on a team project).',
+      },
+      400,
+    );
+  }
   const month = currentMonth();
+  const meterTeam = billingTeamId != null && plan.id !== 'free';
 
-  // Atomic monthly reservations (CONC-1, COST-1): reserve the run and planned
-  // screenshot count up front so concurrent submissions cannot overshoot limits
-  // and giant fan-out cannot spend compute before metering.
+  // Atomic monthly reservations (CONC-1, COST-1, DM-3): reserve the run and
+  // planned screenshot count up front so concurrent submissions cannot overshoot
+  // limits and giant fan-out cannot spend compute before metering.
   const runLimit = plan.limits.runsPerMonth;
   if (runLimit !== null) {
-    const reserved = await store.tryReserveRun(userId, month, runLimit);
+    const reserved = meterTeam
+      ? await store.tryReserveTeamRun(billingTeamId!, month, runLimit)
+      : await store.tryReserveRun(userId, month, runLimit);
     if (!reserved) {
-      const usage = await store.getUsage(userId, month);
+      const usage = meterTeam
+        ? await store.getTeamUsage(billingTeamId!, month)
+        : await store.getUsage(userId, month);
       return c.json(
         {
           error: `Monthly run limit reached (${runLimit} on the ${plan.name} plan).`,
@@ -316,21 +329,26 @@ app.post('/v1/run', async (c) => {
         402,
       );
     }
+  } else if (meterTeam) {
+    await store.incrementTeamUsage(billingTeamId!, month, 1, 0);
   } else {
     await store.incrementUsage(userId, month, 1, 0);
   }
 
   const screenshotLimit = plan.limits.screenshotsPerMonth;
   if (screenshotLimit !== null) {
-    const reserved = await store.tryReserveScreenshots(
-      userId,
-      month,
-      screenshotLimit,
-      plannedScreenshots,
-    );
+    const reserved = meterTeam
+      ? await store.tryReserveTeamScreenshots(billingTeamId!, month, screenshotLimit, plannedScreenshots)
+      : await store.tryReserveScreenshots(userId, month, screenshotLimit, plannedScreenshots);
     if (!reserved) {
-      await store.incrementUsage(userId, month, -1, 0);
-      const usage = await store.getUsage(userId, month);
+      if (meterTeam) {
+        await store.incrementTeamUsage(billingTeamId!, month, -1, 0);
+      } else {
+        await store.incrementUsage(userId, month, -1, 0);
+      }
+      const usage = meterTeam
+        ? await store.getTeamUsage(billingTeamId!, month)
+        : await store.getUsage(userId, month);
       return c.json(
         {
           error: `Monthly screenshot limit reached (${screenshotLimit} on the ${plan.name} plan).`,
@@ -343,7 +361,11 @@ app.post('/v1/run', async (c) => {
       );
     }
   } else if (plannedScreenshots > 0) {
-    await store.incrementUsage(userId, month, 0, plannedScreenshots);
+    if (meterTeam) {
+      await store.incrementTeamUsage(billingTeamId!, month, 0, plannedScreenshots);
+    } else {
+      await store.incrementUsage(userId, month, 0, plannedScreenshots);
+    }
   }
 
   const runId = crypto.randomUUID();
