@@ -192,6 +192,8 @@ export class InMemoryStore implements Store {
   private usageLocks = new Map<string, Promise<void>>();
   /** Serializes team usage mutations per (teamId, month) (DM-3). */
   private teamUsageLocks = new Map<string, Promise<void>>();
+  /** Serializes monitor lease claims per monitor id (CONC-3). */
+  private monitorClaimLocks = new Map<string, Promise<void>>();
 
   private users = new Map<string, User>();
   private apiKeys = new Map<string, ApiKeyRecord>();
@@ -325,6 +327,21 @@ export class InMemoryStore implements Store {
       release = resolve;
     });
     this.usageLocks.set(key, prev.then(() => gate));
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
+  private async withMonitorClaimLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.monitorClaimLocks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.monitorClaimLocks.set(key, prev.then(() => gate));
     await prev;
     try {
       return await fn();
@@ -501,6 +518,7 @@ export class InMemoryStore implements Store {
       await Promise.resolve();
       if ((this.monitorVersions.get(id) ?? 0) !== expected) continue;
       Object.assign(m, patch);
+      if ('leasedUntil' in patch && patch.leasedUntil === undefined) delete m.leasedUntil;
       this.monitorVersions.set(id, expected + 1);
       return;
     }
@@ -513,6 +531,16 @@ export class InMemoryStore implements Store {
   }
   async listDueMonitors(now: Date): Promise<Monitor[]> {
     return [...this.monitors.values()].filter((m) => isMonitorDue(m, now));
+  }
+  async tryClaimDueMonitor(id: string, now: Date, leaseTtlMs: number): Promise<Monitor | null> {
+    return this.withMonitorClaimLock(id, async () => {
+      const m = this.monitors.get(id);
+      if (!m || !isMonitorDue(m, now)) return null;
+      if (m.leasedUntil && new Date(m.leasedUntil).getTime() > now.getTime()) return null;
+      const leasedUntil = new Date(now.getTime() + leaseTtlMs).toISOString();
+      m.leasedUntil = leasedUntil;
+      return { ...m };
+    });
   }
   async addMonitorRun(run: MonitorRun): Promise<void> {
     this.monitorRuns.push({ ...run });
