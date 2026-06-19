@@ -14,6 +14,11 @@ import { D1Store, type D1Database } from './d1-store.js';
 
 /** Worker bindings the API expects (all optional for local dev/tests). */
 export interface Bindings {
+  /**
+   * Deployment environment. Production mode is explicit — `ENVIRONMENT=production`
+   * in wrangler vars (SEC-6). Do not infer production from the presence of `DB`.
+   */
+  ENVIRONMENT?: string;
   /** Cloudflare D1 database binding. */
   DB?: D1Database;
   /** Cloudflare R2 bucket for screenshots. */
@@ -68,7 +73,15 @@ export function getStore(env: Bindings | undefined): Store {
   return getMemoryStore();
 }
 
-/** Returns true when running against a real D1 binding (production mode). */
+/** Returns true when the deployment is explicitly marked production (SEC-6). */
 export function isProduction(env: Bindings | undefined): boolean {
-  return !!env?.DB;
+  return env?.ENVIRONMENT === 'production';
+}
+
+/**
+ * True when production is declared but a required binding is missing.
+ * Callers fail closed (503) rather than falling back to dev auth.
+ */
+export function isProductionMisconfigured(env: Bindings | undefined): boolean {
+  return isProduction(env) && !env?.DB;
 }

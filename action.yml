@@ -12,13 +12,13 @@
 # the steps here is the only form that works for an external consumer pinning
 # `ravidsrk/frontguard@v0`.
 #
-# Keep this file in sync with `packages/cli/action.yml`. The
-# `.github/workflows/action-smoke.yml` workflow exercises both on every PR so
-# behavioural drift surfaces immediately.
+# GENERATED BODY — do not edit the steps below. Edit `packages/cli/action.template.yml`
+# and run `node packages/cli/scripts/sync-root-action.mjs`.
 #
-# Sub-path consumers (`uses: ravidsrk/frontguard/packages/cli@v0.2.0`) continue
+# Sub-path consumers (`uses: ravidsrk/frontguard/packages/cli@0.2.0`) continue
 # to resolve against `packages/cli/action.yml` — that file is intentionally
 # preserved.
+
 name: 'Frontguard Visual Regression'
 description: 'AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.'
 author: 'ravidsrk'
@@ -81,43 +81,70 @@ runs:
 
     - name: Install Frontguard
       shell: bash
-      run: npm install -g @frontguard/cli@latest
+      env:
+        FRONTGUARD_CLI_VERSION: '0.2.0'
+      run: npm install -g "@frontguard/cli@${FRONTGUARD_CLI_VERSION}"
 
     - name: Install Playwright browsers
       shell: bash
-      run: npx playwright install --with-deps ${{ inputs.browsers }}
+      env:
+        IN_BROWSERS: ${{ inputs.browsers }}
+      run: |
+        set -euo pipefail
+        if ! echo "$IN_BROWSERS" | grep -Eq '^(chromium|firefox|webkit)(,(chromium|firefox|webkit))*$'; then
+          echo "Invalid browsers input: $IN_BROWSERS" >&2
+          exit 1
+        fi
+        IFS=',' read -ra BROWSER_ARR <<< "$IN_BROWSERS"
+        npx playwright install --with-deps "${BROWSER_ARR[@]}"
 
     - name: Detect Preview URL
       id: preview-url
       shell: bash
+      env:
+        IN_URL: ${{ inputs.url }}
       run: |
-        # Auto-detect preview URL from CI environment
-        if [ -n "${{ inputs.url }}" ]; then
-          echo "url=${{ inputs.url }}" >> $GITHUB_OUTPUT
-          echo "Preview URL: ${{ inputs.url }} (from input)"
+        set -euo pipefail
+
+        write_github_output() {
+          local key="$1"
+          local value="$2"
+          local delim="ghadelim_$(openssl rand -hex 8)"
+          {
+            printf '%s<<%s\n' "$key" "$delim"
+            printf '%s\n' "$value"
+            printf '%s\n' "$delim"
+          } >> "$GITHUB_OUTPUT"
+        }
+
+        if [ -n "$IN_URL" ]; then
+          write_github_output url "$IN_URL"
+          echo "Preview URL: $IN_URL (from input)"
         elif [ -n "$VERCEL_URL" ]; then
-          echo "url=https://$VERCEL_URL" >> $GITHUB_OUTPUT
-          echo "Preview URL: https://$VERCEL_URL (Vercel)"
+          PREVIEW_URL="https://$VERCEL_URL"
+          write_github_output url "$PREVIEW_URL"
+          echo "Preview URL: $PREVIEW_URL (Vercel)"
         elif [ -n "$VERCEL_PREVIEW_URL" ]; then
-          echo "url=$VERCEL_PREVIEW_URL" >> $GITHUB_OUTPUT
+          write_github_output url "$VERCEL_PREVIEW_URL"
           echo "Preview URL: $VERCEL_PREVIEW_URL (Vercel)"
         elif [ -n "$DEPLOY_PRIME_URL" ]; then
-          echo "url=$DEPLOY_PRIME_URL" >> $GITHUB_OUTPUT
+          write_github_output url "$DEPLOY_PRIME_URL"
           echo "Preview URL: $DEPLOY_PRIME_URL (Netlify)"
         elif [ -n "$DEPLOY_URL" ]; then
-          echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          write_github_output url "$DEPLOY_URL"
           echo "Preview URL: $DEPLOY_URL (Netlify)"
         elif [ -n "$CF_PAGES_URL" ]; then
-          echo "url=$CF_PAGES_URL" >> $GITHUB_OUTPUT
+          write_github_output url "$CF_PAGES_URL"
           echo "Preview URL: $CF_PAGES_URL (Cloudflare Pages)"
         elif [ -n "$RAILWAY_STATIC_URL" ]; then
-          echo "url=https://$RAILWAY_STATIC_URL" >> $GITHUB_OUTPUT
-          echo "Preview URL: https://$RAILWAY_STATIC_URL (Railway)"
+          PREVIEW_URL="https://$RAILWAY_STATIC_URL"
+          write_github_output url "$PREVIEW_URL"
+          echo "Preview URL: $PREVIEW_URL (Railway)"
         elif [ -n "$RENDER_EXTERNAL_URL" ]; then
-          echo "url=$RENDER_EXTERNAL_URL" >> $GITHUB_OUTPUT
+          write_github_output url "$RENDER_EXTERNAL_URL"
           echo "Preview URL: $RENDER_EXTERNAL_URL (Render)"
         else
-          echo "url=" >> $GITHUB_OUTPUT
+          write_github_output url ""
           echo "⚠️ No preview URL detected. Set the 'url' input or ensure your deployment sets environment variables."
         fi
 
@@ -128,44 +155,91 @@ runs:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         FRONTGUARD_OPENAI_KEY: ${{ env.FRONTGUARD_OPENAI_KEY }}
         FRONTGUARD_ANTHROPIC_KEY: ${{ env.FRONTGUARD_ANTHROPIC_KEY }}
+        IN_URL: ${{ steps.preview-url.outputs.url }}
+        IN_ROUTES: ${{ inputs.routes }}
+        IN_VIEWPORTS: ${{ inputs.viewports }}
+        IN_BROWSERS: ${{ inputs.browsers }}
+        IN_THRESHOLD: ${{ inputs.threshold }}
+        IN_CONFIG: ${{ inputs.config }}
+        IN_UPDATE_BASELINES: ${{ inputs.update-baselines }}
       run: |
-        ARGS=""
+        set -euo pipefail
 
-        if [ -n "${{ steps.preview-url.outputs.url }}" ]; then
-          ARGS="$ARGS --url ${{ steps.preview-url.outputs.url }}"
+        write_github_output() {
+          local key="$1"
+          local value="$2"
+          local delim="ghadelim_$(openssl rand -hex 8)"
+          {
+            printf '%s<<%s\n' "$key" "$delim"
+            printf '%s\n' "$value"
+            printf '%s\n' "$delim"
+          } >> "$GITHUB_OUTPUT"
+        }
+
+        if ! echo "$IN_VIEWPORTS" | grep -Eq '^[0-9]+(,[0-9]+)*$'; then
+          echo "Invalid viewports input: $IN_VIEWPORTS" >&2
+          exit 1
+        fi
+        if ! echo "$IN_BROWSERS" | grep -Eq '^(chromium|firefox|webkit)(,(chromium|firefox|webkit))*$'; then
+          echo "Invalid browsers input: $IN_BROWSERS" >&2
+          exit 1
+        fi
+        if ! echo "$IN_THRESHOLD" | grep -Eq '^[0-9]+(\.[0-9]+)?$'; then
+          echo "Invalid threshold input: $IN_THRESHOLD" >&2
+          exit 1
         fi
 
-        if [ -n "${{ inputs.routes }}" ]; then
-          ARGS="$ARGS --routes ${{ inputs.routes }}"
+        CMD=(frontguard run)
+        if [ -n "$IN_URL" ]; then CMD+=(--url "$IN_URL"); fi
+        if [ -n "$IN_ROUTES" ]; then CMD+=(--routes "$IN_ROUTES"); fi
+        CMD+=(--viewports "$IN_VIEWPORTS")
+        CMD+=(--browsers "$IN_BROWSERS")
+        CMD+=(--threshold "$IN_THRESHOLD")
+        if [ -n "$IN_CONFIG" ]; then CMD+=(--config "$IN_CONFIG"); fi
+        if [ "$IN_UPDATE_BASELINES" = "true" ]; then CMD+=(--update-baselines); fi
+        CMD+=(--output json)
+
+        set +e
+        "${CMD[@]}" > /tmp/frontguard-result.json 2>/tmp/frontguard-stderr.log
+        RUN_EXIT=$?
+        set -e
+
+        if [ -s /tmp/frontguard-stderr.log ]; then
+          cat /tmp/frontguard-stderr.log >&2
         fi
 
-        ARGS="$ARGS --viewports ${{ inputs.viewports }}"
-        ARGS="$ARGS --browsers ${{ inputs.browsers }}"
-        ARGS="$ARGS --threshold ${{ inputs.threshold }}"
-
-        if [ -n "${{ inputs.config }}" ]; then
-          ARGS="$ARGS --config ${{ inputs.config }}"
+        RUN_FAILED=0
+        REGRESSIONS=""
+        if [ "$RUN_EXIT" -ne 0 ]; then
+          RUN_FAILED=1
         fi
 
-        if [ "${{ inputs.update-baselines }}" = "true" ]; then
-          ARGS="$ARGS --update-baselines"
+        if [ ! -s /tmp/frontguard-result.json ]; then
+          RUN_FAILED=1
+          printf '{}' > /tmp/frontguard-result.json
+        elif ! jq -e '(.summary.regressions | type) == "number"' /tmp/frontguard-result.json >/dev/null 2>&1; then
+          RUN_FAILED=1
+        else
+          REGRESSIONS=$(jq -r '.summary.regressions' /tmp/frontguard-result.json)
         fi
 
-        # Run and capture output
-        frontguard run $ARGS --output json > /tmp/frontguard-result.json 2>&1 || true
+        write_github_output result "$(cat /tmp/frontguard-result.json)"
 
-        # Parse results
-        REGRESSIONS=$(cat /tmp/frontguard-result.json | jq -r '.summary.regressions // 0')
+        if [ "$RUN_FAILED" -eq 1 ]; then
+          write_github_output status "error"
+          write_github_output regressions ""
+          echo "Frontguard run failed (exit=$RUN_EXIT) or produced non-parseable JSON" >&2
+          exit 1
+        fi
 
-        echo "result=$(cat /tmp/frontguard-result.json)" >> $GITHUB_OUTPUT
-        echo "regressions=$REGRESSIONS" >> $GITHUB_OUTPUT
+        write_github_output regressions "$REGRESSIONS"
 
         if [ "$REGRESSIONS" -gt 0 ]; then
-          echo "status=fail" >> $GITHUB_OUTPUT
+          write_github_output status "fail"
           exit 1
-        else
-          echo "status=pass" >> $GITHUB_OUTPUT
         fi
+
+        write_github_output status "pass"
 
     - name: Upload Report
       if: always()

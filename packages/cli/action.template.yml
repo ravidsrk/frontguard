@@ -1,0 +1,229 @@
+name: 'Frontguard Visual Regression'
+description: 'AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.'
+author: 'ravidsrk'
+branding:
+  icon: 'eye'
+  color: 'blue'
+
+inputs:
+  url:
+    description: 'Base URL to test. Auto-detects Vercel/Netlify preview URLs if not set.'
+    required: false
+  routes:
+    description: 'Comma-separated routes to test (optional — auto-discovers if not set)'
+    required: false
+  viewports:
+    description: 'Comma-separated viewport widths (default: 375,768,1440)'
+    required: false
+    default: '375,768,1440'
+  browsers:
+    description: 'Comma-separated browsers: chromium,firefox,webkit (default: chromium)'
+    required: false
+    default: 'chromium'
+  threshold:
+    description: 'Pixel diff threshold percentage (default: 0.1)'
+    required: false
+    default: '0.1'
+  config:
+    description: 'Path to frontguard.config.ts'
+    required: false
+  ai-provider:
+    description: 'AI provider: openai or anthropic'
+    required: false
+  ai-model:
+    description: 'AI model name (e.g., gpt-4o, claude-3-5-sonnet-20241022)'
+    required: false
+  update-baselines:
+    description: 'Accept current screenshots as new baselines'
+    required: false
+    default: 'false'
+  github-token:
+    description: 'GitHub token for PR comments (defaults to github.token)'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  result:
+    description: 'JSON result of the visual regression test run'
+  regressions:
+    description: 'Number of regressions found'
+  status:
+    description: 'pass, fail, or error'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Frontguard
+      shell: bash
+      env:
+        FRONTGUARD_CLI_VERSION: '@@FRONTGUARD_VERSION@@'
+      run: npm install -g "@frontguard/cli@${FRONTGUARD_CLI_VERSION}"
+
+    - name: Install Playwright browsers
+      shell: bash
+      env:
+        IN_BROWSERS: ${{ inputs.browsers }}
+      run: |
+        set -euo pipefail
+        if ! echo "$IN_BROWSERS" | grep -Eq '^(chromium|firefox|webkit)(,(chromium|firefox|webkit))*$'; then
+          echo "Invalid browsers input: $IN_BROWSERS" >&2
+          exit 1
+        fi
+        IFS=',' read -ra BROWSER_ARR <<< "$IN_BROWSERS"
+        npx playwright install --with-deps "${BROWSER_ARR[@]}"
+
+    - name: Detect Preview URL
+      id: preview-url
+      shell: bash
+      env:
+        IN_URL: ${{ inputs.url }}
+      run: |
+        set -euo pipefail
+
+        write_github_output() {
+          local key="$1"
+          local value="$2"
+          local delim="ghadelim_$(openssl rand -hex 8)"
+          {
+            printf '%s<<%s\n' "$key" "$delim"
+            printf '%s\n' "$value"
+            printf '%s\n' "$delim"
+          } >> "$GITHUB_OUTPUT"
+        }
+
+        if [ -n "$IN_URL" ]; then
+          write_github_output url "$IN_URL"
+          echo "Preview URL: $IN_URL (from input)"
+        elif [ -n "$VERCEL_URL" ]; then
+          PREVIEW_URL="https://$VERCEL_URL"
+          write_github_output url "$PREVIEW_URL"
+          echo "Preview URL: $PREVIEW_URL (Vercel)"
+        elif [ -n "$VERCEL_PREVIEW_URL" ]; then
+          write_github_output url "$VERCEL_PREVIEW_URL"
+          echo "Preview URL: $VERCEL_PREVIEW_URL (Vercel)"
+        elif [ -n "$DEPLOY_PRIME_URL" ]; then
+          write_github_output url "$DEPLOY_PRIME_URL"
+          echo "Preview URL: $DEPLOY_PRIME_URL (Netlify)"
+        elif [ -n "$DEPLOY_URL" ]; then
+          write_github_output url "$DEPLOY_URL"
+          echo "Preview URL: $DEPLOY_URL (Netlify)"
+        elif [ -n "$CF_PAGES_URL" ]; then
+          write_github_output url "$CF_PAGES_URL"
+          echo "Preview URL: $CF_PAGES_URL (Cloudflare Pages)"
+        elif [ -n "$RAILWAY_STATIC_URL" ]; then
+          PREVIEW_URL="https://$RAILWAY_STATIC_URL"
+          write_github_output url "$PREVIEW_URL"
+          echo "Preview URL: $PREVIEW_URL (Railway)"
+        elif [ -n "$RENDER_EXTERNAL_URL" ]; then
+          write_github_output url "$RENDER_EXTERNAL_URL"
+          echo "Preview URL: $RENDER_EXTERNAL_URL (Render)"
+        else
+          write_github_output url ""
+          echo "⚠️ No preview URL detected. Set the 'url' input or ensure your deployment sets environment variables."
+        fi
+
+    - name: Run Frontguard
+      id: frontguard
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        FRONTGUARD_OPENAI_KEY: ${{ env.FRONTGUARD_OPENAI_KEY }}
+        FRONTGUARD_ANTHROPIC_KEY: ${{ env.FRONTGUARD_ANTHROPIC_KEY }}
+        IN_URL: ${{ steps.preview-url.outputs.url }}
+        IN_ROUTES: ${{ inputs.routes }}
+        IN_VIEWPORTS: ${{ inputs.viewports }}
+        IN_BROWSERS: ${{ inputs.browsers }}
+        IN_THRESHOLD: ${{ inputs.threshold }}
+        IN_CONFIG: ${{ inputs.config }}
+        IN_UPDATE_BASELINES: ${{ inputs.update-baselines }}
+      run: |
+        set -euo pipefail
+
+        write_github_output() {
+          local key="$1"
+          local value="$2"
+          local delim="ghadelim_$(openssl rand -hex 8)"
+          {
+            printf '%s<<%s\n' "$key" "$delim"
+            printf '%s\n' "$value"
+            printf '%s\n' "$delim"
+          } >> "$GITHUB_OUTPUT"
+        }
+
+        if ! echo "$IN_VIEWPORTS" | grep -Eq '^[0-9]+(,[0-9]+)*$'; then
+          echo "Invalid viewports input: $IN_VIEWPORTS" >&2
+          exit 1
+        fi
+        if ! echo "$IN_BROWSERS" | grep -Eq '^(chromium|firefox|webkit)(,(chromium|firefox|webkit))*$'; then
+          echo "Invalid browsers input: $IN_BROWSERS" >&2
+          exit 1
+        fi
+        if ! echo "$IN_THRESHOLD" | grep -Eq '^[0-9]+(\.[0-9]+)?$'; then
+          echo "Invalid threshold input: $IN_THRESHOLD" >&2
+          exit 1
+        fi
+
+        CMD=(frontguard run)
+        if [ -n "$IN_URL" ]; then CMD+=(--url "$IN_URL"); fi
+        if [ -n "$IN_ROUTES" ]; then CMD+=(--routes "$IN_ROUTES"); fi
+        CMD+=(--viewports "$IN_VIEWPORTS")
+        CMD+=(--browsers "$IN_BROWSERS")
+        CMD+=(--threshold "$IN_THRESHOLD")
+        if [ -n "$IN_CONFIG" ]; then CMD+=(--config "$IN_CONFIG"); fi
+        if [ "$IN_UPDATE_BASELINES" = "true" ]; then CMD+=(--update-baselines); fi
+        CMD+=(--output json)
+
+        set +e
+        "${CMD[@]}" > /tmp/frontguard-result.json 2>/tmp/frontguard-stderr.log
+        RUN_EXIT=$?
+        set -e
+
+        if [ -s /tmp/frontguard-stderr.log ]; then
+          cat /tmp/frontguard-stderr.log >&2
+        fi
+
+        RUN_FAILED=0
+        REGRESSIONS=""
+        if [ "$RUN_EXIT" -ne 0 ]; then
+          RUN_FAILED=1
+        fi
+
+        if [ ! -s /tmp/frontguard-result.json ]; then
+          RUN_FAILED=1
+          printf '{}' > /tmp/frontguard-result.json
+        elif ! jq -e '(.summary.regressions | type) == "number"' /tmp/frontguard-result.json >/dev/null 2>&1; then
+          RUN_FAILED=1
+        else
+          REGRESSIONS=$(jq -r '.summary.regressions' /tmp/frontguard-result.json)
+        fi
+
+        write_github_output result "$(cat /tmp/frontguard-result.json)"
+
+        if [ "$RUN_FAILED" -eq 1 ]; then
+          write_github_output status "error"
+          write_github_output regressions ""
+          echo "Frontguard run failed (exit=$RUN_EXIT) or produced non-parseable JSON" >&2
+          exit 1
+        fi
+
+        write_github_output regressions "$REGRESSIONS"
+
+        if [ "$REGRESSIONS" -gt 0 ]; then
+          write_github_output status "fail"
+          exit 1
+        fi
+
+        write_github_output status "pass"
+
+    - name: Upload Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontguard-report
+        path: frontguard-report/
+        if-no-files-found: ignore

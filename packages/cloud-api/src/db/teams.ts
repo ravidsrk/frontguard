@@ -46,6 +46,8 @@ export interface TeamInvitation {
   role: TeamRole;
   token: string;
   createdAt: string;
+  /** ISO timestamp after which the token is no longer valid (SEC-4). */
+  expiresAt?: string;
   acceptedAt?: string;
 }
 
@@ -122,6 +124,8 @@ export function roleAtLeast(a: TeamRole, b: TeamRole): boolean {
 export interface TeamStore {
   createTeam(team: Team, ownerUserId: string): Promise<void>;
   getTeam(id: string): Promise<Team | null>;
+  /** Resolves a team by its Stripe subscription id (fallback when webhook metadata is absent). */
+  getTeamByStripeSubscriptionId(subscriptionId: string): Promise<Team | null>;
   updateTeam(id: string, patch: Partial<Team>): Promise<void>;
   deleteTeam(id: string): Promise<boolean>;
   listTeamsForUser(userId: string): Promise<Array<Team & { role: TeamRole }>>;
@@ -144,7 +148,7 @@ export interface TeamStore {
   deleteProject(id: string, teamId: string): Promise<boolean>;
 
   // Project-scoped runs & baselines
-  listProjectRuns(projectId: string, limit?: number): Promise<Run[]>;
+  listProjectRuns(projectId: string, limit?: number, offset?: number): Promise<Run[]>;
   getProjectBaseline(projectId: string): Promise<Run | null>;
 
   // Baseline approvals / review workflow

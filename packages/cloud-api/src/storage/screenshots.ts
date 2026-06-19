@@ -58,6 +58,34 @@ export function screenshotKey(
   return `${runPrefix(userId, runId)}${slug}-${viewport}-${browser}-${type}.png`;
 }
 
+const KNOWN_BROWSERS = new Set(['chromium', 'firefox', 'webkit']);
+
+/** Parsed metadata recovered from a persisted screenshot object key. */
+export interface ParsedScreenshotKey {
+  route: string;
+  viewport: number;
+  browser: string;
+  type: 'baseline' | 'current' | 'diff';
+}
+
+/**
+ * Reverse-parses an object key produced by {@link screenshotKey}. Returns
+ * `null` when the key does not match the expected shape.
+ */
+export function parseScreenshotKey(key: string): ParsedScreenshotKey | null {
+  const filename = key.split('/').pop();
+  if (!filename) return null;
+  const base = filename.replace(/\.png$/i, '');
+  const m = base.match(/^(.*)-(\d+)-([a-z]+)-(baseline|current|diff)$/);
+  if (!m) return null;
+  const [, slug, viewportStr, browser, type] = m;
+  if (!KNOWN_BROWSERS.has(browser)) return null;
+  const viewport = Number(viewportStr);
+  if (!Number.isFinite(viewport)) return null;
+  const route = slug === 'root' || slug === '' ? '/' : `/${slug}`;
+  return { route, viewport, browser, type: type as ParsedScreenshotKey['type'] };
+}
+
 /**
  * Converts a route path to the safe filesystem segment the CLI uses for
  * baseline storage. Mirrors `sanitizeRoutePath` in the CLI's git-orphan

@@ -27,6 +27,11 @@ import type {
 } from './teams.js';
 import type { IgnoreMask, MaskStore } from './masks.js';
 import type { RunAttachment, AttachmentStore } from './attachments.js';
+import type {
+  BackgroundFailure,
+  BackgroundFailureStore,
+  ListBackgroundFailuresOptions,
+} from './background-failures.js';
 
 /** A per-screenshot accept/reject decision recorded from the diff viewer. */
 export interface ScreenshotDecision {
@@ -42,6 +47,8 @@ export interface ScreenshotDecision {
 export interface User {
   id: string;
   githubId?: string;
+  /** GitHub handle (login) — used for githubLogin invitation binding (SEC-4). */
+  githubLogin?: string;
   email?: string;
   plan: string;
   createdAt: string;
@@ -106,12 +113,13 @@ export interface UsageAlertState {
 /**
  * Persistent storage contract. All methods are async to accommodate D1.
  */
-export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentStore {
+export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentStore, BackgroundFailureStore {
   // Users
   createUser(user: User): Promise<void>;
   getUser(id: string): Promise<User | null>;
   getUserByGithubId(githubId: string): Promise<User | null>;
   updateUserPlan(id: string, plan: string): Promise<void>;
+  updateUserIdentity(id: string, patch: { email?: string; githubLogin?: string }): Promise<void>;
 
   // API keys
   createApiKey(key: ApiKeyRecord): Promise<void>;
@@ -134,6 +142,36 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
 
   // Usage
   incrementUsage(userId: string, month: string, runs: number, screenshots: number): Promise<void>;
+  /**
+   * Atomically reserves one monthly run if usage is below `limit`.
+   * Returns false when the limit is already reached (CONC-1).
+   */
+  tryReserveRun(userId: string, month: string, limit: number): Promise<boolean>;
+  /**
+   * Atomically reserves `amount` monthly screenshots if usage + amount ≤ `limit`.
+   * Returns false when the reservation would exceed the limit (COST-1).
+   */
+  tryReserveScreenshots(
+    userId: string,
+    month: string,
+    limit: number,
+    amount: number,
+  ): Promise<boolean>;
+  /**
+   * Atomically reserves one monthly run against a team pool (DM-3).
+   * Returns false when the team limit is already reached.
+   */
+  tryReserveTeamRun(teamId: string, month: string, limit: number): Promise<boolean>;
+  /**
+   * Atomically reserves screenshots against a team pool (DM-3).
+   */
+  tryReserveTeamScreenshots(
+    teamId: string,
+    month: string,
+    limit: number,
+    amount: number,
+  ): Promise<boolean>;
+  incrementTeamUsage(teamId: string, month: string, runs: number, screenshots: number): Promise<void>;
   getUsage(userId: string, month: string): Promise<UsageRecord>;
   /** Returns the spend-cap warning tier already alerted for (user, month), or null. */
   getUsageAlertState(userId: string, month: string): Promise<UsageAlertState | null>;
@@ -155,11 +193,22 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
  * In-memory store. Data is lost on restart — used for local dev and tests.
  */
 export class InMemoryStore implements Store {
+  /** Serializes usage mutations per (userId, month) for atomic reservations. */
+  private usageLocks = new Map<string, Promise<void>>();
+  /** Serializes team usage mutations per (teamId, month) (DM-3). */
+  private teamUsageLocks = new Map<string, Promise<void>>();
+  /** Serializes monitor lease claims per monitor id (CONC-3). */
+  private monitorClaimLocks = new Map<string, Promise<void>>();
+
   private users = new Map<string, User>();
   private apiKeys = new Map<string, ApiKeyRecord>();
   private runs = new Map<string, { run: Run; userId: string }>();
+  private runVersions = new Map<string, number>();
+  private monitorVersions = new Map<string, number>();
+  private teamVersions = new Map<string, number>();
   private screenshots = new Map<string, ScreenshotRecord[]>();
   private usage = new Map<string, UsageRecord>();
+  private teamUsage = new Map<string, { teamId: string; month: string; runsCount: number; screenshotsCount: number }>();
   private monitors = new Map<string, Monitor>();
   private monitorRuns: MonitorRun[] = [];
   private alertState = new Map<string, MonitorAlertState>();
@@ -173,6 +222,7 @@ export class InMemoryStore implements Store {
   private attachments = new Map<string, RunAttachment>();
   private usageAlertState = new Map<string, UsageAlertState>(); // key: `${userId}:${month}`
   private decisions: ScreenshotDecision[] = [];
+  private backgroundFailures: BackgroundFailure[] = [];
 
   async createUser(user: User): Promise<void> {
     this.users.set(user.id, { ...user });
@@ -187,6 +237,12 @@ export class InMemoryStore implements Store {
   async updateUserPlan(id: string, plan: string): Promise<void> {
     const u = this.users.get(id);
     if (u) u.plan = plan;
+  }
+  async updateUserIdentity(id: string, patch: { email?: string; githubLogin?: string }): Promise<void> {
+    const u = this.users.get(id);
+    if (!u) return;
+    if (patch.email !== undefined) u.email = patch.email;
+    if (patch.githubLogin !== undefined) u.githubLogin = patch.githubLogin;
   }
 
   async createApiKey(key: ApiKeyRecord): Promise<void> {
@@ -210,6 +266,7 @@ export class InMemoryStore implements Store {
 
   async createRun(run: Run, userId: string): Promise<void> {
     this.runs.set(run.id, { run: { ...run }, userId });
+    this.runVersions.set(run.id, 0);
   }
   async getRun(id: string): Promise<Run | null> {
     return this.runs.get(id)?.run ?? null;
@@ -234,13 +291,30 @@ export class InMemoryStore implements Store {
       .slice(0, limit);
   }
   async updateRun(id: string, patch: Partial<Run>): Promise<void> {
-    const entry = this.runs.get(id);
-    if (entry) Object.assign(entry.run, patch);
+    const maxRetries = 5;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const entry = this.runs.get(id);
+      if (!entry) return;
+      const expected = this.runVersions.get(id) ?? 0;
+      await Promise.resolve();
+      if ((this.runVersions.get(id) ?? 0) !== expected) continue;
+      Object.assign(entry.run, patch);
+      this.runVersions.set(id, expected + 1);
+      return;
+    }
+    throw new Error(`optimistic concurrency conflict: run ${id}`);
   }
   async deleteRun(id: string, userId: string): Promise<boolean> {
     const entry = this.runs.get(id);
-    if (entry && entry.userId === userId) return this.runs.delete(id);
-    return false;
+    if (!entry || entry.userId !== userId) return false;
+    this.runs.delete(id);
+    this.screenshots.delete(id);
+    for (const [attId, att] of this.attachments) {
+      if (att.runId === id) this.attachments.delete(attId);
+    }
+    this.decisions = this.decisions.filter((d) => d.runId !== id);
+    this.approvals = this.approvals.filter((a) => a.runId !== id);
+    return true;
   }
 
   async addScreenshot(rec: ScreenshotRecord): Promise<void> {
@@ -252,13 +326,126 @@ export class InMemoryStore implements Store {
     return this.screenshots.get(runId) ?? [];
   }
 
+  private async withUsageLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.usageLocks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.usageLocks.set(key, prev.then(() => gate));
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
+  private async withMonitorClaimLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.monitorClaimLocks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.monitorClaimLocks.set(key, prev.then(() => gate));
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
+  private async withTeamUsageLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.teamUsageLocks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.teamUsageLocks.set(key, prev.then(() => gate));
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
   async incrementUsage(userId: string, month: string, runs: number, screenshots: number): Promise<void> {
     const key = `${userId}:${month}`;
-    const cur = this.usage.get(key) ?? { userId, month, runsCount: 0, screenshotsCount: 0 };
-    cur.runsCount += runs;
-    cur.screenshotsCount += screenshots;
-    this.usage.set(key, cur);
+    await this.withUsageLock(key, async () => {
+      const cur = this.usage.get(key) ?? { userId, month, runsCount: 0, screenshotsCount: 0 };
+      cur.runsCount += runs;
+      cur.screenshotsCount += screenshots;
+      this.usage.set(key, cur);
+    });
   }
+
+  async tryReserveRun(userId: string, month: string, limit: number): Promise<boolean> {
+    const key = `${userId}:${month}`;
+    return this.withUsageLock(key, async () => {
+      const cur = this.usage.get(key) ?? { userId, month, runsCount: 0, screenshotsCount: 0 };
+      if (cur.runsCount >= limit) return false;
+      cur.runsCount += 1;
+      this.usage.set(key, cur);
+      return true;
+    });
+  }
+
+  async tryReserveScreenshots(
+    userId: string,
+    month: string,
+    limit: number,
+    amount: number,
+  ): Promise<boolean> {
+    if (amount <= 0) return true;
+    const key = `${userId}:${month}`;
+    return this.withUsageLock(key, async () => {
+      const cur = this.usage.get(key) ?? { userId, month, runsCount: 0, screenshotsCount: 0 };
+      if (cur.screenshotsCount + amount > limit) return false;
+      cur.screenshotsCount += amount;
+      this.usage.set(key, cur);
+      return true;
+    });
+  }
+  async tryReserveTeamRun(teamId: string, month: string, limit: number): Promise<boolean> {
+    const key = `${teamId}:${month}`;
+    return this.withTeamUsageLock(key, async () => {
+      const cur = this.teamUsage.get(key) ?? { teamId, month, runsCount: 0, screenshotsCount: 0 };
+      if (cur.runsCount >= limit) return false;
+      cur.runsCount += 1;
+      this.teamUsage.set(key, cur);
+      return true;
+    });
+  }
+
+  async tryReserveTeamScreenshots(
+    teamId: string,
+    month: string,
+    limit: number,
+    amount: number,
+  ): Promise<boolean> {
+    if (amount <= 0) return true;
+    const key = `${teamId}:${month}`;
+    return this.withTeamUsageLock(key, async () => {
+      const cur = this.teamUsage.get(key) ?? { teamId, month, runsCount: 0, screenshotsCount: 0 };
+      if (cur.screenshotsCount + amount > limit) return false;
+      cur.screenshotsCount += amount;
+      this.teamUsage.set(key, cur);
+      return true;
+    });
+  }
+
+  async incrementTeamUsage(teamId: string, month: string, runs: number, screenshots: number): Promise<void> {
+    const key = `${teamId}:${month}`;
+    await this.withTeamUsageLock(key, async () => {
+      const cur = this.teamUsage.get(key) ?? { teamId, month, runsCount: 0, screenshotsCount: 0 };
+      cur.runsCount += runs;
+      cur.screenshotsCount += screenshots;
+      this.teamUsage.set(key, cur);
+    });
+  }
+
   async getUsage(userId: string, month: string): Promise<UsageRecord> {
     return (
       this.usage.get(`${userId}:${month}`) ?? { userId, month, runsCount: 0, screenshotsCount: 0 }
@@ -320,6 +507,7 @@ export class InMemoryStore implements Store {
   // Monitors -----------------------------------------------------------------
   async createMonitor(m: Monitor): Promise<void> {
     this.monitors.set(m.id, { ...m });
+    this.monitorVersions.set(m.id, 0);
   }
   async getMonitor(id: string): Promise<Monitor | null> {
     return this.monitors.get(id) ?? null;
@@ -328,8 +516,19 @@ export class InMemoryStore implements Store {
     return [...this.monitors.values()].filter((m) => m.userId === userId);
   }
   async updateMonitor(id: string, patch: Partial<Monitor>): Promise<void> {
-    const m = this.monitors.get(id);
-    if (m) Object.assign(m, patch);
+    const maxRetries = 5;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const m = this.monitors.get(id);
+      if (!m) return;
+      const expected = this.monitorVersions.get(id) ?? 0;
+      await Promise.resolve();
+      if ((this.monitorVersions.get(id) ?? 0) !== expected) continue;
+      Object.assign(m, patch);
+      if ('leasedUntil' in patch && patch.leasedUntil === undefined) delete m.leasedUntil;
+      this.monitorVersions.set(id, expected + 1);
+      return;
+    }
+    throw new Error(`optimistic concurrency conflict: monitor ${id}`);
   }
   async deleteMonitor(id: string, userId: string): Promise<boolean> {
     const m = this.monitors.get(id);
@@ -338,6 +537,18 @@ export class InMemoryStore implements Store {
   }
   async listDueMonitors(now: Date): Promise<Monitor[]> {
     return [...this.monitors.values()].filter((m) => isMonitorDue(m, now));
+  }
+  async tryClaimDueMonitor(id: string, now: Date, leaseTtlMs: number): Promise<Monitor | null> {
+    return this.withMonitorClaimLock(id, async () => {
+      const m = this.monitors.get(id);
+      if (!m || !isMonitorDue(m, now)) return null;
+      if (m.leasedUntil && new Date(m.leasedUntil).getTime() > now.getTime()) return null;
+      const leasedUntil = new Date(now.getTime() + leaseTtlMs).toISOString();
+      m.leasedUntil = leasedUntil;
+      const version = this.monitorVersions.get(id) ?? 0;
+      this.monitorVersions.set(id, version + 1);
+      return { ...m };
+    });
   }
   async addMonitorRun(run: MonitorRun): Promise<void> {
     this.monitorRuns.push({ ...run });
@@ -363,9 +574,22 @@ export class InMemoryStore implements Store {
     this.alertState.set(state.monitorId, { ...state });
   }
 
+  // Background failures (OPS-3) ----------------------------------------------
+  async recordBackgroundFailure(failure: BackgroundFailure): Promise<void> {
+    this.backgroundFailures.push({ ...failure, context: failure.context ? { ...failure.context } : undefined });
+  }
+  async listBackgroundFailures(opts: ListBackgroundFailuresOptions = {}): Promise<BackgroundFailure[]> {
+    const { kind, sourceId, limit = 50 } = opts;
+    return this.backgroundFailures
+      .filter((f) => (kind == null || f.kind === kind) && (sourceId == null || f.sourceId === sourceId))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
+  }
+
   // Teams --------------------------------------------------------------------
   async createTeam(team: Team, ownerUserId: string): Promise<void> {
     this.teams.set(team.id, { ...team });
+    this.teamVersions.set(team.id, 0);
     const member: TeamMember = {
       teamId: team.id,
       userId: ownerUserId,
@@ -377,11 +601,39 @@ export class InMemoryStore implements Store {
   async getTeam(id: string): Promise<Team | null> {
     return this.teams.get(id) ?? null;
   }
+  async getTeamByStripeSubscriptionId(subscriptionId: string): Promise<Team | null> {
+    for (const team of this.teams.values()) {
+      if (team.stripeSubscriptionId === subscriptionId) return team;
+    }
+    return null;
+  }
   async updateTeam(id: string, patch: Partial<Team>): Promise<void> {
-    const t = this.teams.get(id);
-    if (t) Object.assign(t, patch);
+    const maxRetries = 5;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const t = this.teams.get(id);
+      if (!t) return;
+      const expected = this.teamVersions.get(id) ?? 0;
+      await Promise.resolve();
+      if ((this.teamVersions.get(id) ?? 0) !== expected) continue;
+      Object.assign(t, patch);
+      this.teamVersions.set(id, expected + 1);
+      return;
+    }
+    throw new Error(`optimistic concurrency conflict: team ${id}`);
   }
   async deleteTeam(id: string): Promise<boolean> {
+    const projectIds = new Set(
+      [...this.projects.values()].filter((p) => p.teamId === id).map((p) => p.id),
+    );
+    for (const [runId, entry] of this.runs) {
+      if (entry.run.projectId != null && projectIds.has(entry.run.projectId)) {
+        await this.deleteRun(runId, entry.userId);
+      }
+    }
+    this.activity = this.activity.filter((a) => a.teamId !== id);
+    for (const key of [...this.teamUsage.keys()]) {
+      if (key.startsWith(`${id}:`)) this.teamUsage.delete(key);
+    }
     for (const [key, m] of this.members) if (m.teamId === id) this.members.delete(key);
     for (const [key, p] of this.projects) if (p.teamId === id) this.projects.delete(key);
     for (const [key, inv] of this.invitations) if (inv.teamId === id) this.invitations.delete(key);
@@ -439,6 +691,7 @@ export class InMemoryStore implements Store {
   async acceptInvitation(token: string, at: string): Promise<TeamInvitation | null> {
     const inv = this.invitations.get(token);
     if (!inv || inv.acceptedAt) return null;
+    if (!inv.expiresAt || new Date(inv.expiresAt) <= new Date(at)) return null;
     inv.acceptedAt = at;
     return inv;
   }
@@ -458,12 +711,12 @@ export class InMemoryStore implements Store {
     return false;
   }
 
-  async listProjectRuns(projectId: string, limit = 50): Promise<Run[]> {
+  async listProjectRuns(projectId: string, limit = 50, offset = 0): Promise<Run[]> {
     return [...this.runs.values()]
       .map((r) => r.run)
       .filter((r) => r.projectId === projectId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, limit);
+      .slice(offset, offset + limit);
   }
   async getProjectBaseline(projectId: string): Promise<Run | null> {
     const approved = [...this.runs.values()]
@@ -500,10 +753,11 @@ export class InMemoryStore implements Store {
         return { userId: m.userId, runsCount: u.runsCount, screenshotsCount: u.screenshotsCount };
       }),
     );
+    const pooled = this.teamUsage.get(`${teamId}:${month}`);
     return {
       month,
-      runsCount: perMember.reduce((s, m) => s + m.runsCount, 0),
-      screenshotsCount: perMember.reduce((s, m) => s + m.screenshotsCount, 0),
+      runsCount: pooled?.runsCount ?? 0,
+      screenshotsCount: pooled?.screenshotsCount ?? 0,
       memberCount: members.length,
       perMember,
     };
@@ -516,6 +770,7 @@ export class InMemoryStore implements Store {
     this.runs.clear();
     this.screenshots.clear();
     this.usage.clear();
+    this.teamUsage.clear();
     this.monitors.clear();
     this.monitorRuns = [];
     this.alertState.clear();
