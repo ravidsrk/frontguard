@@ -2,8 +2,9 @@
  * D1 migration runner (Task 5.2, DM-1).
  *
  * Applies ordered, versioned migrations against a D1 database. Each pending
- * migration runs inside a transaction and is recorded in `schema_migrations`.
- * Re-running {@link migrate} is idempotent.
+ * migration runs as one atomic {@link D1Database.batch} (D1's transactional
+ * primitive) and is recorded in `schema_migrations`. Re-running
+ * {@link migrate} is idempotent.
  *
  * v1 is the canonical `schema.sql` baseline (`CREATE TABLE IF NOT EXISTS`).
  * Later migrations are additive `ALTER TABLE` / `CREATE INDEX` files.
@@ -14,7 +15,7 @@
  * @module db/migrate
  */
 
-import type { D1Database } from './d1-store.js';
+import type { D1Database, D1PreparedStatement } from './d1-store.js';
 import { MIGRATIONS, type Migration } from './migrations/index.js';
 
 export type { Migration } from './migrations/index.js';
@@ -25,6 +26,12 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
   applied_at TEXT NOT NULL
 );
 `;
+
+/** Options for {@link migrate} and {@link runMigrations}. */
+export interface MigrateOptions {
+  /** Override the migration registry (tests inject v2+ without touching prod). */
+  migrations?: readonly Migration[];
+}
 
 /**
  * Splits a SQL script into individual statements. Strips line *and* inline
@@ -59,38 +66,20 @@ async function getAppliedVersions(db: D1Database): Promise<Set<string>> {
   return new Set(results.map((row) => row.version));
 }
 
-async function recordMigration(db: D1Database, version: string): Promise<void> {
-  await db
-    .prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)')
-    .bind(version, new Date().toISOString())
-    .run();
-}
-
-async function runStatements(db: D1Database, statements: string[]): Promise<void> {
-  for (const stmt of statements) {
-    await db.prepare(stmt).run();
-  }
-}
-
 /**
- * Applies a single migration inside a transaction and records it in the ledger.
+ * Applies a single migration atomically via D1 batch and records it in the ledger.
  */
 async function applyMigration(db: D1Database, migration: Migration): Promise<number> {
   const statements = splitStatements(migration.sql);
-  await db.exec('BEGIN');
-  try {
-    await runStatements(db, statements);
-    await recordMigration(db, migration.version);
-    await db.exec('COMMIT');
-    return statements.length;
-  } catch (err) {
-    try {
-      await db.exec('ROLLBACK');
-    } catch {
-      // Ignore rollback failures; surface the original error.
-    }
-    throw err;
-  }
+  const appliedAt = new Date().toISOString();
+  const batch: D1PreparedStatement[] = [
+    ...statements.map((sql) => db.prepare(sql)),
+    db
+      .prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)')
+      .bind(migration.version, appliedAt),
+  ];
+  await db.batch(batch);
+  return statements.length;
 }
 
 /**
@@ -100,8 +89,9 @@ async function applyMigration(db: D1Database, migration: Migration): Promise<num
  */
 export async function runMigrations(
   db: D1Database,
-  migrations: readonly Migration[],
+  options?: MigrateOptions,
 ): Promise<number> {
+  const migrations = options?.migrations ?? MIGRATIONS;
   await ensureLedger(db);
   const applied = await getAppliedVersions(db);
 
@@ -116,10 +106,10 @@ export async function runMigrations(
 }
 
 /**
- * Runs pending migrations from the production registry against a D1 database.
+ * Runs pending migrations against a D1 database.
  *
  * @returns The number of SQL statements executed across newly applied migrations.
  */
-export async function migrate(db: D1Database): Promise<number> {
-  return runMigrations(db, MIGRATIONS);
+export async function migrate(db: D1Database, options?: MigrateOptions): Promise<number> {
+  return runMigrations(db, options);
 }

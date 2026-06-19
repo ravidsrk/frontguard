@@ -43,6 +43,8 @@ export interface D1PreparedStatement {
 export interface D1Database {
   prepare(query: string): D1PreparedStatement;
   exec(query: string): Promise<unknown>;
+  /** Runs prepared statements atomically (D1's transactional primitive). */
+  batch(statements: D1PreparedStatement[]): Promise<unknown[]>;
 }
 
 interface RunRow {
