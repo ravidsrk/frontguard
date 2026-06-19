@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { app } from '../src/index.js';
 import { resetMemoryStore } from '../src/db/factory.js';
-import { hashKey } from '../src/auth/keys.js';
+import { hashKey, MAX_KEYS_PER_USER } from '../src/auth/keys.js';
 import { migrate } from '../src/db/migrate.js';
 import { createSqliteD1 } from './helpers/sqlite-d1.js';
 
@@ -47,6 +47,31 @@ describe('/v1/keys (dev mode)', () => {
     expect((await delRes.json()).deleted).toBe(true);
     const listRes = await app.request('/v1/keys', { headers: auth() });
     expect((await listRes.json()).total).toBe(0);
+  });
+
+  // COST-3: per-user key cap rejects creation beyond the limit.
+  it('rejects key creation when the per-user cap is reached', async () => {
+    for (let i = 0; i < MAX_KEYS_PER_USER; i++) {
+      const res = await app.request('/v1/keys', {
+        method: 'POST',
+        headers: auth('cap-user'),
+        body: JSON.stringify({ name: `key-${i}` }),
+      });
+      expect(res.status).toBe(201);
+    }
+
+    const overRes = await app.request('/v1/keys', {
+      method: 'POST',
+      headers: auth('cap-user'),
+      body: JSON.stringify({ name: 'one-too-many' }),
+    });
+    expect(overRes.status).toBe(429);
+    const body = await overRes.json();
+    expect(body.error).toMatch(/limit reached/i);
+    expect(body.limit).toBe(MAX_KEYS_PER_USER);
+
+    const listRes = await app.request('/v1/keys', { headers: auth('cap-user') });
+    expect((await listRes.json()).total).toBe(MAX_KEYS_PER_USER);
   });
 });
 

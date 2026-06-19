@@ -116,15 +116,6 @@ authRoutes.get('/github/callback', async (c) => {
     await store.createUser(user);
   }
 
-  // Mint an initial API key (plaintext shown once).
-  const apiKey = generateApiKey();
-  await store.createApiKey({
-    keyHash: await hashKey(apiKey),
-    userId: user.id,
-    name: 'Default (created via GitHub login)',
-    createdAt: new Date().toISOString(),
-  });
-
   // If this login was initiated for the browser dashboard, set a session cookie
   // and redirect there instead of returning JSON. The redirect target is read
   // from the query param or the short-lived cookie set in GET /auth/github.
@@ -142,10 +133,30 @@ authRoutes.get('/github/callback', async (c) => {
     return c.redirect(redirect, 302);
   }
 
+  // JSON/CLI bootstrap: mint at most one default key per user. Dashboard
+  // sessions rely on the HMAC cookie — no throwaway keys on browser login.
+  const existingKeys = await store.listApiKeys(user.id);
+  let apiKey: string | undefined;
+  if (existingKeys.length === 0) {
+    apiKey = generateApiKey();
+    await store.createApiKey({
+      keyHash: await hashKey(apiKey),
+      userId: user.id,
+      name: 'Default (created via GitHub login)',
+      createdAt: new Date().toISOString(),
+    });
+  }
+
   return c.json({
     user: { id: user.id, login: ghUser.login, email: user.email },
-    apiKey,
-    note: 'Store this key securely — it will not be shown again.',
+    ...(apiKey
+      ? {
+          apiKey,
+          note: 'Store this key securely — it will not be shown again.',
+        }
+      : {
+          note: 'You already have an API key. Use your existing key or create one via POST /v1/keys.',
+        }),
     mode: isProduction(c.env) ? 'production' : 'dev',
   });
 });
