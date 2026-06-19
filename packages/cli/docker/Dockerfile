@@ -16,7 +16,7 @@
 #   WebKit) and their patch level are baked into that tag, so a `latest` tag
 #   would silently change the rendered output across builds.
 # - The base's Playwright minor MUST match the `playwright` version in
-#   packages/cli/package.json (currently `^1.59.0`, resolved to `1.59.0`).
+#   packages/cli/package.json (currently `1.59.0`, exact-pinned).
 #   When bumping `playwright` in package.json, bump this FROM line in the same
 #   commit. The build is intentionally simple to make that pairing obvious.
 # - Fonts: Liberation (Microsoft-metric Arial/Helvetica/Times substitutes),
