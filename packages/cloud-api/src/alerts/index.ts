@@ -11,13 +11,17 @@
 import type { Monitor } from '../db/monitors.js';
 import type { Store } from '../db/store.js';
 
-/** A single regression detected during a monitor check. */
+/** A single regression or check-failure alert from a monitor run. */
 export interface MonitorAlert {
   url: string;
   route: string;
   viewport: number;
   diffPercentage: number;
   threshold: number;
+  /** Regression (default) or a hard check failure (target down / sandbox error). */
+  kind?: 'regression' | 'error';
+  /** Human-readable detail for error alerts. */
+  message?: string;
 }
 
 /**
@@ -64,10 +68,12 @@ export function diffBucket(diffPercentage: number): number {
  */
 export function alertFingerprint(alerts: MonitorAlert[]): string {
   return alerts
-    .map(
-      (a) =>
-        `${a.route}@${a.viewport}:${alertSeverity(a.diffPercentage, a.threshold)}:${diffBucket(a.diffPercentage)}`,
-    )
+    .map((a) => {
+      if (a.kind === 'error') {
+        return `error:${a.message ?? 'check-failed'}`;
+      }
+      return `${a.route}@${a.viewport}:${alertSeverity(a.diffPercentage, a.threshold)}:${diffBucket(a.diffPercentage)}`;
+    })
     .sort()
     .join('|');
 }
@@ -103,18 +109,27 @@ export interface AlertEnv {
  * Exposed for testing.
  */
 export function buildSlackPayload(monitor: Monitor, alerts: MonitorAlert[]): unknown {
+  const isError = alerts.some((a) => a.kind === 'error');
   const lines = alerts
-    .map(
-      (a) =>
-        `• \`${a.route}\` @ ${a.viewport}px — *${(a.diffPercentage * 100).toFixed(2)}%* changed (threshold ${(a.threshold * 100).toFixed(1)}%)`,
-    )
+    .map((a) => {
+      if (a.kind === 'error') {
+        return `• Check failed — ${a.message ?? 'target unreachable or sandbox error'}`;
+      }
+      return `• \`${a.route}\` @ ${a.viewport}px — *${(a.diffPercentage * 100).toFixed(2)}%* changed (threshold ${(a.threshold * 100).toFixed(1)}%)`;
+    })
     .join('\n');
+  const headline = isError
+    ? `🚨 Frontguard: monitor check failed on ${monitor.name}`
+    : `🚨 Frontguard: ${alerts.length} visual regression(s) on ${monitor.name}`;
   return {
-    text: `🚨 Frontguard: ${alerts.length} visual regression(s) on ${monitor.name}`,
+    text: headline,
     blocks: [
       {
         type: 'header',
-        text: { type: 'plain_text', text: `🚨 ${alerts.length} visual regression(s)` },
+        text: {
+          type: 'plain_text',
+          text: isError ? '🚨 Monitor check failed' : `🚨 ${alerts.length} visual regression(s)`,
+        },
       },
       {
         type: 'section',
@@ -129,13 +144,16 @@ export function buildSlackPayload(monitor: Monitor, alerts: MonitorAlert[]): unk
  * Builds an HTML email body for a set of alerts. Exposed for testing.
  */
 export function buildEmailHtml(monitor: Monitor, alerts: MonitorAlert[]): string {
+  const isError = alerts.some((a) => a.kind === 'error');
   const rows = alerts
-    .map(
-      (a) =>
-        `<tr><td>${escapeHtml(a.route)}</td><td>${a.viewport}px</td><td>${(a.diffPercentage * 100).toFixed(2)}%</td></tr>`,
-    )
+    .map((a) => {
+      if (a.kind === 'error') {
+        return `<tr><td colspan="3">${escapeHtml(a.message ?? 'Check failed')}</td></tr>`;
+      }
+      return `<tr><td>${escapeHtml(a.route)}</td><td>${a.viewport}px</td><td>${(a.diffPercentage * 100).toFixed(2)}%</td></tr>`;
+    })
     .join('');
-  return `<h2>🚨 Frontguard — ${alerts.length} visual regression(s)</h2>
+  return `<h2>🚨 Frontguard — ${isError ? 'monitor check failed' : `${alerts.length} visual regression(s)`}</h2>
 <p><strong>Monitor:</strong> ${escapeHtml(monitor.name)}<br/>
 <strong>URL:</strong> ${escapeHtml(monitor.url)}</p>
 <table border="1" cellpadding="6" cellspacing="0">

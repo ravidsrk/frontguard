@@ -573,7 +573,7 @@ export default {
     ctx.waitUntil(
       runScheduledChecks(env).then((res) => {
         console.log(
-          `[scheduler] checked=${res.checked} alerted=${res.alerted} errors=${res.errors}`,
+          `[scheduler] checked=${res.checked} processed=${res.processed} deferred=${res.deferred} alerted=${res.alerted} errors=${res.errors}`,
         );
       }),
     );
