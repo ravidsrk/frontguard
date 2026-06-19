@@ -8,7 +8,7 @@
  *   3. Persists a {@link MonitorRun} history record and updates the monitor's
  *      latest status.
  *   4. Meters usage against the owner's plan.
- *   5. Dispatches alerts on regressions.
+ *   5. Dispatches alerts on regressions and check failures.
  *   6. Prunes monitor-run history beyond the owner's plan retention window.
  *
  * The scheduled handler is exported and attached to the Worker's `scheduled`
@@ -25,10 +25,26 @@ import { processRun, type ProcessorEnv } from './processor.js';
 import { dispatchAlertsWithState, type MonitorAlert, type AlertEnv } from './alerts/index.js';
 import { getPlan, hasFeature } from './billing/plans.js';
 import type { Run } from './types.js';
+import { getScreenshotStore, type R2Bucket } from './storage/screenshots.js';
+import { persistScreenshots, type PendingScreenshot } from './storage/persist-screenshots.js';
+import type { BaselineRestore } from './daytona-runner.js';
+import {
+  baselineRestoreFromRefs,
+  buildMonitorScreenshotRefs,
+  parseMonitorScreenshots,
+  promoteRefsForBaselineStorage,
+  runIdFromR2Key,
+  type MonitorScreenshotRef,
+} from './monitor-screenshots.js';
 
 /** Summary of a single scheduler tick (returned for logging/tests). */
 export interface SchedulerTickResult {
+  /** Monitors that were due at tick start. */
   checked: number;
+  /** Monitors actually executed this tick (may be less than `checked`). */
+  processed: number;
+  /** Due monitors left for a later tick because of the per-tick cap. */
+  deferred: number;
   alerted: number;
   errors: number;
   pruned: number;
@@ -45,8 +61,105 @@ export interface MonitorExecution {
 /** Maximum attempts per monitor execution (1 initial + 1 retry). */
 const MAX_ATTEMPTS = 2;
 
-/** Executes a single check attempt against a monitor's URL. */
-async function attemptCheck(monitor: Monitor, now: Date, env: ProcessorEnv): Promise<Run> {
+/**
+ * Maximum monitors executed per cron tick. Each run can take up to 5 minutes;
+ * the cron fires every 15 minutes, so unbounded sequential execution silently
+ * drops late monitors when the Worker is killed (REL-4).
+ */
+export const MONITORS_PER_TICK = 3;
+
+/** Parallel monitor executions within a single tick. */
+export const MONITOR_CONCURRENCY = 2;
+
+/** Scheduler env: Worker bindings + alert delivery secrets. */
+export type SchedulerEnv = Bindings & AlertEnv & ProcessorEnv;
+
+interface CheckAttempt {
+  run: Run;
+  screenshotRefs: MonitorScreenshotRef[];
+}
+
+/**
+ * Orders due monitors oldest-due-first so deferred monitors are prioritized on
+ * the next tick and cannot be starved by short-interval monitors (REL-4).
+ */
+export function sortMonitorsByDuePriority(monitors: Monitor[]): Monitor[] {
+  return [...monitors].sort((a, b) => {
+    const aLast = a.lastRunAt ? new Date(a.lastRunAt).getTime() : 0;
+    const bLast = b.lastRunAt ? new Date(b.lastRunAt).getTime() : 0;
+    if (aLast !== bLast) return aLast - bLast;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+/** Builds a check-failure alert after the retry budget is exhausted (REL-6). */
+function buildErrorAlert(monitor: Monitor, message: string): MonitorAlert {
+  return {
+    url: monitor.url,
+    route: '(check failed)',
+    viewport: 0,
+    diffPercentage: 1,
+    threshold: monitor.alertThreshold,
+    kind: 'error',
+    message,
+  };
+}
+
+/**
+ * Resolves baselines for the next monitor check (REL-2):
+ *   1. Approved project baseline, when the monitor is project-scoped.
+ *   2. Approved baseline via `baseline_approvals` on a prior process run.
+ *   3. Most recent successful run's persisted screenshots (last-run-as-baseline).
+ */
+async function resolveMonitorBaseline(
+  store: Store,
+  monitor: Monitor,
+  bucket: R2Bucket | undefined,
+): Promise<BaselineRestore | undefined> {
+  if (!bucket) return undefined;
+
+  if (monitor.projectId) {
+    const baselineRun = await store.getProjectBaseline(monitor.projectId);
+    if (baselineRun) {
+      const approvedRefs = buildMonitorScreenshotRefs(
+        monitor.routes,
+        (await store.listScreenshots(baselineRun.id)).filter((s) => s.type === 'baseline'),
+      );
+      const approved = baselineRestoreFromRefs(approvedRefs, bucket);
+      if (approved) return approved;
+    }
+  }
+
+  const priorRuns = await store.listMonitorRuns(monitor.id, 20);
+
+  for (const prior of priorRuns) {
+    const refs = parseMonitorScreenshots(prior.screenshots, monitor.routes);
+    const runIds = [...new Set(refs.map((r) => runIdFromR2Key(r.r2Key)).filter((id): id is string => id != null))];
+    for (const runId of runIds) {
+      const approvals = await store.listApprovals(runId);
+      if (approvals[0]?.status === 'approved') {
+        const restore = baselineRestoreFromRefs(refs, bucket);
+        if (restore) return restore;
+      }
+    }
+  }
+
+  for (const prior of priorRuns) {
+    if (prior.status === 'error') continue;
+    const refs = parseMonitorScreenshots(prior.screenshots, monitor.routes);
+    const restore = baselineRestoreFromRefs(refs, bucket);
+    if (restore) return restore;
+  }
+  return undefined;
+}
+
+/** Executes a single check attempt against a monitor's URL (REL-2 baseline wiring). */
+async function attemptCheck(
+  monitor: Monitor,
+  now: Date,
+  env: SchedulerEnv,
+  store: Store,
+): Promise<CheckAttempt> {
   const run: Run = {
     id: crypto.randomUUID(),
     status: 'queued',
@@ -60,8 +173,20 @@ async function attemptCheck(monitor: Monitor, now: Date, env: ProcessorEnv): Pro
     results: null,
     reportUrl: null,
   };
-  await processRun(run, env);
-  return run;
+
+  const blobs = getScreenshotStore(env.SCREENSHOTS as R2Bucket | undefined);
+  const onScreenshots = async (shots: PendingScreenshot[]): Promise<void> => {
+    await persistScreenshots(store, blobs, monitor.userId, run.id, shots);
+  };
+  const baselineRestore = await resolveMonitorBaseline(store, monitor, env.SCREENSHOTS as R2Bucket | undefined);
+
+  await processRun(run, env, onScreenshots, baselineRestore);
+
+  const screenshotRefs = buildMonitorScreenshotRefs(
+    monitor.routes,
+    await store.listScreenshots(run.id),
+  );
+  return { run, screenshotRefs };
 }
 
 /**
@@ -69,7 +194,7 @@ async function attemptCheck(monitor: Monitor, now: Date, env: ProcessorEnv): Pro
  * history entry, meters usage, updates status, and fires alerts.
  */
 export async function runMonitor(
-  env: Bindings & AlertEnv,
+  env: SchedulerEnv,
   store: Store,
   monitor: Monitor,
   now: Date,
@@ -80,11 +205,20 @@ export async function runMonitor(
   let lastError: string | undefined;
   let attempts = 0;
   let succeeded = false;
+  let screenshotRefs: MonitorScreenshotRef[] = [];
 
   while (attempts < MAX_ATTEMPTS && !succeeded) {
     attempts++;
     try {
-      const run = await attemptCheck(monitor, now, env);
+      const attempt = await attemptCheck(monitor, now, env, store);
+      const { run } = attempt;
+      screenshotRefs = attempt.screenshotRefs;
+
+      // processRun marks failures on the run without throwing (REL-6).
+      if (run.status === 'failed') {
+        throw new Error(run.error ?? 'check failed');
+      }
+
       alerts = (run.results ?? [])
         .filter((r) => r.status === 'regression' || r.diffPercentage > monitor.alertThreshold)
         .map((r) => ({
@@ -104,14 +238,20 @@ export async function runMonitor(
     }
   }
 
+  if (status === 'error' && lastError) {
+    alerts = [buildErrorAlert(monitor, lastError)];
+  }
+
   // Persist the run history record.
   const monitorRun: MonitorRun = {
     id: crypto.randomUUID(),
     monitorId: monitor.id,
     userId: monitor.userId,
     status,
-    regressionsCount: alerts.length,
+    regressionsCount: alerts.filter((a) => a.kind !== 'error').length,
     attempts,
+    screenshots:
+      screenshotRefs.length > 0 ? promoteRefsForBaselineStorage(screenshotRefs) : undefined,
     error: lastError,
     createdAt: now.toISOString(),
     completedAt: new Date().toISOString(),
@@ -144,11 +284,32 @@ async function pruneForUser(store: Store, userId: string, now: Date): Promise<nu
   return store.pruneMonitorRuns(userId, cutoff);
 }
 
+/** Runs `fn` over `items` with at most `concurrency` in flight. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker(): Promise<void> {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i]!);
+    }
+  }
+  const workers = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return results;
+}
+
 /**
  * Executes one scheduler tick across all due monitors.
  */
 export async function runScheduledChecks(
-  env: Bindings & AlertEnv,
+  env: SchedulerEnv,
   now: Date = new Date(),
   fetchImpl: typeof fetch = fetch,
 ): Promise<SchedulerTickResult> {
@@ -172,19 +333,26 @@ export async function runScheduledChecks(
   }
 
   let skipped = 0;
+  const eligible: Monitor[] = [];
   for (const monitor of due) {
-    // Gate execution on the owner's plan: a downgraded user's existing monitors
-    // must not keep running on a plan without production monitoring.
     if (!(await canMonitor(monitor.userId))) {
       skipped++;
-    } else {
-      try {
-        const { alerts, run } = await runMonitor(env, store, monitor, now, fetchImpl);
-        if (alerts.length > 0) alerted++;
-        if (run.status === 'error') errors++;
-      } catch {
-        errors++;
-      }
+      continue;
+    }
+    eligible.push(monitor);
+  }
+
+  const ordered = sortMonitorsByDuePriority(eligible);
+  const toProcess = ordered.slice(0, MONITORS_PER_TICK);
+  const deferred = eligible.length - toProcess.length;
+
+  await mapWithConcurrency(toProcess, MONITOR_CONCURRENCY, async (monitor) => {
+    try {
+      const { alerts, run } = await runMonitor(env, store, monitor, now, fetchImpl);
+      if (alerts.length > 0) alerted++;
+      if (run.status === 'error') errors++;
+    } catch {
+      errors++;
     }
     // Prune each owner's history at most once per tick.
     if (!prunedUsers.has(monitor.userId)) {
@@ -195,7 +363,15 @@ export async function runScheduledChecks(
         /* non-fatal */
       }
     }
-  }
+  });
 
-  return { checked: due.length, alerted, errors, pruned, skipped };
+  return {
+    checked: due.length,
+    processed: toProcess.length,
+    deferred,
+    alerted,
+    errors,
+    pruned,
+    skipped,
+  };
 }
