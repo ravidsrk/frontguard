@@ -266,7 +266,9 @@ async function executeTask(
     if (task.route.discoveredVia === 'storybook') {
       try {
         const sbTimeout = Math.min(config.pageTimeout ?? 30_000, 30_000);
-        const result = (await page.evaluate(STORYBOOK_READY_SCRIPT, sbTimeout)) as {
+        const result = (await page.evaluate(
+          `(${STORYBOOK_READY_SCRIPT})(${sbTimeout})`,
+        )) as {
           ready: boolean;
           reason: string;
           elapsedMs: number;
