@@ -34,10 +34,13 @@ describe('/pricing', () => {
     expect(install).toHaveAttribute('href', '/#install')
     expect(install).not.toHaveAttribute('target')
 
-    const trial = screen.getByRole('link', { name: /start 14-day trial/i })
-    expect(trial).toHaveAttribute('href', 'https://app.frontguard.dev/signup')
-    expect(trial).toHaveAttribute('target', '_blank')
-    expect(trial).toHaveAttribute('rel', 'noopener noreferrer')
+    const waitlist = screen.getByRole('link', { name: /join the waitlist/i })
+    expect(waitlist).toHaveAttribute(
+      'href',
+      'mailto:hello@frontguard.dev?subject=Pro%20waitlist',
+    )
+    expect(waitlist).toHaveAttribute('target', '_blank')
+    expect(waitlist).toHaveAttribute('rel', 'noopener noreferrer')
 
     const contact = screen.getByRole('link', { name: /contact us/i })
     expect(contact).toHaveAttribute(
