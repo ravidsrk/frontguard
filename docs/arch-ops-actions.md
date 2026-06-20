@@ -76,6 +76,9 @@ row **O2** (apps/web redeploy).
   npm --workspace apps/web run build && npx wrangler pages deploy apps/web/dist
   # verify the served structured data is no longer stale (corrected claims present in the live HTML):
   curl -sf https://frontguard.dev | grep -i 'application/ld+json'
+  # dist-11 acceptance — the live HTML must NOT ship the fabricated Schema.org rating;
+  # this grep MUST return no matches (exit 1) after the redeploy:
+  curl -s https://frontguard.dev/ | grep -E 'AggregateRating|ratingValue|ratingCount'   # expect NO matches
   ```
 
 ## Downstream human gates (NOT done; human-owned)
