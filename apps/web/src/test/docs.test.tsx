@@ -105,6 +105,16 @@ describe('docs content store', () => {
     expect(ghActions?.html).toContain('ravidsrk/frontguard@v0')
     expect(ghActions?.html).not.toMatch(/ravidsrk\/frontguard@(v1|main)/)
   })
+
+  it('cross-os-rendering doc gates --docker on local build and image preflight', () => {
+    const crossOs = articles.find((a) => a.id === 'cross-os-rendering')!
+    expect(crossOs.html).toContain('not yet published')
+    expect(crossOs.html).toContain('docker image inspect')
+    expect(crossOs.html).toContain('docker manifest inspect')
+    expect(crossOs.html).toContain('Building the image locally')
+    expect(crossOs.html).not.toContain('Docker will pull')
+    expect(crossOs.html).not.toMatch(/first pull on a cold machine/i)
+  })
 })
 
 describe('docs article HTML quality', () => {
