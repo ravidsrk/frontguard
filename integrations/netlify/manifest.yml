@@ -3,8 +3,10 @@
 name: "@frontguard/netlify-plugin"
 inputs:
   - name: apiUrl
-    description: Frontguard Cloud API base URL.
-    default: https://api.frontguard.dev
+    description: >-
+      Frontguard Cloud API base URL (required). Use your self-hosted
+      deployment URL or set FRONTGUARD_API_URL in site environment variables.
+    required: true
   - name: apiKey
     description: >-
       Frontguard API key. Prefer the FRONTGUARD_API_KEY site environment

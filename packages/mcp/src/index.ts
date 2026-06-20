@@ -18,7 +18,7 @@ import { resolve } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { requireAuth, MissingApiKeyError } from './auth.js';
+import { requireAuth, MissingApiKeyError, MissingApiUrlError } from './auth.js';
 import { CloudApiError, CloudClient } from './client/cloud.js';
 import {
   acceptBaseline,
@@ -117,7 +117,7 @@ async function withCloudClient<T>(
 }
 
 function toolError(err: unknown): CallToolResult {
-  if (err instanceof MissingApiKeyError) {
+  if (err instanceof MissingApiKeyError || err instanceof MissingApiUrlError) {
     return {
       isError: true,
       content: [{ type: 'text', text: err.message }],

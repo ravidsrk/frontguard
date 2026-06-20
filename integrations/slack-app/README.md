@@ -27,7 +27,7 @@ Slack →  GET  /slack/oauth/callback
                   ↓
         Cloudflare Worker (this package)
                   ↓ submits run
-        Frontguard Cloud API (api.frontguard.dev)
+        Frontguard Cloud API (your FRONTGUARD_API_URL)
                   ↓ poll until terminal
         Slack response_url (delayed in-channel reply)
 ```
@@ -41,7 +41,7 @@ Slack →  GET  /slack/oauth/callback
 | `SLACK_CLIENT_SECRET` | `wrangler secret` | OAuth v2 client secret. |
 | `SLACK_REDIRECT_URI` | `wrangler secret` | Exact OAuth redirect URL — must match the manifest. |
 | `SLACK_SCOPES` | `wrangler.toml` `vars` | Bot scopes (default `chat:write,commands`). |
-| `FRONTGUARD_API_URL` | `wrangler.toml` `vars` | Cloud API base URL. Defaults to `https://api.frontguard.dev`. |
+| `FRONTGUARD_API_URL` | `wrangler secret` | **Required.** Cloud API base URL for your self-hosted deployment. |
 | `FRONTGUARD_API_KEY` | `wrangler secret` | Server-side API key the worker uses to submit runs on behalf of each Slack workspace. |
 | `SLACK_TEAMS` | `wrangler.toml` `kv_namespaces` binding | KV namespace storing per-team installs. |
 
@@ -84,6 +84,7 @@ Slack →  GET  /slack/oauth/callback
    wrangler secret put SLACK_CLIENT_ID
    wrangler secret put SLACK_CLIENT_SECRET
    wrangler secret put SLACK_REDIRECT_URI
+   wrangler secret put FRONTGUARD_API_URL
    wrangler secret put FRONTGUARD_API_KEY
    ```
 

@@ -52,7 +52,7 @@ export interface SlackAppEnv {
   SLACK_REDIRECT_URI?: string;
   /** Bot scopes (comma-separated). Defaults to `chat:write,commands`. */
   SLACK_SCOPES?: string;
-  /** Frontguard Cloud API base URL (e.g. `https://api.frontguard.dev`). */
+  /** Frontguard Cloud API base URL (your self-hosted deployment). */
   FRONTGUARD_API_URL?: string;
   /** Frontguard API key used to submit runs on behalf of the workspace. */
   FRONTGUARD_API_KEY?: string;

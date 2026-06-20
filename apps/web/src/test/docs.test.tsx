@@ -115,6 +115,22 @@ describe('docs content store', () => {
     expect(crossOs.html).not.toContain('Docker will pull')
     expect(crossOs.html).not.toMatch(/first pull on a cold machine/i)
   })
+
+  it('marks Cloud API URL as required on integration docs (no live hosted default)', () => {
+    for (const id of [
+      'integrations/netlify',
+      'integrations/vercel',
+      'integrations/slack',
+      'integrations/mcp',
+      'guides/cloud-api',
+      'distribution',
+    ] as const) {
+      const article = articles.find((a) => a.id === id)
+      expect(article?.html, id).toMatch(/Cloud API URL required|Self-host or bring your own API URL|no working hosted default/i)
+      expect(article?.html, id).not.toContain('apiUrl = &quot;https://api.frontguard.dev&quot;')
+      expect(article?.html, id).not.toContain('apiUrl   = &quot;https://api.frontguard.dev&quot;')
+    }
+  })
 })
 
 describe('docs article HTML quality', () => {

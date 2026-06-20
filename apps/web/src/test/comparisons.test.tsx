@@ -58,7 +58,7 @@ describe('/comparisons', () => {
     migrations.forEach((card) => {
       expect(card).toHaveAttribute('target', '_blank')
       expect(card).toHaveAttribute('rel', 'noopener noreferrer')
-      expect(card.getAttribute('href')).toContain('docs.frontguard.dev')
+      expect(card.getAttribute('href')).toContain('frontguard.dev/docs')
     })
   })
 

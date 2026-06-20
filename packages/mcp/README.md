@@ -31,7 +31,8 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
       "command": "npx",
       "args": ["-y", "@frontguard/mcp"],
       "env": {
-        "FRONTGUARD_API_KEY": "fg_live_xxx"
+        "FRONTGUARD_API_KEY": "fg_live_xxx",
+        "FRONTGUARD_API_URL": "https://your-cloud-api.example.com"
       }
     }
   }
@@ -48,7 +49,10 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
     "frontguard": {
       "command": "npx",
       "args": ["-y", "@frontguard/mcp"],
-      "env": { "FRONTGUARD_API_KEY": "fg_live_xxx" }
+      "env": {
+        "FRONTGUARD_API_KEY": "fg_live_xxx",
+        "FRONTGUARD_API_URL": "https://your-cloud-api.example.com"
+      }
     }
   }
 }
@@ -65,7 +69,10 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@frontguard/mcp"],
-      "env": { "FRONTGUARD_API_KEY": "${env:FRONTGUARD_API_KEY}" }
+      "env": {
+        "FRONTGUARD_API_KEY": "${env:FRONTGUARD_API_KEY}",
+        "FRONTGUARD_API_URL": "${env:FRONTGUARD_API_URL}"
+      }
     }
   }
 }
@@ -102,12 +109,14 @@ The cloud client strips trailing slashes and validates that `FRONTGUARD_API_KEY`
 
 ## Authentication
 
-| Variable | Default | Required |
-|----------|---------|----------|
-| `FRONTGUARD_API_KEY` | _none_ | yes — per-tool-call |
-| `FRONTGUARD_API_URL` | `https://api.frontguard.dev` | no |
+| Variable | Required |
+|----------|----------|
+| `FRONTGUARD_API_KEY` | yes — per-tool-call |
+| `FRONTGUARD_API_URL` | yes — your self-hosted cloud-api base URL (e.g. `http://localhost:8787` for local dev) |
 
-The server starts on stdio even when the key is missing (so `tools/list` works); the missing-key error only surfaces when a tool is actually called.
+There is no hosted default. The server starts on stdio even when credentials are
+missing (so `tools/list` works); missing-key or missing-URL errors surface when
+a tool is actually called.
 
 ## License
 
