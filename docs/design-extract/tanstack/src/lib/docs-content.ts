@@ -329,7 +329,7 @@ ${h2b('Quick setup')}
     <span style="color: ${C.y};">steps</span>:
       - <span style="color: ${C.y};">uses</span>: actions/checkout@v4
       - <span style="color: ${C.y};">name</span>: Run Frontguard
-        <span style="color: ${C.y};">uses</span>: ravidsrk/frontguard@main
+        <span style="color: ${C.y};">uses</span>: ravidsrk/frontguard@v0
         <span style="color: ${C.y};">with</span>:
           <span style="color: ${C.y};">url</span>: <span style="color: ${C.g};">\${{ env.PREVIEW_URL }}</span>  <span style="color: ${C.cm};"># or let it auto-detect</span>
         <span style="color: ${C.y};">env</span>:
