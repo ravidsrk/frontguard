@@ -37,7 +37,7 @@
   "dependencies": {
     "@daytona/sdk": "^0.189.0",
     "hono": "^4.12.26",
-    "zod": "^3.25.67"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
