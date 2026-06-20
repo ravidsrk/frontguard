@@ -14,6 +14,9 @@ import { isInvokedDirectly } from '../src/index.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const INDEX_PATH = join(HERE, '../src/index.ts');
 const DIST_BIN = join(HERE, '../dist/index.js');
+const PKG_VERSION = (
+  JSON.parse(readFileSync(join(HERE, '../package.json'), 'utf8')) as { version: string }
+).version;
 const INIT_JSONL = join(HERE, 'fixtures/init.jsonl');
 
 function parseJsonl(text: string): unknown[] {
@@ -114,7 +117,9 @@ describe('dist bin JSON-RPC stdio (mcp-3, mcp-10)', () => {
       const { stdout, stderr, code } = await runDistBin(DIST_BIN, tmpdir(), stdin);
 
       expect(code).toBe(0);
-      expect(stderr).toMatch(/frontguard-mcp v0\.2\.0 starting on stdio/);
+      expect(stderr).toMatch(
+        new RegExp(`frontguard-mcp v${PKG_VERSION.replace(/\./g, '\\.')} starting on stdio`),
+      );
       expect(stdout.length).toBeGreaterThan(0);
       expect(stdout).not.toMatch(/frontguard-mcp v/);
 
@@ -158,7 +163,9 @@ describe('dist bin JSON-RPC stdio (mcp-3, mcp-10)', () => {
       const { stdout, stderr, code } = await runDistBin(link, dir, stdin);
 
       expect(code).toBe(0);
-      expect(stderr).toMatch(/frontguard-mcp v0\.2\.0 starting on stdio/);
+      expect(stderr).toMatch(
+        new RegExp(`frontguard-mcp v${PKG_VERSION.replace(/\./g, '\\.')} starting on stdio`),
+      );
       expect(stdout).toContain('"tools"');
       expect(stdout).toContain('list_regressions');
     },
