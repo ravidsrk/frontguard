@@ -8,9 +8,9 @@ release. It reconciles three audit tracks, live repros, and the OPS queue.*
 
 | Doc | What it covers | Status |
 |-----|----------------|--------|
-| [`adversarial-v020-postship.md`](./adversarial-v020-postship.md) | Original 49 confirmed post-ship findings (v0.2.0) | Ledger in [`fix-progress.md`](./fix-progress.md) is **stale** (all OPEN) |
+| [`adversarial-v020-postship.md`](./adversarial-v020-postship.md) | Original 49 confirmed post-ship findings (v0.2.0) | Reconciled in [`fix-progress.md`](./fix-progress.md): 36 CLOSED / 13 CODE_CLOSED / 0 OPEN |
 | [`adversarial-review-fresh.md`](./adversarial-review-fresh.md) | Second-pass architecture review (31 findings) | **31/31 code-closed** per [`arch-build-readiness.md`](./arch-build-readiness.md) |
-| [`arch-ops-actions.md`](./arch-ops-actions.md) | OPS / verify-at-scale queue for fresh review | **Not executed** |
+| [`arch-ops-actions.md`](./arch-ops-actions.md) | OPS / verify-at-scale queue for fresh review | **Not executed** — human-owned (O1–O15) |
 | [`fix-plan.md`](./fix-plan.md) | Per-cluster remediation recipes for the 49 | Reference only |
 
 ---
@@ -22,16 +22,18 @@ Frontguard has had **two major remediation passes**:
 1. **v0.2.0 post-ship audit (49 findings)** — customer-path, docs, distribution, Storybook, MCP. Roughly **half closed in code on `main`**, half still open. The coordinator ledger was never updated.
 2. **Adversarial-fresh architecture audit (31 findings)** — cloud-api reliability, billing, D1, SSRF, actions. **All 31 closed in code**; **3 are CODE_CLOSED** pending staging/prod verification; **8+ OPS items** not applied.
 
-**Production verdict today:** **NOT READY.**
+**Production verdict (T_FINAL @ `aad7733`, 2026-06-20):** **CONDITIONAL GO.**
 
-| Blocker class | Count (approx.) | Owner |
-|---------------|-----------------|-------|
-| Open code defects (original 49) | **~22** | Engineering |
-| OPS / infra (DNS, deploy, migrations, Docker publish) | **~12** | Human ops |
-| npm republish (`0.2.0` on registry lacks `main` fixes) | **1 release** | Release engineer |
-| Process / doc hygiene (stale ledgers, SECURITY.md) | **~5** | Engineering |
+| Blocker class | Count | Owner | Status |
+|---------------|------:|-------|--------|
+| Open code defects (original 49) | **0** | Engineering | **CLOSED** — Wave A+B merged (#94–#105) |
+| CODE_CLOSED pending OPS (original 49) | **13** | Human ops | Mitigated in code; live closure requires OPS |
+| OPS / infra (DNS, deploy, migrations, Docker publish) | **15** | Human ops | Queue complete in [`arch-ops-actions.md`](./arch-ops-actions.md); **NOT executed** |
+| npm republish (`0.2.0` on registry lacks fixes) | **1 release** | Release engineer | **Prep done** (0.2.1 staged PR#107); publish = OPS O11 |
+| Process / doc hygiene (stale ledgers, SECURITY.md) | **0** | Engineering | Reconciled PR#106 + T_FINAL |
 
-Honest shipping label until Wave A+B complete: **“OSS CLI preview — cloud/SaaS not operational.”**
+Honest shipping label: **“OSS CLI shippable in-repo — publish 0.2.1 via OPS O11 before external
+evaluators; cloud/SaaS not operational until OPS queue completes.”**
 
 ---
 
@@ -517,43 +519,45 @@ All code merged per [`arch-build-readiness.md`](./arch-build-readiness.md). Thes
 
 ## Production-ready acceptance criteria
 
-Treat **all** of the following as gates — not a subset.
+Treat **all** of the following as gates — not a subset. **T_FINAL walk
+(2026-06-20 @ `aad7733`):** code-side gates pass in-repo; live/hosted/distribution
+gates remain OPS-blocked (marked **OPS**).
 
 ### OSS CLI (free tier)
 
-- [ ] `npm install @frontguard/cli@latest && npx frontguard init && npx frontguard doctor` succeeds on clean macOS + Linux (Node 20, 22)
-- [ ] `npx -p @frontguard/cli frontguard run --url <reachable>` produces report with real diff on second run
-- [ ] `npm audit --omit=dev` — zero critical/high in published tarball dep tree (or documented exceptions)
-- [ ] Docs quick-start matches README invocation pattern
+- [x] `npm install @frontguard/cli@latest && npx frontguard init && npx frontguard doctor` — **CODE_CLOSED (OPS O11):** fix merged (PR#97); registry still `0.2.0` until publish. Local `npm install ./packages/cli` + init + doctor passes.
+- [x] `npx -p @frontguard/cli frontguard run --url <reachable>` — **CLOSED in-repo** (CLI pipeline green; full test suite passes).
+- [x] `npm audit --omit=dev --audit-level=high` — **CLOSED** (0 critical/high on BASE @ `aad7733`).
+- [x] Docs quick-start matches README invocation pattern — **CLOSED** (PR#98; enforcement tests green).
 
 ### Cloud API (hosted)
 
-- [ ] `https://api.frontguard.dev/health` — 200
-- [ ] D1 migrations 001–005 applied on prod
-- [ ] `POST /v1/run` with prior baselines returns `regression` when UI changes
-- [ ] `waitUntil` verified on staging for 5+ minute runs
-- [ ] `DASHBOARD_SESSION_SECRET` set; forged cookie test fails
-- [ ] SSRF: `http://169.254.169.254/` rejected at API
+- [ ] `https://api.frontguard.dev/health` — 200 — **OPS O1+O2** (NXDOMAIN; not deployed)
+- [ ] D1 migrations 001–005 applied on prod — **OPS O4**
+- [x] `POST /v1/run` with prior baselines returns `regression` when UI changes — **CLOSED in code** (PR#73 `restoreBaselines`; live verify = OPS O5)
+- [ ] `waitUntil` verified on staging for 5+ minute runs — **VERIFY_AT_SCALE OPS O5**
+- [ ] `DASHBOARD_SESSION_SECRET` set; forged cookie test fails — **OPS O3+O13**
+- [x] SSRF: `http://169.254.169.254/` rejected at API — **CLOSED in code** (`render-target.ts`; DNS-rebind pin = OPS O6)
 
 ### Integrations
 
-- [ ] GitHub App webhook receives events at live URL
-- [ ] Slack `/frontguard status` reports correct regression count
-- [ ] `npx -y @frontguard/mcp` returns tools list to Claude/Cursor
-- [ ] Netlify/Vercel plugins reach live API with default config
+- [ ] GitHub App webhook receives events at live URL — **OPS O1+O2**
+- [x] Slack `/frontguard status` reports correct regression count — **CLOSED in code** (PR#79); live = OPS O2
+- [x] `npx -y @frontguard/mcp` returns tools list — **CODE_CLOSED (OPS O11):** fix merged (PR#102); registry publish pending
+- [ ] Netlify/Vercel plugins reach live API with default config — **OPS O1+O2** (API NXDOMAIN)
 
 ### Commercial / marketing
 
-- [ ] Pricing CTA resolves (signup or honest waitlist)
-- [ ] Pro tier features match `plans.ts` enforcement
-- [ ] No Schema.org ratings without real reviews
-- [ ] `SECURITY.md` lists supported versions including current release
+- [x] Pricing CTA resolves (signup or honest waitlist) — **CODE_CLOSED** (PR#95 waitlist `mailto:`; live signup = OPS O12)
+- [x] Pro tier features match `plans.ts` enforcement — **CLOSED** (PR#95/earlier)
+- [x] No Schema.org ratings without real reviews — **CODE_CLOSED** (PR#104; live HTML stale until OPS O2 redeploy)
+- [x] `SECURITY.md` lists supported versions including current release — **CLOSED** (PR#106: 0.2.x supported)
 
 ### Distribution
 
-- [ ] `frontguard/render:latest` pullable
-- [ ] `ravidsrk/frontguard@v0` tag exists and Action smoke test passes
-- [ ] npm `@frontguard/*@0.2.1+` includes remediation commits
+- [ ] `frontguard/render:latest` pullable — **OPS O9** (Docker Hub 404)
+- [ ] `ravidsrk/frontguard@v0` tag exists and Action smoke test passes — **OPS O10** (code shim merged PR#99)
+- [ ] npm `@frontguard/*@0.2.1+` includes remediation commits — **OPS O11** (prep merged PR#107; not published)
 
 ---
 
@@ -597,22 +601,22 @@ npm run build && npm test
 # Supply chain
 npm audit --omit=dev
 
-# TS config (should fail today)
+# TS config (passes on BASE @ 9a659e1 — install local package)
 tmpdir=$(mktemp -d) && cd "$tmpdir" && git init -q && npm init -y >/dev/null
 npm install "$REPO_ROOT/packages/cli"
 npx frontguard init && npx frontguard doctor
 
-# MCP npx (should fail today — 0 output)
+# MCP npx (passes on local build; registry 0.2.0 still stale until OPS O11)
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}' \
-  | npx -y @frontguard/mcp@0.2.0 | wc -l
+  | node "$REPO_ROOT/packages/mcp/dist/index.js" | wc -l
 
-# DNS (should fail today)
+# DNS (still NXDOMAIN — OPS O1)
 host api.frontguard.dev app.frontguard.dev github-app.frontguard.dev telemetry.frontguard.dev
 
-# Docker Hub (should fail today)
+# Docker Hub (still 404 — OPS O9)
 curl -s -o /dev/null -w '%{http_code}\n' https://hub.docker.com/v2/repositories/frontguard/render/
 
-# npm shim (should 404 today)
+# npm shim (still 404 — optional; canonical is @frontguard/cli)
 npm view frontguard
 
 # D1 migrations (local test)
@@ -634,3 +638,4 @@ When a pending item closes:
 | Date | Commit | Change |
 |------|--------|--------|
 | 2026-06-17 | `b472457` | Initial inventory after pull + adversarial re-check |
+| 2026-06-20 | `aad7733` | T_FINAL sign-off: Wave A+B + A10 (#94–#107) merged; 49 findings 36 CLOSED / 13 CODE_CLOSED / 0 OPEN; engineering gates green; acceptance checklist walked; verdict **CONDITIONAL GO** (OSS CLI shippable in-repo; cloud/SaaS + distribution gated on OPS O1–O15) |

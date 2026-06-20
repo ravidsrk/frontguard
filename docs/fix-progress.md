@@ -2,7 +2,7 @@
 
 *Reconciled 2026-06-20 against `docs/production-pending.md` and
 `docs/production-close-progress.md` on BASE `ravidsrk/production-close` @
-`6ee923f` after Wave A+B code merges (PRs #94–#105). Canonical go/no-go
+`aad7733` after Wave A+B + A10 (#94–#107) and T_FINAL sign-off. Canonical go/no-go
 inventory: [`production-pending.md`](./production-pending.md).*
 
 **Source of truth (workers read this for the recommendations):**
