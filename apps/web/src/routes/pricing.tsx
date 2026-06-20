@@ -129,7 +129,7 @@ const matrix = [
 const faqs = [
   {
     q: 'How do I install Frontguard?',
-    a: 'Run npm install @frontguard/cli to install the engine, then npx frontguard init to write a typed config and npx frontguard run --url <your URL> to do your first scan. The Playwright plugin is a thin wrapper: npm install -D @frontguard/cli @frontguard/playwright.',
+    a: 'Run npm install @frontguard/cli to install the engine, then npx -p @frontguard/cli frontguard init to write a typed config and npx -p @frontguard/cli frontguard run --url <your URL> to do your first scan. The Playwright plugin is a thin wrapper: npm install -D @frontguard/cli @frontguard/playwright.',
   },
   {
     q: 'How does Frontguard handle cross-OS rendering differences?',

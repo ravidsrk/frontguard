@@ -43,8 +43,8 @@ MIT
 
 ```bash
 npm install @frontguard/cli
-npx frontguard init
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard init
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
 ### Playwright plugin
@@ -162,7 +162,7 @@ visual:
     - npm ci
     - npm run build
     - npm start &
-    - npx frontguard run --url http://localhost:3000
+    - npx -p @frontguard/cli frontguard run --url http://localhost:3000
   variables:
     FRONTGUARD_OPENAI_KEY: $OPENAI_KEY
   artifacts:
@@ -206,7 +206,7 @@ Maps to miniflare for the Worker runtime, SQLite in place of D1, and a local-dis
 
 ### How do I install Frontguard?
 
-`npm install @frontguard/cli`, then `npx frontguard init`, then `npx frontguard run --url <your URL>`.
+`npm install @frontguard/cli`, then `npx -p @frontguard/cli frontguard init`, then `npx -p @frontguard/cli frontguard run --url <your URL>`.
 
 ### How does Frontguard handle cross-OS rendering differences?
 
