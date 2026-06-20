@@ -183,7 +183,7 @@ visual:
 - `recent_runs(repo, branch)`
 
 ```bash
-npx @frontguard/mcp
+npx -y @frontguard/mcp
 ```
 
 Drop into `mcp.json` per the docs at https://frontguard.dev/docs/integrations/mcp.

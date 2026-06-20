@@ -25,7 +25,7 @@ export const acceptBaselineInputSchema = {
 
 export type AcceptBaselineInput = {
   run_id: string;
-  confirm_all_regressions_reviewed: true;
+  confirm_all_regressions_reviewed?: boolean;
 };
 
 export interface AcceptBaselineResult {
@@ -37,6 +37,11 @@ export async function acceptBaseline(
   client: CloudClient,
   input: AcceptBaselineInput,
 ): Promise<AcceptBaselineResult> {
+  if (input.confirm_all_regressions_reviewed !== true) {
+    throw new Error(
+      'confirm_all_regressions_reviewed must be true — review every regression from list_regressions before approving the baseline.',
+    );
+  }
   const res = await client.approveBaseline(input.run_id);
   return { approved: res.approved, runId: res.runId };
 }
