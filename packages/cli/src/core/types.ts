@@ -334,6 +334,8 @@ export interface StorybookIntegrationConfig {
   exclude?: string[];
   /** Optional fetch timeout for the index request, in milliseconds. */
   fetchTimeoutMs?: number;
+  /** Root directory of the Storybook project (for `importPath` resolution). */
+  projectRoot?: string;
 }
 
 /**

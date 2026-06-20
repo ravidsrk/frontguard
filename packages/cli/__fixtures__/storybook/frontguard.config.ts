@@ -20,5 +20,6 @@ export default {
   storybook: {
     url: 'http://localhost:6006',
     stories: ['**'],
+    projectRoot: import.meta.dirname,
   },
 };
