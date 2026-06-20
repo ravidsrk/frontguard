@@ -119,6 +119,7 @@ describe('route SEO head', () => {
       '@type': string
     }
     expect(jsonLd['@type']).toBe('SoftwareApplication')
+    expect(jsonLd).not.toHaveProperty('aggregateRating')
   })
 
   it('pricing exposes canonical, OG, Twitter, and FAQPage JSON-LD script', async () => {
