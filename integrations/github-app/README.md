@@ -20,12 +20,14 @@ the tagged release of the action (`ravidsrk/frontguard@v0`).
 
 ## Install
 
-The hosted app lives in the GitHub Marketplace:
+The GitHub Marketplace listing is **in review** — there is no live one-click
+install URL yet. To use the GitHub App today, self-host the worker from
+[`integrations/github-app/`](./) (see [Self-hosting](#self-hosting) below).
 
-  → <https://github.com/marketplace/frontguard>
-
-Click **Install**, choose the repositories you want covered, and merge the
-bootstrap PR. That's it — your next PR gets a Frontguard check run.
+Once the listing is approved, installing is one-click from the GitHub
+Marketplace: pick the account (personal or organisation), choose the
+repositories to grant access to, and merge the bootstrap PR the app opens.
+Your next PR then gets a Frontguard check run.
 
 ### Choose repositories
 

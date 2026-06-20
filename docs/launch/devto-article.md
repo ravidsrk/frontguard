@@ -54,7 +54,7 @@ Frontguard is **CLI-first** and **Playwright-native**. There's no SaaS you're
 forced into, no dashboard you have to live in. You run:
 
 ```bash
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
 …and it captures, diffs, and *judges*. Three ideas do the heavy lifting.

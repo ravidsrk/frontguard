@@ -145,7 +145,7 @@ CTAs: Install (→ `#install`, with arrow icon), See it work (→ `#demo`), GitH
 Demo panel: window chrome (red/yellow/green dots + `frontguard run` label). Primary content is `/demo/frontguard-demo.gif` (alt text describes a /checkout regression, AI explanation, sandbox-verified CSS fix; `loading="eager"`, 1200×700). On image `onError`, falls back to an animated terminal mock built from `terminalLines` (14 lines), color-coded by type (command/success/warning/danger/ai/fix/patchRemove/patchAdd), each line fading in on a stagger (`500 + i*60` ms). The terminal mock content:
 
 ```
-$ npx frontguard run --url https://myapp.com
+$ npx -p @frontguard/cli frontguard run --url https://myapp.com
 
 ✔ Discovering routes — 8 route(s) found
 ✔ Rendering — 24 screenshots · 3 viewports · 3 browsers
@@ -200,7 +200,7 @@ Row-count discrepancy with the static fallback: the `index.html` SEO-fallback co
 
 Eyebrow "Quick start". Heading: "Install in 30 seconds, three ways." Sub: "One CLI package, three integration paths. Pick the one that matches your stack." Three tabs:
 
-- CLI: `npm install @frontguard/cli` / `npx frontguard init` / `npx frontguard run --url http://localhost:3000`
+- CLI: `npm install @frontguard/cli` / `npx -p @frontguard/cli frontguard init` / `npx -p @frontguard/cli frontguard run --url http://localhost:3000`
 - Playwright plugin: `npm install -D @frontguard/cli @frontguard/playwright` + a `tests/checkout.spec.ts` using `visualTest`
 - GitHub Action: `.github/workflows/visual.yml` snippet pinned to `ravidsrk/frontguard@v1`
 

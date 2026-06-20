@@ -25,21 +25,25 @@ export interface ValidationPayload {
     recheckRouteCount: number
     recheckPositiveCount: number
     pixelFalsePositiveRate: number
+    methodologyValidated: boolean
+    recheckMeasuredRouteCount: number
   }
   repos: ValidationRepo[]
 }
 
 export const VALIDATION: ValidationPayload = {
-  runDate: '2026-06-16',
+  runDate: '2026-06-20',
   cliVersion: '0.2.0',
   aiEnabled: false,
   aggregate: {
     reposAttempted: 5,
     reposBooted: 2,
     reposSkipped: 3,
-    recheckRouteCount: 43,
+    recheckRouteCount: 39,
     recheckPositiveCount: 0,
     pixelFalsePositiveRate: 0,
+    methodologyValidated: true,
+    recheckMeasuredRouteCount: 39,
   },
   repos: [
     {

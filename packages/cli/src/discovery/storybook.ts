@@ -24,8 +24,14 @@
  * @module discovery/storybook
  */
 
-import type { FrontguardConfig, IgnoreRule, Route } from '../core/types.js';
+import type { FrontguardConfig, Route } from '../core/types.js';
 import { logger } from '../utils/logger.js';
+import {
+  resolveStoryFrontguardParameters,
+  type StoryFrontguardParameters,
+} from './storybook-parameters.js';
+
+export type { StoryFrontguardParameters };
 
 // ---------------------------------------------------------------------------
 // Public Config Surface
@@ -61,29 +67,17 @@ export interface StorybookConfig {
    * Defaults to 15s.
    */
   fetchTimeoutMs?: number;
+  /**
+   * Root directory of the Storybook project (where `importPath` files live).
+   * When omitted, Frontguard walks up from `process.cwd()` looking for
+   * `.storybook/main.*`.
+   */
+  projectRoot?: string;
 }
 
 // ---------------------------------------------------------------------------
 // Index Schemas (intentionally permissive — we only read a few fields)
 // ---------------------------------------------------------------------------
-
-/**
- * Per-story Frontguard overrides set via `parameters.frontguard` in the
- * story file. All fields are optional; missing fields fall back to global
- * config.
- */
-export interface StoryFrontguardParameters {
-  /** Override viewport widths for this story (e.g. `[375, 1024]`). */
-  viewports?: number[];
-  /** Override pixel-diff threshold for this story (fraction 0–1). */
-  threshold?: number;
-  /** Extra ignore rules merged with the global config rules. */
-  ignore?: IgnoreRule[];
-  /** When `true`, skip this story entirely (still enumerated, not captured). */
-  skip?: boolean;
-  /** Optional human-readable label override for reports. */
-  label?: string;
-}
 
 /** Shape of a single story entry in `index.json` (Storybook 8). */
 interface RawStoryEntry {
@@ -323,6 +317,16 @@ export async function discoverStorybookStories(
   const includes = sbConfig.stories ?? [];
   const excludes = sbConfig.exclude ?? [];
 
+  const paramMap = await resolveStoryFrontguardParameters(
+    normalizeBase(sbConfig.url),
+    Object.values(entries),
+    {
+      storybookMajor,
+      projectRoot: sbConfig.projectRoot,
+      fetchTimeoutMs: sbConfig.fetchTimeoutMs,
+    },
+  );
+
   const routes: Route[] = [];
   let docsSkipped = 0;
   let filtered = 0;
@@ -347,7 +351,7 @@ export async function discoverStorybookStories(
       continue;
     }
 
-    const params = entry.parameters?.frontguard;
+    const params = paramMap.get(entry.id) ?? entry.parameters?.frontguard;
     if (params?.skip) {
       paramSkipped++;
       continue;
@@ -404,8 +408,8 @@ export async function discoverStorybookRoutesForConfig(
  *
  * Strategy:
  *   1. Wait for `window.__STORYBOOK_PREVIEW__` to exist.
- *   2. Watch `storyRenders` (Storybook 8) for `phase === 'completed'` /
- *      `'played'` — this is set after the play function resolves.
+ *   2. Watch `storyRenders` (Storybook 8) for terminal phases — `'completed'`,
+ *      `'finished'` (SB 8.6+), or `'played'` — set after the play function resolves.
  *   3. As a Storybook 7 fallback, listen for the `storyRendered` channel
  *      event and resolve when it fires.
  *   4. Network idle + a final animation frame for paint stability.
@@ -426,7 +430,13 @@ export const STORYBOOK_READY_SCRIPT = `(timeoutMs) => new Promise((resolve) => {
   }
 
   function isCompletedPhase(phase) {
-    return phase === 'completed' || phase === 'played' || phase === 'errored' || phase === 'aborted';
+    return (
+      phase === 'completed' ||
+      phase === 'finished' ||
+      phase === 'played' ||
+      phase === 'errored' ||
+      phase === 'aborted'
+    );
   }
 
   function poll() {

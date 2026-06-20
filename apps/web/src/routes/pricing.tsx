@@ -78,8 +78,8 @@ const tiers: Tier[] = [
     per: '/ month',
     featured: true,
     tagline: 'A hosted dashboard and managed baselines for solo devs and small teams.',
-    cta: 'Start 14-day trial',
-    ctaHref: 'https://app.frontguard.dev/signup',
+    cta: 'Join the waitlist',
+    ctaHref: 'mailto:hello@frontguard.dev?subject=Pro%20waitlist',
     external: true,
     featuresLabel: 'EVERYTHING IN OPEN SOURCE, PLUS',
     features: [
@@ -129,7 +129,7 @@ const matrix = [
 const faqs = [
   {
     q: 'How do I install Frontguard?',
-    a: 'Run npm install @frontguard/cli to install the engine, then npx frontguard init to write a typed config and npx frontguard run --url <your URL> to do your first scan. The Playwright plugin is a thin wrapper: npm install -D @frontguard/cli @frontguard/playwright.',
+    a: 'Run npm install @frontguard/cli to install the engine, then npx -p @frontguard/cli frontguard init to write a typed config and npx -p @frontguard/cli frontguard run --url <your URL> to do your first scan. The Playwright plugin is a thin wrapper: npm install -D @frontguard/cli @frontguard/playwright.',
   },
   {
     q: 'How does Frontguard handle cross-OS rendering differences?',
@@ -153,7 +153,7 @@ const faqs = [
   },
   {
     q: 'Is there an MCP server for in-IDE agents?',
-    a: '@frontguard/mcp exposes list_regressions(pr_id), get_suggested_fix(diff_id), accept_baseline(diff_id), and recent_runs(repo, branch) to Claude Code, Cursor, Cline, and Copilot. Run as npx @frontguard/mcp and drop the snippet into your mcp.json.',
+    a: '@frontguard/mcp exposes list_regressions(pr_id), get_suggested_fix(diff_id), accept_baseline(run_id — run-scoped), and recent_runs(repo, branch) to Claude Code, Cursor, Cline, and Copilot. Run as npx -y @frontguard/mcp and drop the snippet into your mcp.json.',
   },
   {
     q: "What's the data retention policy for screenshots?",

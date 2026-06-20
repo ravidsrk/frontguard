@@ -13,6 +13,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { tsImport } from 'tsx/esm/api';
 import type { FrontguardConfig } from './types.js';
 import { getFrameworkInfo } from '../templates/index.js';
 
@@ -205,7 +206,7 @@ export const configSchema = z.object({
   /** Screenshot image-upload configuration (for PR comment thumbnails). */
   imageUpload: imageUploadSchema.optional(),
 
-  /** Anonymous usage telemetry (default: true). Set false to opt out. */
+  /** Anonymous usage telemetry (default: false). Set true to opt in. */
   telemetry: z.boolean().optional(),
 
   /** Generate AI-powered CSS fixes for regressions (requires `ai`). */
@@ -226,6 +227,7 @@ export const configSchema = z.object({
       stories: z.array(z.string().min(1)).optional(),
       exclude: z.array(z.string().min(1)).optional(),
       fetchTimeoutMs: z.number().int().positive().optional(),
+      projectRoot: z.string().min(1).optional(),
     })
     .optional(),
 });
@@ -331,13 +333,36 @@ export function detectSecrets(obj: unknown, path = 'config'): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * Unwraps nested ESM default exports (tsx may double-wrap `export default`).
+ */
+function resolveModuleExport(mod: unknown): unknown {
+  let current = mod;
+  while (
+    current !== null &&
+    typeof current === 'object' &&
+    'default' in current &&
+    (current as { default?: unknown }).default !== undefined
+  ) {
+    const next = (current as { default: unknown }).default;
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+}
+
+/**
  * Dynamically imports a JS/TS/MJS config file and returns its default
  * export (or the module itself if there is no default).
  */
 async function loadConfigFile(filePath: string): Promise<unknown> {
-  const fileUrl = pathToFileURL(resolve(filePath)).href;
+  const resolved = resolve(filePath);
+  if (resolved.endsWith('.ts') || resolved.endsWith('.mts')) {
+    const mod = await tsImport(resolved, import.meta.url);
+    return resolveModuleExport(mod);
+  }
+  const fileUrl = pathToFileURL(resolved).href;
   const mod = await import(fileUrl);
-  return mod.default ?? mod;
+  return resolveModuleExport(mod);
 }
 
 /**
@@ -558,14 +583,11 @@ export function generateDefaultConfig(options: GenerateConfigOptions = {}): stri
     return JSON.stringify(config, null, 2) + '\n';
   }
 
-  // JS / TS format
+  // JS / TS format — keep the scaffold self-contained so the CLI can load it
+  // without importing @frontguard/cli (that would cycle back into this module).
   const exportKeyword = format === 'ts' ? 'export default' : 'module.exports =';
-  const typeAnnotation = format === 'ts'
-    ? "import type { FrontguardConfig } from '@frontguard/cli';\n\n"
-    : '';
-  const satisfies = format === 'ts' ? ' satisfies FrontguardConfig' : '';
 
-  return `${typeAnnotation}${frameworkComment}${exportKeyword} {
+  return `${frameworkComment}${exportKeyword} {
   version: 1,
   baseUrl: '${baseUrl}',
   ${routeHint}
@@ -578,6 +600,6 @@ export function generateDefaultConfig(options: GenerateConfigOptions = {}): stri
   pageTimeout: 30000,
   maxHeight: 5000,
   outputDir: './frontguard-report',
-}${satisfies};
+};
 `;
 }

@@ -91,3 +91,15 @@ jobs:
             echo "⚠️ Bundle exceeds 180KB"
             exit 1
           fi
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - name: npm audit (prod, high+)
+        run: npm audit --omit=dev --audit-level=high

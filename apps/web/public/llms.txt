@@ -30,8 +30,8 @@ Frontguard is an open-source CLI + cloud platform. The CLI is MIT-licensed and f
 
 ```
 npm install @frontguard/cli
-npx frontguard init
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard init
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
 Playwright plugin:

@@ -1,6 +1,6 @@
 {
   "name": "@frontguard/cloud-api",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Cloud API service for Frontguard",
   "license": "MIT",
@@ -35,8 +35,8 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@daytonaio/sdk": "^0.158.0",
-    "hono": "^4.12.9",
+    "@daytona/sdk": "^0.189.0",
+    "hono": "^4.12.26",
     "zod": "^3.25.67"
   },
   "devDependencies": {

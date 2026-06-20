@@ -176,6 +176,41 @@ describe('list_regressions', () => {
     expect(out.runId).toBe(null);
     expect(out.notFound?.reason).toMatch(/No Frontguard run found for pr_id=1234/);
   });
+
+  it('does not treat first-time baseline status=new as a regression', async () => {
+    const runWithNewBaseline = {
+      ...SAMPLE_RUN,
+      id: 'run_new_baseline',
+      results: [
+        {
+          route: '/',
+          viewport: 1280,
+          status: 'new',
+          diffPercentage: 0,
+          timestamp: '2026-06-10T10:00:10.000Z',
+        },
+        {
+          route: '/pricing',
+          viewport: 1280,
+          status: 'regression',
+          diffPercentage: 0.087,
+          classification: 'regression',
+          timestamp: '2026-06-10T10:00:20.000Z',
+        },
+      ],
+    };
+    const client = new CloudClient(AUTH, {
+      fetch: (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+        const path = new URL(url).pathname;
+        if (path === '/v1/runs/run_new_baseline') return Response.json(runWithNewBaseline);
+        return makeStubFetch({ approved: [] })(input, init);
+      }) as typeof fetch,
+    });
+    const out = await listRegressions(client, { pr_id: 'run_new_baseline' });
+    expect(out.count).toBe(1);
+    expect(out.regressions[0].route).toBe('/pricing');
+  });
 });
 
 describe('get_suggested_fix', () => {
@@ -212,20 +247,47 @@ describe('get_suggested_fix', () => {
 });
 
 describe('accept_baseline', () => {
-  it('approves the run derived from a diff id', async () => {
+  it('approves a run when all regressions were reviewed', async () => {
     const state: StubState = { approved: [] };
     const client = buildClient(state);
-    const out = await acceptBaseline(client, { diff_id: 'run_pr42:/pricing:1280' });
+    const out = await acceptBaseline(client, {
+      run_id: 'run_pr42',
+      confirm_all_regressions_reviewed: true,
+    });
     expect(out).toEqual({ approved: true, runId: 'run_pr42' });
     expect(state.approved).toEqual(['run_pr42']);
   });
 
-  it('approves a bare run id', async () => {
+  it('approves a different run id', async () => {
     const state: StubState = { approved: [] };
     const client = buildClient(state);
-    const out = await acceptBaseline(client, { diff_id: 'run_pr99' });
+    const out = await acceptBaseline(client, {
+      run_id: 'run_pr99',
+      confirm_all_regressions_reviewed: true,
+    });
     expect(out).toEqual({ approved: true, runId: 'run_pr99' });
     expect(state.approved).toEqual(['run_pr99']);
+  });
+
+  it('rejects when confirm_all_regressions_reviewed is missing (direct handler)', async () => {
+    const state: StubState = { approved: [] };
+    const client = buildClient(state);
+    await expect(acceptBaseline(client, { run_id: 'run_pr42' })).rejects.toThrow(
+      /confirm_all_regressions_reviewed must be true/,
+    );
+    expect(state.approved).toEqual([]);
+  });
+
+  it('rejects when confirm_all_regressions_reviewed is false (direct handler)', async () => {
+    const state: StubState = { approved: [] };
+    const client = buildClient(state);
+    await expect(
+      acceptBaseline(client, {
+        run_id: 'run_pr42',
+        confirm_all_regressions_reviewed: false,
+      }),
+    ).rejects.toThrow(/confirm_all_regressions_reviewed must be true/);
+    expect(state.approved).toEqual([]);
   });
 });
 
@@ -257,6 +319,34 @@ describe('recent_runs', () => {
     const out = await recentRuns(client, { limit: 1 });
     expect(out.count).toBe(1);
     expect(out.runs[0].runId).toBe('run_pr99');
+  });
+
+  it('does not count status=new rows in regressionsCount (mcp-8)', async () => {
+    const runWithNewBaseline = {
+      ...SAMPLE_RUN,
+      id: 'run_new_only',
+      results: [
+        {
+          route: '/',
+          viewport: 1280,
+          status: 'new',
+          diffPercentage: 0,
+          timestamp: '2026-06-10T10:00:10.000Z',
+        },
+      ],
+    };
+    const client = new CloudClient(AUTH, {
+      fetch: (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+        const path = new URL(url).pathname;
+        if (path === '/v1/runs') {
+          return Response.json({ runs: [runWithNewBaseline], total: 1 });
+        }
+        return makeStubFetch({ approved: [] })(input, init);
+      }) as typeof fetch,
+    });
+    const out = await recentRuns(client, {});
+    expect(out.runs[0].regressionsCount).toBe(0);
   });
 });
 
@@ -319,6 +409,16 @@ describe('MCP server tools/list + tools/call', () => {
     await server.close();
   });
 
+  it('accept_baseline description states run-scoped approval (mcp-6)', async () => {
+    const { client, server } = await connectPair();
+    const res = await client.listTools();
+    const tool = res.tools.find((t) => t.name === 'accept_baseline');
+    expect(tool?.description).toMatch(/run-scoped/i);
+    expect(tool?.description).toMatch(/confirm_all_regressions_reviewed/i);
+    await client.close();
+    await server.close();
+  });
+
   function extractText(res: CallToolResult): string {
     const part = res.content?.[0];
     if (!part || part.type !== 'text') throw new Error('expected text content');
@@ -353,10 +453,34 @@ describe('MCP server tools/list + tools/call', () => {
     const { client, server } = await connectPair();
     const res = (await client.callTool({
       name: 'accept_baseline',
-      arguments: { diff_id: 'run_pr42:/pricing:1280' },
+      arguments: { run_id: 'run_pr42', confirm_all_regressions_reviewed: true },
     })) as CallToolResult;
     expect(res.isError).toBeFalsy();
     expect(state.approved).toEqual(['run_pr42']);
+    await client.close();
+    await server.close();
+  });
+
+  it('accept_baseline rejects missing confirm_all_regressions_reviewed without approving', async () => {
+    const { client, server } = await connectPair();
+    const res = (await client.callTool({
+      name: 'accept_baseline',
+      arguments: { run_id: 'run_pr42' },
+    })) as CallToolResult;
+    expect(res.isError).toBe(true);
+    expect(state.approved).toEqual([]);
+    await client.close();
+    await server.close();
+  });
+
+  it('accept_baseline rejects false confirm_all_regressions_reviewed without approving', async () => {
+    const { client, server } = await connectPair();
+    const res = (await client.callTool({
+      name: 'accept_baseline',
+      arguments: { run_id: 'run_pr42', confirm_all_regressions_reviewed: false },
+    })) as CallToolResult;
+    expect(res.isError).toBe(true);
+    expect(state.approved).toEqual([]);
     await client.close();
     await server.close();
   });

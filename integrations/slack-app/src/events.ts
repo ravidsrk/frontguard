@@ -1,3 +1,5 @@
+import { isAllowedRunUrl } from './runs.js';
+
 /**
  * Pure decisioning for Slack Events API envelopes and slash commands.
  *
@@ -93,6 +95,12 @@ export function decideCommand(cmd: SlackCommand): CommandDecision {
       new URL(cleaned);
     } catch {
       return { kind: 'status_invalid', reason: 'That URL is not valid' };
+    }
+    if (!isAllowedRunUrl(cleaned)) {
+      return {
+        kind: 'status_invalid',
+        reason: 'That URL targets a private or internal address and cannot be checked',
+      };
     }
     return { kind: 'status', url: cleaned };
   }
