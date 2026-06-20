@@ -24,7 +24,7 @@ jobs:
   smoke-root-action:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Assert repo-root action.yml exists (int-3 regression guard)
         run: test -f ./action.yml
@@ -54,7 +54,7 @@ jobs:
   smoke-subpath-action:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Assert sub-path action.yml exists
         run: test -f ./packages/cli/action.yml
