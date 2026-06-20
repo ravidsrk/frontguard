@@ -13,6 +13,7 @@
 import { z } from 'zod';
 import type { CloudClient, CloudRun, CloudRunResult } from '../client/cloud.js';
 import { diffIdFor } from '../client/cloud.js';
+import { isRegressionResult } from './_regression.js';
 
 export const listRegressionsInputSchema = {
   pr_id: z
@@ -61,10 +62,8 @@ export interface ListRegressionsResult {
   notFound?: { reason: string };
 }
 
-const REGRESSION_STATUSES = new Set(['regression', 'changed', 'new', 'error']);
-
 function isRegression(r: CloudRunResult): boolean {
-  return REGRESSION_STATUSES.has(r.status) || (r.classification === 'regression');
+  return isRegressionResult(r);
 }
 
 function matchesPrFilter(run: CloudRun, prId: number | string, repo?: string): boolean {
