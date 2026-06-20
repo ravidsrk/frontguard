@@ -179,7 +179,7 @@ visual:
 
 - `list_regressions(pr_id)`
 - `get_suggested_fix(diff_id)`
-- `accept_baseline(diff_id)`
+- `accept_baseline(run_id, confirm_all_regressions_reviewed: true)` — run-scoped, not per-diff
 - `recent_runs(repo, branch)`
 
 ```bash
