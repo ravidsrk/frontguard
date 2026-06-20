@@ -28,7 +28,8 @@ import {
 } from './events.js';
 import { buildSlackAuthorizeUrl, exchangeSlackCode, type SlackOAuthConfig } from './oauth.js';
 import { putTeamInstall, type KVNamespace } from './storage.js';
-import { submitCloudRun, deliverRunResult } from './runs.js';
+import { submitCloudRun, deliverRunResult, assertSafeRunUrl } from './runs.js';
+import { SafeRenderTargetError } from '@frontguard/cloud-api/render-target';
 
 export type { KVNamespace } from './storage.js';
 
@@ -144,6 +145,7 @@ export function createSlackApp() {
       // Submit synchronously so we can surface 4xx errors (auth, plan limit)
       // in the ack response. The follow-up message is delivered later.
       try {
+        await assertSafeRunUrl(decision.url);
         const run = await submitCloudRun({ apiBaseUrl: apiUrl, apiKey, url: decision.url });
         // `executionCtx` is a getter in Hono that throws when no Workers context
         // is attached (e.g. in tests / Node). Read it defensively.
@@ -171,9 +173,15 @@ export function createSlackApp() {
           text: `🔍 Queued visual check \`${run.id}\` for \`${decision.url}\`. I'll post the result here when it's done.`,
         });
       } catch (err) {
+        const message =
+          err instanceof SafeRenderTargetError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : String(err);
         return c.json({
           response_type: 'ephemeral',
-          text: `:warning: Could not submit the run: ${err instanceof Error ? err.message : String(err)}`,
+          text: `:warning: Could not submit the run: ${message}`,
         });
       }
     }

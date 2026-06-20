@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@frontguard/cloud-api": "*",
     "hono": "^4.12.9"
   },
   "devDependencies": {
