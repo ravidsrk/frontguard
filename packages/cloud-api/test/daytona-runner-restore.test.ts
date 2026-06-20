@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
-// Shared sandbox + call log, hoisted so the @daytonaio/sdk mock factory can
+// Shared sandbox + call log, hoisted so the @daytona/sdk mock factory can
 // reference them. The mock keeps the real SDK (and its transitive `ws` dep)
 // from ever loading.
 const h = vi.hoisted(() => {
@@ -38,7 +38,7 @@ const h = vi.hoisted(() => {
   return { calls, sandbox };
 });
 
-vi.mock('@daytonaio/sdk', () => ({
+vi.mock('@daytona/sdk', () => ({
   Daytona: class {
     async create() {
       h.calls.push('create');
