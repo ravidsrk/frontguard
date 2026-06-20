@@ -102,7 +102,7 @@ Point the server at a local `wrangler dev` instance of `@frontguard/cloud-api`:
 ```bash
 export FRONTGUARD_API_URL=http://localhost:8787
 export FRONTGUARD_API_KEY=fg_dev_localkey
-npx @frontguard/mcp
+npx -y @frontguard/mcp
 ```
 
 The cloud client strips trailing slashes and validates that `FRONTGUARD_API_KEY` is non-empty on every tool call.

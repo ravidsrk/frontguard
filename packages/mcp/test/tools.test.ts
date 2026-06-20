@@ -268,6 +268,27 @@ describe('accept_baseline', () => {
     expect(out).toEqual({ approved: true, runId: 'run_pr99' });
     expect(state.approved).toEqual(['run_pr99']);
   });
+
+  it('rejects when confirm_all_regressions_reviewed is missing (direct handler)', async () => {
+    const state: StubState = { approved: [] };
+    const client = buildClient(state);
+    await expect(acceptBaseline(client, { run_id: 'run_pr42' })).rejects.toThrow(
+      /confirm_all_regressions_reviewed must be true/,
+    );
+    expect(state.approved).toEqual([]);
+  });
+
+  it('rejects when confirm_all_regressions_reviewed is false (direct handler)', async () => {
+    const state: StubState = { approved: [] };
+    const client = buildClient(state);
+    await expect(
+      acceptBaseline(client, {
+        run_id: 'run_pr42',
+        confirm_all_regressions_reviewed: false,
+      }),
+    ).rejects.toThrow(/confirm_all_regressions_reviewed must be true/);
+    expect(state.approved).toEqual([]);
+  });
 });
 
 describe('recent_runs', () => {
@@ -436,6 +457,30 @@ describe('MCP server tools/list + tools/call', () => {
     })) as CallToolResult;
     expect(res.isError).toBeFalsy();
     expect(state.approved).toEqual(['run_pr42']);
+    await client.close();
+    await server.close();
+  });
+
+  it('accept_baseline rejects missing confirm_all_regressions_reviewed without approving', async () => {
+    const { client, server } = await connectPair();
+    const res = (await client.callTool({
+      name: 'accept_baseline',
+      arguments: { run_id: 'run_pr42' },
+    })) as CallToolResult;
+    expect(res.isError).toBe(true);
+    expect(state.approved).toEqual([]);
+    await client.close();
+    await server.close();
+  });
+
+  it('accept_baseline rejects false confirm_all_regressions_reviewed without approving', async () => {
+    const { client, server } = await connectPair();
+    const res = (await client.callTool({
+      name: 'accept_baseline',
+      arguments: { run_id: 'run_pr42', confirm_all_regressions_reviewed: false },
+    })) as CallToolResult;
+    expect(res.isError).toBe(true);
+    expect(state.approved).toEqual([]);
     await client.close();
     await server.close();
   });
