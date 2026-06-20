@@ -7,7 +7,7 @@
  *   npx tsx scripts/test-daytona.ts
  */
 
-import { Daytona } from '@daytonaio/sdk';
+import { Daytona } from '@daytona/sdk';
 
 async function test() {
   console.log('🧪 Testing Daytona sandbox creation...\n');

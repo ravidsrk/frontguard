@@ -234,7 +234,7 @@ interface DaytonaSnapshotModule {
 }
 
 /**
- * Publishes the snapshot using `@daytonaio/sdk`. The runCommands here mirror
+ * Publishes the snapshot using `@daytona/sdk`. The runCommands here mirror
  * the steps in `packages/cli/docker/Dockerfile` — keep them aligned when you
  * change one. The Daytona SDK can't `docker build` a Dockerfile directly, so
  * we reproduce the install sequence using `Image.base().runCommands()`.
@@ -242,10 +242,10 @@ interface DaytonaSnapshotModule {
 async function publishSnapshot(args: { name: string; dryRun: boolean }): Promise<void> {
   let mod: DaytonaSnapshotModule;
   try {
-    mod = (await import('@daytonaio/sdk')) as unknown as DaytonaSnapshotModule;
+    mod = (await import('@daytona/sdk')) as unknown as DaytonaSnapshotModule;
   } catch {
     throw new Error(
-      'The @daytonaio/sdk package is not installed. Run `npm install` at the repo root first.',
+      'The @daytona/sdk package is not installed. Run `npm install` at the repo root first.',
     );
   }
 
