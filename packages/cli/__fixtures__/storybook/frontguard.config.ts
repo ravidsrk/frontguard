@@ -3,7 +3,7 @@
  *
  * Boot Storybook (`npm run storybook`) on port 6006, then:
  *
- *   npx frontguard run --config packages/cli/__fixtures__/storybook/frontguard.config.ts
+ *   npx -p @frontguard/cli frontguard run --config packages/cli/__fixtures__/storybook/frontguard.config.ts
  */
 export default {
   version: 1,

@@ -281,13 +281,13 @@ export function runInit(opts: InitOptions = {}): InitResult {
   if (useStorybook) {
     logger.info('  1. Start your Storybook (e.g. npm run storybook)');
     logger.info(`     Frontguard expects it at ${storybookUrl}`);
-    logger.info('  2. Run: npx frontguard run');
+    logger.info('  2. Run: npx -p @frontguard/cli frontguard run');
     logger.info('  3. (Optional) Add `parameters.frontguard` to individual stories');
     logger.info('     to set per-story viewports, threshold, or ignore rules.');
   } else {
     logger.info(`  1. Edit ${fileName} to set your baseUrl and routes`);
     logger.info('  2. Start your dev server (e.g. npm run dev)');
-    logger.info('  3. Run: npx frontguard run');
+    logger.info('  3. Run: npx -p @frontguard/cli frontguard run');
   }
   logger.info('');
   logger.info('On first run, Frontguard captures baselines.');

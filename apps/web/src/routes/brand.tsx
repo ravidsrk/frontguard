@@ -463,7 +463,7 @@ function Brand() {
                 MONO / 13
               </span>
               <span style={s(`font-family: ${MONO}; font-size: 13px; color: #e8862e;`)}>
-                $ npx frontguard run --url localhost:3000
+                $ npx -p @frontguard/cli frontguard run --url localhost:3000
               </span>
             </div>
           </div>
