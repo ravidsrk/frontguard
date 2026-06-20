@@ -1,4 +1,5 @@
 export const REPO_URL = 'https://github.com/ravidsrk/frontguard'
-export const DOCS_BASE = 'https://frontguard.dev'
+/** Canonical public docs host (TanStack app at /docs). */
+export const DOCS_EXTERNAL = 'https://frontguard.dev'
 
-export const docsUrl = (path: string) => `${DOCS_BASE}/docs/${path}`
+export const docsUrl = (path: string) => `${DOCS_EXTERNAL}/docs/${path}`

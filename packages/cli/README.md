@@ -239,7 +239,7 @@ GITHUB_TOKEN=ghp_...
 
 ## Documentation
 
-Full documentation lives at [docs.frontguard.dev](https://docs.frontguard.dev). Source and issues: [github.com/ravidsrk/frontguard](https://github.com/ravidsrk/frontguard).
+Full documentation lives at [frontguard.dev/docs](https://frontguard.dev/docs). Source and issues: [github.com/ravidsrk/frontguard](https://github.com/ravidsrk/frontguard).
 
 ## License
 

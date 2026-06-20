@@ -7,6 +7,7 @@
  *   1. Every href="/docs/<slug>" in docs-content.ts resolves to a real article id.
  *   2. Action refs — only `ravidsrk/frontguard@v0` is allowed (forbids @v1 / @main).
  *   3. No dead marketplace listing URLs (404 until OPS publishes listings).
+ *   4. No forbidden doc patterns (fake CLI flags, invented commands, stale paths).
  *
  * Scans: apps/web/src/lib/docs-content.ts, apps/web/public/llms*.txt,
  * integration READMEs (github/netlify/vercel), and design-extract doc snapshots.
@@ -28,6 +29,15 @@ const DEAD_MARKETPLACE_URLS = [
 ];
 const ID_RE = /\{\s*id:\s*"([^"]+)"/g;
 const LINK_RE = /href="(\/docs\/[^"#?]+)"/g;
+const FORBIDDEN_PATTERNS = [
+  { re: /--baseline-strategy\b/, label: 'nonexistent --baseline-strategy flag' },
+  { re: /--ai\b/, label: 'nonexistent --ai flag' },
+  { re: /frontguard approve/, label: 'invented frontguard approve command' },
+  { re: /scheduled-monitors/, label: 'dead /docs/guides/scheduled-monitors link' },
+  { re: /guides\/frontguard-vs-(percy|chromatic)/, label: 'stale guides/ comparison path' },
+  { re: /Docker will pull/, label: 'unpublished registry pull promise' },
+  { re: /docs\.frontguard\.dev/, label: 'stale docs.frontguard.dev host' },
+];
 
 const SCAN_TARGETS = [
   { path: join(HERE, '../src/lib/docs-content.ts'), label: 'docs-content.ts', lines: true },
@@ -85,6 +95,21 @@ while ((m = LINK_RE.exec(docsContent)) !== null) {
 
 for (const target of SCAN_TARGETS) {
   scanText(readFileSync(target.path, 'utf8'), target.label, target.lines);
+}
+
+for (const { re, label } of FORBIDDEN_PATTERNS) {
+  if (re.test(docsContent)) {
+    violations.push(`forbidden pattern (${label})`);
+  }
+}
+
+const deployment = docsContent.match(/label: "DEPLOYMENT & SANDBOXING"[^}]+ids: \[([^\]]+)\]/);
+if (deployment) {
+  for (const id of ['"self-host"', '"sandbox"', '"cross-os-rendering"', '"distribution"']) {
+    if (!deployment[1].includes(id)) {
+      violations.push(`DEPLOYMENT & SANDBOXING nav missing ${id}`);
+    }
+  }
 }
 
 if (violations.length > 0) {
