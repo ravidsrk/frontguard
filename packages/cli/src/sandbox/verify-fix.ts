@@ -94,7 +94,7 @@ export async function verifyFix(
       const isDaytonaConfig =
         requestedKind === 'daytona' &&
         !opts.sandboxImpl &&
-        (msg.includes('DAYTONA_API_KEY') || msg.includes('@daytonaio/sdk'));
+        (msg.includes('DAYTONA_API_KEY') || msg.includes('@daytona/sdk'));
       if (!isDaytonaConfig) throw createErr;
       logger.warn(
         `Daytona fix verification unconfigured (${msg}). Falling back to local sandbox.`,

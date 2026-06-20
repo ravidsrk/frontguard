@@ -2,7 +2,7 @@
  * Daytona sandbox for fix verification.
  *
  * Boots a remote Daytona sandbox, renders a URL with the staged CSS patch
- * injected, and returns the screenshot. The `@daytonaio/sdk` is imported
+ * injected, and returns the screenshot. The `@daytona/sdk` is imported
  * dynamically so it stays optional. Falls back to {@link LocalSandbox}
  * semantics if Daytona is unavailable (the caller decides).
  *
@@ -77,12 +77,12 @@ export class DaytonaSandbox implements Sandbox {
       );
     }
 
-    let mod: typeof import('@daytonaio/sdk');
+    let mod: typeof import('@daytona/sdk');
     try {
-      mod = await import('@daytonaio/sdk');
+      mod = await import('@daytona/sdk');
     } catch {
       throw new Error(
-        'Daytona sandbox requires "@daytonaio/sdk". Install it or use the local sandbox.',
+        'Daytona sandbox requires "@daytona/sdk". Install it or use the local sandbox.',
       );
     }
 
