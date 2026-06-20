@@ -66,13 +66,14 @@ export function isTelemetryEnabled(opts?: {
 
   if (opts?.optOutFlag) return false;
   if (opts?.configEnabled === false) return false;
-  if (opts?.configEnabled === true) return true;
 
   const dnt = env.DO_NOT_TRACK;
   if (dnt && dnt !== '0' && dnt !== 'false') return false;
 
   const flag = (env.FRONTGUARD_TELEMETRY ?? '').toLowerCase();
   if (flag === '0' || flag === 'false' || flag === 'off' || flag === 'no') return false;
+
+  if (opts?.configEnabled === true) return true;
   if (flag === '1' || flag === 'true' || flag === 'on' || flag === 'yes') return true;
 
   return false;

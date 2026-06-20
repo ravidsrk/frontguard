@@ -48,6 +48,24 @@ describe('isTelemetryEnabled', () => {
   it('DO_NOT_TRACK=0 does not enable without opt-in', () => {
     expect(isTelemetryEnabled({ env: { DO_NOT_TRACK: '0' } as NodeJS.ProcessEnv })).toBe(false);
   });
+
+  it('DO_NOT_TRACK=1 disables telemetry even when config telemetry:true', () => {
+    expect(
+      isTelemetryEnabled({
+        configEnabled: true,
+        env: { DO_NOT_TRACK: '1' } as NodeJS.ProcessEnv,
+      }),
+    ).toBe(false);
+  });
+
+  it('FRONTGUARD_TELEMETRY=0 disables telemetry even when config telemetry:true', () => {
+    expect(
+      isTelemetryEnabled({
+        configEnabled: true,
+        env: { FRONTGUARD_TELEMETRY: '0' } as NodeJS.ProcessEnv,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('detectCI', () => {
