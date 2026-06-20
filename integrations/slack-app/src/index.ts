@@ -44,6 +44,7 @@ export {
   buildFollowUpResponse,
   deliverRunResult,
   isAllowedRunUrl,
+  assertSafeRunUrl,
   type CloudRunResponse,
   type CloudRunStatus,
   type CloudRunResult,

@@ -7,6 +7,7 @@ import {
   summarizeRun,
   deliverRunResult,
   isAllowedRunUrl,
+  assertSafeRunUrl,
   type CloudRunStatus,
 } from '../src/runs.js';
 
@@ -46,6 +47,39 @@ describe('isAllowedRunUrl', () => {
     expect(isAllowedRunUrl('javascript:alert(1)')).toBe(false);
     expect(isAllowedRunUrl('file:///etc/passwd')).toBe(false);
     expect(isAllowedRunUrl('not-a-url')).toBe(false);
+  });
+  it('blocks private/loopback/link-local hosts (SSRF)', () => {
+    for (const url of [
+      'http://169.254.169.254/latest/meta-data/',
+      'https://169.254.169.254',
+      'http://127.0.0.1',
+      'https://10.0.0.5',
+      'http://192.168.1.1',
+      'https://172.16.0.1',
+      'http://localhost:6379',
+      'https://metadata.google.internal',
+      'https://[::1]',
+    ]) {
+      expect(isAllowedRunUrl(url)).toBe(false);
+    }
+  });
+});
+
+describe('assertSafeRunUrl', () => {
+  it('rejects hostnames that resolve to private addresses', async () => {
+    await expect(
+      assertSafeRunUrl('https://evil.example', {
+        resolveHost: async () => ['10.0.0.1'],
+      }),
+    ).rejects.toThrow(/private, loopback, or link-local/);
+  });
+
+  it('allows hostnames that resolve to public addresses', async () => {
+    await expect(
+      assertSafeRunUrl('https://example.com', {
+        resolveHost: async () => ['93.184.216.34'],
+      }),
+    ).resolves.toBeUndefined();
   });
 });
 

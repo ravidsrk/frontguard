@@ -9,6 +9,12 @@ asked.
 - `/frontguard status <url>` — submits a visual-regression run to the Frontguard
   Cloud API against `<url>`, acks immediately, and posts the result back to the
   same channel via the slash command's `response_url`.
+- **SSRF guard (defense-in-depth).** Before any Cloud API call, the worker
+  validates `<url>` with the shared `@frontguard/cloud-api/render-target`
+  helpers: private / loopback / link-local host literals (including cloud
+  metadata `169.254.169.254`) are rejected in the slash-command parser, and
+  hostnames are DNS-resolved and re-checked before `POST /v1/run`. The Cloud
+  API applies the same guard again at the render entrypoint.
 - `/frontguard help` — shows usage.
 - OAuth v2 install per workspace — bot tokens are stored in Workers KV keyed by
   Slack `team_id` so a single deployment serves every workspace that installed
