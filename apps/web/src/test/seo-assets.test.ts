@@ -54,6 +54,9 @@ describe('public SEO assets', () => {
     expect(llms).toContain('https://frontguard.dev/docs')
     expect(llms).toContain('ravidsrk/frontguard@v0')
     expect(llms).not.toContain('ravidsrk/frontguard@v1')
+    const llmsFull = readPublic('llms-full.txt')
+    expect(llmsFull).toContain('ravidsrk/frontguard@v0')
+    expect(llmsFull).not.toMatch(/ravidsrk\/frontguard@(v1|main)/)
   })
 
   it('robots.txt references the sitemap', () => {

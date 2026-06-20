@@ -131,6 +131,38 @@ describe('docs content store', () => {
       expect(article?.html, id).not.toContain('apiUrl   = &quot;https://api.frontguard.dev&quot;')
     }
   })
+
+  it('documents the repo-root action shim for marketplace consumers', () => {
+    const ghActions = articles.find((a) => a.id === 'ci-cd/github-actions')
+    expect(ghActions?.html).toMatch(/action\.yml/i)
+  })
+
+  it('hedges marketplace listings on integration docs (no live 404 URLs)', () => {
+    const deadUrls = [
+      'github.com/marketplace/frontguard',
+      'github.com/apps/frontguard',
+      'frontguard/frontguard-action',
+    ]
+    for (const id of [
+      'integrations/github',
+      'integrations/slack',
+      'integrations/vercel',
+      'integrations/netlify',
+      'distribution',
+    ] as const) {
+      const article = articles.find((a) => a.id === id)!
+      expect(article.html, id).toMatch(/in review|Coming soon/i)
+      for (const dead of deadUrls) {
+        expect(article.html, `${id}:${dead}`).not.toContain(dead)
+      }
+    }
+  })
+
+  it('pins bootstrap workflow examples to @v0 on the GitHub App doc', () => {
+    const github = articles.find((a) => a.id === 'integrations/github')
+    expect(github?.html).toContain('ravidsrk/frontguard@v0')
+    expect(github?.html).not.toMatch(/ravidsrk\/frontguard@(v1|main)/)
+  })
 })
 
 describe('docs article HTML quality', () => {
