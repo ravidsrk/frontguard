@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet — open an issue or PR to land the first 0.3 work._
 
+## [0.2.1] - 2026-06-20
+
+Production-close remediation release. npm `v0.2.0` predated remediation PRs
+#73–#104; this patch republishes the five public npm packages with every
+code-side fix from the adversarial-fresh production-close wave. No breaking
+API changes — semver patch.
+
+### Fixed
+
+- **CLI config loader (PR#97)** — `frontguard.config.ts` / `.js` / `.mjs` /
+  `.cjs` resolution no longer fails on valid ESM/CJS configs; env opt-outs
+  override `telemetry.enabled` in config.
+- **MCP server (PR#102)** — realpath-safe entry guard; stderr startup banner
+  (stdio JSON-RPC only on stdout); `list_regressions` excludes `status=new`;
+  `accept_baseline` requires run-scoped review confirmation; docs corrected
+  for `npx -y @frontguard/mcp` init flow.
+- **Storybook renderer (PR#96)** — Storybook 8.6 `finished` phase treated as
+  ready; parameter discovery and `play()` ready-wait hardened.
+- **Supply chain (PR#101)** — migrated to `@daytona/sdk`; cleared
+  critical/high `npm audit` findings; added CI audit gate and Dependabot
+  config.
+- **Slack integration (PR#100)** — defense-in-depth SSRF guard on slash-command
+  run URLs.
+- **Netlify plugin detection** — reads the real cloud-api result shape
+  (`status === 'failed' | 'regression' | 'changed'`), not the non-existent
+  `run.results.changed` field.
+
+### Changed
+
+- **Docs & install surfaces (PR#98, PR#99, PR#103)** — bare `npx frontguard`
+  replaced with scoped `@frontguard/cli` invocations across live doc surfaces;
+  GitHub Action / marketplace doc residuals closed; canonical URLs, README
+  links, and regression guards added.
+- **Hosted-default mitigations (PR#95)** — removed false `api.frontguard.dev`
+  defaults from MCP/Netlify/Slack/CLI; Pro CTA → waitlist `mailto:`; telemetry
+  opt-in by default.
+- **Marketing claims (PR#104)** — corrected Schema.org structured data and
+  README/landing claims (fabricated ratings/stats removed).
+
+### Published packages
+
+- `@frontguard/cli@0.2.1`
+- `@frontguard/playwright@0.2.1`
+- `@frontguard/mcp@0.2.1`
+- `create-frontguard-plugin@0.2.1`
+- `@frontguard/netlify-plugin@0.2.1`
+
 ## [0.2.0] - 2026-06-17
 
 The "ship it in public" release. Everything around the engine — install path,
