@@ -77,7 +77,7 @@ Legend: **OPEN** = reproduces / unaddressed · **PARTIAL** = improved, acceptanc
 
 | Item | Finding(s) | Cluster | Status | Task row |
 |------|-----------|---------|--------|----------|
-| B1 DNS code-side | claim-4, dist-3, docs-2, install-9 (code-side); install-6/claim-6 links | C3 | OPEN (DNS itself = OPS) | `b1-code-mitigations` |
+| B1 DNS code-side | claim-4, dist-3, docs-2, install-9 (code-side); install-6/claim-6 links | C3 | CODE_CLOSED via PR#95 (claim-4/dist-3/docs-2/install-9 — OPS O1 DNS + O2 deploy + waitlist standup remain); install-6/claim-6 links CLOSED | `b1-code-mitigations` |
 | B5 Docker code/doc | docs-3 (CODE_CLOSED via PR#94 — OPS O9 docker publish remains); install-4, docker-1 (CODE_CLOSED — OPS O9 publish); docker-3 (re-verified CLOSED) | C4 | CODE_CLOSED (docs-3 closed via PR#94; OPS O9 remains) | `docker-doc-fix` |
 | B6 Action ref code/doc | int-3 (CODE_CLOSED — `v0` tag = OPS); docs-5 (PARTIAL); docs-6 (OPEN — marketplace = OPS) | C8 | CODE_CLOSED + docs-5 OPEN | `action-doc-residual` |
 
@@ -97,7 +97,7 @@ All booleans start **✗** (`✓` when achieved). Dependency order: **P0** (C1, 
 | cli-config-loader | A | C1 | hot | [install-1, sb-2] | ✓ | ✓ | ✓ | ✓ | ✓ | none | 97 | c1-cli-config-loader | grok | P0. Codex PASS (task_cd5e5e62030a); smoke-root/subpath green; Bugbot non-blocking. `task_edb4e160cc15` |
 | docs-snippet-sweep | A | C2 | hot | [docs-1, docs-10] | ✗ | ✗ | ✗ | ✗ | ✗ | none | — | — | — | P0; dep C1. re-verify ci-3/install-7. `task_3bf74898dd24` |
 | storybook-render | A | C10 | hot | [sb-1, sb-3] | ✗ | ✗ | ✗ | ✗ | ✗ | none | — | — | — | P0. `task_1fe185564626` |
-| b1-code-mitigations | B | C3 | hot | [claim-4, dist-3, docs-2, install-9, install-6, claim-6] | ✗ | ✗ | ✗ | ✗ | ✗ | DNS+waitlist (human) | — | — | — | P0 Wave-B code; shares pricing.tsx w/ C14. `task_bee2e61e7e8d` |
+| b1-code-mitigations | B | C3 | hot | [claim-4, dist-3, docs-2, install-9, install-6, claim-6] | ✓ | ✓ | ✓ | ✓ | ✓ | DNS+waitlist (human) | 95 | c3-b1-code-mitigations | grok | P0 Wave-B code; shares pricing.tsx w/ C14. Codex PASS (task_033abbd0af4b); smoke-root/subpath green; Bugbot Low-Risk/non-blocking. GH formal approval blocked by same-account own-PR rule. CODE_CLOSED: claim-4/dist-3/docs-2/install-9 (OPS O1 DNS + O2 deploy + waitlist standup human-owned); install-6/claim-6 link fixes CLOSED. `task_bee2e61e7e8d` |
 | docker-doc-fix | B | C4 | hot | [docs-3] | ✓ | ✓ | ✓ | ✓ | ✓ | docker push (human) | 94 | c4-docker-doc-fix | grok | P0 Wave-B code; before C15. install-4/docker-1 CODE_CLOSED. Codex PASS; OPS docker push human-owned (O9). `task_a2ed02297740` |
 | mcp-fixes | A | C12 | hot | [mcp-3, mcp-6] | ✗ | ✗ | ✗ | ✗ | ✗ | none | — | — | — | P1; also re-verify mcp-8/mcp-9/mcp-10. `task_e0e99f241691` |
 | docs-hygiene | A | C15 | hot | [docs-4, docs-7, docs-8, docs-9] | ✗ | ✗ | ✗ | ✗ | ✗ | none | — | — | — | P1; dep C2+C4. picks up docs-5 doc residual. `task_9208764790fe` |
@@ -190,3 +190,4 @@ and, at FINAL, `docs/fix-progress.md`.
 | 2026-06-20 | Ingest: transcribed REVIEW_DOC → CLOSE-INDEX + 15 task rows; created Orca task DAG; `PHASE=FIXING`. BASE `ravidsrk/production-close` @ `fb8b599`. |
 | 2026-06-20 | Merged PR #94 (C4 `docker-doc-fix`, WT `c4-docker-doc-fix`, worker grok) into BASE via merge commit `2153095`. Codex PASS (task_7deeb65802cf); smoke-root/subpath green; Bugbot non-blocking. CLOSE-INDEX B5 docs-3 → CODE_CLOSED via PR#94; install-4/docker-1/docker-3 unchanged (OPS O9 docker publish human-owned). |
 | 2026-06-20 | Merged PR #97 (C1 `cli-config-loader`, WT `c1-cli-config-loader`, worker grok) into BASE via merge commit `35c855c`. Codex PASS (task_cd5e5e62030a); smoke-root/subpath green; Bugbot non-blocking. CLOSE-INDEX A1 install-1/sb-2 → CLOSED via PR#97. |
+| 2026-06-20 | Merged PR #95 (C3 `b1-code-mitigations`, WT `c3-b1-code-mitigations`, worker grok) into BASE via merge commit `d3d15b5`. Codex PASS (task_033abbd0af4b); smoke-root/subpath green; Bugbot Low-Risk/non-blocking; GH formal approval blocked by same-account own-PR rule. CLOSE-INDEX B1: claim-4/dist-3/docs-2/install-9 → CODE_CLOSED via PR#95 (OPS O1 DNS + O2 deploy + waitlist standup remain human-owned); install-6/claim-6 link fixes → CLOSED. Removed false `api.frontguard.dev` hosted defaults (mcp/netlify/slack/cli), Pro CTA → waitlist mailto, telemetry opt-in, README comparison links fixed; added publish-surface guard tests. |
