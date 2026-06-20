@@ -62,6 +62,22 @@ secrets). Mirrors `docs/production-close-progress.md` OPS rows **O1, O2, O3, O12
   curl -sf https://frontguard.dev/api/install   # expect non-404 after O1+O2
   ```
 
+## C14 / A9 — marketing claims redeploy (PR#104, merge `504a038`) — human-owned, NOT executed
+
+PR#104 corrected the marketing/README claims and the apps/web Schema.org structured data. Code is
+CODE_CLOSED; the live site at `frontguard.dev` / apps-web still serves the **stale Schema.org HTML**
+(`dist-11`) until apps/web is rebuilt and redeployed. **The swarm did NOT run any of the commands
+below** (no `wrangler` / Pages deploy, no DNS edit). Mirrors `docs/production-close-progress.md` OPS
+row **O2** (apps/web redeploy).
+
+- **[OPS] O2-C14 — redeploy apps/web for corrected Schema.org / marketing claims (`dist-11`):**
+  ```sh
+  # rebuild + redeploy apps/web so live frontguard.dev HTML reflects the PR#104 Schema.org/claims fix:
+  npm --workspace apps/web run build && npx wrangler pages deploy apps/web/dist
+  # verify the served structured data is no longer stale (corrected claims present in the live HTML):
+  curl -sf https://frontguard.dev | grep -i 'application/ld+json'
+  ```
+
 ## Downstream human gates (NOT done; human-owned)
 
 - BASE (`ravidsrk/adversarial-fresh`) → `main` promotion: human meta-PR.
