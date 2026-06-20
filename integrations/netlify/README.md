@@ -73,8 +73,11 @@ Then add it to `netlify.toml`:
 
 ## Plugin manifest
 
-The full manifest is in [`manifest.yml`](./manifest.yml) and is what Netlify
-reads when the plugin is installed from the Marketplace.
+The full manifest is in [`manifest.yml`](./manifest.yml). The Netlify Build
+Plugins directory listing is **in review** — until it is live, install via
+`netlify.toml` using the in-repo manifest (see the docs site Install section).
+Once approved, Netlify reads this manifest when the plugin is installed from
+the Marketplace.
 
 ```yaml
 name: "@frontguard/netlify-plugin"
