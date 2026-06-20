@@ -23,7 +23,7 @@ jobs:
       - name: Capture production audit JSON
         run: npm audit --omit=dev --json > audit-current.json || true
       - name: Post weekly audit diff to issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           AUDIT_LABEL: npm-audit-weekly
         with:
