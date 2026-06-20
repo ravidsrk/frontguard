@@ -5,18 +5,22 @@ autonomous product-completion build that took Frontguard from "stalled
 mid-build, marketing site full of fabricated stats" to "complete product
 ready to ship." Authored by the orchestration coordinator on 2026-06-15.*
 
-> ## 2026-06-20 FINAL — production-close sign-off (T_FINAL)
+> ## 2026-06-20 FINAL — production-close sign-off (T_FINAL, PR #108)
 >
 > On `ravidsrk/production-close` @ `aad7733` (after PRs #94–#107), the
 > production-close run merged **14 code/doc PRs** addressing the post-ship
 > adversarial dossier plus A10 release-prep. Ledger reconciled in
 > [`docs/fix-progress.md`](./fix-progress.md): **36 CLOSED · 13 CODE_CLOSED · 0
 > OPEN** (all 49 confirmed findings addressed in code; `val-5` CLOSED via PR#105).
-> Engineering gates (`npm ci && npm run build && npm test`) re-run green on
-> BASE @ `aad7733`; `npm audit --omit=dev --audit-level=high` → 0 critical/high.
+> Engineering gates (`npm ci && npm run build && npm test`) first ran green on
+> code-equivalent `9a659e1` (PR #107 merge); re-checked on BASE @ `aad7733` where
+> the only delta is ledger-only A10DOC/A10REL rows (no code change).
+> `npm audit --omit=dev --audit-level=high` → 0 critical/high.
 >
-> **Final verdict: CONDITIONAL GO — OSS CLI shippable in-repo; cloud/SaaS gated
-> on the human-owned OPS queue (O1–O15).**
+> **Verdict: CONDITIONAL GO — OSS CLI shippable in-repo; cloud/SaaS/distribution
+> gated on the human-owned OPS queue (O1–O15, none executed).** Full T_FINAL
+> artifact: [`docs/production-close-readiness.md`](./production-close-readiness.md).
+> PR #108 records acceptance; merge completes T_FINAL.
 >
 > - **OSS CLI:** All code defects from the original 49 are closed in-repo.
 >   Release-prep stages `0.2.1` (VERSION, workspace package.json, CHANGELOG,
@@ -32,7 +36,9 @@ ready to ship." Authored by the orchestration coordinator on 2026-06-15.*
 >   are mitigated in code but not live until OPS applies.
 > - **T_FINAL:** Acceptance checklist walked 2026-06-20 @ `aad7733` — code-side
 >   gates pass; live/hosted/distribution gates remain OPS-blocked (documented in
->   [`docs/production-pending.md`](./production-pending.md) § acceptance criteria).
+>   [`docs/production-close-readiness.md`](./production-close-readiness.md) §
+>   REVIEW_DOC acceptance criteria walk). Frozen inventory:
+>   [`docs/production-pending.md`](./production-pending.md).
 >
 > The 2026-06-17 NO-GO banner below is **historical context** — the defects it
 > lists were the remediation input; all are now CLOSED or CODE_CLOSED in code.
@@ -305,11 +311,13 @@ reconciled 49-finding close-index.
 operational until OPS queue (O1–O15) completes.*
 
 **Engineering complete:** Wave A+B code merges (#94–#105), A10 doc-reconcile
-(#106), A10 release-prep (#107), T_FINAL sign-off. No open code defects remain.
+(#106), A10 release-prep (#107). T_FINAL acceptance recorded in PR #108
+(pending merge). No open code defects remain.
 
 **Remaining human-owned OPS (not done):** DNS attach, `wrangler deploy`, D1
 migrations, Docker Hub publish, `v0` git tag, npm `@frontguard/*@0.2.1`
 republish, marketplace submissions, production bindings — 15 items in
-[`docs/production-close-progress.md`](./production-close-progress.md) § OPS.
+[`docs/production-close-readiness.md`](./production-close-readiness.md) § O1–O15.
 
-— Frontguard production-close remediation, 2026-06-20. **T_FINAL sign-off: CONDITIONAL GO.**
+— Frontguard production-close remediation, 2026-06-20. **CONDITIONAL GO (code-side;
+full GO requires OPS O1–O15).**
