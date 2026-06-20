@@ -482,6 +482,17 @@ export interface DiffResult {
   ssim?: number;
   /** Whether SSIM analysis overrode a pixel-diff failure to pass. */
   ssimOverride?: boolean;
+  /**
+   * How the pixel engine compared images. Survives buffer disposal in the
+   * pipeline so JSON output can prove the recheck pass ran pixelmatch (val-5).
+   */
+  comparisonMethod?: 'byte-identical' | 'pixelmatch';
+  /**
+   * Whether a non-empty baseline buffer was supplied at compare time. Persisted
+   * separately from `baselineImage` because passing diffs dispose image buffers
+   * before JSON serialization.
+   */
+  comparedAgainstBaseline?: boolean;
   /** Public URL of the uploaded baseline image (set by the upload stage). */
   baselineImageUrl?: string;
   /** Public URL of the uploaded current image (set by the upload stage). */

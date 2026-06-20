@@ -13,9 +13,9 @@ frontends. Two numbers we treat as launch gates:
 > served by the **same** dev-server process, and `pixel.ts` short-circuited to
 > `pass` whenever the new PNG was byte-for-byte equal to the baseline (val-5).
 > That measured Chromium's encoder determinism, not Frontguard's diff engine.
-> This run restarts the dev server between passes and disables the fast path so
-> every recheck comparison runs the full pixelmatch path. The number is still
-> **0.0%** — see
+> This run restarts the dev server between passes, disables the fast path, and
+> records `comparisonMethod: "pixelmatch"` plus `hasBaselineImage: true` on
+> every measured recheck diff. The number is still **0.0%** — see
 > [Why this run disables the byte-identical fast path](#why-this-run-disables-the-byte-identical-fast-path)
 > for why that is the honest, and stronger, result.
 
@@ -23,8 +23,8 @@ frontends. Two numbers we treat as launch gates:
 
 | | |
 |---|---|
-| Run date | 2026-06-17 |
-| Frontguard CLI | `0.2.0` (built locally from `ravidsrk/c16-validation-recheck`) |
+| Run date | 2026-06-20 |
+| Frontguard CLI | `0.2.0` (built locally from `ravidsrk/validation-methodology`) |
 | Harness | `validation/run-external.sh` (two-pass: baseline, then recheck on a **fresh dev-server process** with `FRONTGUARD_DISABLE_BYTE_COMPARE=1`) |
 | Aggregator | `validation/aggregate-results.mjs` |
 | Host | macOS 25.5.0, Node 22.15, pnpm 11.6 |
@@ -108,16 +108,19 @@ and docs:
 | `medusa-storefront` | `medusajs/nextjs-starter-medusa` | E-commerce storefront |
 | `nextra-docs` | `shuding/nextra` | Docs site (MDX) |
 
-## 2026-06-17 — Re-run (byte-identical fast path disabled)
+## 2026-06-20 — Re-run (pixelmatch instrumentation confirmed)
 
 This run re-measures the pixel-only FP rate with the methodology hardening
 described above: the recheck pass renders on a **fresh dev-server process**
 and runs with the **byte-identical fast path disabled**, so every comparison
 exercises the full pixelmatch path instead of short-circuiting on byte
-equality. The two repos that boot end-to-end in this environment
-(`tailwind-dashboard`, `chakra-ui-docs`) were re-run; the other three remain
-honest, environmental skips (see *Limitations*). Per-repo JSON artifacts live
-in [`validation/results/`](./results/).
+equality. JSON output now carries `comparisonMethod: "pixelmatch"` and
+`hasBaselineImage: true` on every non-error recheck diff (39/39 measured
+comparisons across the two booted repos), proving the headline metric is not a
+byte-compare short-circuit artifact. The two repos that boot end-to-end in
+this environment (`tailwind-dashboard`, `chakra-ui-docs`) were re-run; the other
+three remain honest, environmental skips (see *Limitations*). Per-repo JSON
+artifacts live in [`validation/results/`](./results/).
 
 <!-- BEGIN GENERATED -->
 ### Aggregate (pixel-only)
@@ -130,6 +133,9 @@ in [`validation/results/`](./results/).
 | Recheck routes measured | 43 |
 | Recheck positives (regression+warning) | 0 |
 | **Pixel-only false-positive rate** | **0.0%** |
+| Recheck diffs via pixelmatch (hasBaselineImage:true) | 39 / 43 |
+| **Pixel-only FP rate (pixelmatch-measured only)** | **0.0%** |
+| Methodology validated (all recheck diffs ran pixelmatch) | ✅ |
 | AI classification accuracy | _pending key configuration (no AI provider key set in env)_ |
 
 ### Per-repo
@@ -217,10 +223,10 @@ npm run build:cli
 node validation/aggregate-results.mjs
 
 # 4. Confirm the recheck genuinely ran the diff engine (every recheck diff is a
-#    real pixelmatch result, not a byte short-circuit):
-jq '.recheckRuns[].result.diffs[]?.diffPercentage' \
+#    real pixelmatch result with a baseline, not a byte short-circuit):
+jq '[.recheckRuns[].result.diffs[]? | select(.status != "error") | {comparisonMethod, hasBaselineImage}] | unique' \
   validation/results/tailwind-dashboard.json \
-  validation/results/chakra-ui-docs.json | sort -u
+  validation/results/chakra-ui-docs.json
 
 # To force the slow path on a one-off comparison outside the harness:
 FRONTGUARD_DISABLE_BYTE_COMPARE=1 frontguard run --url http://localhost:3000/
@@ -236,11 +242,12 @@ can surface them.
 ## Launch gate
 
 The v0.2 gate published on the landing page is **pixel-only FP < 15%** until
-an AI provider key lands in CI. With this run we measure **0.0%** across the
-two repos that booted end-to-end — well inside the gate, and now genuinely a
-measurement of the diff engine (byte-identical fast path disabled, fresh
-dev-server per pass) rather than of Chromium's encoder determinism. AI
-accuracy remains marked *pending* on the landing page rather than asserted.
+an AI provider key lands in CI. With this run we measure **0.0%** across
+**39 pixelmatch-measured recheck diffs** (all with `hasBaselineImage:true`) —
+well inside the gate, and now instrumented proof that the diff engine ran
+rather than the byte-identical fast path. The landing page gates its headline
+stat on `methodologyValidated: true` from `aggregate-results.mjs --landing`.
+AI accuracy remains marked *pending* on the landing page rather than asserted.
 
 ## Prior runs
 
