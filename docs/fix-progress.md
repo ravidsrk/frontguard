@@ -1,5 +1,11 @@
 # Frontguard v0.2.0 — Adversarial Remediation Progress
 
+> **⚠️ Ledger stale (2026-06-17).** This file still lists all 49 findings as
+> `OPEN`, but `origin/main` @ `b472457` has closed many in code. The
+> reconciled, live inventory is **[`production-pending.md`](./production-pending.md)** —
+> use that for go/no-go and prioritization. Update this ledger when closing
+> items.
+
 *Live ledger for the autonomous remediation of the 49 confirmed findings from
 the v0.2.0 post-ship adversarial dossier. The coordinator's external brain
 — state lives in this file, not in memory. Re-read first action every turn.*
