@@ -153,7 +153,7 @@ const faqs = [
   },
   {
     q: 'Is there an MCP server for in-IDE agents?',
-    a: '@frontguard/mcp exposes list_regressions(pr_id), get_suggested_fix(diff_id), accept_baseline(diff_id), and recent_runs(repo, branch) to Claude Code, Cursor, Cline, and Copilot. Run as npx @frontguard/mcp and drop the snippet into your mcp.json.',
+    a: '@frontguard/mcp exposes list_regressions(pr_id), get_suggested_fix(diff_id), accept_baseline(run_id — run-scoped), and recent_runs(repo, branch) to Claude Code, Cursor, Cline, and Copilot. Run as npx -y @frontguard/mcp and drop the snippet into your mcp.json.',
   },
   {
     q: "What's the data retention policy for screenshots?",

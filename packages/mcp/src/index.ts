@@ -13,6 +13,7 @@
  * @module @frontguard/mcp
  */
 
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -44,7 +45,7 @@ export function createServer(): McpServer {
     {
       capabilities: { tools: {} },
       instructions:
-        'Frontguard MCP server. Use `list_regressions` to see what visual regressions a PR has, `get_suggested_fix` to read the AI patch for a specific diff, `accept_baseline` to promote new screenshots, and `recent_runs` to browse history.',
+        'Frontguard MCP server. Use `list_regressions` to see what visual regressions a PR has, `get_suggested_fix` to read the AI patch for a specific diff, `accept_baseline` to promote an entire run as the new baseline (run-scoped — review every regression first), and `recent_runs` to browse history.',
     },
   );
 
@@ -73,9 +74,9 @@ export function createServer(): McpServer {
   server.registerTool(
     'accept_baseline',
     {
-      title: 'Accept the run as the new baseline',
+      title: 'Accept the entire run as the new baseline',
       description:
-        'Promote a run’s current screenshots to the new baseline. Accepts a `diffId` (the run id is extracted from it) or a bare run id.',
+        'Promote every screenshot in a run to the new baseline (run-scoped — not per-diff). Requires `run_id` and `confirm_all_regressions_reviewed: true` after you have reviewed every regression from `list_regressions`.',
       inputSchema: acceptBaselineInputSchema,
     },
     async (args) => withCloudClient(async (client) => acceptBaseline(client, args)),
@@ -142,21 +143,26 @@ function toolError(err: unknown): CallToolResult {
 }
 
 /** Process entry — connects the server to stdio. */
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
+  process.stderr.write(`frontguard-mcp v${SERVER_VERSION} starting on stdio\n`);
   const server = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
 
-// Run only when invoked directly (not when imported from tests).
-const invokedDirectly = (() => {
-  if (typeof process === 'undefined' || !process.argv[1]) return false;
+/** True when this module is the process entry (not when imported from tests). */
+export function isInvokedDirectly(argv: string[] = process.argv): boolean {
+  if (typeof process === 'undefined' || !argv[1]) return false;
   try {
-    return fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+    return (
+      realpathSync(fileURLToPath(import.meta.url)) === realpathSync(resolve(argv[1]))
+    );
   } catch {
     return false;
   }
-})();
+}
+
+const invokedDirectly = isInvokedDirectly();
 
 if (invokedDirectly) {
   main().catch((err) => {
