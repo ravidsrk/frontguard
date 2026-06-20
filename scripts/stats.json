@@ -1,20 +1,20 @@
 {
   "version": "0.2.1",
-  "tests": 44,
-  "sourceFiles": 48,
+  "tests": 58,
+  "sourceFiles": 54,
   "plugins": 5,
   "bundleSize": {
-    "tarballBytes": 395031,
-    "tarballKB": 386,
-    "unpackedBytes": 1559211,
-    "unpackedKB": 1523
+    "tarballBytes": 470030,
+    "tarballKB": 459,
+    "unpackedBytes": 1828123,
+    "unpackedKB": 1785
   },
   "display": {
-    "tests": "44 tests",
-    "sourceFiles": "48 source files",
+    "tests": "58 tests",
+    "sourceFiles": "54 source files",
     "plugins": "5 built-in plugins",
-    "version": "v0.2.0",
-    "bundle": "386KB"
+    "version": "v0.2.1",
+    "bundle": "459KB"
   },
   "source": "derived-from-source"
 }
