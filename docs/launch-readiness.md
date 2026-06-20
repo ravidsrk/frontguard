@@ -5,24 +5,35 @@ autonomous product-completion build that took Frontguard from "stalled
 mid-build, marketing site full of fabricated stats" to "complete product
 ready to ship." Authored by the orchestration coordinator on 2026-06-15.*
 
-> ## ⚠️ 2026-06-17 update — post-ship adversarial audit contradicts this verdict
+> ## 2026-06-20 update — production-close remediation (Wave A+B)
 >
-> v0.2.0 was tagged and packages were published to npm on 2026-06-17. A
-> 15-dimension post-ship adversarial review — 161 candidate findings, 112
-> refuted under two-lens verification, **49 confirmed (22 P0 / 15 P1 /
-> 12 P2)** — is the new source of truth and contradicts the unconditional
-> GO below. See [`docs/adversarial-v020-postship.md`](./adversarial-v020-postship.md)
-> for the full punch list. Headline confirmed defects:
-> `frontguard init` writes a `.ts` config the CLI cannot load (Quick Start
-> step 2 fails on every clean machine); the cloud Daytona path never
-> uploads prior baselines so every run returns `new_baseline` (the cloud
-> can't detect regressions); the dashboard session secret has a hardcoded
-> production fallback shipped in published code (any reader can forge any
-> user's cookie); the marketed `frontguard/render` Docker image isn't on
-> Docker Hub; the Pricing CTA points at `app.frontguard.dev` (NXDOMAIN);
-> the Pro tier advertises `productionMonitoring` whose own gate returns
-> HTTP 402 to Pro customers. **Treat the v0.2.0 launch as a public beta,
-> not a 1.0 candidate, until the post-ship dossier's P0 list is closed.**
+> On `ravidsrk/production-close` @ `6ee923f`, the production-close run merged
+> **13 code PRs (#94–#105)** addressing the post-ship adversarial dossier.
+> Ledger reconciled in [`docs/fix-progress.md`](./fix-progress.md):
+> **36 CLOSED · 13 CODE_CLOSED · 0 OPEN** (all 49 confirmed findings addressed
+> in code; `val-5` CLOSED via PR#105). Engineering gates
+> (`npm ci && npm run build && npm test`) are green on BASE.
+>
+> **Current verdict: CONDITIONAL GO — OSS CLI preview; cloud/SaaS gated on OPS.**
+>
+> - **OSS CLI:** Code defects from the original 49 are closed in-repo. A `0.2.1`
+>   npm republish (human-owned, see `a10-release-prep`) is the remaining step
+>   before recommending `@frontguard/cli@0.2.1` to evaluators. `val-5` validation
+>   methodology is CLOSED via PR#105 (39/39 measured recheck diffs with real
+>   pixelmatch); marketing may cite the corrected methodology after release-prep.
+> - **Cloud / SaaS:** Not operational. DNS (`api`/`app`/`github-app`/`telemetry`
+>   subdomains), `wrangler deploy`, D1 migrations, Docker Hub `frontguard/render`,
+>   git tag `v0`, and marketplace listings remain in the OPS queue — see
+>   [`docs/production-close-progress.md`](./production-close-progress.md) and
+>   [`docs/arch-ops-actions.md`](./arch-ops-actions.md). CODE_CLOSED findings
+>   (pricing CTA waitlist, integration doc warnings, action `@v0` shim) are
+>   mitigated in code but not live until OPS executes.
+> - **T_FINAL sign-off** (acceptance checklist walk + honest verdict flip) is
+>   pending `a10-release-prep` and remains the last gate before calling this
+>   document's verdict final.
+>
+> The 2026-06-17 NO-GO banner below is **historical context** — the defects it
+> lists were the remediation input; most are now closed or CODE_CLOSED in code.
 
 > **Verdict (original, 2026-06-15): GO with documented operational follow-ups.** The product is
 > complete: every IN-scope feature from
@@ -261,7 +272,7 @@ verbatim from the dossier:**
   inspection; the harness was not re-run with byte-compare disabled to
   measure what the actual pixel-only FP rate is on the same 43 routes.
 
-**Updated launch posture.** The npm packages are live and cannot be
+**Updated launch posture (2026-06-17).** The npm packages are live and cannot be
 unpublished without triggering the 72-hour grace + the per-version
 permanence rule. Treat v0.2.0 as a **public beta**: useful to early
 adopters who understand the constraints, not suitable for "trust us,
@@ -269,3 +280,33 @@ we're production-ready" marketing copy. The P0 punch list in the
 dossier is the v0.2.1 release boundary.
 
 — Frontguard post-ship adversarial audit, 2026-06-17.
+
+---
+
+## 2026-06-20 Production-close remediation — addendum
+
+The production-close run on `ravidsrk/production-close` addressed the
+post-ship dossier's code-side defects across Wave A (evaluator unblockers)
+and Wave B (SaaS code-side mitigations). PRs #94–#105 merged; see
+[`docs/production-close-progress.md`](./production-close-progress.md) for
+the task ledger and [`docs/fix-progress.md`](./fix-progress.md) for the
+reconciled 49-finding close-index.
+
+| Tier | Original count | After remediation |
+|------|---------------:|------------------:|
+| P0 | 22 | 0 OPEN · 9 CODE_CLOSED (OPS) · 13 CLOSED |
+| P1 | 15 | 0 OPEN · 1 CODE_CLOSED (OPS Dependabot — O15 human-owned, NOT done) · 14 CLOSED |
+| P2 | 12 | 0 OPEN · 3 CODE_CLOSED (OPS redeploy/npm republish — human-owned, NOT done) · 9 CLOSED (`val-5` CLOSED via PR#105) |
+
+**Honest shipping label today:** *OSS CLI preview — republish as 0.2.1 after
+release-prep; cloud/SaaS not operational until OPS queue completes.*
+
+**Remaining engineering:** A10 release-prep (VERSION/CHANGELOG staging, no
+publish); T_FINAL acceptance gate.
+
+**Remaining human-owned OPS (not done):** DNS attach, `wrangler deploy`, D1
+migrations, Docker Hub publish, `v0` git tag, npm `@frontguard/*@0.2.1`
+republish, marketplace submissions, production bindings — 15 items in
+[`docs/production-close-progress.md`](./production-close-progress.md) § OPS.
+
+— Frontguard production-close remediation, 2026-06-20. T_FINAL sign-off pending.
