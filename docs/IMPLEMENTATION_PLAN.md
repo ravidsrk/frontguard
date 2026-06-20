@@ -82,7 +82,7 @@ Missing Infrastructure (nothing exists):
 
 ### Sprint 1 (Week 1-2): Foundation + Quick Wins
 
-**Goal:** Nail the basics that make or break first impressions. A developer should be able to `npx frontguard init`, run it against their site, and get a useful result in under 2 minutes. Fix the gaps that would make them bounce.
+**Goal:** Nail the basics that make or break first impressions. A developer should be able to `npx -p @frontguard/cli frontguard init`, run it against their site, and get a useful result in under 2 minutes. Fix the gaps that would make them bounce.
 
 **Total estimated effort:** 8-12 dev-days
 
@@ -483,8 +483,8 @@ The PR comment markdown format should be:
 **Acceptance criteria:**
 - [x] `git tag v0.2.0 && git push --tags` triggers publish to npm
 - [x] All three packages published with correct `exports`, `types`, and `bin` fields
-- [x] `npx frontguard` works for a cold install (no peer dep issues)
-- [x] `npx frontguard doctor` works without a config file
+- [x] `npx -p @frontguard/cli frontguard` works for a cold install (no peer dep issues)
+- [x] `npx -p @frontguard/cli frontguard doctor` works without a config file
 - [x] Package size is reasonable (<5MB for CLI, <500KB for playwright plugin)
 - [x] README renders correctly on npmjs.com
 - [x] Provenance attestation enabled (npm `--provenance` flag)

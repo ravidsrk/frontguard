@@ -1,6 +1,6 @@
 {
   "name": "@frontguard/mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Model Context Protocol server for Frontguard — lets in-IDE agents (Claude Code, Cursor, Copilot) query visual regressions and suggested fixes.",
   "type": "module",
   "bin": {
@@ -21,6 +21,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "pretest": "npm run build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"

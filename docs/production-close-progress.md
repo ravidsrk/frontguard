@@ -1,0 +1,206 @@
+# Frontguard — Production Close Progress (Coordinator Ledger)
+
+```
+PHASE=final/verify
+```
+
+Live coordinator ledger for the **production-close run (2026-06-20)**. Transcribed by the
+ingest worker from the frozen canonical inventory **`docs/production-pending.md`** (REVIEW_DOC,
+compiled 2026-06-17 @ `b472457`) plus auxiliary acceptance specs in
+`/Users/ravindra/orca/workspaces/frontguard/tang/.frontguard-audit/cluster-specs.json`.
+Setup facts and decisions: see `DECISIONS.md` § "Production close run, 2026-06-20".
+
+- **BASE:** `ravidsrk/production-close` @ `aad7733` (origin). Per-cluster fix PRs cut from and merge into BASE.
+- **MAINTAINER (every commit):** `ravidsrk <ravidsrk@gmail.com>`.
+- **Merge policy:** `gh pr merge --merge --delete-branch` (commits preserved, never squash). Merge ≠ deploy.
+- **Engineering gate:** `npm ci && npm run build && npm test` (root fans out via workspaces). Per-workspace scripts in `DECISIONS.md`.
+- **Scope of THIS run:** code + docs fixes only. Every OPS / deploy / publish / DNS / tag / migrate item is **human-owned** and lives in the OPS queue below (mirrored in `docs/arch-ops-actions.md`); it is **NOT** a dispatchable fix task and is **NOT done**.
+- **Do not re-fix:** REVIEW_DOC "What already landed" rows (install-2, claim-5, cloud-1/4, sec-1/2, int-1, docker-3, cloud-9, ci-3, mcp-1/2/7, install-7) are CLOSED. Where a CLOSED finding shares a cluster with OPEN ones, the cluster task only re-verifies it.
+
+> **⚠ LAYOUT DRIFT (read before fixing).** cluster-specs `touches` were authored against an
+> `apps/landing/**` + `apps/docs/content/docs/**.mdx` (fumadocs) layout. **Current BASE has
+> `apps/web/**` only** (single TanStack app); `apps/landing` and `apps/docs/content` do **not**
+> exist here. Live docs content is in `apps/web/src/lib/` + `apps/web/src/routes/`; the live
+> pricing CTA is `apps/web/src/routes/pricing.tsx`. Stray `npx frontguard` snippets live in
+> `docs/*.md`, `CONTRIBUTING.md`, `docs/launch/*`, `docs/design-extract/tanstack/**`, and test
+> fixtures — **not** in `apps/docs/content`. Fixers must locate live equivalents; **REVIEW_DOC
+> acceptance still governs**.
+
+---
+
+## Hot-file map (serialize: one in-flight task per hot file)
+
+| Hot file / surface | Tasks that touch it | Serialization rule |
+|--------------------|---------------------|--------------------|
+| CLI config (`packages/cli/src/core/config.ts`, doctor) | C1 | sole owner |
+| Storybook/render (`packages/cli/src/discovery/storybook.ts`, `render/playwright.ts`) | C10 | sole owner |
+| MCP (`packages/mcp/src/**`) | C12 | sole owner |
+| Supply-chain / root manifests (`package.json`, `package-lock.json`, `.github/`) | C11 | sole owner; **also coordinate the pre-existing coordinator lockfile edit** |
+| Validation (`validation/**`, `packages/cli/src/diff/pixel.ts`) | C16 | isolated (indep) |
+| Docs snippet sweep (root `README.md`, `CONTRIBUTING.md`, `docs/*`, `apps/web` docs) | C2 | run before C14/C15 |
+| Docs hygiene (`apps/web` docs: self-host, sidebar, links) | C15 | after C2 + C4 |
+| Cloud/API integration docs + `pricing.tsx` | C3 | **shares `pricing.tsx` with C14** → never run C3 ∥ C14 |
+| Root README / marketing + `pricing.tsx` | C14 | after C2; **serialize with C3 on `pricing.tsx`** |
+| Docker render + `cross-os-rendering` doc | C4 | run before C15 (shared cross-os doc) |
+| Action / integration docs (`action.yml`, `integrations/github-app/**`, github-actions doc) | C8 | **shares slack/vercel integration docs with C3** → serialize with C3 |
+| Slack-app source SSRF guard (`integrations/slack-app/src/**`) | INT7 | isolated (indep) |
+| Ledgers/docs (`fix-progress.md`, `SECURITY.md`, `launch-readiness.md`) | A10DOC | FINAL, after all code merges |
+| Versions/CHANGELOG (`VERSION`, workspace `package.json`, `CHANGELOG.md`) | A10REL | FINAL, after all code merges |
+
+---
+
+## CLOSE-INDEX — every IN finding from REVIEW_DOC
+
+Legend: **OPEN** = reproduces / unaddressed · **PARTIAL** = improved, acceptance not met ·
+**CODE_CLOSED** = code mitigated, OPS required for full closure. CLOSED / do-not-refix rows are
+**excluded** (re-verified inside their cluster only).
+
+### Wave A — code (A1–A10)
+
+| Item | Finding(s) | Cluster | Status | Task row |
+|------|-----------|---------|--------|----------|
+| A1 TS config loader | install-1, sb-2 | C1 | CLOSED (PR#97) | `cli-config-loader` |
+| A2 docs `npx` snippet sweep | docs-1, docs-10 (both CLOSED via PR#98) · re-verify ci-3, install-7 (CLOSED) | C2 | CLOSED (PR#98) | `docs-snippet-sweep` |
+| A3 MCP `npx` silent fail | mcp-3 | C12 | CLOSED (PR#102) | `mcp-fixes` |
+| A4 Storybook integration | sb-1, sb-3 | C10 | CLOSED (PR#96) | `storybook-render` |
+| A5 Storybook/self-host doc flags | docs-4, docs-7, docs-8, docs-9 (CLOSED via PR#103) · install-6, claim-6 (dead links, CLOSED via PR#95) | C15 | CLOSED (PR#103) | `docs-hygiene` |
+| A6 MCP run-scoped approve | mcp-6 | C12 | CLOSED (PR#102) | `mcp-fixes` |
+| A7 Supply chain | supply-2, supply-6, install-13 | C11 | CLOSED (PR#101; OPS O15/O11 human-owned) | `supply-chain` |
+| A8 Validation methodology | val-5 | C16 | CLOSED (PR#105) | `validation-methodology` |
+| A9 Marketing / README claims | claim-7 (CLOSED via PR#104), claim-9 (CLOSED via PR#104), dist-11 (CODE_CLOSED via PR#104 — OPS redeploy `frontguard.dev` / apps-web remains human-owned) · re-verify claim-5 (CLOSED) | C14 | CODE_CLOSED via PR#104 (claim-7/claim-9 CLOSED; dist-11 OPS redeploy remains) | `marketing-claims` |
+| A10 Process hygiene | fix-progress drift, SECURITY.md versions, launch-readiness banner, npm version staleness | — | CLOSED (PR#106 doc-reconcile + PR#107 release-prep + T_FINAL sign-off) | `a10-doc-reconcile`, `a10-release-prep`, `T_FINAL` |
+| (A-misc) MCP re-verify | mcp-8, mcp-10 | C12 | CLOSED (PR#102) | folded into `mcp-fixes` |
+| (A-misc) MCP cloud browser | mcp-9 (re-verified browser/diffId preservation) | C12/C7 | CLOSED (PR#102) | re-verify in `mcp-fixes` (note: C7 cloud already CLOSED mcp-1/2/7) |
+| (A-misc) Slack SSRF | int-7 (CLOSED via PR#100) | C8-residual | CLOSED | `int7-slack-ssrf` |
+
+### Wave B — code-side mitigations
+
+| Item | Finding(s) | Cluster | Status | Task row |
+|------|-----------|---------|--------|----------|
+| B1 DNS code-side | claim-4, dist-3, docs-2, install-9 (code-side); install-6/claim-6 links | C3 | CODE_CLOSED via PR#95 (claim-4/dist-3/docs-2/install-9 — OPS O1 DNS + O2 deploy + waitlist standup remain); install-6/claim-6 links CLOSED | `b1-code-mitigations` |
+| B5 Docker code/doc | docs-3 (CODE_CLOSED via PR#94 — OPS O9 docker publish remains); install-4, docker-1 (CODE_CLOSED — OPS O9 publish); docker-3 (re-verified CLOSED) | C4 | CODE_CLOSED (docs-3 closed via PR#94; OPS O9 remains) | `docker-doc-fix` |
+| B6 Action ref code/doc | int-3, docs-5, docs-6 — code-side CODE_CLOSED via PR#99 (OPS O10 `v0` tag + O12 marketplace submissions remain human-owned) | C8 | CODE_CLOSED via PR#99 | `action-doc-residual` |
+
+> Wave B **pure-OPS** items (B1 DNS records, B2 wrangler deploy, B3 D1 migrate, B4 staging verify,
+> B5 docker push, B6 `v0` tag push, B7 npm republish, B8 marketplace submit) and the fresh-audit
+> residual OPS are **not** code tasks — see the OPS / VERIFY_AT_SCALE queue below.
+
+---
+
+## TASK ROWS
+
+Columns: `TASK <slug>` | `WAVE` | `CLUSTER` | `FILE` | `CLOSES=[ids]` | `CODED PR_OPEN REVIEWED MERGED ACCEPT` | `OPS` | `PR#` | `WT` | `WORKER` | `NOTE`.
+All booleans start **✗** (`✓` when achieved). Dependency order: **P0** (C1, C2, C10, C3, C4) → **P1** (C12, C15, C11, C8, INT7) → **P2** (C16, C14) → **FINAL** (A10DOC, A10REL, T_FINAL). `T_FINAL` last.
+
+| TASK | WAVE | CLUSTER | FILE | CLOSES | CODED | PR_OPEN | REVIEWED | MERGED | ACCEPT | OPS | PR# | WT | WORKER | NOTE |
+|------|------|---------|------|--------|:-----:|:------:|:--------:|:------:|:------:|-----|-----|----|--------|------|
+| cli-config-loader | A | C1 | hot | [install-1, sb-2] | ✓ | ✓ | ✓ | ✓ | ✓ | none | 97 | c1-cli-config-loader | grok | P0. Codex PASS (task_cd5e5e62030a); smoke-root/subpath green; Bugbot non-blocking. `task_edb4e160cc15` |
+| docs-snippet-sweep | A | C2 | hot | [docs-1, docs-10] | ✓ | ✓ | ✓ | ✓ | ✓ | none | 98 | docs-snippet-sweep | grok | P0; dep C1. Codex PASS (task_2e3f80a26927); focused docs/template tests 21/21 + smoke-root/subpath green; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule. Acceptance grep: bare `npx frontguard` survives only in frozen audit/coordination text (historical audit docs intentionally unchanged). re-verify ci-3/install-7. `task_3bf74898dd24` |
+| storybook-render | A | C10 | hot | [sb-1, sb-3] | ✓ | ✓ | ✓ | ✓ | ✓ | none | 96 | c10-storybook-render | grok | P0. Codex PASS (task_e7ec6ffb2267); 69/69 focused Storybook tests + build green; smoke-root/subpath green; Bugbot non-blocking. `task_1fe185564626` |
+| b1-code-mitigations | B | C3 | hot | [claim-4, dist-3, docs-2, install-9, install-6, claim-6] | ✓ | ✓ | ✓ | ✓ | ✓ | DNS+waitlist (human) | 95 | c3-b1-code-mitigations | grok | P0 Wave-B code; shares pricing.tsx w/ C14. Codex PASS (task_033abbd0af4b); smoke-root/subpath green; Bugbot Low-Risk/non-blocking. GH formal approval blocked by same-account own-PR rule. CODE_CLOSED: claim-4/dist-3/docs-2/install-9 (OPS O1 DNS + O2 deploy + waitlist standup human-owned); install-6/claim-6 link fixes CLOSED. `task_bee2e61e7e8d` |
+| docker-doc-fix | B | C4 | hot | [docs-3] | ✓ | ✓ | ✓ | ✓ | ✓ | docker push (human) | 94 | c4-docker-doc-fix | grok | P0 Wave-B code; before C15. install-4/docker-1 CODE_CLOSED. Codex PASS; OPS docker push human-owned (O9). `task_a2ed02297740` |
+| mcp-fixes | A | C12 | hot | [mcp-3, mcp-6] | ✓ | ✓ | ✓ | ✓ | ✓ | none | 102 | mcp-fixes | grok | P1; also re-verify mcp-8/mcp-9/mcp-10. Codex PASS (task_6c0d0475ff4f); smoke-root/subpath green; MCP tests 51/51; web docs/pricing tests 26/26; independent direct-handler smoke zero `approveBaseline` calls; symlinked stdio smoke stdout JSON-RPC only / stderr banner; secret/live-op scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule; no OPS. `task_e0e99f241691` |
+| docs-hygiene | A | C15 | hot | [docs-4, docs-7, docs-8, docs-9] | ✓ | ✓ | ✓ | ✓ | ✓ | none | 103 | docs-hygiene | grok | P1; dep C2+C4. docs-5 residual CODE_CLOSED via PR#99 (C8) — not in scope here (not reopened). Codex PASS (task_f6cd8d3432f8); smoke-root/subpath green; check-doc-links 37 articles/8 surfaces clean; apps/web build passed; docs/comparisons/readme-links Vitest 34/34; structured C15 acceptance checks clean; added-line secret/live-op scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule; no OPS. `task_9208764790fe` |
+| supply-chain | A | C11 | hot | [supply-2, supply-6, install-13] | ✓ | ✓ | ✓ | ✓ | ✓ | enable Dependabot + republish (human) | 101 | supply-chain | grok | P1; coordinate pre-existing lockfile edit. Codex PASS (task_3c44368b2ec5); smoke-root/subpath green; `npm audit --omit=dev --audit-level=high` 0 high/critical; C11 guard tests 8/8; Daytona focused 12/12; cloud-api 468/468; `npm run build` + full `npm test` passed; secret/OPS scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule. OPS O15 Dependabot enablement + O11 npm republish remain human-owned (NOT done). `task_711f52f57f99` |
+| action-doc-residual | A/B | C8 | hot | [docs-5] | ✓ | ✓ | ✓ | ✓ | ✓ | v0 tag + marketplace (human) | 99 | action-doc-residual | grok | P1; int-3 CODE_CLOSED; docs-6 OPS (O12 marketplace); serialize w/ C3. Codex PASS (task_a68a39a04cc2); smoke-root/subpath green; check-doc-links 37/8; docs.test.tsx 20; github-app publish-surface 88; netlify 43; vercel 60; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule; no secrets/OPS. `task_65cfef634489` |
+| int7-slack-ssrf | A | C8-res | indep | [int-7] | ✓ | ✓ | ✓ | ✓ | ✓ | none | 100 | int7-slack-ssrf | grok | P1; unclustered residual. Codex PASS (task_dd42f4692cd8); Slack typecheck + tests 8 files/76 tests; cloud-api render-target/sec-2 tests 2 files/13 tests; smoke-root/subpath green; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule; no secrets/OPS. `task_0ffae0841984` |
+| validation-methodology | A | C16 | indep | [val-5] | ✓ | ✓ | ✓ | ✓ | ✓ | none | 105 | validation-methodology | grok | P2; isolated. Codex PASS (task_2dc5fc267597); smoke-root/subpath green on rebased head `90db880`; CLI pixel/report JSON tests 21/21; validation aggregate methodology validated (39/39 measured recheck diffs pixelmatch with hasBaselineImage=true); apps/web home test + build passed; secret/live-op scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule; OPS none. `task_c7cd07c09f99` |
+| marketing-claims | A | C14 | hot | [claim-7, claim-9, dist-11] | ✓ | ✓ | ✓ | ✓ | ✓ | redeploy site (human) | 104 | marketing-claims | grok | P2; dep C2; serialize w/ C3 on pricing.tsx. Codex PASS (task_3a3e8ec9cd9b); smoke-root/subpath green; apps/web build passed; marketing/home/seo/pricing tests 4 files/26 tests; claim-7/claim-9/dist-11/claim-5 checks clean; secret/live-op scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule. CODE_CLOSED: claim-7/claim-9 CLOSED; dist-11 OPS redeploy `frontguard.dev` / apps-web human-owned. `task_23bde400428e` |
+| a10-doc-reconcile | FINAL | — | hot | [fix-progress, SECURITY.md, launch-readiness] | ✓ | ✓ | ✓ | ✓ | ✓ | none | 106 | a10-doc-reconcile | grok | A10; dep all code tasks. Codex PASS (task_20d3622ad7e6) after R2; head 163a363; smoke-root/subpath green; CLOSE-INDEX count alignment 49 = 36 CLOSED / 13 CODE_CLOSED / 0 OPEN; no secrets/live-OPS done claims; Bugbot non-blocking. `task_f7abe1998a35` |
+| a10-release-prep | FINAL | — | hot | [VERSION, pkg-versions, CHANGELOG] | ✓ | ✓ | ✓ | ✓ | ✓ | npm republish 0.2.1 + `v0.2.1` tag (human) | 107 | a10-release-prep | grok | A10 release prep only; NO publish/tag executed. Codex PASS (task_bf71e94bce99) after stats retry; head `78f3ce8`; smoke-root/subpath green; `VERSION`, manifests, lockfile, action/Dockerfile pins, CLI/MCP constants, tests, and `scripts/stats.json` all 0.2.1 / v0.2.1; release/tag/publish handoff recorded as human-owned NOT done; secret/live-OPS scan clean; GH formal approval blocked by same-account own-PR rule. `task_bcd083d3cac2` |
+| T_FINAL | FINAL | — | indep | [acceptance-criteria gate] | ✓ | ✓ | ✗ | ✗ | ✓ | none | 108 | t-final-readiness | grok | LAST; dep A10DOC+A10REL. Gates green @ `aad7733` (code-equivalent `9a659e1`); acceptance walked; `production-close-readiness.md` added; PR #108 OPEN — MERGED pending. `task_98c32be0124f` |
+
+**Orca task IDs (for dispatch):**
+
+| Task row | Orca task ID | Deps |
+|----------|--------------|------|
+| cli-config-loader (C1) | `task_edb4e160cc15` | — |
+| docs-snippet-sweep (C2) | `task_3bf74898dd24` | C1 |
+| storybook-render (C10) | `task_1fe185564626` | — |
+| b1-code-mitigations (C3) | `task_bee2e61e7e8d` | — |
+| docker-doc-fix (C4) | `task_a2ed02297740` | — |
+| mcp-fixes (C12) | `task_e0e99f241691` | — |
+| docs-hygiene (C15) | `task_9208764790fe` | C2, C4 |
+| supply-chain (C11) | `task_711f52f57f99` | — |
+| action-doc-residual (C8) | `task_65cfef634489` | — |
+| int7-slack-ssrf (INT7) | `task_0ffae0841984` | — |
+| validation-methodology (C16) | `task_c7cd07c09f99` | — |
+| marketing-claims (C14) | `task_23bde400428e` | C2 |
+| a10-doc-reconcile (A10DOC) | `task_f7abe1998a35` | all 12 code tasks |
+| a10-release-prep (A10REL) | `task_bcd083d3cac2` | all 12 code tasks |
+| T_FINAL (TFINAL) | `task_98c32be0124f` | A10DOC, A10REL |
+
+---
+
+## OPS / VERIFY_AT_SCALE queue (human-owned — NOT done)
+
+Seeded from REVIEW_DOC Wave B, the fresh-architecture residual OPS table, and the verification
+appendix. **None executed this run** (safety rails: no wrangler deploy, D1 migrate, DNS edit,
+docker push, release.sh / npm publish, `v0`/`v0.2.1` tag push, live secrets, marketplace submit).
+Live actions remain in `docs/arch-ops-actions.md`.
+
+| # | OPS item | REVIEW_DOC | Unblocks / verifies | Owner | Done |
+|---|----------|-----------|---------------------|-------|:----:|
+| O1 | Move `frontguard.dev` zone to Cloudflare; create A/AAAA/CNAME for api/app/github-app/telemetry | B1 | claim-4, dist-3, docs-2, install-9, C3 | Human ops | ✗ |
+| O2 | `wrangler deploy` cloud-api / github-app / slack-app; redeploy apps/web after doc fixes | B2 | Cloud API live; integrations | Human ops | ✗ |
+| O3 | Set Worker secrets: `DASHBOARD_SESSION_SECRET` (≥32), `STRIPE_*`, `DAYTONA_API_KEY`, `GITHUB_*`, OAuth | B2 | Forged-cookie test; billing | Human ops | ✗ |
+| O4 | Apply D1 migrations 001→005 to staging (verify idempotent re-run) then prod | B3 | DM-1/2/3, CONC-2, SEC-4, CONC-3, OPS-3 | Human ops | ✗ |
+| O5 | VERIFY_AT_SCALE REL-1: multi-minute Daytona run reaches `completed`; results+reportHtml persist after 202 | B4 | REL-1 (CODE_CLOSED PR#73) | Human ops | ✗ |
+| O6 | VERIFY_AT_SCALE SEC-2: pin renderer connection to validated IP (DNS-rebind) at Daytona/infra | B4 | SEC-2 (CODE_CLOSED PR#83) | Human ops | ✗ |
+| O7 | VERIFY_AT_SCALE REL-3: deploy DO/KV distributed rate limiter; load-test under concurrency | B4 | REL-3 (CODE_CLOSED PR#85) | Human ops | ✗ |
+| O8 | VERIFY_AT_SCALE CONC-1/COST-1: 100 parallel `/v1/run` → rejection at cap; atomic reservation holds | B4 | CONC-1/COST-1 (CLOSED PR#78) | Human ops | ✗ |
+| O9 | `docker buildx build --platform linux/amd64 -t frontguard/render:0.2.1 -t :latest …` + `docker push`; smoke-pull; pin digest in docs | B5 | install-4, docker-1, docs-3 (truly closed) | Human ops | ✗ |
+| O10 | Push lightweight git tag `v0` → stable commit (`git tag v0 <sha> && git push origin v0`) | B6 | int-3, docs-5 (Action ref resolves) | Human ops | ✗ |
+| O11 | Bump to 0.2.1, run `scripts/release.sh` (or release workflow), publish `@frontguard/*`; verify `npm view @frontguard/cli@0.2.1` | B7 | npm staleness; supply-chain republish | Release eng | ✗ |
+| O12 | Submit marketplace listings: GitHub, Vercel, Netlify, Slack; fix `frontguard.dev/api/install` 404 | B8 | docs-6 | Human ops | ✗ |
+| O13 | SEC-6 / OPS-2: set `ENVIRONMENT=production` + real `DB`/bindings; replace placeholder wrangler IDs at deploy | Fresh OPS | SEC-6, OPS-2 (CLOSED) | Human ops | ✗ |
+| O14 | OPS-3: wire dead-letter consumer / alerting for `background_failures` table | Fresh OPS | OPS-3 (CLOSED) | Human ops | ✗ |
+| O15 | Enable Dependabot in repo settings (Security → Code security) so `.github/dependabot.yml` activates | A7/C11 | supply-6 | Human ops | ✗ |
+
+**Acceptance probes (REVIEW_DOC verification appendix — run post-OPS):**
+`curl -sf https://api.frontguard.dev/health` → 200 · `host api/app/github-app/telemetry.frontguard.dev` resolves ·
+`npx -y @frontguard/mcp@0.2.1 | wc -l` > 0 · `npm view frontguard` (shim) or canonical `-p @frontguard/cli` ·
+`npm audit --omit=dev` zero critical/high · Docker Hub `frontguard/render` 200.
+
+---
+
+## A10 reconciliation (process hygiene — handled by FINAL tasks)
+
+Per REVIEW_DOC A10, the following must be reconciled after Wave A+B land:
+
+1. **`docs/fix-progress.md`** — reconciled via PR#106: 49 confirmed findings, 36 CLOSED / 13 CODE_CLOSED / 0 OPEN, with OPS-gated items marked human-owned / NOT done.
+2. **`SECURITY.md`** — 0.2.x shipping-support line added via PR#106. `VERSION` / package bumps were handled by `a10-release-prep` via PR#107.
+3. **`docs/launch-readiness.md`** — 2026-06-17 NO-GO banner replaced via PR#106; T_FINAL flipped to final CONDITIONAL GO @ `aad7733`.
+4. **VERSION / workspace package versions / CHANGELOG release-prep procedure** — staged `0.2.1` via PR#107, updated `CHANGELOG.md`/changeset, and documented the `scripts/release.sh` + tag + publish handoff. **Prep only — no publish/tag (= OPS O10/O11).** → `a10-release-prep` CLOSED.
+5. **Final readiness** — engineering gates green @ `aad7733` (re-checked from code-equivalent `9a659e1`); acceptance checklist walked; OPS queue O1–O15 documented human-owned / NOT done; launch-readiness CONDITIONAL GO; `production-close-readiness.md` output. → `T_FINAL` ACCEPT ✓, MERGED pending PR #108.
+
+---
+
+## Maintenance
+
+When a cluster PR merges: set its `MERGED ✓`, fill `PR#`/`WT`/`WORKER`, flip the CLOSE-INDEX
+finding(s) to CLOSED (or CODE_CLOSED if OPS remains), and set `ACCEPT ✓` once the REVIEW_DOC
+acceptance check passes. Keep this ledger in sync with `docs/production-pending.md` (canonical)
+and, at FINAL, `docs/fix-progress.md`.
+
+### Run changelog
+
+| Date | Event |
+|------|-------|
+| 2026-06-20 | Ingest: transcribed REVIEW_DOC → CLOSE-INDEX + 15 task rows; created Orca task DAG; `PHASE=FIXING`. BASE `ravidsrk/production-close` @ `fb8b599`. |
+| 2026-06-20 | Merged PR #94 (C4 `docker-doc-fix`, WT `c4-docker-doc-fix`, worker grok) into BASE via merge commit `2153095`. Codex PASS (task_7deeb65802cf); smoke-root/subpath green; Bugbot non-blocking. CLOSE-INDEX B5 docs-3 → CODE_CLOSED via PR#94; install-4/docker-1/docker-3 unchanged (OPS O9 docker publish human-owned). |
+| 2026-06-20 | Merged PR #97 (C1 `cli-config-loader`, WT `c1-cli-config-loader`, worker grok) into BASE via merge commit `35c855c`. Codex PASS (task_cd5e5e62030a); smoke-root/subpath green; Bugbot non-blocking. CLOSE-INDEX A1 install-1/sb-2 → CLOSED via PR#97. |
+| 2026-06-20 | Merged PR #95 (C3 `b1-code-mitigations`, WT `c3-b1-code-mitigations`, worker grok) into BASE via merge commit `d3d15b5`. Codex PASS (task_033abbd0af4b); smoke-root/subpath green; Bugbot Low-Risk/non-blocking; GH formal approval blocked by same-account own-PR rule. CLOSE-INDEX B1: claim-4/dist-3/docs-2/install-9 → CODE_CLOSED via PR#95 (OPS O1 DNS + O2 deploy + waitlist standup remain human-owned); install-6/claim-6 link fixes → CLOSED. Removed false `api.frontguard.dev` hosted defaults (mcp/netlify/slack/cli), Pro CTA → waitlist mailto, telemetry opt-in, README comparison links fixed; added publish-surface guard tests. |
+| 2026-06-20 | Merged PR #96 (C10 `storybook-render`, WT `c10-storybook-render`, worker grok) into BASE via merge commit `e73d65e` (head `a10a73d`). Codex PASS (task_e7ec6ffb2267); 69/69 focused Storybook tests + build green; smoke-root/subpath green; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule. CLOSE-INDEX A4 sb-1/sb-3 → CLOSED via PR#96. |
+| 2026-06-20 | Merged PR #98 (C2 `docs-snippet-sweep`, WT `docs-snippet-sweep`, worker grok) into BASE via merge commit `8d96da5` (head `a653bca`). Codex PASS (task_2e3f80a26927); focused docs/template tests 21/21 + smoke-root/subpath green; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule. Acceptance grep (`apps/web/src/lib/docs-content.ts`, root + cli `README.md`) → zero bare `npx frontguard`; remaining repo-wide hits are frozen audit/coordination text (`docs/adversarial-*.md`, `docs/fix-plan.md`, `docs/launch-readiness.md` finding quotes, `DECISIONS.md`) + the enforcement test — historical audit docs intentionally unchanged. CLOSE-INDEX A2 docs-1/docs-10 → CLOSED via PR#98. (Residual outside C2 scope flagged to coordinator: `packages/cloud-api/cloud-landing/index.html` bare snippet — cloud-product page, not docs sweep.) |
+| 2026-06-20 | Merged PR #100 (INT7 `int7-slack-ssrf`, WT `int7-slack-ssrf`, worker grok) into BASE via merge commit `3da5ccf` (head `93d3bc7`). Codex PASS (task_dd42f4692cd8); Slack typecheck + tests 8 files/76 tests; cloud-api render-target/sec-2 tests 2 files/13 tests; smoke-root/subpath green; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule; no secrets/OPS. CLOSE-INDEX (A-misc) Slack SSRF int-7 → CLOSED via PR#100. |
+| 2026-06-20 | Merged PR #99 (C8 `action-doc-residual`, WT `action-doc-residual`, worker grok) into BASE via merge commit `17c221a` (head `8cfab37`). Codex PASS (task_a68a39a04cc2); smoke-root/subpath green; check-doc-links 37/8; docs.test.tsx 20; github-app publish-surface 88; netlify 43; vercel 60; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule; no secrets/OPS. CLOSE-INDEX B6 int-3/docs-5/docs-6 code-side → CODE_CLOSED via PR#99 (OPS O10 `v0` tag + O12 marketplace submissions remain human-owned). A5/C15 docs-hygiene no longer carries docs-5 residual; docs-4/docs-7/docs-8/docs-9 unchanged (still OPEN). |
+| 2026-06-20 | Merged PR #101 (C11 `supply-chain`, WT `supply-chain`, worker grok) into BASE via merge commit `c966f94` (head `0ddbd42`). Codex PASS (task_3c44368b2ec5); smoke-root-action + smoke-subpath-action green; `npm audit --omit=dev --audit-level=high` 0 high/critical; C11 guard tests 8/8; Daytona focused 12/12; cloud-api 468/468; `npm run build` + full `npm test` passed; secret/OPS scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule. Migrated `@daytona/sdk`, made CLI an optional dep, added audit CI gate + `.github/dependabot.yml`. CLOSE-INDEX A7 supply-2/supply-6/install-13 → CLOSED via PR#101 (OPS O15 Dependabot repo-settings enablement + O11 npm republish remain human-owned, NOT done). |
+| 2026-06-20 | Merged PR #102 (C12 `mcp-fixes`, WT `mcp-fixes`, worker grok) into BASE via merge commit `1bfa9b3` (base `c669f3b`, head `dc29320`). Codex PASS (task_6c0d0475ff4f); smoke-root-action + smoke-subpath-action green; MCP tests 51/51; web docs/pricing tests 26/26; independent direct-handler smoke zero `approveBaseline` calls; symlinked stdio smoke stdout JSON-RPC only / stderr banner; secret/live-op scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule; no OPS. CLOSE-INDEX A3 mcp-3 → CLOSED via PR#102; A6 mcp-6 → CLOSED via PR#102; (A-misc) mcp-8/mcp-10 → CLOSED via PR#102; (A-misc) mcp-9 → CLOSED via PR#102 as re-verified browser/diffId preservation. OPS queue unchanged (C12 has OPS none). |
+| 2026-06-20 | Merged PR #103 (C15 `docs-hygiene`, WT `docs-hygiene`, worker grok) into BASE via merge commit `e1acb02` (base `65fa231`, head `01421d9`). Codex PASS (task_f6cd8d3432f8); smoke-root-action + smoke-subpath-action green; check-doc-links 37 articles/8 surfaces clean; apps/web build passed; docs/comparisons/readme-links Vitest 34/34; structured C15 acceptance checks clean; added-line secret/live-op scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule; no OPS. CLOSE-INDEX A5 docs-4/docs-7/docs-8/docs-9 → CLOSED via PR#103. docs-5 remains CODE_CLOSED via PR#99 (C8) (not reopened); OPS queue unchanged (C15 has OPS none). |
+| 2026-06-20 | Merged PR #104 (C14 `marketing-claims`, WT `marketing-claims`, worker grok) into BASE via merge commit `504a038` (base `a186cc8`, head `31e8413`). Codex PASS (task_3a3e8ec9cd9b); smoke-root-action + smoke-subpath-action green; apps/web build passed; marketing/home/seo/pricing tests 4 files/26 tests; claim-7/claim-9/dist-11/claim-5 checks clean; secret/live-op scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule. CLOSE-INDEX A9: claim-7 → CLOSED via PR#104; claim-9 → CLOSED via PR#104; dist-11 → CODE_CLOSED via PR#104 (OPS redeploy `frontguard.dev` / apps-web live Schema.org stale HTML remains human-owned, NOT done); claim-5 remains CLOSED/re-verified (not reopened). OPS queue unchanged (C14 OPS = apps/web redeploy, human-owned). |
+| 2026-06-20 | Merged PR #105 (C16 `validation-methodology`, WT `validation-methodology`, worker grok) into BASE via merge commit `d45bd09` (base `0a2174a`, head `90db880`). Codex PASS (task_2dc5fc267597); smoke-root-action + smoke-subpath-action green on rebased head; CLI pixel/report JSON tests 21/21; validation aggregate methodology validated (39/39 measured recheck diffs pixelmatch with hasBaselineImage=true); apps/web home test + build passed; secret/live-op scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule; no OPS. CLOSE-INDEX A8 val-5 → CLOSED via PR#105. |
+| 2026-06-20 | Merged PR #106 (A10DOC `a10-doc-reconcile`, WT `a10-doc-reconcile`, worker grok) into BASE via merge commit `1e674fc` (base `6ee923f`, head `163a363`). Codex PASS (task_20d3622ad7e6) after R2; smoke-root-action + smoke-subpath-action green; Bugbot non-blocking (IN_PROGRESS, no blocking review/comment posted); GH formal approval blocked by same-account own-PR rule; no secrets/live-OPS done claims. Doc-only reconcile: `docs/fix-progress.md` rows aligned to final status (CLOSE-INDEX count alignment 49 = 36 CLOSED / 13 CODE_CLOSED / 0 OPEN), `SECURITY.md` Supported Versions line added for shipping release, `docs/launch-readiness.md` banner updated. A10 Process hygiene doc-reconcile subtask CLOSED; A10 row remains OPEN until A10REL (PR#107) + T_FINAL merge. |
+| 2026-06-20 | Merged PR #107 (A10REL `a10-release-prep`, WT `a10-release-prep`, worker grok) into BASE via merge commit `9a659e1` (base `6ee923f`, head `78f3ce8`). Codex PASS (task_bf71e94bce99) after stats retry; smoke-root-action + smoke-subpath-action green; Bugbot non-blocking (IN_PROGRESS, no blocking review/comment posted); GH formal approval blocked by same-account own-PR rule; release-prep diff scoped to 0.2.1 version surfaces, CHANGELOG/changeset, action/Dockerfile pins, `scripts/stats.json`, and `docs/arch-ops-actions.md`; `scripts/stats.json` verified 0.2.1 / v0.2.1; no secrets/live-OPS done claims. A10 release-prep subtask CLOSED; O10/O11 publish/tag remain human-owned, NOT done. |
+| 2026-06-20 | T_FINAL R1 (`task_98c32be0124f`, WT `t-final-readiness`, worker grok): gates green @ `9a659e1`; walked acceptance; updated ledgers — coordinator flagged: missing `production-close-readiness.md`, frozen `production-pending.md` modified, stale `9a659e1` refs, premature `PHASE=COMPLETE`. |
+| 2026-06-20 | T_FINAL R2 (PR #108 readiness fix, worker grok): restored frozen `production-pending.md` from BASE; added `docs/production-close-readiness.md`; fixed gate SHA honesty (`9a659e1` code-equivalent → `aad7733` ledger-only delta); `launch-readiness.md` + `fix-progress.md` honest CONDITIONAL GO; T_FINAL row PR_OPEN/ACCEPT, MERGED pending; `PHASE=final/verify`. No live OPS done. |

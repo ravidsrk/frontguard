@@ -129,7 +129,11 @@ The handler is Workers-compatible (no Node APIs, only Web Crypto). Bundle
 
 ## Marketplace listing
 
-`manifest.yml` is the source of truth for the Vercel Marketplace listing
+The Vercel Marketplace listing and the post-install callback (`/api/install`)
+are **in review** — there is no live one-click install URL yet. Self-host this
+handler and wire the manifest fields below until OPS publishes the listing.
+
+`manifest.yml` is the source of truth for the listing copy
 (name, scopes, redirect URL, webhook URL, requested permissions). When the
 listing is published or edited via Vercel's Integration Console, mirror those
 fields back into this file so the repo stays the canonical record.

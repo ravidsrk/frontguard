@@ -62,6 +62,8 @@ export function compareScreenshot(
     return errorResult(current, 'Current screenshot buffer is empty (zero bytes).');
   }
 
+  const comparedAgainstBaseline = true;
+
   // --- Fast path: byte-identical images --------------------------------------
   // Skippable via FRONTGUARD_DISABLE_BYTE_COMPARE=1 so the validation harness can
   // force every comparison through pixelmatch and measure the diff engine against
@@ -79,6 +81,8 @@ export function compareScreenshot(
       diffImage: undefined,
       baselineImage: baseline,
       currentImage: current.buffer,
+      comparisonMethod: 'byte-identical',
+      comparedAgainstBaseline,
     };
   }
 
@@ -174,6 +178,8 @@ export function compareScreenshot(
     diffImage,
     baselineImage: baseline,
     currentImage: current.buffer,
+    comparisonMethod: 'pixelmatch',
+    comparedAgainstBaseline,
   };
 
   if (noteMsg) {

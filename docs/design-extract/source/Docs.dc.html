@@ -133,10 +133,10 @@
 <span style="color: #7c746b;">$</span> npm install @frontguard/cli
 
 <span style="color: #564f48;"># initialize config (auto-detects your framework, --ci adds a GitHub Action)</span>
-<span style="color: #7c746b;">$</span> npx frontguard init --ci
+<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard init --ci
 
 <span style="color: #564f48;"># verify your environment is ready</span>
-<span style="color: #7c746b;">$</span> npx frontguard doctor</pre>
+<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard doctor</pre>
         </div>
 
         <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Framework detection</h2>
@@ -370,7 +370,7 @@ test(<span style="color: #98c379;">'checkout page'</span>, <span style="color: #
     <span style="color: #5b8def;">steps</span>:
       - <span style="color: #5b8def;">uses</span>: actions/checkout@v4
       - <span style="color: #5b8def;">name</span>: Run Frontguard
-        <span style="color: #5b8def;">uses</span>: ravidsrk/frontguard@main
+        <span style="color: #5b8def;">uses</span>: ravidsrk/frontguard@v0
         <span style="color: #5b8def;">with</span>:
           <span style="color: #5b8def;">url</span>: <span style="color: #98c379;">${{ env.PREVIEW_URL }}</span>  <span style="color: #564f48;"># or let it auto-detect</span>
         <span style="color: #5b8def;">env</span>:
@@ -710,10 +710,10 @@ class Component extends DCLogic {
         { name: 'FRONTGUARD_DEBUG', desc: 'Set to 1 for full stack traces on errors.' },
       ],
       quickSteps: [
-        { n: '1', title: 'Initialize', desc: 'Auto-detect your framework and scaffold a config (plus a GitHub Action with --ci).', cmd: 'npx frontguard init --ci' },
-        { n: '2', title: 'Check your environment', desc: 'Verify Node, Playwright, browsers and git are ready.', cmd: 'npx frontguard doctor' },
-        { n: '3', title: 'Run', desc: 'First run captures baselines; subsequent runs diff against them.', cmd: 'npx frontguard run --url http://localhost:3000' },
-        { n: '4', title: 'Accept changes', desc: 'After an intentional redesign, accept the current screenshots as new baselines.', cmd: 'npx frontguard update-baselines' },
+        { n: '1', title: 'Initialize', desc: 'Auto-detect your framework and scaffold a config (plus a GitHub Action with --ci).', cmd: 'npx -p @frontguard/cli frontguard init --ci' },
+        { n: '2', title: 'Check your environment', desc: 'Verify Node, Playwright, browsers and git are ready.', cmd: 'npx -p @frontguard/cli frontguard doctor' },
+        { n: '3', title: 'Run', desc: 'First run captures baselines; subsequent runs diff against them.', cmd: 'npx -p @frontguard/cli frontguard run --url http://localhost:3000' },
+        { n: '4', title: 'Accept changes', desc: 'After an intentional redesign, accept the current screenshots as new baselines.', cmd: 'npx -p @frontguard/cli frontguard update-baselines' },
       ],
       statuses: [
         { glyph: '✓', label: 'PASS', desc: 'within threshold', hex: '#4fb477' },

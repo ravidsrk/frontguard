@@ -39,7 +39,7 @@ Then add it to `netlify.toml`:
   package = "@frontguard/netlify-plugin"
 
   [plugins.inputs]
-    apiUrl = "https://api.frontguard.dev"
+    apiUrl = "https://your-cloud-api.example.com"
     routes = ["/", "/pricing", "/blog"]
     failBuild = false
     productionToo = false
@@ -51,7 +51,7 @@ Then add it to `netlify.toml`:
 
 | Input           | Default                      | Description                                                                |
 | --------------- | ---------------------------- | -------------------------------------------------------------------------- |
-| `apiUrl`        | `https://api.frontguard.dev` | Frontguard Cloud API base URL. Override only for self-hosted deployments.  |
+| `apiUrl`        | — **required**               | Frontguard Cloud API base URL. Use your self-hosted deployment or set `FRONTGUARD_API_URL`. |
 | `apiKey`        | —                            | Frontguard API key. **Prefer the env var `FRONTGUARD_API_KEY`.**           |
 | `routes`        | `["/"]`                      | Routes (paths) to screenshot. Each is appended to the preview URL.         |
 | `failBuild`     | `false`                      | Fail the Netlify deploy when the run reports any regression.               |
@@ -60,9 +60,10 @@ Then add it to `netlify.toml`:
 
 ### Secrets (Netlify UI → Site settings → Environment variables)
 
-- `FRONTGUARD_API_KEY` — **required**. Get one from
-  [app.frontguard.dev/keys](https://app.frontguard.dev/keys).
-- `FRONTGUARD_API_URL` — optional. Fallback for `apiUrl`.
+- `FRONTGUARD_API_KEY` — **required**. Create one in your cloud-api dashboard
+  or via the API after you deploy `@frontguard/cloud-api`.
+- `FRONTGUARD_API_URL` — optional fallback for `apiUrl` when not set in
+  `netlify.toml`. Point it at your self-hosted cloud-api base URL.
 - `GITHUB_TOKEN` — optional. Enables PR comments. A fine-grained PAT or
   GitHub App token with `issues:write` / `pull_requests:write` is enough.
 
@@ -72,14 +73,17 @@ Then add it to `netlify.toml`:
 
 ## Plugin manifest
 
-The full manifest is in [`manifest.yml`](./manifest.yml) and is what Netlify
-reads when the plugin is installed from the Marketplace.
+The full manifest is in [`manifest.yml`](./manifest.yml). The Netlify Build
+Plugins directory listing is **in review** — until it is live, install via
+`netlify.toml` using the in-repo manifest (see the docs site Install section).
+Once approved, Netlify reads this manifest when the plugin is installed from
+the Marketplace.
 
 ```yaml
 name: "@frontguard/netlify-plugin"
 inputs:
   - name: apiUrl
-    default: https://api.frontguard.dev
+    required: true
   - name: apiKey
   - name: routes
     default: ["/"]
@@ -103,7 +107,7 @@ inputs:
 
 If `CONTEXT` is unset — for example, when running `netlify build` locally
 without `--cwd-context` — the plugin does nothing. This guards against
-accidentally hitting `api.frontguard.dev` from developer machines.
+accidentally submitting runs from developer machines without a real deploy.
 
 ## Failing the build
 

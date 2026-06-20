@@ -127,6 +127,8 @@ describe('FRONTGUARD_DISABLE_BYTE_COMPARE escape hatch (val-5)', () => {
     expect(result.diffPercentage).toBe(0);
     // Fast-path signature: the diff overlay is never materialized.
     expect(result.diffImage).toBeUndefined();
+    expect(result.comparisonMethod).toBe('byte-identical');
+    expect(result.comparedAgainstBaseline).toBe(true);
   });
 
   it('FRONTGUARD_DISABLE_BYTE_COMPARE=1: byte-identical PNGs go through pixelmatch', () => {
@@ -141,6 +143,8 @@ describe('FRONTGUARD_DISABLE_BYTE_COMPARE escape hatch (val-5)', () => {
     expect(result.diffPercentage).toBe(0);
     expect(result.diffImage).toBeDefined();
     expect(result.diffImage).toBeInstanceOf(Buffer);
+    expect(result.comparisonMethod).toBe('pixelmatch');
+    expect(result.comparedAgainstBaseline).toBe(true);
   });
 });
 

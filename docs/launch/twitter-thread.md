@@ -64,7 +64,7 @@ CLI-first. Playwright-native.
 
 It's one command:
 
-  npx frontguard run --url http://localhost:3000
+  npx -p @frontguard/cli frontguard run --url http://localhost:3000
 
 …or 3 lines with @playwright via @frontguard/playwright.
 

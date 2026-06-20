@@ -158,6 +158,28 @@ describe('JSONReporter', () => {
     spy.mockRestore();
   });
 
+  it('preserves comparedAgainstBaseline after pipeline buffer disposal (val-5)', () => {
+    const reporter = new JSONReporter();
+    const diffs = [
+      makeDiff({
+        status: 'pass',
+        diffPercentage: 0,
+        comparisonMethod: 'pixelmatch',
+        comparedAgainstBaseline: true,
+      }),
+    ];
+    const result = makeRunResult(diffs);
+
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    reporter.onComplete(result);
+    const parsed = JSON.parse(spy.mock.calls[0][0] as string);
+
+    const diff = parsed.diffs[0];
+    expect(diff.hasBaselineImage).toBe(true);
+    expect(diff.comparisonMethod).toBe('pixelmatch');
+    spy.mockRestore();
+  });
+
   it('includes AI analysis when present', () => {
     const reporter = new JSONReporter();
     const diffs = [

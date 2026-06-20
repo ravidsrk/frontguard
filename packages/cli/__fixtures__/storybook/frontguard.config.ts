@@ -1,11 +1,9 @@
-import type { FrontguardConfig } from '@frontguard/cli';
-
 /**
  * Frontguard config for the Storybook fixture.
  *
  * Boot Storybook (`npm run storybook`) on port 6006, then:
  *
- *   npx frontguard run --config packages/cli/__fixtures__/storybook/frontguard.config.ts
+ *   npx -p @frontguard/cli frontguard run --config packages/cli/__fixtures__/storybook/frontguard.config.ts
  */
 export default {
   version: 1,
@@ -22,5 +20,6 @@ export default {
   storybook: {
     url: 'http://localhost:6006',
     stories: ['**'],
+    projectRoot: import.meta.dirname,
   },
-} satisfies FrontguardConfig;
+};

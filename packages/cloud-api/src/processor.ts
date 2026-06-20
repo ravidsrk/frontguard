@@ -44,7 +44,7 @@ export async function processRun(
     const hasDaytona = !!env.DAYTONA_API_KEY;
 
     if (hasDaytona) {
-      // Lazy-import to avoid loading @daytonaio/sdk when not needed
+      // Lazy-import to avoid loading @daytona/sdk when not needed
       const { executeInSandbox } = await import('./daytona-runner.js');
       const sandboxResult = await executeInSandbox({
         url: run.url,

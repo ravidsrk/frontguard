@@ -82,7 +82,7 @@ jobs:
           npx wait-on http://localhost:${port} --timeout 60000
 
       - name: Run Frontguard
-        run: npx frontguard run --url http://localhost:${port} --output json
+        run: npx -p @frontguard/cli frontguard run --url http://localhost:${port} --output json
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
           # Optional — enable AI classification by adding these secrets:

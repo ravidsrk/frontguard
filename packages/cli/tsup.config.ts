@@ -17,7 +17,7 @@ const OPTIONAL_PEERS = ['@aws-sdk/client-s3'];
 // As a published package, runtime deps are declared in package.json and resolved
 // from node_modules at install time — they must NOT be inlined by the bundler.
 // Externalizing all of them keeps dist/index.js (the library entry) thin and lets
-// native/optional addons (better-sqlite3, playwright, @daytonaio/sdk) load at runtime.
+// native/optional addons (better-sqlite3, playwright, @daytona/sdk) load at runtime.
 const EXTERNAL = [
   ...Object.keys(pkg.dependencies ?? {}),
   ...Object.keys(pkg.optionalDependencies ?? {}),

@@ -83,7 +83,7 @@ describe('generateGitHubActionsWorkflow', () => {
     const yaml = generateGitHubActionsWorkflow();
     expect(yaml).toContain('name: Frontguard');
     expect(yaml).toContain('pull_request');
-    expect(yaml).toContain('npx frontguard run');
+    expect(yaml).toContain('npx -p @frontguard/cli frontguard run');
     expect(yaml).toContain('actions/checkout@v4');
     expect(yaml).toContain('fetch-depth: 0');
     expect(yaml).toContain('pull-requests: write');

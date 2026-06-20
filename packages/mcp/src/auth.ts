@@ -9,8 +9,6 @@
  * @module auth
  */
 
-const DEFAULT_API_URL = 'https://api.frontguard.dev';
-
 export interface FrontguardAuth {
   apiKey: string;
   apiUrl: string;
@@ -32,6 +30,20 @@ export class MissingApiKeyError extends Error {
 }
 
 /**
+ * Thrown when {@link FRONTGUARD_API_URL} is missing. There is no hosted
+ * default — point the server at your self-hosted cloud-api or local
+ * `wrangler dev` instance.
+ */
+export class MissingApiUrlError extends Error {
+  constructor() {
+    super(
+      'FRONTGUARD_API_URL is not set. Add your cloud-api base URL to your MCP client config (e.g. mcp.json -> servers.frontguard.env) or export it in your shell — for local dev: http://localhost:8787. Then restart the agent.',
+    );
+    this.name = 'MissingApiUrlError';
+  }
+}
+
+/**
  * Resolve auth from `process.env`. Throws {@link MissingApiKeyError} when
  * `FRONTGUARD_API_KEY` is empty/unset. Tool handlers call this lazily so
  * the server can still start (and list its tool catalog) without a key.
@@ -41,6 +53,9 @@ export function requireAuth(env: NodeJS.ProcessEnv = process.env): FrontguardAut
   if (!apiKey) {
     throw new MissingApiKeyError();
   }
-  const apiUrl = (env.FRONTGUARD_API_URL?.trim() || DEFAULT_API_URL).replace(/\/+$/, '');
-  return { apiKey, apiUrl };
+  const apiUrl = env.FRONTGUARD_API_URL?.trim();
+  if (!apiUrl) {
+    throw new MissingApiUrlError();
+  }
+  return { apiKey, apiUrl: apiUrl.replace(/\/+$/, '') };
 }
