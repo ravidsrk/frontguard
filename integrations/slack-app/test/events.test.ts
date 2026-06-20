@@ -92,6 +92,14 @@ describe('decideCommand', () => {
     expect(d.kind).toBe('status_invalid');
   });
 
+  it('rejects private/internal hosts before forwarding (SSRF)', () => {
+    const d = decideCommand({ ...base, text: 'status http://169.254.169.254/' });
+    expect(d).toEqual({
+      kind: 'status_invalid',
+      reason: 'That URL targets a private or internal address and cannot be checked',
+    });
+  });
+
   it('falls through to help for unknown subcommands', () => {
     expect(decideCommand({ ...base, text: '' })).toEqual({ kind: 'help' });
     expect(decideCommand({ ...base, text: 'wat' })).toEqual({ kind: 'help' });

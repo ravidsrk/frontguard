@@ -11,15 +11,75 @@
  * @module runs
  */
 
+import {
+  isIpLiteral,
+  isPrivateOrLoopbackHost,
+  resolveHostAddresses,
+  SafeRenderTargetError,
+  type HostResolver,
+} from '@frontguard/cloud-api/render-target';
 import { buildVisualResultBlocks, type RunSummary } from './slack-api.js';
 
-/** URL validation: only `http(s)` schemes are accepted for runs. */
+/**
+ * URL validation for slash-command runs: `http(s)` only, and never private /
+ * loopback / link-local hosts (SSRF guard — mirrors Vercel + cloud-api).
+ */
 export function isAllowedRunUrl(value: string): boolean {
   try {
     const u = new URL(value);
-    return u.protocol === 'https:' || u.protocol === 'http:';
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+    return !isPrivateOrLoopbackHost(u.hostname);
   } catch {
     return false;
+  }
+}
+
+/**
+ * Defense-in-depth SSRF check before forwarding a Slack-submitted URL to the
+ * Cloud API. Rejects host literals synchronously, then resolves hostnames and
+ * re-checks resolved addresses (DNS-rebinding guard).
+ */
+export async function assertSafeRunUrl(
+  url: string,
+  opts: { resolveHost?: HostResolver } = {},
+): Promise<void> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new SafeRenderTargetError('invalid_url', 'url must be a valid URL');
+  }
+
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new SafeRenderTargetError('scheme_not_allowed', 'url must use http or https');
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (isPrivateOrLoopbackHost(host)) {
+    throw new SafeRenderTargetError(
+      'private_host',
+      'url must not target a private, loopback, or link-local host',
+    );
+  }
+
+  if (isIpLiteral(host)) return;
+
+  const resolveHost = opts.resolveHost ?? resolveHostAddresses;
+  let addresses: string[];
+  try {
+    addresses = await resolveHost(host);
+  } catch (err) {
+    if (err instanceof SafeRenderTargetError) throw err;
+    throw new SafeRenderTargetError('dns_resolution_failed', `could not resolve host: ${host}`);
+  }
+
+  for (const addr of addresses) {
+    if (isPrivateOrLoopbackHost(addr)) {
+      throw new SafeRenderTargetError(
+        'dns_private',
+        'url resolves to a private, loopback, or link-local address',
+      );
+    }
   }
 }
 
