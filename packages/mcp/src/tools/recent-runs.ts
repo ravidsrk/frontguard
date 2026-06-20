@@ -9,6 +9,7 @@
 
 import { z } from 'zod';
 import type { CloudClient, CloudRun } from '../client/cloud.js';
+import { isRegressionResult } from './_regression.js';
 
 export const recentRunsInputSchema = {
   repo: z
@@ -59,12 +60,8 @@ export interface RecentRunsResult {
   runs: RecentRunSummary[];
 }
 
-const REGRESSION_STATUSES = new Set(['regression', 'changed', 'new', 'error']);
-
 function regressionsCount(run: CloudRun): number {
-  return (run.results ?? []).filter(
-    (r) => REGRESSION_STATUSES.has(r.status) || r.classification === 'regression',
-  ).length;
+  return (run.results ?? []).filter(isRegressionResult).length;
 }
 
 function matchesRepo(run: CloudRun, repo: string): boolean {
