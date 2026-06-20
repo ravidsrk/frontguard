@@ -9,8 +9,18 @@ import {
 const evt: TelemetryEvent = { command: 'run', version: '0.2.0' };
 
 describe('isTelemetryEnabled', () => {
-  it('enabled by default with empty env', () => {
-    expect(isTelemetryEnabled({ env: {} as NodeJS.ProcessEnv })).toBe(true);
+  it('disabled by default with empty env', () => {
+    expect(isTelemetryEnabled({ env: {} as NodeJS.ProcessEnv })).toBe(false);
+  });
+
+  it('enabled by FRONTGUARD_TELEMETRY=1', () => {
+    expect(isTelemetryEnabled({ env: { FRONTGUARD_TELEMETRY: '1' } as NodeJS.ProcessEnv })).toBe(
+      true,
+    );
+  });
+
+  it('enabled by config telemetry:true', () => {
+    expect(isTelemetryEnabled({ configEnabled: true, env: {} as NodeJS.ProcessEnv })).toBe(true);
   });
 
   it('disabled by --no-telemetry flag', () => {
@@ -35,8 +45,8 @@ describe('isTelemetryEnabled', () => {
     expect(isTelemetryEnabled({ env: { DO_NOT_TRACK: '1' } as NodeJS.ProcessEnv })).toBe(false);
   });
 
-  it('DO_NOT_TRACK=0 does not disable', () => {
-    expect(isTelemetryEnabled({ env: { DO_NOT_TRACK: '0' } as NodeJS.ProcessEnv })).toBe(true);
+  it('DO_NOT_TRACK=0 does not enable without opt-in', () => {
+    expect(isTelemetryEnabled({ env: { DO_NOT_TRACK: '0' } as NodeJS.ProcessEnv })).toBe(false);
   });
 });
 

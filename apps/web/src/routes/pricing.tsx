@@ -78,8 +78,8 @@ const tiers: Tier[] = [
     per: '/ month',
     featured: true,
     tagline: 'A hosted dashboard and managed baselines for solo devs and small teams.',
-    cta: 'Start 14-day trial',
-    ctaHref: 'https://app.frontguard.dev/signup',
+    cta: 'Join the waitlist',
+    ctaHref: 'mailto:hello@frontguard.dev?subject=Pro%20waitlist',
     external: true,
     featuresLabel: 'EVERYTHING IN OPEN SOURCE, PLUS',
     features: [
