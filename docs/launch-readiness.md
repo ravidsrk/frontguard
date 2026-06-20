@@ -294,9 +294,9 @@ reconciled 49-finding close-index.
 
 | Tier | Original count | After remediation |
 |------|---------------:|------------------:|
-| P0 | 22 | 0 OPEN · 7 CODE_CLOSED (OPS) · 15 CLOSED |
-| P1 | 15 | 0 OPEN · 1 CODE_CLOSED (OPS Dependabot) · 14 CLOSED |
-| P2 | 12 | 0 OPEN · 2 CODE_CLOSED (OPS redeploy) · 10 CLOSED (`val-5` via PR#105) |
+| P0 | 22 | 0 OPEN · 9 CODE_CLOSED (OPS) · 13 CLOSED |
+| P1 | 15 | 0 OPEN · 1 CODE_CLOSED (OPS Dependabot — O15 human-owned, NOT done) · 14 CLOSED |
+| P2 | 12 | 0 OPEN · 3 CODE_CLOSED (OPS redeploy/npm republish — human-owned, NOT done) · 9 CLOSED (`val-5` CLOSED via PR#105) |
 
 **Honest shipping label today:** *OSS CLI preview — republish as 0.2.1 after
 release-prep; cloud/SaaS not operational until OPS queue completes.*

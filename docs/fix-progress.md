@@ -61,7 +61,7 @@ Status legend: `OPEN` / `CLOSED via PR#n` / `CLOSED (main)` / `CODE_CLOSED via P
 - [x] cloud-9    CLOSED (main)  — C7 cloud-api data model
 - [x] sec-2      CLOSED (main)  — C6 ssrf-guard
 - [x] supply-2   CLOSED via PR#101  — C11 supply-chain
-- [x] supply-6   CLOSED via PR#101 (OPS: O15 Dependabot repo settings)  — C11 supply-chain
+- [x] supply-6   CODE_CLOSED via PR#101 (OPS: O15 Dependabot repo settings — human-owned, NOT done)  — C11 supply-chain
 - [x] ci-3       CLOSED (main)  — C2 bin/package-name
 - [x] int-7      CLOSED via PR#100  — C6 ssrf-guard (Slack-local)
 - [x] mcp-1      CLOSED (main)  — C7 cloud-api data model
@@ -74,7 +74,7 @@ Status legend: `OPEN` / `CLOSED via PR#n` / `CLOSED (main)` / `CODE_CLOSED via P
 ### P2 (12)
 
 - [x] install-9   CODE_CLOSED via PR#95 (OPS: O1 DNS / telemetry endpoint)  — C3 hosts/DNS code-side
-- [x] install-13  CLOSED via PR#101  — C11 supply-chain
+- [x] install-13  CODE_CLOSED via PR#101 (OPS: O11 npm republish — human-owned, NOT done)  — C11 supply-chain
 - [x] claim-7     CLOSED via PR#104  — C14 marketing-claims
 - [x] claim-9     CLOSED via PR#104  — C14 marketing-claims
 - [x] mcp-8       CLOSED via PR#102  — C12 mcp-correctness
@@ -99,7 +99,7 @@ Status legend: `OPEN` / `CLOSED via PR#n` / `CLOSED (main)` / `CODE_CLOSED via P
 | docker-doc-fix | C4 | docs-3 | ✓ | ✓ | ✓ | ✓ | ✓ | docker push | 94 | c4-docker-doc-fix | grok | P0 Wave-B; install-4/docker-1 CODE_CLOSED |
 | mcp-fixes | C12 | mcp-3, mcp-6, mcp-8, mcp-9, mcp-10 | ✓ | ✓ | ✓ | ✓ | ✓ | — | 102 | mcp-fixes | grok | P1 |
 | docs-hygiene | C15 | docs-4, docs-7, docs-8, docs-9 | ✓ | ✓ | ✓ | ✓ | ✓ | — | 103 | docs-hygiene | grok | P1 |
-| supply-chain | C11 | supply-2, supply-6, install-13 | ✓ | ✓ | ✓ | ✓ | ✓ | Dependabot+republish | 101 | supply-chain | grok | P1; OPS O15/O11 human-owned |
+| supply-chain | C11 | supply-2, supply-6, install-13 | ✓ | ✓ | ✓ | ✓ | ✓ | Dependabot+republish (human) | 101 | supply-chain | grok | P1; supply-2 CLOSED; supply-6/install-13 CODE_CLOSED (OPS O15/O11 human-owned, NOT done) |
 | action-doc-residual | C8 | int-3, docs-5, docs-6 | ✓ | ✓ | ✓ | ✓ | ✓ | v0 tag+marketplace | 99 | action-doc-residual | grok | P1; CODE_CLOSED |
 | int7-slack-ssrf | C8-res | int-7 | ✓ | ✓ | ✓ | ✓ | ✓ | — | 100 | int7-slack-ssrf | grok | P1 |
 | validation-methodology | C16 | val-5 | ✓ | ✓ | ✓ | ✓ | ✓ | — | 105 | validation-methodology | grok | P2; CLOSED PR#105 |
@@ -145,7 +145,7 @@ Independent (parallelize across isolated worktrees):
 - **C8** github-action-ref — int-3, docs-5, docs-6 — **CODE_CLOSED PR#99** (OPS O10/O12)
 - **C9** slack-result-shape — int-1 — **CLOSED (main)**
 - **C10** storybook — sb-1, sb-3 — **CLOSED PR#96**
-- **C11** supply-chain — supply-2, supply-6, install-13 — **CLOSED PR#101** (OPS O15)
+- **C11** supply-chain — supply-2 (CLOSED), supply-6, install-13 (CODE_CLOSED — OPS O15/O11 human-owned, NOT done) — **CODE_CLOSED PR#101**
 - **C12** mcp-correctness — mcp-3, mcp-6, mcp-8, mcp-10 — **CLOSED PR#102**
 - **C13** init-gitignore — install-2 — **CLOSED (main)**
 - **C14** marketing-claims — claim-5, claim-7, claim-9, dist-11 — **CODE_CLOSED PR#104** (OPS redeploy)
