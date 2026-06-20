@@ -1,5 +1,3 @@
-import type { FrontguardConfig } from '@frontguard/cli';
-
 /**
  * Frontguard config for the Storybook fixture.
  *
@@ -23,4 +21,4 @@ export default {
     url: 'http://localhost:6006',
     stories: ['**'],
   },
-} satisfies FrontguardConfig;
+};
