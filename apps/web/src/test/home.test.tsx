@@ -88,5 +88,6 @@ describe('home route — SEO head', () => {
         expect.objectContaining({ name: 'Pro', price: '29' }),
       ]),
     )
+    expect(jsonLd).not.toHaveProperty('aggregateRating')
   })
 })
