@@ -11,7 +11,7 @@
  *   [[plugins]]
  *     package = "@frontguard/netlify-plugin"
  *     [plugins.inputs]
- *       apiUrl = "https://api.frontguard.dev"
+ *       apiUrl = "https://your-cloud-api.example.com"
  *       routes = ["/", "/pricing"]
  *       failBuild = false
  *

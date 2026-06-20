@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MissingApiKeyError, requireAuth } from '../src/auth.js';
+import { MissingApiKeyError, MissingApiUrlError, requireAuth } from '../src/auth.js';
 
 describe('requireAuth', () => {
   it('throws MissingApiKeyError when FRONTGUARD_API_KEY is unset', () => {
@@ -21,10 +21,14 @@ describe('requireAuth', () => {
     }
   });
 
-  it('defaults to api.frontguard.dev when no FRONTGUARD_API_URL', () => {
-    const auth = requireAuth({ FRONTGUARD_API_KEY: 'fg_test_abc' });
-    expect(auth.apiKey).toBe('fg_test_abc');
-    expect(auth.apiUrl).toBe('https://api.frontguard.dev');
+  it('throws MissingApiUrlError when FRONTGUARD_API_URL is unset', () => {
+    expect(() => requireAuth({ FRONTGUARD_API_KEY: 'fg_test_abc' })).toThrow(MissingApiUrlError);
+  });
+
+  it('throws MissingApiUrlError when FRONTGUARD_API_URL is empty', () => {
+    expect(() =>
+      requireAuth({ FRONTGUARD_API_KEY: 'fg_test_abc', FRONTGUARD_API_URL: '   ' }),
+    ).toThrow(MissingApiUrlError);
   });
 
   it('uses FRONTGUARD_API_URL when set, stripping trailing slashes', () => {
@@ -36,7 +40,10 @@ describe('requireAuth', () => {
   });
 
   it('trims whitespace around the key', () => {
-    const auth = requireAuth({ FRONTGUARD_API_KEY: '  fg_test_xyz  ' });
+    const auth = requireAuth({
+      FRONTGUARD_API_KEY: '  fg_test_xyz  ',
+      FRONTGUARD_API_URL: 'http://localhost:8787',
+    });
     expect(auth.apiKey).toBe('fg_test_xyz');
   });
 });
