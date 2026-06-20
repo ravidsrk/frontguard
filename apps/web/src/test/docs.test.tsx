@@ -163,6 +163,49 @@ describe('docs content store', () => {
     expect(github?.html).toContain('ravidsrk/frontguard@v0')
     expect(github?.html).not.toMatch(/ravidsrk\/frontguard@(v1|main)/)
   })
+
+  it('has no C15 hygiene violations across all articles', () => {
+    const allHtml = articles.map((a) => a.html).join('\n')
+    expect(allHtml).not.toMatch(/--baseline-strategy\b/)
+    expect(allHtml).not.toMatch(/--ai\b/)
+    expect(allHtml).not.toContain('frontguard approve')
+    expect(allHtml).not.toContain('scheduled-monitors')
+    expect(allHtml).not.toMatch(/guides\/frontguard-vs-(percy|chromatic)/)
+    expect(allHtml).not.toContain('Docker will pull')
+    expect(allHtml).not.toContain('docs.frontguard.dev')
+  })
+
+  it('registers deployment pages in the sidebar nav', () => {
+    const deployment = navGroups.find((g) => g.label === 'DEPLOYMENT & SANDBOXING')
+    expect(deployment?.ids).toEqual([
+      'self-host',
+      'sandbox',
+      'cross-os-rendering',
+      'distribution',
+    ])
+  })
+
+  it('gates self-host behind build-from-source (no published GHCR image)', () => {
+    const selfHost = articles.find((a) => a.id === 'self-host')!
+    expect(selfHost.html).toContain('build from source')
+    expect(selfHost.html).toContain('not published yet')
+    expect(selfHost.html).toContain('&quot;version&quot;:&quot;0.2.0&quot;')
+    expect(selfHost.html).not.toContain('&quot;version&quot;:&quot;0.1.0&quot;')
+  })
+
+  it('storybook CI recipe uses only real CLI flags', () => {
+    const storybook = articles.find((a) => a.id === 'integrations/storybook')!
+    expect(storybook.html).not.toMatch(/--baseline-strategy\b/)
+    expect(storybook.html).not.toMatch(/--ai\b/)
+    expect(storybook.html).toContain('verify-fixes')
+  })
+
+  it('cross-os-rendering labels playwright setup correctly', () => {
+    const crossOs = articles.find((a) => a.id === 'cross-os-rendering')!
+    expect(crossOs.html).toContain('Playwright plugin setup')
+    expect(crossOs.html).toContain('/docs/playwright/setup')
+    expect(crossOs.html).not.toContain('Cloud API: setup')
+  })
 })
 
 describe('docs article HTML quality', () => {
