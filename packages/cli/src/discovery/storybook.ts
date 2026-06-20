@@ -408,8 +408,8 @@ export async function discoverStorybookRoutesForConfig(
  *
  * Strategy:
  *   1. Wait for `window.__STORYBOOK_PREVIEW__` to exist.
- *   2. Watch `storyRenders` (Storybook 8) for `phase === 'completed'` /
- *      `'played'` — this is set after the play function resolves.
+ *   2. Watch `storyRenders` (Storybook 8) for terminal phases — `'completed'`,
+ *      `'finished'` (SB 8.6+), or `'played'` — set after the play function resolves.
  *   3. As a Storybook 7 fallback, listen for the `storyRendered` channel
  *      event and resolve when it fires.
  *   4. Network idle + a final animation frame for paint stability.
@@ -430,7 +430,13 @@ export const STORYBOOK_READY_SCRIPT = `(timeoutMs) => new Promise((resolve) => {
   }
 
   function isCompletedPhase(phase) {
-    return phase === 'completed' || phase === 'played' || phase === 'errored' || phase === 'aborted';
+    return (
+      phase === 'completed' ||
+      phase === 'finished' ||
+      phase === 'played' ||
+      phase === 'errored' ||
+      phase === 'aborted'
+    );
   }
 
   function poll() {

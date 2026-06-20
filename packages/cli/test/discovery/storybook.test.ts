@@ -344,6 +344,7 @@ describe('STORYBOOK_READY_SCRIPT', () => {
     expect(STORYBOOK_READY_SCRIPT).toContain('__STORYBOOK_PREVIEW__');
     expect(STORYBOOK_READY_SCRIPT).toContain('storyRenders');
     expect(STORYBOOK_READY_SCRIPT).toContain('completed');
+    expect(STORYBOOK_READY_SCRIPT).toContain('finished');
     expect(STORYBOOK_READY_SCRIPT).toContain('storyRendered');
   });
 
@@ -372,6 +373,32 @@ describe('STORYBOOK_READY_SCRIPT', () => {
     expect(result.ready).toBe(true);
     expect(result.reason).toBe('phase-complete');
     expect(result.elapsedMs).toBeLessThan(2000);
+  });
+
+  it('resolves quickly when storyRenders use SB 8.6 "finished" phase', async () => {
+    const win: {
+      __STORYBOOK_PREVIEW__: {
+        storyRenders: Map<string, { phase: string }>;
+        channel: { once: () => void };
+      };
+    } = {
+      __STORYBOOK_PREVIEW__: {
+        storyRenders: new Map([['components-modal--opened-by-play', { phase: 'finished' }]]),
+        channel: { once: () => {} },
+      },
+    };
+    const document = { body: { classList: { contains: () => false } } };
+    const fn = new Function(
+      'window',
+      'document',
+      'requestAnimationFrame',
+      `return (${STORYBOOK_READY_SCRIPT})(500);`,
+    );
+    const raf = (cb: () => void) => setTimeout(cb, 0);
+    const result = await fn(win, document, raf);
+    expect(result.ready).toBe(true);
+    expect(result.reason).toBe('phase-complete');
+    expect(result.elapsedMs).toBeLessThan(500);
   });
 
   it('uses the class heuristic when __STORYBOOK_PREVIEW__ is missing', async () => {
