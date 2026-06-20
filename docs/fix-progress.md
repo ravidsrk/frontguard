@@ -1,9 +1,11 @@
 # Frontguard v0.2.0 — Adversarial Remediation Progress
 
-*Reconciled 2026-06-20 against `docs/production-pending.md` and
-`docs/production-close-progress.md` on BASE `ravidsrk/production-close` @
-`6ee923f` after Wave A+B code merges (PRs #94–#105). Canonical go/no-go
-inventory: [`production-pending.md`](./production-pending.md).*
+*Reconciled 2026-06-20 against the frozen REVIEW_DOC
+[`docs/production-pending.md`](./production-pending.md) and
+[`docs/production-close-progress.md`](./production-close-progress.md) on BASE
+`ravidsrk/production-close` @ `aad7733` after Wave A+B + A10 (#94–#107).
+T_FINAL acceptance output: [`production-close-readiness.md`](./production-close-readiness.md)
+(PR #108, pending merge).*
 
 **Source of truth (workers read this for the recommendations):**
 `.frontguard-audit/adversarial-v020-postship.md` (gitignored — quotes live
@@ -104,9 +106,9 @@ Status legend: `OPEN` / `CLOSED via PR#n` / `CLOSED (main)` / `CODE_CLOSED via P
 | int7-slack-ssrf | C8-res | int-7 | ✓ | ✓ | ✓ | ✓ | ✓ | — | 100 | int7-slack-ssrf | grok | P1 |
 | validation-methodology | C16 | val-5 | ✓ | ✓ | ✓ | ✓ | ✓ | — | 105 | validation-methodology | grok | P2; CLOSED PR#105 |
 | marketing-claims | C14 | claim-7, claim-9, dist-11 | ✓ | ✓ | ✓ | ✓ | ✓ | redeploy site | 104 | marketing-claims | grok | P2; dist-11 CODE_CLOSED |
-| a10-doc-reconcile | — | fix-progress, SECURITY.md, launch-readiness | ✓ | — | — | — | — | — | — | a10-doc-reconcile | grok | FINAL; this PR |
-| a10-release-prep | — | VERSION, CHANGELOG | ✗ | ✗ | ✗ | ✗ | ✗ | npm republish | — | — | — | FINAL; pending |
-| T_FINAL | — | acceptance gate | ✗ | ✗ | ✗ | ✗ | ✗ | — | — | — | — | LAST; pending A10 |
+| a10-doc-reconcile | — | fix-progress, SECURITY.md, launch-readiness | ✓ | ✓ | ✓ | ✓ | ✓ | — | 106 | a10-doc-reconcile | grok | FINAL; merged PR#106 |
+| a10-release-prep | — | VERSION, CHANGELOG | ✓ | ✓ | ✓ | ✓ | ✓ | npm republish (human) | 107 | a10-release-prep | grok | FINAL; merged PR#107; O10/O11 NOT done |
+| T_FINAL | — | acceptance gate | ✓ | ✓ | ✗ | ✗ | ✓ | — | 108 | t-final-readiness | grok | LAST; PR_OPEN pending merge |
 
 ---
 
@@ -164,7 +166,7 @@ Independent (parallelize across isolated worktrees):
 
 ## Next-wave selector
 
-Wave A+B code tasks merged (PRs #94–#105). Remaining engineering:
+Wave A+B + A10 (#94–#107) merged. Remaining:
 
-1. **A10** `a10-release-prep` — VERSION/CHANGELOG prep (no publish)
-2. **T_FINAL** — acceptance gate + launch-readiness sign-off (after A10)
+1. **T_FINAL** — PR #108 acceptance gate + `production-close-readiness.md` (PR_OPEN)
+2. **OPS O1–O15** — human-owned; none executed (see `production-close-readiness.md`)
