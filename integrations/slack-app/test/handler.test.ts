@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createSlackApp } from '../src/handler.js';
 import type { KVNamespace } from '../src/storage.js';
-import { signSlack } from './helpers.js';
+import { signSlack, stubPublicDnsFetch } from './helpers.js';
 
 const SECRET = 'shhh-signing-secret';
 const env = { SLACK_SIGNING_SECRET: SECRET };
@@ -149,9 +149,28 @@ describe('/slack/commands — status subcommand', () => {
     expect(json.text).toContain('FRONTGUARD_API_URL');
   });
 
+  it('rejects metadata/private URLs before any cloud-api fetch (SSRF)', async () => {
+    const calls: string[] = [];
+    const fakeFetch = (async (input: string) => {
+      calls.push(String(input));
+      return new Response('unexpected', { status: 500 });
+    }) as unknown as typeof fetch;
+
+    const res = await postStatus({
+      url: 'http://169.254.169.254/',
+      apiUrl: 'https://api.frontguard.dev',
+      apiKey: 'fg_x',
+      fetchSpy: fakeFetch as unknown as typeof fetch & ((...a: unknown[]) => unknown),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { text: string };
+    expect(json.text).toContain('private');
+    expect(calls.some((u) => u.endsWith('/v1/run'))).toBe(false);
+  });
+
   it('submits a run to the cloud API and acks with the run id', async () => {
     const calls: Array<{ url: string; body?: string }> = [];
-    const fakeFetch = (async (input: string, init?: RequestInit) => {
+    const fakeFetch = stubPublicDnsFetch(async (input: string, init?: RequestInit) => {
       const url = String(input);
       calls.push({ url, body: typeof init?.body === 'string' ? init.body : undefined });
       if (url.endsWith('/v1/run')) {
@@ -167,7 +186,7 @@ describe('/slack/commands — status subcommand', () => {
         });
       }
       return new Response('ok', { status: 200 });
-    }) as unknown as typeof fetch;
+    });
 
     const res = await postStatus({
       url: 'https://example.com',
@@ -186,11 +205,11 @@ describe('/slack/commands — status subcommand', () => {
   });
 
   it('reports a cloud-api failure back to the user', async () => {
-    const fakeFetch = (async (input: string) => {
+    const fakeFetch = stubPublicDnsFetch(async (input: string) => {
       const url = String(input);
       if (url.endsWith('/v1/run')) return new Response('limit', { status: 402 });
       return new Response('ok', { status: 200 });
-    }) as unknown as typeof fetch;
+    });
 
     const res = await postStatus({
       url: 'https://example.com',
