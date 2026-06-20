@@ -168,9 +168,9 @@ Live actions remain in `docs/arch-ops-actions.md`.
 
 Per REVIEW_DOC A10, the following must be reconciled after Wave A+B land:
 
-1. **`docs/fix-progress.md`** — all 49 original findings still `OPEN` (ledger drift). Reconcile each row to its final CLOSED/CODE_CLOSED/OPEN status. → `a10-doc-reconcile` (`task_f7abe1998a35`).
-2. **`SECURITY.md`** — Supported Versions lists only `0.1.x`; `VERSION` is `0.2.0` (→ `0.2.1`). Add the shipping release line. → `a10-doc-reconcile`.
-3. **`docs/launch-readiness.md`** — still shows 2026-06-17 NO-GO banner; update to post-remediation verdict. → `a10-doc-reconcile` + `T_FINAL` sign-off.
+1. **`docs/fix-progress.md`** — reconciled via PR#106: 49 confirmed findings, 36 CLOSED / 13 CODE_CLOSED / 0 OPEN, with OPS-gated items marked human-owned / NOT done.
+2. **`SECURITY.md`** — 0.2.x shipping-support line added via PR#106. `VERSION` / package bumps are handled by `a10-release-prep`.
+3. **`docs/launch-readiness.md`** — 2026-06-17 NO-GO banner replaced via PR#106 with the post-remediation conditional-go posture; `T_FINAL` still owns final sign-off.
 4. **VERSION / workspace package versions / CHANGELOG release-prep procedure** — stage `0.2.1`, update `CHANGELOG.md`/changeset, document the `scripts/release.sh` + tag + publish handoff. **Prep only — no publish/tag (= OPS O10/O11).** → `a10-release-prep` (`task_bcd083d3cac2`).
 5. **Final readiness** — re-run engineering gates, walk the REVIEW_DOC acceptance checklist, confirm OPS queue complete + human-owned, flip launch-readiness to honest verdict (OSS CLI shippable; cloud/SaaS gated on OPS). → `T_FINAL` (`task_98c32be0124f`), **last**.
 
