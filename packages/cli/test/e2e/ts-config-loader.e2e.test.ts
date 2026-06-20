@@ -34,8 +34,10 @@ function runNode(args: string[], cwd: string): { stdout: string; stderr: string;
 
 describe('TypeScript config loader e2e', () => {
   beforeAll(() => {
+    // `npm run build` (full CLI tsc) routinely exceeds vitest's default 10s
+    // hook timeout on CI runners; allow up to 2 minutes for the build.
     execFileSync('npm', ['run', 'build'], { cwd: cliDir, stdio: 'inherit' });
-  });
+  }, 120_000);
 
   let dir: string;
 
