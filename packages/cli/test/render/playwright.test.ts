@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { Route, FrontguardConfig, BrowserEngine, ScreenshotResult } from '../../src/core/types.js';
+import { STORYBOOK_READY_SCRIPT } from '../../src/discovery/storybook.js';
 
 /** Replicate the internal RenderTask structure */
 interface RenderTask {
@@ -19,7 +20,9 @@ interface RenderTask {
 function buildTasks(routes: Route[], config: Pick<FrontguardConfig, 'viewports' | 'browsers'>): RenderTask[] {
   const tasks: RenderTask[] = [];
   for (const route of routes) {
-    for (const viewport of config.viewports) {
+    const viewports =
+      route.viewport && route.viewport.length > 0 ? route.viewport : config.viewports;
+    for (const viewport of viewports) {
       for (const browser of config.browsers) {
         tasks.push({ route, viewport, browser });
       }
@@ -98,6 +101,56 @@ describe('Renderer Task Generation', () => {
   it('tasks have correct viewport assignment', () => {
     const tasks = buildTasks([{ path: '/' }], { viewports: [375, 768, 1440], browsers: ['chromium'] });
     expect(tasks.map(t => t.viewport)).toEqual([375, 768, 1440]);
+  });
+
+  it('honors per-route viewport overrides from Storybook parameters', () => {
+    const tasks = buildTasks(
+      [
+        { path: '/iframe.html?id=components-button--primary&viewMode=story', discoveredVia: 'storybook' },
+        {
+          path: '/iframe.html?id=components-button--secondary&viewMode=story',
+          discoveredVia: 'storybook',
+          viewport: [768],
+        },
+      ],
+      { viewports: [375, 768, 1440], browsers: ['chromium'] },
+    );
+    expect(tasks).toHaveLength(4);
+    expect(tasks.filter((t) => t.route.viewport?.includes(768))).toHaveLength(1);
+    expect(tasks.filter((t) => t.route.viewport === undefined)).toHaveLength(3);
+  });
+});
+
+describe('Storybook ready-wait evaluate shape', () => {
+  it('wraps STORYBOOK_READY_SCRIPT as an invoked function expression', () => {
+    const sbTimeout = 15_000;
+    const expr = `(${STORYBOOK_READY_SCRIPT})(${sbTimeout})`;
+    expect(expr.startsWith('((timeoutMs) => new Promise(')).toBe(true);
+    expect(expr.endsWith(`)(${sbTimeout})`)).toBe(true);
+
+    const win: {
+      __STORYBOOK_PREVIEW__: {
+        storyRenders: Map<string, { phase: string }>;
+        channel: { once: () => void };
+      };
+    } = {
+      __STORYBOOK_PREVIEW__: {
+        storyRenders: new Map([['x', { phase: 'completed' }]]),
+        channel: { once: () => {} },
+      },
+    };
+    const document = { body: { classList: { contains: () => false } } };
+    const fn = new Function(
+      'window',
+      'document',
+      'requestAnimationFrame',
+      `return ${expr};`,
+    );
+    const raf = (cb: () => void) => setTimeout(cb, 0);
+    return expect(fn(win, document, raf)).resolves.toMatchObject({
+      ready: true,
+      reason: 'phase-complete',
+    });
   });
 });
 

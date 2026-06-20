@@ -26,6 +26,7 @@ import {
   storyIframePath,
   STORYBOOK_READY_SCRIPT,
 } from '../../src/discovery/storybook.js';
+import { resolveStoryFrontguardParameters } from '../../src/discovery/storybook-parameters.js';
 
 // ---------------------------------------------------------------------------
 // Mock Storybook server
@@ -343,6 +344,7 @@ describe('STORYBOOK_READY_SCRIPT', () => {
     expect(STORYBOOK_READY_SCRIPT).toContain('__STORYBOOK_PREVIEW__');
     expect(STORYBOOK_READY_SCRIPT).toContain('storyRenders');
     expect(STORYBOOK_READY_SCRIPT).toContain('completed');
+    expect(STORYBOOK_READY_SCRIPT).toContain('finished');
     expect(STORYBOOK_READY_SCRIPT).toContain('storyRendered');
   });
 
@@ -371,6 +373,32 @@ describe('STORYBOOK_READY_SCRIPT', () => {
     expect(result.ready).toBe(true);
     expect(result.reason).toBe('phase-complete');
     expect(result.elapsedMs).toBeLessThan(2000);
+  });
+
+  it('resolves quickly when storyRenders use SB 8.6 "finished" phase', async () => {
+    const win: {
+      __STORYBOOK_PREVIEW__: {
+        storyRenders: Map<string, { phase: string }>;
+        channel: { once: () => void };
+      };
+    } = {
+      __STORYBOOK_PREVIEW__: {
+        storyRenders: new Map([['components-modal--opened-by-play', { phase: 'finished' }]]),
+        channel: { once: () => {} },
+      },
+    };
+    const document = { body: { classList: { contains: () => false } } };
+    const fn = new Function(
+      'window',
+      'document',
+      'requestAnimationFrame',
+      `return (${STORYBOOK_READY_SCRIPT})(500);`,
+    );
+    const raf = (cb: () => void) => setTimeout(cb, 0);
+    const result = await fn(win, document, raf);
+    expect(result.ready).toBe(true);
+    expect(result.reason).toBe('phase-complete');
+    expect(result.elapsedMs).toBeLessThan(500);
   });
 
   it('uses the class heuristic when __STORYBOOK_PREVIEW__ is missing', async () => {
@@ -407,6 +435,69 @@ describe('STORYBOOK_READY_SCRIPT', () => {
     const result = await fn(win, document, raf);
     expect(result.ready).toBe(true);
     expect(result.reason).toBe('timeout');
+  });
+});
+
+/** SB8-shaped index without `parameters` — matches real Storybook 8 output. */
+const SB8_INDEX_NO_PARAMS = {
+  v: 5,
+  entries: Object.fromEntries(
+    Object.entries(SB8_INDEX.entries).map(([id, entry]) => [
+      id,
+      {
+        type: entry.type,
+        id: entry.id,
+        name: entry.name,
+        title: entry.title,
+        importPath:
+          entry.importPath ??
+          (entry.title?.startsWith('Components/Modal')
+            ? './src/components/Modal.stories.tsx'
+            : './src/components/Button.stories.tsx'),
+        tags: entry.tags,
+      },
+    ]),
+  ),
+};
+
+describe('resolveStoryFrontguardParameters — real SB8 index shape', () => {
+  const fixtureRoot = join(__dirname, '..', '..', '__fixtures__', 'storybook');
+
+  it('extracts frontguard parameters from CSF files via importPath', async () => {
+    const params = await resolveStoryFrontguardParameters(
+      'http://127.0.0.1:9',
+      Object.values(SB8_INDEX_NO_PARAMS.entries),
+      { storybookMajor: 8, projectRoot: fixtureRoot },
+    );
+    expect(params.get('components-button--secondary')).toEqual({
+      viewports: [768],
+      threshold: 0.005,
+    });
+    expect(params.get('components-button--danger')).toEqual({
+      ignore: [{ selector: '.fg-mask' }],
+    });
+    expect(params.get('components-modal--opened-by-play')).toEqual({
+      viewports: [1024],
+    });
+  });
+
+  it('discovers per-story overrides when /index.json omits parameters', async () => {
+    const server = await startMockStorybook({
+      endpoint: 'index.json',
+      body: SB8_INDEX_NO_PARAMS,
+    });
+    try {
+      const result = await discoverStorybookStories({
+        url: server.url,
+        projectRoot: fixtureRoot,
+      });
+      const secondary = result!.routes.find((r) => r.label?.includes('Secondary'));
+      expect(secondary!.viewport).toEqual([768]);
+      const opened = result!.routes.find((r) => r.label?.includes('OpenedByPlay'));
+      expect(opened!.viewport).toEqual([1024]);
+    } finally {
+      await server.close();
+    }
   });
 });
 

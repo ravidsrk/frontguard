@@ -227,6 +227,7 @@ export const configSchema = z.object({
       stories: z.array(z.string().min(1)).optional(),
       exclude: z.array(z.string().min(1)).optional(),
       fetchTimeoutMs: z.number().int().positive().optional(),
+      projectRoot: z.string().min(1).optional(),
     })
     .optional(),
 });
