@@ -325,6 +325,17 @@ run_repo() {
     echo "}"
   } >>"${out_file}"
 
+  # --- Instrumentation gate (val-5): recheck diffs must prove pixelmatch ran ---
+  local recheck_diffs measured_diffs missing_baseline non_pixelmatch
+  recheck_diffs="$(jq '[.recheckRuns[].result.diffs[]? | select(.status != "error")] | length' "${out_file}" 2>/dev/null || echo 0)"
+  measured_diffs="$(jq '[.recheckRuns[].result.diffs[]? | select(.status != "error" and .comparisonMethod == "pixelmatch" and .hasBaselineImage == true)] | length' "${out_file}" 2>/dev/null || echo 0)"
+  missing_baseline="$(jq '[.recheckRuns[].result.diffs[]? | select(.status != "error" and .hasBaselineImage != true)] | length' "${out_file}" 2>/dev/null || echo 0)"
+  non_pixelmatch="$(jq '[.recheckRuns[].result.diffs[]? | select(.status != "error" and .comparisonMethod != "pixelmatch")] | length' "${out_file}" 2>/dev/null || echo 0)"
+  echo "  → recheck instrumentation: ${measured_diffs}/${recheck_diffs} diffs ran pixelmatch with hasBaselineImage:true"
+  if [[ "${recheck_diffs}" -gt 0 ]] && [[ "${measured_diffs}" -ne "${recheck_diffs}" ]]; then
+    echo "WARNING: recheck pass for ${name} did not fully exercise pixelmatch (missing_baseline=${missing_baseline}, non_pixelmatch=${non_pixelmatch}) — landing stats will not treat this repo as methodology-validated" >&2
+  fi
+
   if [[ "${run_ok}" -eq 1 ]]; then
     echo "  ✓ results written to ${out_file}"
   else

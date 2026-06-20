@@ -3,7 +3,7 @@
   "repo": "chakra-ui/chakra-ui-docs",
   "category": "component library docs",
   "baseUrl": "http://localhost:3000",
-  "timestamp": "2026-06-17T15:37:36Z",
+  "timestamp": "2026-06-20T12:16:50Z",
   "aiEnabled": false,
   "baselineRuns": [
     { "route": "/", "url": "http://localhost:3000/", "result": {"url":"http://localhost:3000/","note":"no JSON emitted (likely --update-baselines run)"} },
@@ -26,11 +26,11 @@
     "errors": 0
   },
   "timing": {
-    "discovery": 1,
-    "render": 16477,
-    "compare": 4181,
+    "discovery": 2,
+    "render": 16880,
+    "compare": 4249,
     "ai": 0,
-    "total": 20687
+    "total": 21162
   },
   "diffs": [
     {
@@ -40,9 +40,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/404",
@@ -51,9 +52,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/404",
@@ -62,9 +64,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/blog",
@@ -73,9 +76,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/blog",
@@ -84,9 +88,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/blog",
@@ -95,9 +100,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/community/showcase",
@@ -106,9 +112,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/community/showcase",
@@ -117,9 +124,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/community/showcase",
@@ -128,9 +136,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/community/team",
@@ -139,9 +148,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/community/team",
@@ -150,9 +160,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/community/team",
@@ -161,9 +172,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/",
@@ -172,9 +184,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/",
@@ -183,9 +196,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/",
@@ -194,9 +208,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/resources",
@@ -205,9 +220,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/resources",
@@ -216,9 +232,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/resources",
@@ -227,9 +244,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/search",
@@ -238,9 +256,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/search",
@@ -249,9 +268,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/search",
@@ -260,9 +280,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     }
   ],
   "config": {

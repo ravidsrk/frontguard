@@ -402,6 +402,9 @@ function ValidationSection() {
         </table>
       </div>
       <p style={s('margin: 24px 0 0; max-width: 760px; font-size: 14px; line-height: 1.6; color: #b8b0a6;')}>
+        {aggregate.methodologyValidated
+          ? `Pixel-diff false-positive rate counts only recheck comparisons that ran pixelmatch with a real baseline (${aggregate.recheckMeasuredRouteCount} diffs). `
+          : 'Pixel-diff false-positive rate is provisional until every recheck comparison runs pixelmatch with a real baseline. '}
         {aiEnabled ? null : 'AI classification was disabled in this run, so no accuracy or AI false-positive number is published yet. '}
         We gate the launch on accuracy ≥ {Math.round(VALIDATION_GATE.minAccuracy * 100)}% and a false-positive rate below{' '}
         {Math.round(VALIDATION_GATE.maxFalsePositiveRate * 100)}%. Read the{' '}

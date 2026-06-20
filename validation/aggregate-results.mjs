@@ -60,6 +60,8 @@ function flattenDiffs(routeRuns) {
           status: d.status,
           diffPercentage: d.diffPercentage,
           classification: d?.aiAnalysis?.classification,
+          hasBaselineImage: d.hasBaselineImage,
+          comparisonMethod: d.comparisonMethod,
         });
       }
     }
@@ -91,6 +93,17 @@ function summarize(repo) {
   // server never came up or the CLI crashed before rendering.
   const recheckReal = recheckCounts.pass + recheckCounts.regression + recheckCounts.warning + recheckCounts.new;
   const baselineReal = baselineCounts.pass + baselineCounts.regression + baselineCounts.warning + baselineCounts.new;
+
+  const recheckMeasured = recheck.filter(
+    (d) => d.status !== 'error' && d.comparisonMethod === 'pixelmatch' && d.hasBaselineImage === true,
+  );
+  const recheckMeasuredTotal = recheckMeasured.length;
+  const recheckMeasuredPositives = recheckMeasured.filter(
+    (d) => d.status === 'regression' || d.status === 'warning',
+  ).length;
+  const measuredFpRate =
+    recheckMeasuredTotal > 0 ? recheckMeasuredPositives / recheckMeasuredTotal : null;
+
   return {
     name: repo.name,
     repo: repo.repo,
@@ -100,6 +113,11 @@ function summarize(repo) {
     recheckTotal,
     recheckPositives,
     fpRate,
+    recheckMeasuredTotal,
+    recheckMeasuredPositives,
+    measuredFpRate,
+    methodologyValidated:
+      recheckMeasuredTotal > 0 && recheckMeasuredTotal === recheckReal,
     bootSucceeded: recheckReal + baselineReal > 0,
   };
 }
@@ -139,6 +157,14 @@ function aggregate() {
   const totalRoutes = summaries.reduce((s, r) => s + r.recheckTotal, 0);
   const totalFP = summaries.reduce((s, r) => s + r.recheckPositives, 0);
   const overallFPRate = totalRoutes > 0 ? totalFP / totalRoutes : null;
+
+  const measuredRoutes = summaries.reduce((s, r) => s + r.recheckMeasuredTotal, 0);
+  const measuredFP = summaries.reduce((s, r) => s + r.recheckMeasuredPositives, 0);
+  const measuredFPRate = measuredRoutes > 0 ? measuredFP / measuredRoutes : null;
+  const methodologyValidated =
+    measuredRoutes > 0 &&
+    summaries.filter((s) => s.bootSucceeded).every((s) => s.methodologyValidated);
+
   const reposBooted = summaries.filter((s) => s.bootSucceeded).length;
   const present = new Set(summaries.map((s) => s.name));
   const skipped = deriveSkippedFromManifest(present);
@@ -154,6 +180,10 @@ function aggregate() {
       recheckRouteCount: totalRoutes,
       recheckPositiveCount: totalFP,
       pixelFalsePositiveRate: overallFPRate,
+      recheckMeasuredRouteCount: measuredRoutes,
+      recheckMeasuredPositiveCount: measuredFP,
+      pixelFalsePositiveRateMeasured: measuredFPRate,
+      methodologyValidated,
     },
   };
 }
@@ -177,6 +207,15 @@ function renderMarkdown(a) {
   lines.push(`| Recheck routes measured | ${a.aggregate.recheckRouteCount} |`);
   lines.push(`| Recheck positives (regression+warning) | ${a.aggregate.recheckPositiveCount} |`);
   lines.push(`| **Pixel-only false-positive rate** | **${pct(a.aggregate.pixelFalsePositiveRate)}** |`);
+  lines.push(
+    `| Recheck diffs via pixelmatch (hasBaselineImage:true) | ${a.aggregate.recheckMeasuredRouteCount} / ${a.aggregate.recheckRouteCount} |`,
+  );
+  lines.push(
+    `| **Pixel-only FP rate (pixelmatch-measured only)** | **${pct(a.aggregate.pixelFalsePositiveRateMeasured)}** |`,
+  );
+  lines.push(
+    `| Methodology validated (all recheck diffs ran pixelmatch) | ${a.aggregate.methodologyValidated ? '✅' : '❌'} |`,
+  );
   lines.push(`| AI classification accuracy | ${ai ? 'see per-repo table' : '_pending key configuration (no AI provider key set in env)_'} |`);
   lines.push('');
 
@@ -227,11 +266,29 @@ function buildLandingPayload(a, runDate, cliVersion) {
       skipReason: sk.reason,
     });
   }
+  const agg = a.aggregate;
+  const landingAggregate = {
+    reposAttempted: agg.reposAttempted,
+    reposBooted: agg.reposBooted,
+    reposSkipped: agg.reposSkipped,
+    recheckRouteCount: agg.methodologyValidated
+      ? agg.recheckMeasuredRouteCount
+      : agg.recheckRouteCount,
+    recheckPositiveCount: agg.methodologyValidated
+      ? agg.recheckMeasuredPositiveCount
+      : agg.recheckPositiveCount,
+    pixelFalsePositiveRate: agg.methodologyValidated
+      ? agg.pixelFalsePositiveRateMeasured
+      : agg.pixelFalsePositiveRate,
+    methodologyValidated: agg.methodologyValidated,
+    recheckMeasuredRouteCount: agg.recheckMeasuredRouteCount,
+  };
+
   return {
     runDate,
     cliVersion,
     aiEnabled: process.env.FRONTGUARD_AI_ENABLED === 'true',
-    aggregate: a.aggregate,
+    aggregate: landingAggregate,
     repos: repoEntries,
   };
 }
