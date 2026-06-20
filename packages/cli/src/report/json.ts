@@ -57,6 +57,7 @@ interface SerializedDiff {
   hasBaselineImage: boolean;
   hasCurrentImage: boolean;
   hasDiffImage: boolean;
+  comparisonMethod?: 'byte-identical' | 'pixelmatch';
   aiAnalysis?: {
     classification: string;
     explanation: string;
@@ -129,9 +130,10 @@ function serializeDiff(diff: DiffResult): SerializedDiff {
     browser: diff.browser,
     status: diff.status,
     diffPercentage: diff.diffPercentage,
-    hasBaselineImage: !!diff.baselineImage,
+    hasBaselineImage: diff.comparedAgainstBaseline ?? !!diff.baselineImage,
     hasCurrentImage: !!diff.currentImage,
     hasDiffImage: !!diff.diffImage,
+    comparisonMethod: diff.comparisonMethod,
   };
 
   if (diff.aiAnalysis) {

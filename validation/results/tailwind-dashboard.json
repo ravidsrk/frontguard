@@ -3,7 +3,7 @@
   "repo": "shadcn-ui/next-template",
   "category": "Tailwind dashboard",
   "baseUrl": "http://localhost:3000",
-  "timestamp": "2026-06-17T15:36:15Z",
+  "timestamp": "2026-06-20T12:15:04Z",
   "aiEnabled": false,
   "baselineRuns": [
     { "route": "/", "url": "http://localhost:3000/", "result": {"url":"http://localhost:3000/","note":"no JSON emitted (likely --update-baselines run)"} },
@@ -25,10 +25,10 @@
   },
   "timing": {
     "discovery": 1,
-    "render": 1868,
-    "compare": 1809,
+    "render": 1926,
+    "compare": 1955,
     "ai": 0,
-    "total": 3708
+    "total": 3961
   },
   "diffs": [
     {
@@ -38,9 +38,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/",
@@ -49,9 +50,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/",
@@ -60,9 +62,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/page",
@@ -71,9 +74,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/page",
@@ -82,9 +86,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/page",
@@ -93,9 +98,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     }
   ],
   "config": {
@@ -123,10 +129,10 @@
   },
   "timing": {
     "discovery": 1,
-    "render": 1881,
-    "compare": 1907,
+    "render": 2013,
+    "compare": 1724,
     "ai": 0,
-    "total": 3818
+    "total": 3771
   },
   "diffs": [
     {
@@ -136,9 +142,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/",
@@ -147,9 +154,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/",
@@ -158,9 +166,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/page",
@@ -169,9 +178,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/page",
@@ -180,9 +190,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/page",
@@ -191,9 +202,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     }
   ],
   "config": {
@@ -221,10 +233,10 @@
   },
   "timing": {
     "discovery": 1,
-    "render": 1860,
-    "compare": 1749,
+    "render": 1874,
+    "compare": 1948,
     "ai": 0,
-    "total": 3639
+    "total": 3855
   },
   "diffs": [
     {
@@ -234,9 +246,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/",
@@ -245,9 +258,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/",
@@ -256,9 +270,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/page",
@@ -267,9 +282,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/page",
@@ -278,9 +294,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     },
     {
       "route": "/page",
@@ -289,9 +306,10 @@
       "browser": "chromium",
       "status": "pass",
       "diffPercentage": 0,
-      "hasBaselineImage": false,
+      "hasBaselineImage": true,
       "hasCurrentImage": false,
-      "hasDiffImage": false
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
     }
   ],
   "config": {
