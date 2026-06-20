@@ -80,7 +80,7 @@ From [`docs/product-completion-plan.md` §8](./product-completion-plan.md):
 | # | Flow | Status |
 |---|------|--------|
 | 1 | Land on `frontguard.dev`, see a real demo, read truthful copy. | ✅ Real demo GIF in hero; comparison sourced from `docs/research.md`; FAQ; pricing; no fabricated stats. |
-| 2 | `npm install @frontguard/cli && npx frontguard init`, generated config TypeScript-compiles. | ✅ Verified locally in T4 fresh-reviewer pass. |
+| 2 | `npm install @frontguard/cli && npx -p @frontguard/cli frontguard init`, generated config TypeScript-compiles. | ✅ Verified locally in T4 fresh-reviewer pass. |
 | 3 | `FRONTGUARD_OPENAI_KEY` + `frontguard doctor` correctly says AI configured. | ✅ Verified in T4 fresh-reviewer pass. |
 | 4 | `frontguard run --url <project>` → real diff + AI explanation + suggested fix. | ✅ End-to-end works on a reachable URL; AI fix requires the BYO key. |
 | 5 | GitHub App PR → comment with triplet + working "Accept baseline" → live cloud-api. | ✅ Code complete (PR #20 + #21). Live test requires DNS attachment (see below). |

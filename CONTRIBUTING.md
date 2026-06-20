@@ -130,7 +130,7 @@ org default can't silently restrict them.
 ## Reporting bugs
 
 Open an issue with:
-- Frontguard version (`npx frontguard --version`)
+- Frontguard version (`npx -p @frontguard/cli frontguard --version`)
 - Node.js version
 - Operating system
 - Steps to reproduce

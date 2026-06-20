@@ -588,7 +588,7 @@ Shared fix patterns across the customer base. If 50 teams using Tailwind CSS all
 
 **Absolute minimum to validate the concept:**
 
-1. **CLI tool** (`npx frontguard run`)
+1. **CLI tool** (`npx -p @frontguard/cli frontguard run`)
    - Input: URL (auto-discovers routes) or explicit route list + viewports
    - Smart route discovery: crawl from start URL, find all pages
    - Dependency graph: parse git diff → determine affected pages → render only those
@@ -718,7 +718,7 @@ src/
 - Error boundary per stage — one page failing doesn't kill the entire run
 - Abstraction interfaces: `Renderer`, `Reporter`, `Differ`, `BaselineStorage` — swappable implementations
 - Config validated once at startup (Zod schema), passed through pipeline. No `process.env` deep in modules.
-- `npx frontguard init` detects framework (Next.js, Remix, etc.) and generates smart defaults
+- `npx -p @frontguard/cli frontguard init` detects framework (Next.js, Remix, etc.) and generates smart defaults
 
 ## Plugin Architecture
 

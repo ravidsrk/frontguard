@@ -101,7 +101,7 @@ Named type scale (Brand page specimen):
 | DISPLAY / 52 | 52px | Space Grotesk | "Ship with confidence"                   |
 | HEADING / 38 | 38px | Space Grotesk | "Detect, understand, fix"                |
 | BODY / 16    | 16px | Space Grotesk | running paragraph copy                   |
-| MONO / 13    | 13px | JetBrains Mono| `$ npx frontguard run --url localhost:3000` |
+| MONO / 13    | 13px | JetBrains Mono| `$ npx -p @frontguard/cli frontguard run --url localhost:3000` |
 
 The table above is the Brand page's nominal specimen; the DISPLAY/52 token is the Brand page's own large heading, not the Landing hero. The live page heroes are larger and differ per page. Exact authored heading values, verified against the source CSS (every page's `<h1>`/`<h2>`):
 
@@ -229,7 +229,7 @@ Primary marketing page. Sticky translucent nav, then 14 content sections, then f
 2. Hero (`1fr 1fr`, 88px top padding). Left column: amber pill badge "OPEN SOURCE · MIT · SELF-HOSTABLE" with a pulsing dot; h1 58px "Catch the regression,<br>not the noise."; lead paragraph (18px) naming the ~40% false-positive problem and the regression/intentional/content classification; an install command row (`$ npm install @frontguard/cli`) with a copy button; two CTAs "Get started ->" (amber primary -> Docs) and "★ Star on GitHub" (ghost). Right column: a terminal mock card (`#121110`, deep shadow, amber radial glow behind) titled `frontguard run` with colored run output (discovering routes, 12/47 affected, per-route PASS/WARN/REGRESSION/NEW lines, summary), ending in a blinking cursor; overlapping below it an "AI ANALYSIS - REGRESSION · 94% CONFIDENCE" card explaining a flex-direction regression.
 3. Problem strip (band `#100f0e`, top+bottom border, `1.1fr 1fr`). Left: mono kicker "// WHY TEAMS MUTE VISUAL TESTS", 24px statement, paragraph. Right: 2x2 stat grid (1px gridlines): ~40% false fails, 73% lost faith, <10% run visual regression, $100M Prime Day CSS bug.
 4. Three pillars (`repeat(3,1fr)`, hover-lift cards): 01 / DETECT (green tag), 02 / UNDERSTAND (amber tag), 03 / FIX (blue tag), each with h3 + paragraph.
-5. Two ways in (`1fr 1fr` cards): "Standalone CLI" (`@frontguard/cli`) with a code block showing `npx frontguard run --url`; "Playwright-native" (`@frontguard/playwright`) with an `expectVisual(page)` code block. Each card has a header strip and footnote.
+5. Two ways in (`1fr 1fr` cards): "Standalone CLI" (`@frontguard/cli`) with a code block showing `npx -p @frontguard/cli frontguard run --url`; "Playwright-native" (`@frontguard/playwright`) with an `expectVisual(page)` code block. Each card has a header strip and footnote.
 6. How it works pipeline (`repeat(6,1fr)`, single 1px-bordered strip): six numbered stages from `renderVals.stages`: 01 Discover, 02 Filter, 03 Render, 04 Diff, 05 Analyze, 06 Report, each `num / title / desc`.
 7. AI classification example (band `#100f0e`, `0.9fr 1.1fr`). Left: kicker, h2 36px "Kills the #1 pain of visual testing: false positives.", paragraph, green-check list (severity+confidence scoring, BYOK OpenAI/Anthropic, local-first). Right: two stacked verdict cards, one red REGRESSION 94% with a suggested fix, one green INTENTIONAL 91%.
 8. Features grid (`repeat(3,1fr)`, 1px gridlines, hover rows): nine feature cells from `renderVals.features` (Zero-config routes, Multi-browser, Smart rendering, Git-native baselines, Preview deploys, Per-route thresholds, Framework detection, Security hardened, PR thumbnails), each `tag / title / desc`.
@@ -237,7 +237,7 @@ Primary marketing page. Sticky translucent nav, then 14 content sections, then f
 10. Comparison table: h2 38px "The only one with AI fix verification.", a 6-column table (CAPABILITY + Frontguard + Percy + Chromatic + BackstopJS + Lost Pixel) from `renderVals.comparison`, 7 rows, Frontguard column in green, rivals in muted grey, hover-row highlight.
 11. Plugins: one bordered panel, h3 "Extensible by design - 5 built-in plugins, 6 lifecycle hooks", a mono list of the six hooks, then `repeat(5,1fr)` of plugin cards (Figma, Perf Budgets, Accessibility, 3rd-Party Scripts, Monitor) each with a 2px amber top border.
 12. Honest ("// NO MAGIC, JUST HONEST"): h2 38px "We'll tell you what it isn't.", three hover-lift cards (YOU BRING THE KEY, YOU STAY IN THE LOOP, NUMBERS NOT CLAIMS).
-13. CTA (band `#100f0e`, centered): large CSS shield (44x52), h2 44px "Ship with confidence.", paragraph, an `$ npx frontguard init --ci` copy row, "Read the docs ->" (amber) and "★ Star on GitHub" (ghost).
+13. CTA (band `#100f0e`, centered): large CSS shield (44x52), h2 44px "Ship with confidence.", paragraph, an `$ npx -p @frontguard/cli frontguard init --ci` copy row, "Read the docs ->" (amber) and "★ Star on GitHub" (ghost).
 14. Footer (`1.6fr 1fr 1fr 1fr`): brand blurb column + PRODUCT / RESOURCES / COMMUNITY link columns; bottom sub-bar "© 2026 Frontguard · MIT License" and "Built for teams who ship fast."
 
 States: copy buttons toggle label to "copied ✓" for 1600ms via `navigator.clipboard`. Hover states per the motion table. No loading/empty/error states (static marketing content). The terminal cursor and badge dot animate continuously.

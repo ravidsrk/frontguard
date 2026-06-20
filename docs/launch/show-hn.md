@@ -26,6 +26,6 @@ Before that, an anti-flake step renders each target multiple times and only coun
 differences that are consistent across renders, which filters transient noise (and
 keeps the model bill down). Baselines live on a git orphan branch so they're
 versioned with your code without bloating main. It's MIT licensed, self-hostable,
-and on npm as @frontguard/cli and @frontguard/playwright (`npx frontguard run
+and on npm as @frontguard/cli and @frontguard/playwright (`npx -p @frontguard/cli frontguard run
 --url http://localhost:3000`). I'd love feedback, especially on where the
 classifier gets it wrong — site is https://frontguard.dev.

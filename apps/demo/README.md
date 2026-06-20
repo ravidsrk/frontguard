@@ -41,7 +41,7 @@ npm run dev
 ## Run Frontguard locally
 
 ```bash
-npx frontguard run --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
 ---
