@@ -589,11 +589,11 @@ is hours-to-days** because the procurement path is sales-mediated.
 
 ### 5.5 Frontguard's actual journey (from the README)
 1. `npm install @frontguard/cli`
-2. `npx frontguard init --ci` (auto-detects framework, generates GitHub
+2. `npx -p @frontguard/cli frontguard init --ci` (auto-detects framework, generates GitHub
    Action).
-3. `npx frontguard doctor` (env diagnostics).
-4. `npx frontguard run --url http://localhost:3000`.
-5. `npx frontguard update-baselines`.
+3. `npx -p @frontguard/cli frontguard doctor` (env diagnostics).
+4. `npx -p @frontguard/cli frontguard run --url http://localhost:3000`.
+5. `npx -p @frontguard/cli frontguard update-baselines`.
 6. Optional: drop `FRONTGUARD_OPENAI_KEY` into env, AI activates.
 
 **Time to first local diff:** under 2 minutes for a Next.js app with

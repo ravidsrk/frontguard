@@ -175,7 +175,7 @@
           <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #f5f1ea; font-weight: 500;">Standalone CLI</span>
           <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #564f48;">@frontguard/cli</span>
         </div>
-        <pre style="margin: 0; padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.8; color: #d8d0c5; overflow-x: auto;"><span style="color: #7c746b;">$</span> npx frontguard run \
+        <pre style="margin: 0; padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.8; color: #d8d0c5; overflow-x: auto;"><span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard run \
     --url http://localhost:3000
 
 <span style="color: #4fb477;">  ✓ 11 passed</span>   <span style="color: #e5484d;">✘ 1 regression</span>
@@ -382,7 +382,7 @@ test(<span style="color: #98c379;">'home page'</span>, <span style="color: #c678
       <h2 style="font-size: 44px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;">Ship with confidence.</h2>
       <p style="font-size: 17px; color: #b8b0a6; margin: 0 auto 34px; max-width: 480px; line-height: 1.55;">Free forever. No per-screenshot pricing cliff, no dashboard lock-in. Install it and run your first check in two minutes.</p>
       <div style="display: inline-flex; align-items: stretch; border: 1px solid #322d28; background: #161412; margin-bottom: 24px;">
-        <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #e6e0d6; padding: 14px 20px; white-space: nowrap;"><span style="color: #7c746b;">$ </span>npx frontguard init --ci</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #e6e0d6; padding: 14px 20px; white-space: nowrap;"><span style="color: #7c746b;">$ </span>npx -p @frontguard/cli frontguard init --ci</span>
         <button onClick="{{ copyInit }}" class="fg-btn-ghost" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #b8b0a6; background: #1f1c19; border: none; border-left: 1px solid #322d28; padding: 0 18px; cursor: pointer; transition: all .18s ease;">{{ copyInitLabel }}</button>
       </div>
       <div style="display: flex; gap: 14px; justify-content: center;">
@@ -449,7 +449,7 @@ class Component extends DCLogic {
       copyLabel: this.state.copyLabel,
       copyInitLabel: this.state.copyInitLabel,
       copyInstall: () => this.copy('npm install @frontguard/cli', 'copyLabel', 'copy'),
-      copyInit: () => this.copy('npx frontguard init --ci', 'copyInitLabel', 'copy'),
+      copyInit: () => this.copy('npx -p @frontguard/cli frontguard init --ci', 'copyInitLabel', 'copy'),
       stages: [
         { num: '01', title: 'Discover', desc: 'Crawl, filesystem scan, or config — finds every route automatically.' },
         { num: '02', title: 'Filter', desc: 'Dependency graph renders only pages affected by your changes.' },

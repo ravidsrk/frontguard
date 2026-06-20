@@ -333,11 +333,11 @@ Honest (`// NO MAGIC, JUST HONEST`, "We'll tell you what it isn't."):
 
 ### A6. Install commands (consolidated, exact)
 - `npm install @frontguard/cli` (hero, InstallTabs CLI, pricing CTA, FAQ)
-- `npx frontguard init`
-- `npx frontguard run --url http://localhost:3000`
-- `npx frontguard run \ --url http://localhost:3000` (TwoWaysIn standalone)
+- `npx -p @frontguard/cli frontguard init`
+- `npx -p @frontguard/cli frontguard run --url http://localhost:3000`
+- `npx -p @frontguard/cli frontguard run \ --url http://localhost:3000` (TwoWaysIn standalone)
 - `npm install -D @frontguard/cli @frontguard/playwright` (Playwright)
-- `npx frontguard init --ci` (Cta)
+- `npx -p @frontguard/cli frontguard init --ci` (Cta)
 - GitHub Action: `uses: ravidsrk/frontguard@v1` with `url`, env `FRONTGUARD_OPENAI_KEY`, `GITHUB_TOKEN`
 - Playwright snippet: `import { expectVisual } from '@frontguard/playwright'; ... await expectVisual(page);` (note: home uses `expectVisual`, while docs/index.html no-JS fallback use `visualTest` — naming drift to reconcile)
 

@@ -69,7 +69,7 @@ Sharing an approach in case it's useful for anyone wiring visual checks into a
 Node CI pipeline. The goal was a tool that runs entirely from the command line, no
 mandatory SaaS, with results you actually trust.
 
-The flow: `npx frontguard run --url <url>` captures screenshots with Playwright,
+The flow: `npx -p @frontguard/cli frontguard run --url <url>` captures screenshots with Playwright,
 renders each target multiple times to filter flake, and on a real diff sends
 before/after to a vision model (OpenAI or Anthropic — your key, images don't pass
 through any server I run) to classify it as regression / intentional /

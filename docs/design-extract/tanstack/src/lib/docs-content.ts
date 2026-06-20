@@ -100,10 +100,10 @@ ${code(
 <span style="color: #7c746b;">$</span> npm install @frontguard/cli
 
 <span style="color: #564f48;"># initialize config (auto-detects your framework, --ci adds a GitHub Action)</span>
-<span style="color: #7c746b;">$</span> npx frontguard init --ci
+<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard init --ci
 
 <span style="color: #564f48;"># verify your environment is ready</span>
-<span style="color: #7c746b;">$</span> npx frontguard doctor`,
+<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard doctor`,
 )}
 ${h2b('Framework detection')}
 ${p(`${ic('frontguard init')} auto-detects your framework and writes sensible defaults — including a filesystem route source where one exists.`)}
@@ -142,10 +142,10 @@ const quickHtml = `
 ${h1('Quick start')}
 ${lead('Run your first visual check in two minutes. The first run captures baselines; every subsequent run diffs against them.')}
 <div style="display: grid; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 30px;">
-  ${quickStep('1', 'Initialize', 'Auto-detect your framework and scaffold a config (plus a GitHub Action with --ci).', 'npx frontguard init --ci')}
-  ${quickStep('2', 'Check your environment', 'Verify Node, Playwright, browsers and git are ready.', 'npx frontguard doctor')}
-  ${quickStep('3', 'Run', 'First run captures baselines; subsequent runs diff against them.', 'npx frontguard run --url http://localhost:3000')}
-  ${quickStep('4', 'Accept changes', 'After an intentional redesign, accept the current screenshots as new baselines.', 'npx frontguard update-baselines')}
+  ${quickStep('1', 'Initialize', 'Auto-detect your framework and scaffold a config (plus a GitHub Action with --ci).', 'npx -p @frontguard/cli frontguard init --ci')}
+  ${quickStep('2', 'Check your environment', 'Verify Node, Playwright, browsers and git are ready.', 'npx -p @frontguard/cli frontguard doctor')}
+  ${quickStep('3', 'Run', 'First run captures baselines; subsequent runs diff against them.', 'npx -p @frontguard/cli frontguard run --url http://localhost:3000')}
+  ${quickStep('4', 'Accept changes', 'After an intentional redesign, accept the current screenshots as new baselines.', 'npx -p @frontguard/cli frontguard update-baselines')}
 </div>
 <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 40px 0 16px;">Reading the output</h2>
 ${p('Every route × viewport gets a status. Regressions exit non-zero, so the run fails CI.')}

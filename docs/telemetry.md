@@ -35,7 +35,7 @@ Any **one** of these disables telemetry completely:
 
 ```bash
 # Per-invocation flag
-npx frontguard run --no-telemetry
+npx -p @frontguard/cli frontguard run --no-telemetry
 
 # Environment variable
 export FRONTGUARD_TELEMETRY=0

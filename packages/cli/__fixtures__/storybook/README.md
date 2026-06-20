@@ -6,7 +6,7 @@ example for the Storybook integration docs.
 ```
 npm install --prefix packages/cli/__fixtures__/storybook
 npm run storybook --prefix packages/cli/__fixtures__/storybook   # localhost:6006
-npx frontguard run \
+npx -p @frontguard/cli frontguard run \
   --config packages/cli/__fixtures__/storybook/frontguard.config.ts
 ```
 

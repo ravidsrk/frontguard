@@ -113,17 +113,17 @@ end-to-end on a fresh machine with no special configuration.
 **Acceptance:**
 - A fresh `mkdir t && cd t && git init && npm install @frontguard/cli`
   succeeds and resolves the published package.
-- `npx frontguard init` writes a buildable `frontguard.config.ts` that
+- `npx -p @frontguard/cli frontguard init` writes a buildable `frontguard.config.ts` that
   TypeScript compiles without errors.
-- `npx frontguard doctor` reports correctly whether `FRONTGUARD_OPENAI_KEY` /
+- `npx -p @frontguard/cli frontguard doctor` reports correctly whether `FRONTGUARD_OPENAI_KEY` /
   `FRONTGUARD_ANTHROPIC_KEY` are set, agreeing exactly with the env-var
   contract the runtime uses.
-- `npx frontguard run --url <localhost>` against an unreachable URL exits
+- `npx -p @frontguard/cli frontguard run --url <localhost>` against an unreachable URL exits
   with one clear error message, not four ECONNREFUSEDs.
-- `npx frontguard run --url <real URL>` produces a `report/` directory with
+- `npx -p @frontguard/cli frontguard run --url <real URL>` produces a `report/` directory with
   baseline / current / diff PNGs and an AI classification + suggested fix
   for each regression.
-- `npx frontguard update-baselines` accepts the current run as new baseline.
+- `npx -p @frontguard/cli frontguard update-baselines` accepts the current run as new baseline.
 - Includes: P0-1, P0-2, P0-3, P0-4, P1-3.
 
 ### IN-2 — Cloud-api: real platform, not Math.random()
@@ -692,7 +692,7 @@ the task fails review and goes back to implementation.
 This plan ships if a new user can:
 
 1. Land on `frontguard.dev`, see a real demo, read truthful copy.
-2. Run `npm install @frontguard/cli && npx frontguard init` against a
+2. Run `npm install @frontguard/cli && npx -p @frontguard/cli frontguard init` against a
    working project, with the generated config TypeScript-compiling on
    the first try.
 3. Set `FRONTGUARD_OPENAI_KEY` and have `frontguard doctor` correctly

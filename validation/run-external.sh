@@ -243,7 +243,7 @@ run_repo() {
   # Resolve the frontguard binary (prefer a globally-linked one for hermeticity).
   local FG_BIN="frontguard"
   if ! command -v frontguard >/dev/null 2>&1; then
-    FG_BIN="npx frontguard"
+    FG_BIN="npx -p @frontguard/cli frontguard"
   fi
 
   run_one_pass() {

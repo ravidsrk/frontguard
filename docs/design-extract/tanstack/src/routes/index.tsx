@@ -81,7 +81,7 @@ const TERMINAL_HTML = `<span style="color: #e8862e;">🔍 Discovering routes...<
 <span style="color: #3b3531;">───────────────────────────────────</span>
 <span style="color: #e5484d;">1 regression</span> · <span style="color: #e8862e;">1 warning</span> · <span style="color: #4fb477;">9 passed</span> · <span style="color: #5b8def;">1 new</span><span style="display: inline-block; width: 8px; height: 15px; background: #e8862e; vertical-align: -2px; margin-left: 4px; animation: fg-blink 1.1s step-end infinite;"></span>`
 
-const CLI_HTML = `<span style="color: #7c746b;">$</span> npx frontguard run \\
+const CLI_HTML = `<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard run \\
     --url http://localhost:3000
 
 <span style="color: #4fb477;">  ✓ 11 passed</span>   <span style="color: #e5484d;">✘ 1 regression</span>
@@ -449,9 +449,9 @@ function Home() {
           <p style={s('font-size: 17px; color: #b8b0a6; margin: 0 auto 34px; max-width: 480px; line-height: 1.55;')}>Free forever. No per-screenshot pricing cliff, no dashboard lock-in. Install it and run your first check in two minutes.</p>
           <div style={s('display: inline-flex; align-items: stretch; border: 1px solid #322d28; background: #161412; margin-bottom: 24px;')}>
             <span style={s(`font-family: ${MONO}; font-size: 14px; color: #e6e0d6; padding: 14px 20px; white-space: nowrap;`)}>
-              <span style={s('color: #7c746b;')}>$ </span>npx frontguard init --ci
+              <span style={s('color: #7c746b;')}>$ </span>npx -p @frontguard/cli frontguard init --ci
             </span>
-            <button onClick={() => copyInit('npx frontguard init --ci')} className="fg-btn-ghost" style={s(`font-family: ${MONO}; font-size: 12px; color: #b8b0a6; background: #1f1c19; border: none; border-left: 1px solid #322d28; padding: 0 18px; cursor: pointer;`)}>
+            <button onClick={() => copyInit('npx -p @frontguard/cli frontguard init --ci')} className="fg-btn-ghost" style={s(`font-family: ${MONO}; font-size: 12px; color: #b8b0a6; background: #1f1c19; border: none; border-left: 1px solid #322d28; padding: 0 18px; cursor: pointer;`)}>
               {initLabel}
             </button>
           </div>
