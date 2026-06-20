@@ -193,7 +193,7 @@ export async function checkConfig(cwd: string = process.cwd()): Promise<CheckRes
       status: 'fail',
       message: `config file is invalid: ${message}`,
       fix: 'Fix the config errors above, or regenerate with `frontguard init`.',
-      critical: false,
+      critical: true,
     };
   } finally {
     if (needsChdir) process.chdir(originalCwd);

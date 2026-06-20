@@ -8,7 +8,7 @@ import {
   formatReport,
   type CheckResult,
 } from '../../src/cli/doctor.js';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -152,6 +152,35 @@ describe('doctor: checkConfig', () => {
       const r = await checkConfig(dir);
       expect(r.status).toBe('warn');
       expect(r.critical).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('passes when a valid .ts config is present', async () => {
+    const dir = makeTempDir();
+    try {
+      writeFileSync(
+        join(dir, 'frontguard.config.ts'),
+        `export default {
+  baseUrl: 'http://localhost:3000',
+};`,
+      );
+      const r = await checkConfig(dir);
+      expect(r.status).toBe('pass');
+      expect(r.message).toContain('loaded config');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('fails critically when a config file exists but cannot be loaded', async () => {
+    const dir = makeTempDir();
+    try {
+      writeFileSync(join(dir, 'frontguard.config.ts'), 'export default { baseUrl: invalid };');
+      const r = await checkConfig(dir);
+      expect(r.status).toBe('fail');
+      expect(r.critical).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
