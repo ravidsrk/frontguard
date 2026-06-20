@@ -1,6 +1,6 @@
 {
   "name": "@frontguard/slack-app",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Frontguard Slack app — visual regression alerts and slash commands in Slack",
   "license": "MIT",
