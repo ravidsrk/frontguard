@@ -1,7 +1,7 @@
 # Frontguard — Production Close Progress (Coordinator Ledger)
 
 ```
-PHASE=FIXING
+PHASE=final/verify
 ```
 
 Live coordinator ledger for the **production-close run (2026-06-20)**. Transcribed by the
@@ -10,7 +10,7 @@ compiled 2026-06-17 @ `b472457`) plus auxiliary acceptance specs in
 `/Users/ravindra/orca/workspaces/frontguard/tang/.frontguard-audit/cluster-specs.json`.
 Setup facts and decisions: see `DECISIONS.md` § "Production close run, 2026-06-20".
 
-- **BASE:** `ravidsrk/production-close` @ `fb8b599` (origin). Per-cluster fix PRs cut from and merge into BASE.
+- **BASE:** `ravidsrk/production-close` @ `aad7733` (origin). Per-cluster fix PRs cut from and merge into BASE.
 - **MAINTAINER (every commit):** `ravidsrk <ravidsrk@gmail.com>`.
 - **Merge policy:** `gh pr merge --merge --delete-branch` (commits preserved, never squash). Merge ≠ deploy.
 - **Engineering gate:** `npm ci && npm run build && npm test` (root fans out via workspaces). Per-workspace scripts in `DECISIONS.md`.
@@ -68,7 +68,7 @@ Legend: **OPEN** = reproduces / unaddressed · **PARTIAL** = improved, acceptanc
 | A7 Supply chain | supply-2, supply-6, install-13 | C11 | CLOSED (PR#101; OPS O15/O11 human-owned) | `supply-chain` |
 | A8 Validation methodology | val-5 | C16 | CLOSED (PR#105) | `validation-methodology` |
 | A9 Marketing / README claims | claim-7 (CLOSED via PR#104), claim-9 (CLOSED via PR#104), dist-11 (CODE_CLOSED via PR#104 — OPS redeploy `frontguard.dev` / apps-web remains human-owned) · re-verify claim-5 (CLOSED) | C14 | CODE_CLOSED via PR#104 (claim-7/claim-9 CLOSED; dist-11 OPS redeploy remains) | `marketing-claims` |
-| A10 Process hygiene | fix-progress drift, SECURITY.md versions, launch-readiness banner, npm version staleness | — | OPEN (doc-reconcile CLOSED via PR#106; release-prep CLOSED via PR#107; remains OPEN until T_FINAL merge) | `a10-doc-reconcile`, `a10-release-prep`, `T_FINAL` |
+| A10 Process hygiene | fix-progress drift, SECURITY.md versions, launch-readiness banner, npm version staleness | — | CLOSED (PR#106 doc-reconcile + PR#107 release-prep + T_FINAL sign-off) | `a10-doc-reconcile`, `a10-release-prep`, `T_FINAL` |
 | (A-misc) MCP re-verify | mcp-8, mcp-10 | C12 | CLOSED (PR#102) | folded into `mcp-fixes` |
 | (A-misc) MCP cloud browser | mcp-9 (re-verified browser/diffId preservation) | C12/C7 | CLOSED (PR#102) | re-verify in `mcp-fixes` (note: C7 cloud already CLOSED mcp-1/2/7) |
 | (A-misc) Slack SSRF | int-7 (CLOSED via PR#100) | C8-residual | CLOSED | `int7-slack-ssrf` |
@@ -108,7 +108,7 @@ All booleans start **✗** (`✓` when achieved). Dependency order: **P0** (C1, 
 | marketing-claims | A | C14 | hot | [claim-7, claim-9, dist-11] | ✓ | ✓ | ✓ | ✓ | ✓ | redeploy site (human) | 104 | marketing-claims | grok | P2; dep C2; serialize w/ C3 on pricing.tsx. Codex PASS (task_3a3e8ec9cd9b); smoke-root/subpath green; apps/web build passed; marketing/home/seo/pricing tests 4 files/26 tests; claim-7/claim-9/dist-11/claim-5 checks clean; secret/live-op scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule. CODE_CLOSED: claim-7/claim-9 CLOSED; dist-11 OPS redeploy `frontguard.dev` / apps-web human-owned. `task_23bde400428e` |
 | a10-doc-reconcile | FINAL | — | hot | [fix-progress, SECURITY.md, launch-readiness] | ✓ | ✓ | ✓ | ✓ | ✓ | none | 106 | a10-doc-reconcile | grok | A10; dep all code tasks. Codex PASS (task_20d3622ad7e6) after R2; head 163a363; smoke-root/subpath green; CLOSE-INDEX count alignment 49 = 36 CLOSED / 13 CODE_CLOSED / 0 OPEN; no secrets/live-OPS done claims; Bugbot non-blocking. `task_f7abe1998a35` |
 | a10-release-prep | FINAL | — | hot | [VERSION, pkg-versions, CHANGELOG] | ✓ | ✓ | ✓ | ✓ | ✓ | npm republish 0.2.1 + `v0.2.1` tag (human) | 107 | a10-release-prep | grok | A10 release prep only; NO publish/tag executed. Codex PASS (task_bf71e94bce99) after stats retry; head `78f3ce8`; smoke-root/subpath green; `VERSION`, manifests, lockfile, action/Dockerfile pins, CLI/MCP constants, tests, and `scripts/stats.json` all 0.2.1 / v0.2.1; release/tag/publish handoff recorded as human-owned NOT done; secret/live-OPS scan clean; GH formal approval blocked by same-account own-PR rule. `task_bcd083d3cac2` |
-| T_FINAL | FINAL | — | indep | [acceptance-criteria gate] | ✗ | ✗ | ✗ | ✗ | ✗ | none | — | — | — | LAST; dep A10DOC+A10REL. flips launch-readiness verdict. `task_98c32be0124f` |
+| T_FINAL | FINAL | — | indep | [acceptance-criteria gate] | ✓ | ✓ | ✗ | ✗ | ✓ | none | 108 | t-final-readiness | grok | LAST; dep A10DOC+A10REL. Gates green @ `aad7733` (code-equivalent `9a659e1`); acceptance walked; `production-close-readiness.md` added; PR #108 OPEN — MERGED pending. `task_98c32be0124f` |
 
 **Orca task IDs (for dispatch):**
 
@@ -170,9 +170,9 @@ Per REVIEW_DOC A10, the following must be reconciled after Wave A+B land:
 
 1. **`docs/fix-progress.md`** — reconciled via PR#106: 49 confirmed findings, 36 CLOSED / 13 CODE_CLOSED / 0 OPEN, with OPS-gated items marked human-owned / NOT done.
 2. **`SECURITY.md`** — 0.2.x shipping-support line added via PR#106. `VERSION` / package bumps were handled by `a10-release-prep` via PR#107.
-3. **`docs/launch-readiness.md`** — 2026-06-17 NO-GO banner replaced via PR#106 with the post-remediation conditional-go posture; `T_FINAL` still owns final sign-off.
-4. **VERSION / workspace package versions / CHANGELOG release-prep procedure** — staged `0.2.1` via PR#107, updated `CHANGELOG.md`/changeset, and documented the `scripts/release.sh` + tag + publish handoff. **Prep only — no publish/tag (= OPS O10/O11).**
-5. **Final readiness** — re-run engineering gates, walk the REVIEW_DOC acceptance checklist, confirm OPS queue complete + human-owned, flip launch-readiness to honest verdict (OSS CLI shippable; cloud/SaaS gated on OPS). → `T_FINAL` (`task_98c32be0124f`), **last**.
+3. **`docs/launch-readiness.md`** — 2026-06-17 NO-GO banner replaced via PR#106; T_FINAL flipped to final CONDITIONAL GO @ `aad7733`.
+4. **VERSION / workspace package versions / CHANGELOG release-prep procedure** — staged `0.2.1` via PR#107, updated `CHANGELOG.md`/changeset, and documented the `scripts/release.sh` + tag + publish handoff. **Prep only — no publish/tag (= OPS O10/O11).** → `a10-release-prep` CLOSED.
+5. **Final readiness** — engineering gates green @ `aad7733` (re-checked from code-equivalent `9a659e1`); acceptance checklist walked; OPS queue O1–O15 documented human-owned / NOT done; launch-readiness CONDITIONAL GO; `production-close-readiness.md` output. → `T_FINAL` ACCEPT ✓, MERGED pending PR #108.
 
 ---
 
@@ -201,4 +201,6 @@ and, at FINAL, `docs/fix-progress.md`.
 | 2026-06-20 | Merged PR #104 (C14 `marketing-claims`, WT `marketing-claims`, worker grok) into BASE via merge commit `504a038` (base `a186cc8`, head `31e8413`). Codex PASS (task_3a3e8ec9cd9b); smoke-root-action + smoke-subpath-action green; apps/web build passed; marketing/home/seo/pricing tests 4 files/26 tests; claim-7/claim-9/dist-11/claim-5 checks clean; secret/live-op scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule. CLOSE-INDEX A9: claim-7 → CLOSED via PR#104; claim-9 → CLOSED via PR#104; dist-11 → CODE_CLOSED via PR#104 (OPS redeploy `frontguard.dev` / apps-web live Schema.org stale HTML remains human-owned, NOT done); claim-5 remains CLOSED/re-verified (not reopened). OPS queue unchanged (C14 OPS = apps/web redeploy, human-owned). |
 | 2026-06-20 | Merged PR #105 (C16 `validation-methodology`, WT `validation-methodology`, worker grok) into BASE via merge commit `d45bd09` (base `0a2174a`, head `90db880`). Codex PASS (task_2dc5fc267597); smoke-root-action + smoke-subpath-action green on rebased head; CLI pixel/report JSON tests 21/21; validation aggregate methodology validated (39/39 measured recheck diffs pixelmatch with hasBaselineImage=true); apps/web home test + build passed; secret/live-op scan clean; Bugbot non-blocking; GH formal approval blocked by same-account own-PR rule; no OPS. CLOSE-INDEX A8 val-5 → CLOSED via PR#105. |
 | 2026-06-20 | Merged PR #106 (A10DOC `a10-doc-reconcile`, WT `a10-doc-reconcile`, worker grok) into BASE via merge commit `1e674fc` (base `6ee923f`, head `163a363`). Codex PASS (task_20d3622ad7e6) after R2; smoke-root-action + smoke-subpath-action green; Bugbot non-blocking (IN_PROGRESS, no blocking review/comment posted); GH formal approval blocked by same-account own-PR rule; no secrets/live-OPS done claims. Doc-only reconcile: `docs/fix-progress.md` rows aligned to final status (CLOSE-INDEX count alignment 49 = 36 CLOSED / 13 CODE_CLOSED / 0 OPEN), `SECURITY.md` Supported Versions line added for shipping release, `docs/launch-readiness.md` banner updated. A10 Process hygiene doc-reconcile subtask CLOSED; A10 row remains OPEN until A10REL (PR#107) + T_FINAL merge. |
-| 2026-06-20 | Merged PR #107 (A10REL `a10-release-prep`, WT `a10-release-prep`, worker grok) into BASE via merge commit `9a659e1` (base `6ee923f`, head `78f3ce8`). Codex PASS (task_bf71e94bce99) after stats retry; smoke-root-action + smoke-subpath-action green; Bugbot non-blocking (IN_PROGRESS, no blocking review/comment posted); GH formal approval blocked by same-account own-PR rule; release-prep diff scoped to 0.2.1 version surfaces, CHANGELOG/changeset, action/Dockerfile pins, `scripts/stats.json`, and `docs/arch-ops-actions.md`; `scripts/stats.json` verified 0.2.1 / v0.2.1; no secrets/live-OPS done claims. A10 release-prep subtask CLOSED; O10/O11 publish/tag remain human-owned, NOT done; A10 remains OPEN until T_FINAL merge. |
+| 2026-06-20 | Merged PR #107 (A10REL `a10-release-prep`, WT `a10-release-prep`, worker grok) into BASE via merge commit `9a659e1` (base `6ee923f`, head `78f3ce8`). Codex PASS (task_bf71e94bce99) after stats retry; smoke-root-action + smoke-subpath-action green; Bugbot non-blocking (IN_PROGRESS, no blocking review/comment posted); GH formal approval blocked by same-account own-PR rule; release-prep diff scoped to 0.2.1 version surfaces, CHANGELOG/changeset, action/Dockerfile pins, `scripts/stats.json`, and `docs/arch-ops-actions.md`; `scripts/stats.json` verified 0.2.1 / v0.2.1; no secrets/live-OPS done claims. A10 release-prep subtask CLOSED; O10/O11 publish/tag remain human-owned, NOT done. |
+| 2026-06-20 | T_FINAL R1 (`task_98c32be0124f`, WT `t-final-readiness`, worker grok): gates green @ `9a659e1`; walked acceptance; updated ledgers — coordinator flagged: missing `production-close-readiness.md`, frozen `production-pending.md` modified, stale `9a659e1` refs, premature `PHASE=COMPLETE`. |
+| 2026-06-20 | T_FINAL R2 (PR #108 readiness fix, worker grok): restored frozen `production-pending.md` from BASE; added `docs/production-close-readiness.md`; fixed gate SHA honesty (`9a659e1` code-equivalent → `aad7733` ledger-only delta); `launch-readiness.md` + `fix-progress.md` honest CONDITIONAL GO; T_FINAL row PR_OPEN/ACCEPT, MERGED pending; `PHASE=final/verify`. No live OPS done. |
