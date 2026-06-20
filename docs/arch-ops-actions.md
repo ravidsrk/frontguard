@@ -81,6 +81,74 @@ row **O2** (apps/web redeploy).
   curl -s https://frontguard.dev/ | grep -E 'AggregateRating|ratingValue|ratingCount'   # expect NO matches
   ```
 
+## A10 / B7 — npm 0.2.1 republish (production-close release-prep) — human-owned, NOT executed
+
+Code-side release prep (VERSION, workspace `package.json` versions, `CHANGELOG.md`,
+`.changeset/production-close-0.2.1.md`) is staged on branch `ravidsrk/a10-release-prep`
+and merged into BASE `ravidsrk/production-close` via PR. **The swarm did NOT run any
+of the commands below** (no `scripts/release.sh`, no `npm publish`, no `git tag
+v0.2.1` push). Mirrors `docs/production-close-progress.md` OPS rows **O10, O11**.
+
+**Context.** npm `v0.2.0` (2026-06-17) predates remediation PRs #73–#104. Consumers
+still install stale artifacts until OPS publishes `0.2.1`.
+
+**Publishable packages** (from `scripts/release.sh` `NPM_PACKAGES`):
+
+- `@frontguard/cli`
+- `@frontguard/playwright`
+- `@frontguard/mcp`
+- `create-frontguard-plugin`
+- `@frontguard/netlify-plugin`
+
+**Prerequisites (human checks before tagging):**
+
+1. Merge the `a10-release-prep` PR into BASE; promote BASE → `main` when ready.
+2. Confirm `VERSION` file reads `0.2.1` and every publishable `package.json`
+   version matches (release script enforces this).
+3. Confirm working tree is clean.
+
+**Release procedure (exact OPS handoff):**
+
+```sh
+# 1. Final engineering gate on the release commit
+git checkout ravidsrk/production-close   # or main after promotion
+git pull
+npm ci && npm run build && npm test
+
+# 2. Dry-run validates metadata, build, and npm pack without secrets
+./scripts/release.sh --dry-run
+
+# 3. Tag the release (triggers .github/workflows/release.yml on push)
+git tag -a v0.2.1 -m "Frontguard 0.2.1 — production-close remediation"
+git push origin v0.2.1
+
+# 4. If not using the tag-triggered workflow, publish locally instead:
+#    export NPM_TOKEN=<npmjs automation token>
+#    ./scripts/release.sh --only-npm
+
+# 5. Post-publish verification
+npm view @frontguard/cli@0.2.1 version
+npm view @frontguard/mcp@0.2.1 version
+npm view @frontguard/playwright@0.2.1 version
+npm view create-frontguard-plugin@0.2.1 version
+npm view @frontguard/netlify-plugin@0.2.1 version
+npx -y @frontguard/mcp@0.2.1 --help 2>&1 | head -5   # stderr banner, not empty crash
+npm audit --omit=dev --audit-level=high                # expect 0 critical/high
+```
+
+**Optional (closes `docs-1` option a):** publish an unscoped `frontguard` npm shim
+that depends on `@frontguard/cli@0.2.1` — not included in `scripts/release.sh`;
+separate human decision.
+
+**Related OPS (publish-adjacent, still human-owned):**
+
+- **O10** — push lightweight `v0` tag to the stable commit so
+  `uses: ravidsrk/frontguard@v0` resolves (see B6 in `docs/production-pending.md`).
+- **O9** — Docker Hub `frontguard/render:0.2.1` build+push (B5).
+- **O15** — enable Dependabot in repo settings so `.github/dependabot.yml` activates.
+
+---
+
 ## Downstream human gates (NOT done; human-owned)
 
 - BASE (`ravidsrk/adversarial-fresh`) → `main` promotion: human meta-PR.

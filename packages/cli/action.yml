@@ -61,7 +61,7 @@ runs:
     - name: Install Frontguard
       shell: bash
       env:
-        FRONTGUARD_CLI_VERSION: '0.2.0'
+        FRONTGUARD_CLI_VERSION: '0.2.1'
       run: npm install -g "@frontguard/cli@${FRONTGUARD_CLI_VERSION}"
 
     - name: Install Playwright browsers

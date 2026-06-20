@@ -33,7 +33,7 @@ import {
 } from './tools/index.js';
 
 const SERVER_NAME = '@frontguard/mcp';
-const SERVER_VERSION = '0.2.0';
+const SERVER_VERSION = '0.2.1';
 
 /**
  * Build a fresh {@link McpServer} with all Frontguard tools registered.
