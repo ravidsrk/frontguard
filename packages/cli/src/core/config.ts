@@ -206,7 +206,7 @@ export const configSchema = z.object({
   /** Screenshot image-upload configuration (for PR comment thumbnails). */
   imageUpload: imageUploadSchema.optional(),
 
-  /** Anonymous usage telemetry (default: true). Set false to opt out. */
+  /** Anonymous usage telemetry (default: false). Set true to opt in. */
   telemetry: z.boolean().optional(),
 
   /** Generate AI-powered CSS fixes for regressions (requires `ai`). */

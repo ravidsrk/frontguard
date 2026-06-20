@@ -5,8 +5,9 @@
  * features are used and prioritise work. Telemetry is:
  *
  * - **Anonymous** — no URLs, file paths, config contents, or user identity.
- * - **Opt-out** — disabled via `FRONTGUARD_TELEMETRY=0`, `--no-telemetry`,
- *   the standard `DO_NOT_TRACK=1`, or `telemetry: false` in config.
+ * - **Opt-in** — disabled by default until a hosted collector is live. Enable
+ *   with `FRONTGUARD_TELEMETRY=1`, `telemetry: true` in config, or opt out via
+ *   `--no-telemetry`, `FRONTGUARD_TELEMETRY=0`, `DO_NOT_TRACK=1`.
  * - **Non-blocking** — fire-and-forget with a short timeout; never slows or
  *   fails the CLI.
  *
@@ -46,11 +47,15 @@ export interface TelemetryEvent {
 /**
  * Determines whether telemetry is enabled.
  *
+ * Disabled by default (hosted collector not live). Enabled when:
+ * - `FRONTGUARD_TELEMETRY` is `1`/`true`/`on`/`yes`
+ * - `configEnabled` is explicitly `true`
+ *
  * Disabled when any opt-out signal is present:
+ * - `optOutFlag` is `true` (from `--no-telemetry`)
+ * - `configEnabled` is explicitly `false`
  * - `FRONTGUARD_TELEMETRY` is `0`/`false`/`off`
  * - `DO_NOT_TRACK` is truthy (the cross-tool standard)
- * - `configEnabled` is explicitly `false`
- * - `optOutFlag` is `true` (from `--no-telemetry`)
  */
 export function isTelemetryEnabled(opts?: {
   configEnabled?: boolean;
@@ -68,7 +73,10 @@ export function isTelemetryEnabled(opts?: {
   const flag = (env.FRONTGUARD_TELEMETRY ?? '').toLowerCase();
   if (flag === '0' || flag === 'false' || flag === 'off' || flag === 'no') return false;
 
-  return true;
+  if (opts?.configEnabled === true) return true;
+  if (flag === '1' || flag === 'true' || flag === 'on' || flag === 'yes') return true;
+
+  return false;
 }
 
 /**
@@ -95,8 +103,8 @@ export function showFirstRunNotice(): void {
   if (firstRunNoticeShown) return;
   firstRunNoticeShown = true;
   logger.debug(
-    'Frontguard collects anonymous usage telemetry (no URLs, paths, or config). ' +
-      'Disable with FRONTGUARD_TELEMETRY=0 or --no-telemetry.',
+    'Frontguard can send anonymous usage telemetry (no URLs, paths, or config). ' +
+      'Enable with FRONTGUARD_TELEMETRY=1 or telemetry: true in config.',
   );
 }
 
