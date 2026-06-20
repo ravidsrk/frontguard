@@ -21,7 +21,7 @@ Setup facts and decisions: see `DECISIONS.md` § "Production close run, 2026-06-
 > `apps/landing/**` + `apps/docs/content/docs/**.mdx` (fumadocs) layout. **Current BASE has
 > `apps/web/**` only** (single TanStack app); `apps/landing` and `apps/docs/content` do **not**
 > exist here. Live docs content is in `apps/web/src/lib/` + `apps/web/src/routes/`; the live
-> pricing CTA is `apps/web/src/routes/pricing.tsx`. Stray `npx -p @frontguard/cli frontguard` snippets live in
+> pricing CTA is `apps/web/src/routes/pricing.tsx`. Stray `npx frontguard` snippets live in
 > `docs/*.md`, `CONTRIBUTING.md`, `docs/launch/*`, `docs/design-extract/tanstack/**`, and test
 > fixtures — **not** in `apps/docs/content`. Fixers must locate live equivalents; **REVIEW_DOC
 > acceptance still governs**.
