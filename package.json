@@ -56,7 +56,9 @@
     "@grpc/grpc-js": "^1.14.4",
     "fast-xml-builder": "^1.1.7",
     "form-data": "^4.0.5",
-    "hono": "^4.12.26"
+    "hono": "^4.12.26",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
   },
   "devDependencies": {
     "husky": "^9.1.7",
