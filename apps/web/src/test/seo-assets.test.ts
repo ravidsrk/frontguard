@@ -14,6 +14,23 @@ import { Route as RootRoute } from '../routes/__root'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC = path.resolve(__dirname, '../../public')
+const AGENT_SURFACES = [
+  {
+    href: 'https://frontguard.dev/agents.md',
+    publicPath: '/agents.md',
+    file: 'agents.md',
+  },
+  {
+    href: 'https://frontguard.dev/openapi.json',
+    publicPath: '/openapi.json',
+    file: 'openapi.json',
+  },
+  {
+    href: 'https://frontguard.dev/.well-known/mcp.json',
+    publicPath: '/.well-known/mcp.json',
+    file: '.well-known/mcp.json',
+  },
+] as const
 
 type RouteHead = {
   meta?: unknown[]
@@ -110,6 +127,15 @@ describe('public SEO assets', () => {
     const llmsFull = readPublic('llms-full.txt')
     expect(llmsFull).toContain('ravidsrk/frontguard@v0')
     expect(llmsFull).not.toMatch(/ravidsrk\/frontguard@(v1|main)/)
+
+    for (const surface of AGENT_SURFACES) {
+      expect(llms, `llms.txt missing ${surface.publicPath}`).toContain(surface.publicPath)
+      expect(llms, `llms.txt missing ${surface.href}`).toContain(surface.href)
+      expect(llmsFull, `llms-full.txt missing ${surface.href}`).toContain(surface.href)
+      expect(fs.existsSync(path.join(PUBLIC, surface.file)), `${surface.file} should exist`).toBe(true)
+    }
+    expect(llms).toContain('@frontguard/mcp')
+    expect(llms).toContain('FRONTGUARD_API_URL=https://api.frontguard.dev')
   })
 
   it('robots.txt references the sitemap', () => {
