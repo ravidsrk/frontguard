@@ -1,6 +1,6 @@
 {
   "name": "@frontguard/mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Model Context Protocol server for Frontguard — lets in-IDE agents (Claude Code, Cursor, Copilot) query visual regressions and suggested fixes.",
   "type": "module",
   "bin": {
