@@ -3,16 +3,63 @@ import { Footer } from '../components/Footer'
 import { Nav } from '../components/Nav'
 import { REPO_URL } from '../lib/site'
 import { s } from '../lib/style'
-import { buildSeoHead } from '../lib/seo'
+import { buildSeoHead, canonicalUrl } from '../lib/seo'
+import {
+  FRONTGUARD_ORGANIZATION_REF,
+  FRONTGUARD_WEBSITE_REF,
+  breadcrumbListJsonLd,
+  jsonLdScript,
+} from '../lib/schema-org'
 import { GROUP_COLORS, GROUP_LABELS, RELEASES } from './changelog/-releases'
+
+const SEO_TITLE = 'Changelog — Frontguard'
+const SEO_DESCRIPTION =
+  "What's new in Frontguard: every notable release, what it added, and what changed — newest first, following Keep a Changelog."
+const CHANGELOG_PATH = '/changelog'
+const CHANGELOG_CANONICAL = canonicalUrl(CHANGELOG_PATH)
+const DATED_RELEASES = RELEASES.filter((release) => release.isoDate)
+const LATEST_DATED_RELEASE = DATED_RELEASES[0]
+const FIRST_DATED_RELEASE = DATED_RELEASES[DATED_RELEASES.length - 1]
+
+const CHANGELOG_ARTICLE_JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  '@id': `${CHANGELOG_CANONICAL}#article`,
+  name: SEO_TITLE,
+  headline: SEO_TITLE,
+  description: SEO_DESCRIPTION,
+  url: CHANGELOG_CANONICAL,
+  mainEntityOfPage: CHANGELOG_CANONICAL,
+  articleSection: 'Changelog',
+  datePublished: FIRST_DATED_RELEASE?.isoDate,
+  dateModified: LATEST_DATED_RELEASE?.isoDate,
+  isPartOf: FRONTGUARD_WEBSITE_REF,
+  author: FRONTGUARD_ORGANIZATION_REF,
+  publisher: FRONTGUARD_ORGANIZATION_REF,
+  hasPart: DATED_RELEASES.map((release) => ({
+    '@type': 'CreativeWork',
+    name: `Frontguard ${release.version}: ${release.title}`,
+    description: release.summary,
+    datePublished: release.isoDate,
+  })),
+}
+
+const CHANGELOG_BREADCRUMB_JSON_LD = breadcrumbListJsonLd([
+  { name: 'Home', path: '/' },
+  { name: 'Changelog', path: CHANGELOG_PATH },
+])
 
 export const Route = createFileRoute('/changelog')({
   head: () =>
     buildSeoHead({
-      title: 'Changelog — Frontguard',
-      description:
-        "What's new in Frontguard: every notable release, what it added, and what changed — newest first, following Keep a Changelog.",
-      path: '/changelog',
+      title: SEO_TITLE,
+      description: SEO_DESCRIPTION,
+      path: CHANGELOG_PATH,
+      ogType: 'article',
+      scripts: [
+        jsonLdScript(CHANGELOG_ARTICLE_JSON_LD),
+        jsonLdScript(CHANGELOG_BREADCRUMB_JSON_LD),
+      ],
     }),
   component: Changelog,
 })
