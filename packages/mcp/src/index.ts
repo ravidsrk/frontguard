@@ -24,12 +24,16 @@ import { CloudApiError, CloudClient } from './client/cloud.js';
 import {
   acceptBaseline,
   acceptBaselineInputSchema,
+  acceptBaselineOutputSchema,
   getSuggestedFix,
   getSuggestedFixInputSchema,
+  getSuggestedFixOutputSchema,
   listRegressions,
   listRegressionsInputSchema,
+  listRegressionsOutputSchema,
   recentRuns,
   recentRunsInputSchema,
+  recentRunsOutputSchema,
 } from './tools/index.js';
 
 const SERVER_NAME = '@frontguard/mcp';
@@ -56,6 +60,7 @@ export function createServer(): McpServer {
       description:
         'Return the visual regressions Frontguard detected on a given GitHub PR (or run id). Each row carries a `diffId` you can pass to `get_suggested_fix`.',
       inputSchema: listRegressionsInputSchema,
+      outputSchema: listRegressionsOutputSchema,
     },
     async (args) => withCloudClient(async (client) => listRegressions(client, args)),
   );
@@ -67,6 +72,7 @@ export function createServer(): McpServer {
       description:
         'Return the AI-generated patch for a single diff (keyed by the `diffId` from `list_regressions`).',
       inputSchema: getSuggestedFixInputSchema,
+      outputSchema: getSuggestedFixOutputSchema,
     },
     async (args) => withCloudClient(async (client) => getSuggestedFix(client, args)),
   );
@@ -78,6 +84,7 @@ export function createServer(): McpServer {
       description:
         'Promote every screenshot in a run to the new baseline (run-scoped — not per-diff). Requires `run_id` and `confirm_all_regressions_reviewed: true` after you have reviewed every regression from `list_regressions`.',
       inputSchema: acceptBaselineInputSchema,
+      outputSchema: acceptBaselineOutputSchema,
     },
     async (args) => withCloudClient(async (client) => acceptBaseline(client, args)),
   );
@@ -89,6 +96,7 @@ export function createServer(): McpServer {
       description:
         'List the most recent runs the API key has access to. Optional `repo` and `branch` filters narrow the results.',
       inputSchema: recentRunsInputSchema,
+      outputSchema: recentRunsOutputSchema,
     },
     async (args) => withCloudClient(async (client) => recentRuns(client, args)),
   );
@@ -102,7 +110,7 @@ export function createServer(): McpServer {
  * returned as `isError: true` so the agent sees them as tool errors rather
  * than as the server crashing.
  */
-async function withCloudClient<T>(
+async function withCloudClient<T extends object>(
   fn: (client: CloudClient) => Promise<T>,
 ): Promise<CallToolResult> {
   try {
@@ -111,6 +119,7 @@ async function withCloudClient<T>(
     const data = await fn(client);
     return {
       content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+      structuredContent: data as Record<string, unknown>,
     };
   } catch (err) {
     return toolError(err);

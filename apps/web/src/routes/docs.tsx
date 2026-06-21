@@ -2,15 +2,66 @@ import { createFileRoute, Link, Outlet, useParams } from '@tanstack/react-router
 import { s } from '../lib/style'
 import { Shield } from '../components/Shield'
 import { articles, navGroups, type Article } from '../lib/docs-content'
-import { buildSeoHead } from '../lib/seo'
+import { buildSeoHead, canonicalUrl } from '../lib/seo'
+import {
+  FRONTGUARD_ORGANIZATION,
+  FRONTGUARD_ORGANIZATION_REF,
+  FRONTGUARD_WEBSITE_REF,
+  breadcrumbListJsonLd,
+  docsArticleDescription,
+  jsonLdScript,
+} from '../lib/schema-org'
+
+const SEO_TITLE = 'Documentation — Frontguard'
+const SEO_DESCRIPTION =
+  'Frontguard docs: install the CLI, configure visual regression tests, run AI analysis, wire up CI/CD, and self-host the cloud.'
+const DOCS_PATH = '/docs'
+const DOCS_COLLECTION_ID = `${canonicalUrl(DOCS_PATH)}#collection`
+
+const DOCS_COLLECTION_JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  '@id': DOCS_COLLECTION_ID,
+  name: SEO_TITLE,
+  description: SEO_DESCRIPTION,
+  url: canonicalUrl(DOCS_PATH),
+  isPartOf: FRONTGUARD_WEBSITE_REF,
+  author: FRONTGUARD_ORGANIZATION_REF,
+  publisher: FRONTGUARD_ORGANIZATION_REF,
+  hasPart: articles.map((article) => {
+    const path = `/docs/${article.id}`
+    return {
+      '@type': 'TechArticle',
+      '@id': `${canonicalUrl(path)}#techarticle`,
+      name: article.label,
+      headline: article.label,
+      description: docsArticleDescription(article),
+      articleSection: article.section,
+      url: canonicalUrl(path),
+      isPartOf: {
+        '@type': 'CollectionPage',
+        '@id': DOCS_COLLECTION_ID,
+      },
+    }
+  }),
+}
+
+const DOCS_BREADCRUMB_JSON_LD = breadcrumbListJsonLd([
+  { name: 'Home', path: '/' },
+  { name: 'Documentation', path: DOCS_PATH },
+])
 
 export const Route = createFileRoute('/docs')({
   head: () =>
     buildSeoHead({
-      title: 'Documentation — Frontguard',
-      description:
-        'Frontguard docs: install the CLI, configure visual regression tests, run AI analysis, wire up CI/CD, and self-host the cloud.',
-      path: '/docs',
+      title: SEO_TITLE,
+      description: SEO_DESCRIPTION,
+      path: DOCS_PATH,
+      scripts: [
+        jsonLdScript(DOCS_COLLECTION_JSON_LD),
+        jsonLdScript(FRONTGUARD_ORGANIZATION),
+        jsonLdScript(DOCS_BREADCRUMB_JSON_LD),
+      ],
     }),
   component: DocsLayout,
 })
