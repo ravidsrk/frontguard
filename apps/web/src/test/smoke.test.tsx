@@ -32,7 +32,9 @@ describe('apps/web smoke', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Catch the regression, not the noise.',
+        // jsdom 29 renders <br> as display:inline, so the accessible name has no
+        // space at the line break; tolerate the missing whitespace.
+        name: /^Catch the regression,\s*not the noise\.$/,
       }),
     ).toBeInTheDocument()
     expect(screen.getByText(/MIT License/)).toBeInTheDocument()

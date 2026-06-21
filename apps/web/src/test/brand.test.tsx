@@ -23,7 +23,9 @@ describe('/brand', () => {
   it('renders the page title and five numbered sections', async () => {
     await renderBrand()
     expect(
-      screen.getByRole('heading', { level: 1, name: /the frontguard brand system/i }),
+      // jsdom 29 renders <br> as display:inline, so the accessible name has no
+      // space at the line break; tolerate the missing whitespace.
+      screen.getByRole('heading', { level: 1, name: /the frontguard\s*brand system/i }),
     ).toBeInTheDocument()
     for (const label of [
       '01 / THE MARK',
