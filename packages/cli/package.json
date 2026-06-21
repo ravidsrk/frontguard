@@ -73,7 +73,7 @@
     "playwright": "1.59.0",
     "pngjs": "^7.0.0",
     "tsx": "^4.21.0",
-    "zod": "^3.25.0"
+    "zod": "^4.4.3"
   },
   "optionalDependencies": {
     "@axe-core/playwright": "^4.10.0",
