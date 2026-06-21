@@ -33,6 +33,11 @@ export interface AcceptBaselineResult {
   runId: string;
 }
 
+export const acceptBaselineOutputSchema = z.object({
+  approved: z.boolean(),
+  runId: z.string(),
+});
+
 export async function acceptBaseline(
   client: CloudClient,
   input: AcceptBaselineInput,

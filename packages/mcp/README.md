@@ -32,7 +32,7 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
       "args": ["-y", "@frontguard/mcp"],
       "env": {
         "FRONTGUARD_API_KEY": "fg_live_xxx",
-        "FRONTGUARD_API_URL": "https://your-cloud-api.example.com"
+        "FRONTGUARD_API_URL": "https://api.frontguard.dev"
       }
     }
   }
@@ -51,7 +51,7 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
       "args": ["-y", "@frontguard/mcp"],
       "env": {
         "FRONTGUARD_API_KEY": "fg_live_xxx",
-        "FRONTGUARD_API_URL": "https://your-cloud-api.example.com"
+        "FRONTGUARD_API_URL": "https://api.frontguard.dev"
       }
     }
   }
