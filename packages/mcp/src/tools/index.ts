@@ -9,6 +9,7 @@
 export {
   listRegressions,
   listRegressionsInputSchema,
+  listRegressionsOutputSchema,
   type ListRegressionsInput,
   type ListRegressionsResult,
   type RegressionRow,
@@ -17,6 +18,7 @@ export {
 export {
   getSuggestedFix,
   getSuggestedFixInputSchema,
+  getSuggestedFixOutputSchema,
   type GetSuggestedFixInput,
   type SuggestedFixResult,
 } from './get-suggested-fix.js';
@@ -24,6 +26,7 @@ export {
 export {
   acceptBaseline,
   acceptBaselineInputSchema,
+  acceptBaselineOutputSchema,
   type AcceptBaselineInput,
   type AcceptBaselineResult,
 } from './accept-baseline.js';
@@ -31,6 +34,7 @@ export {
 export {
   recentRuns,
   recentRunsInputSchema,
+  recentRunsOutputSchema,
   type RecentRunsInput,
   type RecentRunsResult,
   type RecentRunSummary,

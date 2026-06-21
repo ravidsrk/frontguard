@@ -62,6 +62,32 @@ export interface ListRegressionsResult {
   notFound?: { reason: string };
 }
 
+const regressionRowOutputSchema = z.object({
+  diffId: z.string(),
+  runId: z.string(),
+  route: z.string(),
+  viewport: z.number(),
+  status: z.string(),
+  diffPercentage: z.number(),
+  classification: z.string().optional(),
+  hasSuggestedFix: z.boolean(),
+  reportUrl: z.string().nullable(),
+  prNumber: z.number().optional(),
+  repo: z.string().optional(),
+  commitSha: z.string().optional(),
+});
+
+export const listRegressionsOutputSchema = z.object({
+  count: z.number().int().nonnegative(),
+  runId: z.string().nullable(),
+  regressions: z.array(regressionRowOutputSchema),
+  notFound: z
+    .object({
+      reason: z.string(),
+    })
+    .optional(),
+});
+
 function isRegression(r: CloudRunResult): boolean {
   return isRegressionResult(r);
 }

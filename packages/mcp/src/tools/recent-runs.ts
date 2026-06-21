@@ -60,6 +60,27 @@ export interface RecentRunsResult {
   runs: RecentRunSummary[];
 }
 
+const recentRunSummaryOutputSchema = z.object({
+  runId: z.string(),
+  status: z.enum(['queued', 'running', 'completed', 'failed']),
+  url: z.string(),
+  createdAt: z.string(),
+  completedAt: z.string().optional(),
+  durationMs: z.number().optional(),
+  routesCount: z.number().int().nonnegative(),
+  regressionsCount: z.number().int().nonnegative(),
+  baselinesApproved: z.boolean(),
+  reportUrl: z.string().nullable(),
+  repo: z.string().optional(),
+  prNumber: z.number().optional(),
+  commitSha: z.string().optional(),
+});
+
+export const recentRunsOutputSchema = z.object({
+  count: z.number().int().nonnegative(),
+  runs: z.array(recentRunSummaryOutputSchema),
+});
+
 function regressionsCount(run: CloudRun): number {
   return (run.results ?? []).filter(isRegressionResult).length;
 }
