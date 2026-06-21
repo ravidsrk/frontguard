@@ -1,43 +1,55 @@
-import { Hono, type MiddlewareHandler } from 'hono';
-import { cors } from 'hono/cors';
-import { z } from 'zod';
-import type { Run } from './types.js';
-import { processRun, type ProcessorEnv } from './processor.js';
-import type { BaselineRestore, BaselineBucket } from './daytona-runner.js';
-import { emitRunTelemetry, runMetricsFromRun, type OtelEnv } from './otel/index.js';
-import { getStore, isProduction, isProductionMisconfigured, type Bindings } from './db/factory.js';
-import { apiRateLimiter } from './rate-limit.js';
-import { currentMonth, type Store } from './db/store.js';
-import { hashKey } from './auth/keys.js';
-import { authRoutes } from './routes/auth.js';
-import { keyRoutes } from './routes/keys.js';
-import { screenshotRoutes } from './routes/screenshots.js';
-import { getScreenshotStore, type R2Bucket } from './storage/screenshots.js';
-import { persistScreenshots, type PendingScreenshot } from './storage/persist-screenshots.js';
-import { completeCheckRun } from './github-callback.js';
-import { monitorRoutes } from './routes/monitors.js';
-import { dashboardRoutes, sessionDashboardRoutes } from './routes/dashboard.js';
-import { hasValidSessionSecret } from './auth/session.js';
-import { teamRoutes } from './routes/teams.js';
-import { can } from './db/teams.js';
-import { billingRoutes } from './routes/billing.js';
-import { getPlan } from './billing/plans.js';
+import { Hono, type MiddlewareHandler } from "hono";
+import { cors } from "hono/cors";
+import { z } from "zod";
+import type { Run } from "./types.js";
+import { processRun, type ProcessorEnv } from "./processor.js";
+import type { BaselineRestore, BaselineBucket } from "./daytona-runner.js";
+import {
+  emitRunTelemetry,
+  runMetricsFromRun,
+  type OtelEnv,
+} from "./otel/index.js";
+import {
+  getStore,
+  isProduction,
+  isProductionMisconfigured,
+  type Bindings,
+} from "./db/factory.js";
+import { apiRateLimiter } from "./rate-limit.js";
+import { currentMonth, type Store } from "./db/store.js";
+import { hashKey } from "./auth/keys.js";
+import { authRoutes } from "./routes/auth.js";
+import { keyRoutes } from "./routes/keys.js";
+import { screenshotRoutes } from "./routes/screenshots.js";
+import { getScreenshotStore, type R2Bucket } from "./storage/screenshots.js";
+import {
+  persistScreenshots,
+  type PendingScreenshot,
+} from "./storage/persist-screenshots.js";
+import { completeCheckRun } from "./github-callback.js";
+import { monitorRoutes } from "./routes/monitors.js";
+import { dashboardRoutes, sessionDashboardRoutes } from "./routes/dashboard.js";
+import { hasValidSessionSecret } from "./auth/session.js";
+import { teamRoutes } from "./routes/teams.js";
+import { can } from "./db/teams.js";
+import { billingRoutes } from "./routes/billing.js";
+import { getPlan } from "./billing/plans.js";
 import {
   MAX_ROUTES,
   MAX_VIEWPORTS,
   MAX_BROWSERS,
   MAX_FAN_OUT,
   plannedScreenshotCount,
-} from './limits.js';
-import { evaluateSpendCap } from './billing/spend-cap.js';
-import { runScheduledChecks } from './scheduler.js';
-import type { AlertEnv } from './alerts/index.js';
-import { PACKAGE_VERSION } from './version.js';
+} from "./limits.js";
+import { evaluateSpendCap } from "./billing/spend-cap.js";
+import { runScheduledChecks } from "./scheduler.js";
+import type { AlertEnv } from "./alerts/index.js";
+import { PACKAGE_VERSION } from "./version.js";
 import {
   SafeRenderTargetError,
   assertSafeRenderTarget,
-} from './security/render-target.js';
-import { recordDeadLetter } from './dead-letter.js';
+} from "./security/render-target.js";
+import { recordDeadLetter } from "./dead-letter.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,7 +66,7 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 // Zod validation schema for POST /v1/run
 // ---------------------------------------------------------------------------
 const runRequestSchema = z.object({
-  url: z.string().url('url must be a valid URL'),
+  url: z.url("url must be a valid URL"),
   routes: z
     .array(
       z.object({
@@ -64,8 +76,14 @@ const runRequestSchema = z.object({
     )
     .max(MAX_ROUTES)
     .optional(),
-  viewports: z.array(z.number().int().min(320).max(3840)).max(MAX_VIEWPORTS).optional(),
-  browsers: z.array(z.enum(['chromium', 'firefox', 'webkit'])).max(MAX_BROWSERS).optional(),
+  viewports: z
+    .array(z.number().int().min(320).max(3840))
+    .max(MAX_VIEWPORTS)
+    .optional(),
+  browsers: z
+    .array(z.enum(["chromium", "firefox", "webkit"]))
+    .max(MAX_BROWSERS)
+    .optional(),
   threshold: z.number().min(0).max(1).optional(),
   ai: z
     .object({
@@ -93,15 +111,12 @@ const runRequestSchema = z.object({
 // Middleware — CORS (explicit origins)
 // ---------------------------------------------------------------------------
 app.use(
-  '*',
+  "*",
   cors({
     origin: (origin) => {
-      const allowed = [
-        'https://frontguard.dev',
-        'https://www.frontguard.dev',
-      ];
+      const allowed = ["https://frontguard.dev", "https://www.frontguard.dev"];
       if (!origin) return origin;
-      if (origin.startsWith('http://localhost:')) return origin;
+      if (origin.startsWith("http://localhost:")) return origin;
       if (allowed.includes(origin)) return origin;
       return undefined;
     },
@@ -112,21 +127,24 @@ app.use(
 // ---------------------------------------------------------------------------
 // Middleware — Security headers
 // ---------------------------------------------------------------------------
-app.use('*', async (c, next) => {
+app.use("*", async (c, next) => {
   await next();
-  c.header('X-Content-Type-Options', 'nosniff');
-  c.header('X-Frame-Options', 'DENY');
-  c.header('X-XSS-Protection', '0');
-  c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-  c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("X-XSS-Protection", "0");
+  c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 });
 
 // ---------------------------------------------------------------------------
 // Middleware — Fail closed when production is declared but DB is missing (SEC-6)
 // ---------------------------------------------------------------------------
-app.use('*', async (c, next) => {
+app.use("*", async (c, next) => {
   if (isProductionMisconfigured(c.env)) {
-    return c.text('Service misconfigured (DB binding missing in production)', 503);
+    return c.text(
+      "Service misconfigured (DB binding missing in production)",
+      503,
+    );
   }
   await next();
 });
@@ -134,23 +152,23 @@ app.use('*', async (c, next) => {
 // ---------------------------------------------------------------------------
 // Middleware — Resolve the store for every request (D1 in prod, memory in dev)
 // ---------------------------------------------------------------------------
-app.use('*', async (c, next) => {
-  c.set('store', getStore(c.env));
+app.use("*", async (c, next) => {
+  c.set("store", getStore(c.env));
   await next();
 });
 
 // ---------------------------------------------------------------------------
 // Health check (outside /v1/* — no auth required)
 // ---------------------------------------------------------------------------
-app.get('/health', (c) => c.json({ status: 'ok', version: PACKAGE_VERSION }));
+app.get("/health", (c) => c.json({ status: "ok", version: PACKAGE_VERSION }));
 
 // ---------------------------------------------------------------------------
 // Auth + API-key management routes (mounted before the /v1 guard so the OAuth
 // callback and key bootstrap don't require a pre-existing key).
 // ---------------------------------------------------------------------------
-app.route('/auth', authRoutes);
-app.route('/v1/keys', keyRoutes);
-app.route('/v1/billing', billingRoutes);
+app.route("/auth", authRoutes);
+app.route("/v1/keys", keyRoutes);
+app.route("/v1/billing", billingRoutes);
 
 // Fail closed (sec-1, cloud-4): in production the dashboard session secret MUST
 // be configured (set + >= 32 chars). Without it we refuse to serve any
@@ -164,61 +182,68 @@ const requireDashboardSecret: MiddlewareHandler<{
   Variables: Variables;
 }> = async (c, next) => {
   if (isProduction(c.env) && !hasValidSessionSecret(c.env)) {
-    return c.text('Dashboard not configured (DASHBOARD_SESSION_SECRET missing)', 503);
+    return c.text(
+      "Dashboard not configured (DASHBOARD_SESSION_SECRET missing)",
+      503,
+    );
   }
   await next();
 };
-app.use('/dashboard', requireDashboardSecret);
-app.use('/dashboard/*', requireDashboardSecret);
+app.use("/dashboard", requireDashboardSecret);
+app.use("/dashboard/*", requireDashboardSecret);
 
 // Browser dashboard (session-cookie auth) — mounted before the /v1 guard so it
 // is NOT behind the API-key requirement.
-app.route('/dashboard', sessionDashboardRoutes);
+app.route("/dashboard", sessionDashboardRoutes);
 
 // ---------------------------------------------------------------------------
 // Middleware — Auth for all /v1/* routes
 // ---------------------------------------------------------------------------
-app.use('/v1/*', async (c, next) => {
-  const apiKey = c.req.header('Authorization')?.replace('Bearer ', '');
-  if (!apiKey) return c.json({ error: 'Missing API key' }, 401);
+app.use("/v1/*", async (c, next) => {
+  const apiKey = c.req.header("Authorization")?.replace("Bearer ", "");
+  if (!apiKey) return c.json({ error: "Missing API key" }, 401);
 
-  const store = c.get('store');
+  const store = c.get("store");
   let userId: string;
 
   if (isProduction(c.env)) {
     // Production: resolve the key hash to a user.
     const keyHash = await hashKey(apiKey);
     const record = await store.getApiKey(keyHash);
-    if (!record) return c.json({ error: 'Invalid API key' }, 401);
+    if (!record) return c.json({ error: "Invalid API key" }, 401);
     userId = record.userId;
     await store.touchApiKey(keyHash, new Date().toISOString());
   } else {
     // Dev / tests: accept any token and scope data to a per-token demo user.
     userId = `demo:${await hashKey(apiKey)}`;
     if (!(await store.getUser(userId))) {
-      await store.createUser({ id: userId, plan: 'free', createdAt: new Date().toISOString() });
+      await store.createUser({
+        id: userId,
+        plan: "free",
+        createdAt: new Date().toISOString(),
+      });
     }
   }
 
-  c.set('apiKey', apiKey);
-  c.set('userId', userId);
+  c.set("apiKey", apiKey);
+  c.set("userId", userId);
   await next();
 });
 
 // ---------------------------------------------------------------------------
 // Middleware — Rate limiting for all /v1/* routes
 // ---------------------------------------------------------------------------
-app.use('/v1/*', async (c, next) => {
-  const apiKey = c.get('apiKey');
+app.use("/v1/*", async (c, next) => {
+  const apiKey = c.get("apiKey");
   const keyHash = await hashKey(apiKey);
   const result = apiRateLimiter.check(keyHash);
 
-  c.header('X-RateLimit-Limit', String(result.limit));
-  c.header('X-RateLimit-Remaining', String(result.remaining));
-  c.header('X-RateLimit-Reset', String(Math.ceil(result.resetAt / 1000)));
+  c.header("X-RateLimit-Limit", String(result.limit));
+  c.header("X-RateLimit-Remaining", String(result.remaining));
+  c.header("X-RateLimit-Reset", String(Math.ceil(result.resetAt / 1000)));
 
   if (!result.allowed) {
-    return c.json({ error: 'Rate limit exceeded. Try again later.' }, 429);
+    return c.json({ error: "Rate limit exceeded. Try again later." }, 429);
   }
 
   await next();
@@ -227,24 +252,24 @@ app.use('/v1/*', async (c, next) => {
 // ---------------------------------------------------------------------------
 // Screenshot + monitor routes (mounted after the /v1 auth guard above).
 // ---------------------------------------------------------------------------
-app.route('/v1/screenshots', screenshotRoutes);
-app.route('/v1/monitors', monitorRoutes);
-app.route('/v1/dashboard', dashboardRoutes);
-app.route('/v1/teams', teamRoutes);
+app.route("/v1/screenshots", screenshotRoutes);
+app.route("/v1/monitors", monitorRoutes);
+app.route("/v1/dashboard", dashboardRoutes);
+app.route("/v1/teams", teamRoutes);
 
 // ---------------------------------------------------------------------------
 // POST /v1/run — Submit a visual regression run
 // ---------------------------------------------------------------------------
-app.post('/v1/run', async (c) => {
+app.post("/v1/run", async (c) => {
   const body = await c.req.json().catch(() => ({}));
 
   const parsed = runRequestSchema.safeParse(body);
   if (!parsed.success) {
-    const fieldErrors = parsed.error.flatten().fieldErrors;
+    const fieldErrors = z.flattenError(parsed.error).fieldErrors;
     const fields = Object.keys(fieldErrors);
     return c.json(
       {
-        error: `Invalid request: missing or invalid field(s): ${fields.join(', ')}`,
+        error: `Invalid request: missing or invalid field(s): ${fields.join(", ")}`,
         details: fieldErrors,
       },
       400,
@@ -262,13 +287,17 @@ app.post('/v1/run', async (c) => {
     throw err;
   }
 
-  const store = c.get('store');
-  const userId = c.get('userId');
+  const store = c.get("store");
+  const userId = c.get("userId");
 
-  const routes = data.routes ?? [{ path: '/' }];
+  const routes = data.routes ?? [{ path: "/" }];
   const viewports = data.viewports ?? [1440];
-  const browsers = data.browsers ?? ['chromium'];
-  const plannedScreenshots = plannedScreenshotCount(routes, viewports, browsers);
+  const browsers = data.browsers ?? ["chromium"];
+  const plannedScreenshots = plannedScreenshotCount(
+    routes,
+    viewports,
+    browsers,
+  );
   if (plannedScreenshots > MAX_FAN_OUT) {
     return c.json(
       {
@@ -285,10 +314,10 @@ app.post('/v1/run', async (c) => {
   let projectTeamId: string | undefined;
   if (data.projectId) {
     const project = await store.getProjectById(data.projectId);
-    if (!project) return c.json({ error: 'Project not found' }, 404);
+    if (!project) return c.json({ error: "Project not found" }, 404);
     const member = await store.getMember(project.teamId, userId);
-    if (!member || !can(member.role, 'run_tests')) {
-      return c.json({ error: 'Not a member of the project team' }, 403);
+    if (!member || !can(member.role, "run_tests")) {
+      return c.json({ error: "Not a member of the project team" }, 403);
     }
     projectTeamId = project.teamId;
   }
@@ -296,12 +325,13 @@ app.post('/v1/run', async (c) => {
   // Plan enforcement (Task 8.2, DM-3): resolve plan from team scope when present.
   // Paid team plans meter against a shared team_usage pool; personal/free runs
   // stay on the per-user counter. A team's plan may only be claimed by a member.
-  const queryTeamId = c.req.query('teamId');
+  const queryTeamId = c.req.query("teamId");
   const billingTeamId = queryTeamId ?? projectTeamId;
-  let planId = 'free';
+  let planId = "free";
   if (billingTeamId) {
     const member = await store.getMember(billingTeamId, userId);
-    if (!member) return c.json({ error: 'Not a member of the requested team' }, 403);
+    if (!member)
+      return c.json({ error: "Not a member of the requested team" }, 403);
     const team = await store.getTeam(billingTeamId);
     if (team) planId = team.plan;
   } else {
@@ -309,16 +339,17 @@ app.post('/v1/run', async (c) => {
     if (user) planId = user.plan;
   }
   const plan = getPlan(planId);
-  if (plan.id !== 'free' && !billingTeamId) {
+  if (plan.id !== "free" && !billingTeamId) {
     return c.json(
       {
-        error: 'Paid plan runs require a team scope (?teamId= or projectId on a team project).',
+        error:
+          "Paid plan runs require a team scope (?teamId= or projectId on a team project).",
       },
       400,
     );
   }
   const month = currentMonth();
-  const meterTeam = billingTeamId != null && plan.id !== 'free';
+  const meterTeam = billingTeamId != null && plan.id !== "free";
 
   // Atomic monthly reservations (CONC-1, COST-1, DM-3): reserve the run and
   // planned screenshot count up front so concurrent submissions cannot overshoot
@@ -337,7 +368,7 @@ app.post('/v1/run', async (c) => {
           error: `Monthly run limit reached (${runLimit} on the ${plan.name} plan).`,
           limit: runLimit,
           current: usage.runsCount,
-          upgradeUrl: 'https://frontguard.dev/pricing',
+          upgradeUrl: "https://frontguard.dev/pricing",
         },
         402,
       );
@@ -351,8 +382,18 @@ app.post('/v1/run', async (c) => {
   const screenshotLimit = plan.limits.screenshotsPerMonth;
   if (screenshotLimit !== null) {
     const reserved = meterTeam
-      ? await store.tryReserveTeamScreenshots(billingTeamId!, month, screenshotLimit, plannedScreenshots)
-      : await store.tryReserveScreenshots(userId, month, screenshotLimit, plannedScreenshots);
+      ? await store.tryReserveTeamScreenshots(
+          billingTeamId!,
+          month,
+          screenshotLimit,
+          plannedScreenshots,
+        )
+      : await store.tryReserveScreenshots(
+          userId,
+          month,
+          screenshotLimit,
+          plannedScreenshots,
+        );
     if (!reserved) {
       if (meterTeam) {
         await store.incrementTeamUsage(billingTeamId!, month, -1, 0);
@@ -368,14 +409,19 @@ app.post('/v1/run', async (c) => {
           limit: screenshotLimit,
           current: usage.screenshotsCount,
           requested: plannedScreenshots,
-          upgradeUrl: 'https://frontguard.dev/pricing',
+          upgradeUrl: "https://frontguard.dev/pricing",
         },
         402,
       );
     }
   } else if (plannedScreenshots > 0) {
     if (meterTeam) {
-      await store.incrementTeamUsage(billingTeamId!, month, 0, plannedScreenshots);
+      await store.incrementTeamUsage(
+        billingTeamId!,
+        month,
+        0,
+        plannedScreenshots,
+      );
     } else {
       await store.incrementUsage(userId, month, 0, plannedScreenshots);
     }
@@ -384,13 +430,15 @@ app.post('/v1/run', async (c) => {
   const runId = crypto.randomUUID();
   const run: Run = {
     id: runId,
-    status: 'queued',
+    status: "queued",
     url: data.url,
     routes,
     viewports,
     browsers,
     threshold: data.threshold || 0.01,
-    ai: data.ai ? { provider: data.ai.provider, model: data.ai.model ?? '' } : null,
+    ai: data.ai
+      ? { provider: data.ai.provider, model: data.ai.model ?? "" }
+      : null,
     createdAt: new Date().toISOString(),
     results: null,
     reportUrl: null,
@@ -410,7 +458,7 @@ app.post('/v1/run', async (c) => {
       await evaluateSpendCap(c.env ?? {}, store, u, plan, currentMonth());
     }
   } catch (err) {
-    console.warn('[spend-cap] evaluation failed', err);
+    console.warn("[spend-cap] evaluation failed", err);
   }
 
   // Record project run submission to the team activity feed.
@@ -419,7 +467,7 @@ app.post('/v1/run', async (c) => {
       id: crypto.randomUUID(),
       teamId: projectTeamId,
       userId,
-      action: 'run.submitted',
+      action: "run.submitted",
       target: runId,
       metadata: JSON.stringify({ projectId: data.projectId, url: run.url }),
       createdAt: new Date().toISOString(),
@@ -442,9 +490,9 @@ app.post('/v1/run', async (c) => {
   if (run.projectId && screenshotsBucket) {
     const baselineRun = await store.getProjectBaseline(run.projectId);
     if (baselineRun) {
-      const baselineShots = (await store.listScreenshots(baselineRun.id)).filter(
-        (s) => s.type === 'baseline',
-      );
+      const baselineShots = (
+        await store.listScreenshots(baselineRun.id)
+      ).filter((s) => s.type === "baseline");
       if (baselineShots.length > 0) {
         baselineRestore = {
           bucket: screenshotsBucket,
@@ -462,20 +510,25 @@ app.post('/v1/run', async (c) => {
   // Process async — mutates `run`, then persists the final state. The env
   // binding carries DAYTONA_API_KEY (Workers has no Node env). Keep the
   // promise alive past the 202 response via waitUntil (REL-1).
-  const processing = processRun(run, (c.env ?? {}) as ProcessorEnv, onScreenshots, baselineRestore)
+  const processing = processRun(
+    run,
+    (c.env ?? {}) as ProcessorEnv,
+    onScreenshots,
+    baselineRestore,
+  )
     .catch((err: Error) => {
-      run.status = 'failed';
+      run.status = "failed";
       run.error = err.message;
     })
     .finally(async () => {
       // Screenshots were reserved at submit time (COST-1).
       await store.updateRun(runId, run);
-      if (run.status === 'failed') {
+      if (run.status === "failed") {
         await recordDeadLetter(store, {
-          kind: 'run',
+          kind: "run",
           sourceId: runId,
           userId,
-          error: run.error ?? 'background run failed',
+          error: run.error ?? "background run failed",
           attempt: 1,
         });
       }
@@ -495,7 +548,7 @@ app.post('/v1/run', async (c) => {
   return c.json(
     {
       id: runId,
-      status: 'queued',
+      status: "queued",
       reportUrl: `/v1/reports/${runId}`,
       statusUrl: `/v1/runs/${runId}`,
     },
@@ -506,12 +559,12 @@ app.post('/v1/run', async (c) => {
 // ---------------------------------------------------------------------------
 // GET /v1/runs/:id — Check run status
 // ---------------------------------------------------------------------------
-app.get('/v1/runs/:id', async (c) => {
-  const store = c.get('store');
-  const userId = c.get('userId');
-  const id = c.req.param('id');
+app.get("/v1/runs/:id", async (c) => {
+  const store = c.get("store");
+  const userId = c.get("userId");
+  const id = c.req.param("id");
   const run = await store.getRun(id);
-  if (!run) return c.json({ error: 'Run not found' }, 404);
+  if (!run) return c.json({ error: "Run not found" }, 404);
 
   // Allow access if the user owns the run directly.
   if ((await store.getRunOwner(id)) === userId) {
@@ -529,7 +582,7 @@ app.get('/v1/runs/:id', async (c) => {
     }
   }
 
-  return c.json({ error: 'Run not found' }, 404);
+  return c.json({ error: "Run not found" }, 404);
 });
 
 // ---------------------------------------------------------------------------
@@ -541,32 +594,40 @@ app.get('/v1/runs/:id', async (c) => {
 // shared team. An explicit `?teamId=` narrows to that team only and 403s for a
 // non-member.
 // ---------------------------------------------------------------------------
-app.get('/v1/runs', async (c) => {
-  const store = c.get('store');
-  const userId = c.get('userId');
-  const teamId = c.req.query('teamId');
+app.get("/v1/runs", async (c) => {
+  const store = c.get("store");
+  const userId = c.get("userId");
+  const teamId = c.req.query("teamId");
 
   if (teamId) {
     const member = await store.getMember(teamId, userId);
-    if (!member) return c.json({ error: 'Not a member of the requested team' }, 403);
-    const runs = await store.listRuns(userId, { teamIds: [teamId], includeOwn: false, limit: 50 });
+    if (!member)
+      return c.json({ error: "Not a member of the requested team" }, 403);
+    const runs = await store.listRuns(userId, {
+      teamIds: [teamId],
+      includeOwn: false,
+      limit: 50,
+    });
     return c.json({ runs, total: runs.length });
   }
 
   const teams = await store.listTeamsForUser(userId);
-  const runs = await store.listRuns(userId, { teamIds: teams.map((t) => t.id), limit: 50 });
+  const runs = await store.listRuns(userId, {
+    teamIds: teams.map((t) => t.id),
+    limit: 50,
+  });
   return c.json({ runs, total: runs.length });
 });
 
 // ---------------------------------------------------------------------------
 // GET /v1/reports/:id — Get HTML report
 // ---------------------------------------------------------------------------
-app.get('/v1/reports/:id', async (c) => {
-  const store = c.get('store');
-  const userId = c.get('userId');
-  const id = c.req.param('id');
+app.get("/v1/reports/:id", async (c) => {
+  const store = c.get("store");
+  const userId = c.get("userId");
+  const id = c.req.param("id");
   const run = await store.getRun(id);
-  if (!run) return c.json({ error: 'Run not found' }, 404);
+  if (!run) return c.json({ error: "Run not found" }, 404);
 
   // Check access: user must own the run or be a member of its project's team.
   let hasAccess = (await store.getRunOwner(id)) === userId;
@@ -577,26 +638,26 @@ app.get('/v1/reports/:id', async (c) => {
       if (member) hasAccess = true;
     }
   }
-  if (!hasAccess) return c.json({ error: 'Run not found' }, 404);
+  if (!hasAccess) return c.json({ error: "Run not found" }, 404);
 
-  if (run.status !== 'completed') {
-    return c.json({ error: 'Run not yet completed', status: run.status }, 202);
+  if (run.status !== "completed") {
+    return c.json({ error: "Run not yet completed", status: run.status }, 202);
   }
   if (run.reportHtml) {
     return c.html(run.reportHtml);
   }
-  return c.json({ error: 'No report available' }, 404);
+  return c.json({ error: "No report available" }, 404);
 });
 
 // ---------------------------------------------------------------------------
 // POST /v1/baselines/:runId/approve — Approve new baselines
 // ---------------------------------------------------------------------------
-app.post('/v1/baselines/:runId/approve', async (c) => {
-  const store = c.get('store');
-  const userId = c.get('userId');
-  const id = c.req.param('runId');
+app.post("/v1/baselines/:runId/approve", async (c) => {
+  const store = c.get("store");
+  const userId = c.get("userId");
+  const id = c.req.param("runId");
   const run = await store.getRun(id);
-  if (!run) return c.json({ error: 'Run not found' }, 404);
+  if (!run) return c.json({ error: "Run not found" }, 404);
 
   // Check access: user must own the run or be a member of its project's team.
   let hasAccess = (await store.getRunOwner(id)) === userId;
@@ -604,10 +665,10 @@ app.post('/v1/baselines/:runId/approve', async (c) => {
     const project = await store.getProjectById(run.projectId);
     if (project) {
       const member = await store.getMember(project.teamId, userId);
-      if (member && can(member.role, 'run_tests')) hasAccess = true;
+      if (member && can(member.role, "run_tests")) hasAccess = true;
     }
   }
-  if (!hasAccess) return c.json({ error: 'Run not found' }, 404);
+  if (!hasAccess) return c.json({ error: "Run not found" }, 404);
 
   await store.updateRun(id, { baselinesApproved: true });
   return c.json({ approved: true, runId: id });
@@ -616,15 +677,17 @@ app.post('/v1/baselines/:runId/approve', async (c) => {
 // ---------------------------------------------------------------------------
 // DELETE /v1/runs/:id — Delete a run
 // ---------------------------------------------------------------------------
-app.delete('/v1/runs/:id', async (c) => {
-  const store = c.get('store');
-  const id = c.req.param('id');
-  const userId = c.get('userId');
+app.delete("/v1/runs/:id", async (c) => {
+  const store = c.get("store");
+  const id = c.req.param("id");
+  const userId = c.get("userId");
   const deleted = await store.deleteRun(id, userId);
   if (deleted) {
     // Best-effort cleanup of R2 screenshot blobs for this run.
     try {
-      const blobs = getScreenshotStore(c.env?.SCREENSHOTS as R2Bucket | undefined);
+      const blobs = getScreenshotStore(
+        c.env?.SCREENSHOTS as R2Bucket | undefined,
+      );
       await blobs.deleteRun(userId, id);
     } catch {
       /* non-fatal */
@@ -636,13 +699,13 @@ app.delete('/v1/runs/:id', async (c) => {
 // ---------------------------------------------------------------------------
 // GET /v1/usage — Usage stats for API key
 // ---------------------------------------------------------------------------
-app.get('/v1/usage', async (c) => {
-  const store = c.get('store');
-  const usage = await store.getUsage(c.get('userId'), currentMonth());
+app.get("/v1/usage", async (c) => {
+  const store = c.get("store");
+  const usage = await store.getUsage(c.get("userId"), currentMonth());
   return c.json({
     runs: usage.runsCount,
     screenshots: usage.screenshotsCount,
-    period: 'current_month',
+    period: "current_month",
     limits: { runs: 500, screenshots: 5000 },
   });
 });
