@@ -18,6 +18,12 @@ Frontguard is an open-source CLI + cloud platform. The CLI is MIT-licensed and f
 - [npm: @frontguard/playwright](https://www.npmjs.com/package/@frontguard/playwright)
 - [Validation results](https://github.com/ravidsrk/frontguard/blob/main/validation/results-v0.2.md)
 
+## For Agents
+
+- [Agent task routing](https://frontguard.dev/agents.md) — Start here for MCP tools, cloud API routes, auth, limits, and safe task ordering
+- [OpenAPI contract](https://frontguard.dev/openapi.json) — Machine-readable OpenAPI 3.1 contract for the hosted cloud API at `https://api.frontguard.dev`
+- [MCP discovery manifest](https://frontguard.dev/.well-known/mcp.json) — Discovery for `@frontguard/mcp`; configure `FRONTGUARD_API_URL=https://api.frontguard.dev`
+
 ## What Frontguard Does
 
 - Anti-flake consensus — three captures per route, majority wins; SSIM perceptual matching as fallback
