@@ -13,33 +13,36 @@
  * @module routes/monitors
  */
 
-import { Hono } from 'hono';
-import { z } from 'zod';
-import type { Bindings } from '../db/factory.js';
-import type { Store } from '../db/store.js';
-import type { Monitor } from '../db/monitors.js';
+import { Hono } from "hono";
+import { z } from "zod";
+import type { Bindings } from "../db/factory.js";
+import type { Store } from "../db/store.js";
+import type { Monitor } from "../db/monitors.js";
 import {
   dispatchAlerts,
   type AlertEnv,
   type MonitorAlert,
-} from '../alerts/index.js';
-import { getPlan, checkLimit, hasFeature } from '../billing/plans.js';
+} from "../alerts/index.js";
+import { getPlan, checkLimit, hasFeature } from "../billing/plans.js";
 
 type Variables = { store: Store; userId: string };
 
-export const monitorRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+export const monitorRoutes = new Hono<{
+  Bindings: Bindings;
+  Variables: Variables;
+}>();
 
 const createSchema = z.object({
   name: z.string().min(1).max(100),
-  url: z.string().url(),
-  routes: z.array(z.string()).min(1).default(['/']),
+  url: z.url(),
+  routes: z.array(z.string()).min(1).default(["/"]),
   viewports: z.array(z.number().int().min(320).max(3840)).default([1440]),
   intervalMinutes: z.number().int().min(5).max(10_080).default(60),
   alertThreshold: z.number().min(0).max(1).default(0.05),
   alerts: z
     .object({
-      slack: z.string().url().optional(),
-      email: z.array(z.string().email()).optional(),
+      slack: z.url().optional(),
+      email: z.array(z.email()).optional(),
       pagerduty: z.string().min(1).optional(),
     })
     .optional(),
@@ -48,41 +51,47 @@ const createSchema = z.object({
 
 const updateSchema = createSchema.partial();
 
-monitorRoutes.get('/', async (c) => {
-  const monitors = await c.get('store').listMonitors(c.get('userId'));
+monitorRoutes.get("/", async (c) => {
+  const monitors = await c.get("store").listMonitors(c.get("userId"));
   return c.json({ monitors, total: monitors.length });
 });
 
-monitorRoutes.post('/', async (c) => {
+monitorRoutes.post("/", async (c) => {
   const parsed = createSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) {
-    return c.json({ error: 'Invalid monitor', details: parsed.error.flatten().fieldErrors }, 400);
+    return c.json(
+      {
+        error: "Invalid monitor",
+        details: z.flattenError(parsed.error).fieldErrors,
+      },
+      400,
+    );
   }
-  const store = c.get('store');
-  const userId = c.get('userId');
+  const store = c.get("store");
+  const userId = c.get("userId");
 
   // Plan enforcement (Task 8.2): production monitoring is a paid feature and
   // the number of monitors is plan-capped.
   const user = await store.getUser(userId);
   const plan = getPlan(user?.plan);
-  if (!hasFeature(plan, 'productionMonitoring')) {
+  if (!hasFeature(plan, "productionMonitoring")) {
     return c.json(
       {
         error: `Production monitoring is not available on the ${plan.name} plan.`,
-        upgradeUrl: 'https://frontguard.dev/pricing',
+        upgradeUrl: "https://frontguard.dev/pricing",
       },
       402,
     );
   }
   const existing = await store.listMonitors(userId);
-  const monitorLimit = checkLimit(plan, 'monitors', existing.length, 1);
+  const monitorLimit = checkLimit(plan, "monitors", existing.length, 1);
   if (!monitorLimit.allowed) {
     return c.json(
       {
         error: `Monitor limit reached (${monitorLimit.limit} on the ${plan.name} plan).`,
         limit: monitorLimit.limit,
         current: monitorLimit.current,
-        upgradeUrl: 'https://frontguard.dev/pricing',
+        upgradeUrl: "https://frontguard.dev/pricing",
       },
       402,
     );
@@ -106,59 +115,74 @@ monitorRoutes.post('/', async (c) => {
   return c.json(monitor, 201);
 });
 
-monitorRoutes.get('/:id', async (c) => {
-  const m = await c.get('store').getMonitor(c.req.param('id'));
-  if (!m || m.userId !== c.get('userId')) return c.json({ error: 'Monitor not found' }, 404);
+monitorRoutes.get("/:id", async (c) => {
+  const m = await c.get("store").getMonitor(c.req.param("id"));
+  if (!m || m.userId !== c.get("userId"))
+    return c.json({ error: "Monitor not found" }, 404);
   return c.json(m);
 });
 
-monitorRoutes.patch('/:id', async (c) => {
-  const store = c.get('store');
-  const id = c.req.param('id');
+monitorRoutes.patch("/:id", async (c) => {
+  const store = c.get("store");
+  const id = c.req.param("id");
   const m = await store.getMonitor(id);
-  if (!m || m.userId !== c.get('userId')) return c.json({ error: 'Monitor not found' }, 404);
+  if (!m || m.userId !== c.get("userId"))
+    return c.json({ error: "Monitor not found" }, 404);
 
   const parsed = updateSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) {
-    return c.json({ error: 'Invalid update', details: parsed.error.flatten().fieldErrors }, 400);
+    return c.json(
+      {
+        error: "Invalid update",
+        details: z.flattenError(parsed.error).fieldErrors,
+      },
+      400,
+    );
   }
   await store.updateMonitor(id, parsed.data);
   return c.json(await store.getMonitor(id));
 });
 
-monitorRoutes.delete('/:id', async (c) => {
-  const deleted = await c.get('store').deleteMonitor(c.req.param('id'), c.get('userId'));
+monitorRoutes.delete("/:id", async (c) => {
+  const deleted = await c
+    .get("store")
+    .deleteMonitor(c.req.param("id"), c.get("userId"));
   return c.json({ deleted });
 });
 
 // GET /v1/monitors/:id/runs — per-monitor run history (Task 6.1).
-monitorRoutes.get('/:id/runs', async (c) => {
-  const store = c.get('store');
-  const id = c.req.param('id');
+monitorRoutes.get("/:id/runs", async (c) => {
+  const store = c.get("store");
+  const id = c.req.param("id");
   const m = await store.getMonitor(id);
-  if (!m || m.userId !== c.get('userId')) return c.json({ error: 'Monitor not found' }, 404);
-  const limit = Math.min(Number(c.req.query('limit') ?? 50) || 50, 200);
+  if (!m || m.userId !== c.get("userId"))
+    return c.json({ error: "Monitor not found" }, 404);
+  const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 200);
   const runs = await store.listMonitorRuns(id, limit);
   return c.json({ runs, total: runs.length });
 });
 
 // POST /v1/monitors/:id/test-alert — send a sample alert to configured channels (Task 6.2).
-monitorRoutes.post('/:id/test-alert', async (c) => {
-  const store = c.get('store');
-  const id = c.req.param('id');
+monitorRoutes.post("/:id/test-alert", async (c) => {
+  const store = c.get("store");
+  const id = c.req.param("id");
   const m = await store.getMonitor(id);
-  if (!m || m.userId !== c.get('userId')) return c.json({ error: 'Monitor not found' }, 404);
+  if (!m || m.userId !== c.get("userId"))
+    return c.json({ error: "Monitor not found" }, 404);
   const hasChannel =
     !!m.alerts?.slack ||
     (!!m.alerts?.email && m.alerts.email.length > 0) ||
     !!m.alerts?.pagerduty;
   if (!hasChannel) {
-    return c.json({ error: 'No alert channels configured for this monitor' }, 400);
+    return c.json(
+      { error: "No alert channels configured for this monitor" },
+      400,
+    );
   }
   const sample: MonitorAlert[] = [
     {
       url: m.url,
-      route: m.routes[0] ?? '/',
+      route: m.routes[0] ?? "/",
       viewport: m.viewports[0] ?? 1440,
       diffPercentage: m.alertThreshold + 0.1,
       threshold: m.alertThreshold,
@@ -170,16 +194,25 @@ monitorRoutes.post('/:id/test-alert', async (c) => {
 });
 
 // POST /v1/monitors/:id/snooze — suppress alerts for N hours (Task 6.2).
-const snoozeSchema = z.object({ hours: z.number().min(0).max(720).default(24) });
-monitorRoutes.post('/:id/snooze', async (c) => {
-  const store = c.get('store');
-  const id = c.req.param('id');
+const snoozeSchema = z.object({
+  hours: z.number().min(0).max(720).default(24),
+});
+monitorRoutes.post("/:id/snooze", async (c) => {
+  const store = c.get("store");
+  const id = c.req.param("id");
   const m = await store.getMonitor(id);
-  if (!m || m.userId !== c.get('userId')) return c.json({ error: 'Monitor not found' }, 404);
+  if (!m || m.userId !== c.get("userId"))
+    return c.json({ error: "Monitor not found" }, 404);
 
   const parsed = snoozeSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) {
-    return c.json({ error: 'Invalid snooze', details: parsed.error.flatten().fieldErrors }, 400);
+    return c.json(
+      {
+        error: "Invalid snooze",
+        details: z.flattenError(parsed.error).fieldErrors,
+      },
+      400,
+    );
   }
   const existing = await store.getAlertState(id);
   const snoozedUntil =
