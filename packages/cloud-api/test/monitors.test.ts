@@ -153,6 +153,42 @@ describe('/v1/monitors routes (dev mode)', () => {
     expect((await delRes.json()).deleted).toBe(true);
   });
 
+  it('PATCH leaves omitted fields untouched (no reset to create defaults)', async () => {
+    // Regression guard for the Zod 3->4 default-in-optional behavior: the update
+    // schema must NOT re-apply create defaults to fields the PATCH omits.
+    // Create with values that all differ from the create defaults
+    // (routes ['/'], viewports [1440], intervalMinutes 60, alertThreshold 0.05).
+    const createRes = await app.request('/v1/monitors', {
+      method: 'POST',
+      headers: auth(),
+      body: JSON.stringify({
+        name: 'M',
+        url: 'https://example.com',
+        routes: ['/', '/pricing'],
+        viewports: [375, 1440],
+        intervalMinutes: 30,
+        alertThreshold: 0.2,
+      }),
+    });
+    const { id } = await createRes.json();
+
+    // PATCH only the name; every other field is omitted from the body.
+    const patchRes = await app.request(`/v1/monitors/${id}`, {
+      method: 'PATCH',
+      headers: auth(),
+      body: JSON.stringify({ name: 'Renamed' }),
+    });
+    expect(patchRes.status).toBe(200);
+    const patched = await patchRes.json();
+
+    expect(patched.name).toBe('Renamed');
+    // Omitted fields must keep their stored values, not snap back to defaults.
+    expect(patched.routes).toEqual(['/', '/pricing']);
+    expect(patched.viewports).toEqual([375, 1440]);
+    expect(patched.intervalMinutes).toBe(30);
+    expect(patched.alertThreshold).toBe(0.2);
+  });
+
   it('enforces ownership', async () => {
     const createRes = await app.request('/v1/monitors', {
       method: 'POST',

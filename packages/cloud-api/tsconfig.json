@@ -4,6 +4,11 @@
     "module": "ES2022",
     "moduleResolution": "bundler",
     "lib": ["ES2022"],
+    // Silences TS5101 for the baseUrl:"." that tsup's bundled rollup-plugin-dts
+    // injects into the .d.ts build (build = `tsup --dts`); baseUrl is not set
+    // here and tsup 8.5.1 (latest) has no opt-out. Inert for `tsc`
+    // (no deprecated options on the typecheck path); remove at TS 7.0.
+    "ignoreDeprecations": "6.0",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
