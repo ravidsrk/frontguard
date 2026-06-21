@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, ravidsrk/agent-ready]
+    branches: [main]
   pull_request:
-    branches: [main, ravidsrk/agent-ready]
+    branches: [main]
 
 jobs:
   test:
