@@ -32,13 +32,18 @@ export const monitorRoutes = new Hono<{
   Variables: Variables;
 }>();
 
-const createSchema = z.object({
+// Field-level validation rules, WITHOUT create-time defaults. Create layers
+// defaults on top; update derives a `.partial()` from the bare base so an
+// omitted PATCH field stays absent from `parsed.data`. (Zod 4 applies a field's
+// `.default()` even when the field is optional, so `createSchema.partial()`
+// would resurrect create defaults on omitted fields and reset stored values.)
+const baseShape = {
   name: z.string().min(1).max(100),
   url: z.url(),
-  routes: z.array(z.string()).min(1).default(["/"]),
-  viewports: z.array(z.number().int().min(320).max(3840)).default([1440]),
-  intervalMinutes: z.number().int().min(5).max(10_080).default(60),
-  alertThreshold: z.number().min(0).max(1).default(0.05),
+  routes: z.array(z.string()).min(1),
+  viewports: z.array(z.number().int().min(320).max(3840)),
+  intervalMinutes: z.number().int().min(5).max(10_080),
+  alertThreshold: z.number().min(0).max(1),
   alerts: z
     .object({
       slack: z.url().optional(),
@@ -46,10 +51,19 @@ const createSchema = z.object({
       pagerduty: z.string().min(1).optional(),
     })
     .optional(),
-  enabled: z.boolean().default(true),
+  enabled: z.boolean(),
+};
+
+const createSchema = z.object({
+  ...baseShape,
+  routes: baseShape.routes.default(["/"]),
+  viewports: baseShape.viewports.default([1440]),
+  intervalMinutes: baseShape.intervalMinutes.default(60),
+  alertThreshold: baseShape.alertThreshold.default(0.05),
+  enabled: baseShape.enabled.default(true),
 });
 
-const updateSchema = createSchema.partial();
+const updateSchema = z.object(baseShape).partial();
 
 monitorRoutes.get("/", async (c) => {
   const monitors = await c.get("store").listMonitors(c.get("userId"));
