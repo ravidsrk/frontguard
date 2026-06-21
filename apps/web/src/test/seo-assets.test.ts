@@ -18,7 +18,7 @@ const PUBLIC = path.resolve(__dirname, '../../public')
 type RouteHead = {
   meta?: unknown[]
   links?: unknown[]
-  scripts?: Array<{ type?: string; children?: string }>
+  scripts?: Array<{ type?: string; children?: unknown } | undefined>
 }
 
 type JsonLdNode = Record<string, unknown>
@@ -66,8 +66,11 @@ function extractJsonLd(head: RouteHead | undefined): JsonLdNode[] {
     'script:ld+json' in m ? parseJsonLd(m['script:ld+json']) : [],
   )
   const fromScripts = (head?.scripts ?? [])
-    .filter((script) => script.type === 'application/ld+json' && script.children)
-    .flatMap((script) => parseJsonLd(script.children))
+    .flatMap((script) =>
+      script?.type === 'application/ld+json' && script.children
+        ? parseJsonLd(script.children)
+        : [],
+    )
 
   return [...fromMeta, ...fromScripts]
 }
@@ -83,7 +86,7 @@ function findJsonLdByType(nodes: JsonLdNode[], type: string): JsonLdNode {
   return node as JsonLdNode
 }
 
-function expectJsonLdTypes(head: RouteHead | undefined, types: string[]): JsonLdNode[] {
+function expectJsonLdTypes(head: RouteHead | undefined, types: readonly string[]): JsonLdNode[] {
   const nodes = extractJsonLd(head)
   expect(nodes.length).toBeGreaterThanOrEqual(types.length)
   for (const node of nodes) {
