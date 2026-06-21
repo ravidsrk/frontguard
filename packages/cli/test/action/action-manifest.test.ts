@@ -113,9 +113,9 @@ describe('DEP-1: CLI version is pinned, not @latest', () => {
 });
 
 describe('DEP-2: root Dockerfile Playwright matches package.json', () => {
-  it('packages/cli/Dockerfile pins Playwright v1.59.0-jammy', () => {
+  it('packages/cli/Dockerfile pins Playwright v1.61.0-jammy', () => {
     const dockerfile = readFileSync(join(repoRoot, 'packages/cli/Dockerfile'), 'utf8');
-    expect(dockerfile).toContain('mcr.microsoft.com/playwright:v1.59.0-jammy');
+    expect(dockerfile).toContain('mcr.microsoft.com/playwright:v1.61.0-jammy');
     expect(dockerfile).not.toContain('v1.48.0-jammy');
   });
 });
@@ -125,7 +125,7 @@ describe('DEP-4: Playwright is exact-pinned for deterministic renders', () => {
     const pkg = JSON.parse(readFileSync(join(repoRoot, 'packages/cli/package.json'), 'utf8')) as {
       dependencies: { playwright: string };
     };
-    expect(pkg.dependencies.playwright).toBe('1.59.0');
+    expect(pkg.dependencies.playwright).toBe('1.61.0');
     expect(pkg.dependencies.playwright).not.toMatch(/^\^/);
   });
 });

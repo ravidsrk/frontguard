@@ -11,12 +11,12 @@
 #
 # Version-pin policy
 # ------------------
-# - Base: pinned to `mcr.microsoft.com/playwright:v1.59.0-jammy`. Microsoft
+# - Base: pinned to `mcr.microsoft.com/playwright:v1.61.0-jammy`. Microsoft
 #   publishes one tag per Playwright release; the browsers (Chromium, Firefox,
 #   WebKit) and their patch level are baked into that tag, so a `latest` tag
 #   would silently change the rendered output across builds.
 # - The base's Playwright minor MUST match the `playwright` version in
-#   packages/cli/package.json (currently `1.59.0`, exact-pinned).
+#   packages/cli/package.json (currently `1.61.0`, exact-pinned).
 #   When bumping `playwright` in package.json, bump this FROM line in the same
 #   commit. The build is intentionally simple to make that pairing obvious.
 # - Fonts: Liberation (Microsoft-metric Arial/Helvetica/Times substitutes),
@@ -45,7 +45,7 @@
 # enforces the same pin at image-build time even if `docker build` omits it.
 # =============================================================================
 
-FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.59.0-jammy
+FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.61.0-jammy
 
 LABEL org.opencontainers.image.title="frontguard-render" \
       org.opencontainers.image.description="Deterministic cross-OS rendering image for Frontguard visual regression tests" \
