@@ -52,7 +52,7 @@ export interface RenderCliOptions {
 }
 
 /** CLI version — kept in sync with the parent CLI. */
-const VERSION = '0.2.1';
+const VERSION = '0.2.2';
 
 /**
  * Validates a render URL: must be a well-formed http(s) URL with no control
