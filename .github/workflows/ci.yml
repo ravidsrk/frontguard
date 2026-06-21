@@ -55,6 +55,9 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      # Fails if VERSION drifted from any version-coupled file (package.json,
+      # action.yml, Dockerfile, README, cli/mcp version constants).
+      - run: npm run sync-version:check
 
   docs-links:
     # Guards apps/web docs-content.ts against broken internal /docs links
