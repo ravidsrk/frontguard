@@ -1,7 +1,45 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { articles, FIRST_DOC_SLUG } from '../../lib/docs-content'
-import { buildSeoHead } from '../../lib/seo'
+import { articles, FIRST_DOC_SLUG, type Article } from '../../lib/docs-content'
+import { buildSeoHead, canonicalUrl } from '../../lib/seo'
+import {
+  FRONTGUARD_ORGANIZATION_REF,
+  FRONTGUARD_WEBSITE_REF,
+  breadcrumbListJsonLd,
+  docsArticleDescription,
+  jsonLdScript,
+} from '../../lib/schema-org'
 import { s } from '../../lib/style'
+
+const docArticlePath = (slug: string) => `/docs/${slug}`
+const docArticleTitle = (article: Article) => `${article.label} — Frontguard Docs`
+
+function docArticleJsonLd(article: Article) {
+  const path = docArticlePath(article.id)
+  const canonical = canonicalUrl(path)
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    '@id': `${canonical}#techarticle`,
+    name: article.label,
+    headline: article.label,
+    description: docsArticleDescription(article),
+    articleSection: article.section,
+    keywords: article.toc.join(', '),
+    url: canonical,
+    mainEntityOfPage: canonical,
+    isPartOf: FRONTGUARD_WEBSITE_REF,
+    author: FRONTGUARD_ORGANIZATION_REF,
+    publisher: FRONTGUARD_ORGANIZATION_REF,
+  }
+}
+
+function docArticleBreadcrumbJsonLd(article: Article) {
+  return breadcrumbListJsonLd([
+    { name: 'Home', path: '/' },
+    { name: 'Documentation', path: '/docs' },
+    { name: article.label, path: docArticlePath(article.id) },
+  ])
+}
 
 export const Route = createFileRoute('/docs/$')({
   head: ({ params }) => {
@@ -11,15 +49,19 @@ export const Route = createFileRoute('/docs/$')({
       return buildSeoHead({
         title: 'Page not found — Frontguard Docs',
         description: 'No docs article matches this path.',
-        path: `/docs/${slug}`,
+        path: docArticlePath(slug ?? ''),
         robots: 'noindex',
       })
     }
     return buildSeoHead({
-      title: `${article.label} — Frontguard Docs`,
-      description: `Frontguard documentation: ${article.label}. ${article.section} guide for visual regression testing.`,
-      path: `/docs/${slug}`,
+      title: docArticleTitle(article),
+      description: docsArticleDescription(article),
+      path: docArticlePath(article.id),
       ogType: 'article',
+      scripts: [
+        jsonLdScript(docArticleJsonLd(article)),
+        jsonLdScript(docArticleBreadcrumbJsonLd(article)),
+      ],
     })
   },
   component: DocArticle,

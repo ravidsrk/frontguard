@@ -2,15 +2,50 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Nav } from '../components/Nav'
 import { Shield } from '../components/Shield'
 import { buildSeoHead } from '../lib/seo'
+import {
+  FRONTGUARD_ORGANIZATION,
+  breadcrumbListJsonLd,
+  jsonLdScript,
+} from '../lib/schema-org'
 import { s } from '../lib/style'
+
+const SEO_TITLE = 'Brand — The Frontguard brand system'
+const SEO_DESCRIPTION =
+  'The Frontguard brand system: shield mark, warm neutral palette, Space Grotesk + JetBrains Mono typography, and terminal-native voice.'
+const BRAND_PATH = '/brand'
+
+const BRAND_ORGANIZATION_JSON_LD = {
+  ...FRONTGUARD_ORGANIZATION,
+  description: SEO_DESCRIPTION,
+  brand: {
+    '@type': 'Brand',
+    name: 'Frontguard',
+    slogan: 'Catch the regression, not the noise',
+    logo: FRONTGUARD_ORGANIZATION.logo,
+  },
+  knowsAbout: [
+    'visual regression testing',
+    'frontend testing',
+    'Playwright',
+    'AI change classification',
+  ],
+}
+
+const BRAND_BREADCRUMB_JSON_LD = breadcrumbListJsonLd([
+  { name: 'Home', path: '/' },
+  { name: 'Brand', path: BRAND_PATH },
+])
 
 export const Route = createFileRoute('/brand')({
   head: () =>
     buildSeoHead({
-      title: 'Brand — The Frontguard brand system',
-      description:
-        'The Frontguard brand system: shield mark, warm neutral palette, Space Grotesk + JetBrains Mono typography, and terminal-native voice.',
-      path: '/brand',
+      title: SEO_TITLE,
+      description: SEO_DESCRIPTION,
+      path: BRAND_PATH,
+      scripts: [
+        jsonLdScript(BRAND_ORGANIZATION_JSON_LD),
+        jsonLdScript(BRAND_BREADCRUMB_JSON_LD),
+      ],
     }),
   component: Brand,
 })
