@@ -49,7 +49,7 @@ export const Route = createFileRoute('/docs/$')({
       return buildSeoHead({
         title: 'Page not found — Frontguard Docs',
         description: 'No docs article matches this path.',
-        path: docArticlePath(slug),
+        path: docArticlePath(slug ?? ''),
         robots: 'noindex',
       })
     }
