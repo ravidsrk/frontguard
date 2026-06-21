@@ -48,7 +48,7 @@ AI explains what changed and why → Suggests fixes → Posts PR comment
 ```
 
 - **Detect** — Pixel diff + DOM diff catches what humans miss
-- **Understand** — AI explains *why* something broke, not just "pixels differ"
+- **Understand** — AI explains _why_ something broke, not just "pixels differ"
 - **Fix** — Verified code fixes, re-rendered to confirm they actually work
 
 ## Quick Start
@@ -71,19 +71,19 @@ Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on 
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `frontguard run` | Run visual regression tests (default command) |
-| `frontguard init [--ci] [--yes]` | Generate a starter config; `--ci` also writes a GitHub Actions workflow |
-| `frontguard doctor` | Diagnose environment readiness (Node, Playwright, browsers, config, git) |
-| `frontguard update-baselines` | Accept current screenshots as new baselines |
-| `frontguard monitor` | Monitor live production URLs for visual regressions |
-| `frontguard accept-fix <id>` | Mark a suggested fix as accepted (improves future suggestions) |
-| `frontguard reject-fix <id>` | Mark a suggested fix as rejected (negative training signal) |
-| `frontguard export-patterns` | Export the local fix-pattern database as JSON |
-| `frontguard plugin install <name>` | Install a Frontguard plugin from npm |
-| `frontguard plugin uninstall <name>` | Uninstall a Frontguard plugin |
-| `frontguard plugin list` | List installed plugins |
+| Command                              | Description                                                              |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `frontguard run`                     | Run visual regression tests (default command)                            |
+| `frontguard init [--ci] [--yes]`     | Generate a starter config; `--ci` also writes a GitHub Actions workflow  |
+| `frontguard doctor`                  | Diagnose environment readiness (Node, Playwright, browsers, config, git) |
+| `frontguard update-baselines`        | Accept current screenshots as new baselines                              |
+| `frontguard monitor`                 | Monitor live production URLs for visual regressions                      |
+| `frontguard accept-fix <id>`         | Mark a suggested fix as accepted (improves future suggestions)           |
+| `frontguard reject-fix <id>`         | Mark a suggested fix as rejected (negative training signal)              |
+| `frontguard export-patterns`         | Export the local fix-pattern database as JSON                            |
+| `frontguard plugin install <name>`   | Install a Frontguard plugin from npm                                     |
+| `frontguard plugin uninstall <name>` | Uninstall a Frontguard plugin                                            |
+| `frontguard plugin list`             | List installed plugins                                                   |
 
 ## Features
 
@@ -104,32 +104,30 @@ Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on 
 // frontguard.config.ts
 export default {
   version: 1,
-  baseUrl: 'http://localhost:3000',
+  baseUrl: "http://localhost:3000",
 
   // Auto-discover routes (zero config)
   discover: {
-    startUrl: '/',
+    startUrl: "/",
     maxDepth: 3,
-    exclude: ['/admin/*', '/api/*'],
+    exclude: ["/admin/*", "/api/*"],
   },
 
   // Or explicit routes
   // routes: ['/', '/pricing', '/checkout'],
 
   viewports: [375, 768, 1440],
-  browsers: ['chromium'],
+  browsers: ["chromium"],
   threshold: 0.1,
 
   // AI analysis (optional, BYOK)
   ai: {
-    provider: 'openai',
-    model: 'gpt-4o',
+    provider: "openai",
+    model: "gpt-4o",
   },
 
   // Ignore dynamic content
-  ignore: [
-    { selector: '.dynamic-timestamp' },
-  ],
+  ignore: [{ selector: ".dynamic-timestamp" }],
 };
 ```
 
@@ -155,7 +153,7 @@ export default {
 ## CLI Output
 
 ```
- frontguard v0.2.1
+ frontguard v0.2.2
 
  🔍 Discovering routes... found 47 routes
  📊 12/47 routes affected by changed files
@@ -183,25 +181,23 @@ export default {
 
 Frontguard ships with a plugin architecture (6 lifecycle hooks) and 5 built-in plugins:
 
-| Plugin | Description | Key Features |
-|--------|-------------|--------------|
-| **Figma** (`src/plugins/figma.ts`) | Design-to-code comparison | Figma API integration, design token extraction, component mapping |
-| **Performance Budgets** (`src/plugins/perf-budgets.ts`) | Web Vitals & budgets | LCP/CLS/TTFB thresholds, violations correlated with the visual diff |
-| **Accessibility** (`src/plugins/accessibility.ts`) | axe-core audits | WCAG checks (contrast, alt text, target size, focus, headings) in the same render pass |
-| **Third-Party Scripts** (`src/plugins/third-party-scripts.ts`) | Script drift detection | Flags ad/analytics/widget origins that appear or disappear between runs |
-| **Monitor** (`src/plugins/monitor.ts`) | Production visual monitoring (CLI + optional cloud scheduler) | Live-URL checks, threshold alerting, history tracking |
+| Plugin                                                         | Description                                                   | Key Features                                                                           |
+| -------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Figma** (`src/plugins/figma.ts`)                             | Design-to-code comparison                                     | Figma API integration, design token extraction, component mapping                      |
+| **Performance Budgets** (`src/plugins/perf-budgets.ts`)        | Web Vitals & budgets                                          | LCP/CLS/TTFB thresholds, violations correlated with the visual diff                    |
+| **Accessibility** (`src/plugins/accessibility.ts`)             | axe-core audits                                               | WCAG checks (contrast, alt text, target size, focus, headings) in the same render pass |
+| **Third-Party Scripts** (`src/plugins/third-party-scripts.ts`) | Script drift detection                                        | Flags ad/analytics/widget origins that appear or disappear between runs                |
+| **Monitor** (`src/plugins/monitor.ts`)                         | Production visual monitoring (CLI + optional cloud scheduler) | Live-URL checks, threshold alerting, history tracking                                  |
 
 **Plugin lifecycle hooks:** `beforeDiscover`, `afterDiscover`, `afterRender`, `afterCompare`, `afterRun`, `onError`
 
 ```typescript
 // frontguard.config.ts
-import { createFigmaPlugin } from '@frontguard/cli/plugins';
+import { createFigmaPlugin } from "@frontguard/cli/plugins";
 
 export default {
   // ...base config
-  plugins: [
-    createFigmaPlugin({ fileKey: 'your-figma-file-key' }),
-  ],
+  plugins: [createFigmaPlugin({ fileKey: "your-figma-file-key" })],
 };
 ```
 
