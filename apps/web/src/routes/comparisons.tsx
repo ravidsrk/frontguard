@@ -3,16 +3,58 @@ import { Footer } from '../components/Footer'
 import { Nav } from '../components/Nav'
 import { docsUrl } from '../lib/site'
 import { s } from '../lib/style'
-import { buildSeoHead } from '../lib/seo'
+import { buildSeoHead, canonicalUrl } from '../lib/seo'
+import {
+  FRONTGUARD_ORGANIZATION_REF,
+  FRONTGUARD_WEBSITE_REF,
+  breadcrumbListJsonLd,
+  jsonLdScript,
+} from '../lib/schema-org'
 import { ALTERNATIVES, MATRIX, MIGRATIONS, VENDORS, VERSUS } from './comparisons/-data'
+
+const SEO_TITLE = 'Comparisons — Frontguard vs. everyone else'
+const SEO_DESCRIPTION =
+  'How Frontguard compares to Percy, Chromatic, BackstopJS, Lost Pixel, and Argos — capability by capability, with sources you can check.'
+const COMPARISONS_PATH = '/comparisons'
+const COMPARISONS_CANONICAL = canonicalUrl(COMPARISONS_PATH)
+
+const COMPARISONS_ARTICLE_JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  '@id': `${COMPARISONS_CANONICAL}#article`,
+  name: SEO_TITLE,
+  headline: SEO_TITLE,
+  description: SEO_DESCRIPTION,
+  url: COMPARISONS_CANONICAL,
+  mainEntityOfPage: COMPARISONS_CANONICAL,
+  articleSection: 'Comparisons',
+  isPartOf: FRONTGUARD_WEBSITE_REF,
+  author: FRONTGUARD_ORGANIZATION_REF,
+  publisher: FRONTGUARD_ORGANIZATION_REF,
+  about: 'Visual regression testing tools compared capability by capability.',
+  mentions: VENDORS.map((name) => ({
+    '@type': 'SoftwareApplication',
+    name,
+    applicationCategory: 'DeveloperApplication',
+  })),
+}
+
+const COMPARISONS_BREADCRUMB_JSON_LD = breadcrumbListJsonLd([
+  { name: 'Home', path: '/' },
+  { name: 'Comparisons', path: COMPARISONS_PATH },
+])
 
 export const Route = createFileRoute('/comparisons')({
   head: () =>
     buildSeoHead({
-      title: 'Comparisons — Frontguard vs. everyone else',
-      description:
-        'How Frontguard compares to Percy, Chromatic, BackstopJS, Lost Pixel, and Argos — capability by capability, with sources you can check.',
-      path: '/comparisons',
+      title: SEO_TITLE,
+      description: SEO_DESCRIPTION,
+      path: COMPARISONS_PATH,
+      ogType: 'article',
+      scripts: [
+        jsonLdScript(COMPARISONS_ARTICLE_JSON_LD),
+        jsonLdScript(COMPARISONS_BREADCRUMB_JSON_LD),
+      ],
     }),
   component: Comparisons,
 })
