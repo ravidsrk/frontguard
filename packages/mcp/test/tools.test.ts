@@ -19,9 +19,13 @@ import { createServer } from '../src/index.js';
 import { CloudClient, diffIdFor, parseDiffId } from '../src/client/cloud.js';
 import {
   acceptBaseline,
+  acceptBaselineOutputSchema,
   getSuggestedFix,
+  getSuggestedFixOutputSchema,
   listRegressions,
+  listRegressionsOutputSchema,
   recentRuns,
+  recentRunsOutputSchema,
 } from '../src/tools/index.js';
 
 // ---------------------------------------------------------------------------
@@ -424,6 +428,53 @@ describe('MCP server tools/list + tools/call', () => {
     if (!part || part.type !== 'text') throw new Error('expected text content');
     return part.text;
   }
+
+  function extractStructuredContent(res: CallToolResult): Record<string, unknown> {
+    expect(res.structuredContent).toBeDefined();
+    expect(res.structuredContent).not.toBeNull();
+    return res.structuredContent as Record<string, unknown>;
+  }
+
+  it.each([
+    {
+      name: 'list_regressions',
+      arguments: { pr_id: 42 },
+      schema: listRegressionsOutputSchema,
+    },
+    {
+      name: 'get_suggested_fix',
+      arguments: { diff_id: 'run_pr42:/pricing:1280' },
+      schema: getSuggestedFixOutputSchema,
+    },
+    {
+      name: 'accept_baseline',
+      arguments: { run_id: 'run_pr42', confirm_all_regressions_reviewed: true },
+      schema: acceptBaselineOutputSchema,
+    },
+    {
+      name: 'recent_runs',
+      arguments: {},
+      schema: recentRunsOutputSchema,
+    },
+  ])('$name advertises outputSchema and returns validated structuredContent', async (toolCase) => {
+    const { client, server } = await connectPair();
+    const listed = await client.listTools();
+    const tool = listed.tools.find((t) => t.name === toolCase.name);
+    expect(tool?.outputSchema).toBeDefined();
+
+    const res = (await client.callTool({
+      name: toolCase.name,
+      arguments: toolCase.arguments,
+    })) as CallToolResult;
+    expect(res.isError).toBeFalsy();
+
+    const structuredContent = extractStructuredContent(res);
+    expect(() => toolCase.schema.parse(structuredContent)).not.toThrow();
+    expect(JSON.parse(extractText(res))).toEqual(JSON.parse(JSON.stringify(structuredContent)));
+
+    await client.close();
+    await server.close();
+  });
 
   it('list_regressions returns JSON text content', async () => {
     const { client, server } = await connectPair();

@@ -32,6 +32,25 @@ export interface SuggestedFixResult {
   reason?: string;
 }
 
+const cloudSuggestedFixOutputSchema = z.object({
+  fixType: z.enum(['css', 'html', 'config']),
+  category: z.string(),
+  patch: z.string(),
+  confidence: z.number(),
+  explanation: z.string(),
+  target: z.string().optional(),
+});
+
+export const getSuggestedFixOutputSchema = z.object({
+  diffId: z.string(),
+  runId: z.string(),
+  route: z.string(),
+  viewport: z.number(),
+  browser: z.string().optional(),
+  fix: cloudSuggestedFixOutputSchema.nullable(),
+  reason: z.string().optional(),
+});
+
 export async function getSuggestedFix(
   client: CloudClient,
   input: GetSuggestedFixInput,
