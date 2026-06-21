@@ -3,6 +3,12 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "types": ["node"],
+    // Silences TS5101 for the baseUrl:"." that tsup's bundled rollup-plugin-dts
+    // injects into the .d.ts build (node_modules/tsup/dist/rollup.js); baseUrl is
+    // not set here and tsup 8.5.1 (latest) has no opt-out. Inert for `tsc`
+    // (no deprecated options on the typecheck path); remove at TS 7.0.
+    "ignoreDeprecations": "6.0",
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,

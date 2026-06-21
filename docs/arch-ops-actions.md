@@ -154,3 +154,50 @@ separate human decision.
 - BASE (`ravidsrk/adversarial-fresh`) → `main` promotion: human meta-PR.
 - Production deploy / `wrangler deploy` of cloud-api + integrations.
 - Any OPS apply above (D1 migrations on the live DB, live env/secret/binding setup).
+
+---
+
+## SEC-AUDIT — npm transitive security sweep (branch `ravidsrk/security`, 2026-06-21)
+
+`npm audit` before: 8 vulnerabilities (5 high, 2 moderate, 1 low). After: **0 vulnerabilities.**
+Achieved with **zero breaking changes** — no major bump of any direct dep, and the frozen
+Cloudflare tooling (`@cloudflare/vite-plugin@1.41.0`, `wrangler@4.101.0`, `miniflare`) was
+left at its pinned version for Node-20 compat (per DECISIONS.md). No `npm audit fix --force`
+was run.
+
+The 8 advisories all lived in transitive leaves under the exact-pinned `@cloudflare/vite-plugin`
+subtree (its nested `ws`/`undici`/`esbuild` + `wrangler`/`miniflare`) plus a `postcss` nested under
+`next`. npm's suggested `fixAvailable` pointed at breaking parents we deliberately did **not** apply:
+
+- `@cloudflare/vite-plugin@1.42.1` — would have bumped the CF tooling held at 1.41.0 for Node-20. **Rejected.**
+- `next@9.3.3` (a multi-year downgrade from the pinned `16.2.9`) — absurd resolver pick. **Rejected.**
+
+Instead, four **safe transitive leaf pins** were added to root `package.json` `overrides`
+(same pattern as the existing `form-data`/`shell-quote`/`protobufjs` pins — same-major patch/minor):
+
+| override            | pins to | clears advisories                                                                                    |
+| ------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `undici` `^7.28.0`  | 7.28.0  | undici high (TLS bypass, header inject, DoS, cache poisoning) + miniflare/wrangler/vite-plugin chain |
+| `ws` `^8.21.0`      | 8.21.0  | ws high (memory-exhaustion DoS) + miniflare/vite-plugin chain                                        |
+| `esbuild` `^0.28.1` | 0.28.1  | esbuild low (dev-server file read, Windows) + wrangler/vite-plugin chain                             |
+| `postcss` `^8.5.10` | 8.5.15  | postcss moderate (XSS in stringify) + the `next` moderate that depends on it                         |
+
+Pinning the leaves cleared the whole `miniflare → wrangler → vite-plugin` chain without changing the
+parent version numbers. `npm install` against the existing lock left these "invalid" (the parents pin
+exact versions), so the lock was regenerated cleanly via `rm -rf node_modules package-lock.json && npm install`
+(npm-generated, not hand-edited). The regen also re-floated other `^`-range transitive patches
+(AWS SDK, @smithy, rollup 4.62.0→4.62.2, axios, yaml, etc.) — all within existing semver ranges, no
+majors, no direct-dep changes.
+
+**Verified locally, all green:** `npm run typecheck`, `npm run lint` (0 errors), `npm run build`
+(apps/web CF Workers build succeeds with the overrides). vitest: mcp/create-plugin/playwright/
+github-app/netlify/slack-app/vercel/apps/web all pass. The only test failures are **native-only**,
+unrelated to this change: `better-sqlite3` (native addon not compiled because install used
+`--ignore-scripts`; powers cli pattern-store + cloud-api D1 sim) and Playwright chromium build 1228
+not downloaded (`npx playwright install`). CI that runs a full `npm ci` + `npx playwright install`
+will exercise these.
+
+**[OPS / future]** When the Node floor is raised past 20 and the CF tooling freeze is lifted
+(see DECISIONS.md), bump `@cloudflare/vite-plugin` to ≥1.42.1 and **remove** the `undici`/`ws`/
+`esbuild` overrides (they exist only to patch that frozen subtree's leaves). The `postcss` pin
+can stay until `next`'s bundled postcss is ≥8.5.10.

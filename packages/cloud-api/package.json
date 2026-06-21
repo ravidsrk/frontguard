@@ -37,16 +37,16 @@
   "dependencies": {
     "@daytona/sdk": "^0.189.0",
     "hono": "^4.12.26",
-    "zod": "^3.25.67"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^25.5.0",
-    "better-sqlite3": "^11.10.0",
-    "eslint": "^10.1.0",
+    "@types/node": "^26.0.0",
+    "better-sqlite3": "^12.11.1",
+    "eslint": "^10.5.0",
     "tsup": "^8",
     "tsx": "^4",
-    "typescript": "^5",
-    "typescript-eslint": "^8.57.2"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1"
   }
 }

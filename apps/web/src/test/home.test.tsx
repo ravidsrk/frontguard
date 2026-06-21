@@ -16,7 +16,9 @@ describe('home route — real product content', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Catch the regression, not the noise.',
+        // jsdom 29 renders <br> as display:inline, so the accessible name has no
+        // space at the line break; tolerate the missing whitespace.
+        name: /^Catch the regression,\s*not the noise\.$/,
       }),
     ).toBeInTheDocument()
   })

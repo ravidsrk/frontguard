@@ -8,22 +8,33 @@
  * @module core/config
  */
 
-import { z } from 'zod';
-import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { tsImport } from 'tsx/esm/api';
-import type { FrontguardConfig } from './types.js';
-import { getFrameworkInfo } from '../templates/index.js';
+import { z } from "zod";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { resolve, join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { tsImport } from "tsx/esm/api";
+import type { FrontguardConfig } from "./types.js";
+import { getFrameworkInfo } from "../templates/index.js";
 
 // ---------------------------------------------------------------------------
 // Zod Sub-Schemas
 // ---------------------------------------------------------------------------
 
+/**
+ * Builds a Zod v4 `error` callback that customizes ONLY the `invalid_type`
+ * issue, mirroring Zod v3's `invalid_type_error`. Returning `undefined` for
+ * any other issue (e.g. `.int()`, `.min()`, `.max()`) lets Zod fall back to its
+ * default message, exactly as `invalid_type_error` did in v3.
+ */
+const invalidTypeError =
+  (message: string) =>
+  (issue: z.core.$ZodRawIssue): string | undefined =>
+    issue.code === "invalid_type" ? message : undefined;
+
 /** Zod schema for route-discovery options. */
 const discoverSchema = z.object({
-  startUrl: z.string().min(1, 'discover.startUrl must not be empty'),
+  startUrl: z.string().min(1, "discover.startUrl must not be empty"),
   maxDepth: z.number().int().positive().default(3),
   maxRoutes: z.number().int().positive().default(50),
   exclude: z.array(z.string()).default([]),
@@ -31,21 +42,30 @@ const discoverSchema = z.object({
 
 /** Zod schema for AI configuration. */
 const aiConfigSchema = z.object({
-  provider: z.enum(['openai', 'anthropic']),
-  model: z.string().min(1, 'ai.model must not be empty'),
+  provider: z.enum(["openai", "anthropic"]),
+  model: z.string().min(1, "ai.model must not be empty"),
 });
 
 /** Zod schema for an ignore rule. */
-const ignoreRuleSchema = z.object({
-  selector: z.string().min(1, 'ignore rule selector must not be empty').optional(),
-  rect: z.object({
-    x: z.number(),
-    y: z.number(),
-    width: z.number(),
-    height: z.number(),
-  }).optional(),
-  description: z.string().optional(),
-}).refine(r => r.selector || r.rect, { message: 'IgnoreRule must have selector or rect' });
+const ignoreRuleSchema = z
+  .object({
+    selector: z
+      .string()
+      .min(1, "ignore rule selector must not be empty")
+      .optional(),
+    rect: z
+      .object({
+        x: z.number(),
+        y: z.number(),
+        width: z.number(),
+        height: z.number(),
+      })
+      .optional(),
+    description: z.string().optional(),
+  })
+  .refine((r) => r.selector || r.rect, {
+    message: "IgnoreRule must have selector or rect",
+  });
 
 /** Zod schema for auth configuration. */
 const authConfigSchema = z.object({
@@ -53,38 +73,40 @@ const authConfigSchema = z.object({
 });
 
 /** Zod schema for image-upload configuration. */
-const imageUploadSchema = z.object({
-  provider: z.enum(['r2', 's3', 'github-artifacts', 'local']),
-  bucket: z.string().optional(),
-  region: z.string().optional(),
-  endpoint: z.string().optional(),
-  accessKeyId: z.string().optional(),
-  secretAccessKey: z.string().optional(),
-  publicUrlPrefix: z.string().optional(),
-  outputDir: z.string().optional(),
-  project: z.string().optional(),
-}).refine(
-  (c) => {
-    // R2/S3 require a bucket (credentials may come from env, so not enforced here).
-    if (c.provider === 'r2' || c.provider === 's3') return Boolean(c.bucket);
-    return true;
-  },
-  { message: 'imageUpload.bucket is required when provider is "r2" or "s3"' },
-);
+const imageUploadSchema = z
+  .object({
+    provider: z.enum(["r2", "s3", "github-artifacts", "local"]),
+    bucket: z.string().optional(),
+    region: z.string().optional(),
+    endpoint: z.string().optional(),
+    accessKeyId: z.string().optional(),
+    secretAccessKey: z.string().optional(),
+    publicUrlPrefix: z.string().optional(),
+    outputDir: z.string().optional(),
+    project: z.string().optional(),
+  })
+  .refine(
+    (c) => {
+      // R2/S3 require a bucket (credentials may come from env, so not enforced here).
+      if (c.provider === "r2" || c.provider === "s3") return Boolean(c.bucket);
+      return true;
+    },
+    { message: 'imageUpload.bucket is required when provider is "r2" or "s3"' },
+  );
 
 /** Browser engine enum. */
-const browserEngineSchema = z.enum(['chromium', 'firefox', 'webkit']);
+const browserEngineSchema = z.enum(["chromium", "firefox", "webkit"]);
 
 /**
  * Zod schema for a per-route configuration object.
  * Allows overriding threshold / ignore / viewport per route.
  */
 const routeConfigSchema = z.object({
-  path: z.string().min(1, 'route.path must not be empty'),
+  path: z.string().min(1, "route.path must not be empty"),
   threshold: z
     .number()
-    .min(0, 'route.threshold must be >= 0')
-    .max(1, 'route.threshold must be <= 1')
+    .min(0, "route.threshold must be >= 0")
+    .max(1, "route.threshold must be <= 1")
     .optional(),
   ignore: z.array(ignoreRuleSchema).optional(),
   viewport: z.array(z.number().int().positive()).optional(),
@@ -107,14 +129,19 @@ const routeEntrySchema = z.union([z.string().min(1), routeConfigSchema]);
  */
 export const configSchema = z.object({
   version: z
-    .number({ invalid_type_error: 'Config error at `version`: expected number' })
+    .number({
+      error: invalidTypeError("Config error at `version`: expected number"),
+    })
     .int()
     .positive()
     .default(1),
 
-  baseUrl: z
-    .string({ required_error: 'Config error at `baseUrl`: this field is required' })
-    .url('Config error at `baseUrl`: expected a valid URL'),
+  baseUrl: z.url({
+    error: (issue) =>
+      issue.input === undefined
+        ? "Config error at `baseUrl`: this field is required"
+        : "Config error at `baseUrl`: expected a valid URL",
+  }),
 
   routes: z.array(routeEntrySchema).optional(),
 
@@ -122,15 +149,18 @@ export const configSchema = z.object({
 
   viewports: z
     .array(
-      z.number({
-        invalid_type_error: 'Config error at `viewports`: expected array of numbers',
-      }).int().positive(),
+      z
+        .number({
+          error: invalidTypeError(
+            "Config error at `viewports`: expected array of numbers",
+          ),
+        })
+        .int()
+        .positive(),
     )
     .default([375, 768, 1440]),
 
-  browsers: z
-    .array(browserEngineSchema)
-    .default(['chromium']),
+  browsers: z.array(browserEngineSchema).default(["chromium"]),
 
   /**
    * Pixel-diff threshold as a fraction `0–1` (e.g. `0.1` = 10%).
@@ -139,9 +169,13 @@ export const configSchema = z.object({
    * against `DiffResult.diffPercentage` which is `0–100`.
    */
   threshold: z
-    .number({ invalid_type_error: 'Config error at `threshold`: expected number, got string' })
-    .min(0, 'Config error at `threshold`: must be >= 0')
-    .max(1, 'Config error at `threshold`: must be <= 1')
+    .number({
+      error: invalidTypeError(
+        "Config error at `threshold`: expected number, got string",
+      ),
+    })
+    .min(0, "Config error at `threshold`: must be >= 0")
+    .max(1, "Config error at `threshold`: must be <= 1")
     .default(0.1),
 
   ai: aiConfigSchema.optional(),
@@ -151,35 +185,47 @@ export const configSchema = z.object({
   auth: authConfigSchema.optional(),
 
   smartRender: z
-    .boolean({ invalid_type_error: 'Config error at `smartRender`: expected boolean' })
+    .boolean({
+      error: invalidTypeError(
+        "Config error at `smartRender`: expected boolean",
+      ),
+    })
     .default(true),
 
   workers: z
-    .number({ invalid_type_error: 'Config error at `workers`: expected number' })
+    .number({
+      error: invalidTypeError("Config error at `workers`: expected number"),
+    })
     .int()
     .positive()
     .max(16)
     .default(4),
 
   pageTimeout: z
-    .number({ invalid_type_error: 'Config error at `pageTimeout`: expected number' })
+    .number({
+      error: invalidTypeError("Config error at `pageTimeout`: expected number"),
+    })
     .int()
     .positive()
     .default(30_000),
 
   maxHeight: z
-    .number({ invalid_type_error: 'Config error at `maxHeight`: expected number' })
+    .number({
+      error: invalidTypeError("Config error at `maxHeight`: expected number"),
+    })
     .int()
     .positive()
     .max(50_000)
     .default(5_000),
 
-  outputDir: z
-    .string()
-    .default('./frontguard-report'),
+  outputDir: z.string().default("./frontguard-report"),
 
   viewportHeight: z
-    .number({ invalid_type_error: 'Config error at `viewportHeight`: expected number' })
+    .number({
+      error: invalidTypeError(
+        "Config error at `viewportHeight`: expected number",
+      ),
+    })
     .int()
     .positive()
     .max(10_000)
@@ -216,14 +262,17 @@ export const configSchema = z.object({
   verifyFixes: z.boolean().optional(),
 
   /** Sandbox backend for fix verification (default: 'local'). */
-  fixSandbox: z.enum(['local', 'daytona']).optional(),
+  fixSandbox: z.enum(["local", "daytona"]).optional(),
 
   /** Storybook integration — enumerate routes from a running Storybook server. */
   storybook: z
     .object({
-      url: z
-        .string({ required_error: 'Config error at `storybook.url`: this field is required' })
-        .url('Config error at `storybook.url`: expected a valid URL'),
+      url: z.url({
+        error: (issue) =>
+          issue.input === undefined
+            ? "Config error at `storybook.url`: this field is required"
+            : "Config error at `storybook.url`: expected a valid URL",
+      }),
       stories: z.array(z.string().min(1)).optional(),
       exclude: z.array(z.string().min(1)).optional(),
       fetchTimeoutMs: z.number().int().positive().optional(),
@@ -259,7 +308,9 @@ export type UserFrontguardConfig = z.input<typeof configSchema>;
  * });
  * ```
  */
-export function defineConfig(config: UserFrontguardConfig): UserFrontguardConfig {
+export function defineConfig(
+  config: UserFrontguardConfig,
+): UserFrontguardConfig {
   return config;
 }
 
@@ -269,10 +320,10 @@ export function defineConfig(config: UserFrontguardConfig): UserFrontguardConfig
 
 /** Config file names to search for, in priority order. */
 const CONFIG_FILES = [
-  'frontguard.config.ts',
-  'frontguard.config.js',
-  'frontguard.config.mjs',
-  'frontguard.config.json',
+  "frontguard.config.ts",
+  "frontguard.config.js",
+  "frontguard.config.mjs",
+  "frontguard.config.json",
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -281,15 +332,15 @@ const CONFIG_FILES = [
 
 /** Patterns that look like hardcoded API keys / tokens. */
 const SECRET_PATTERNS: RegExp[] = [
-  /sk-[A-Za-z0-9]{20,}/,          // OpenAI
-  /sk-proj-[A-Za-z0-9_-]{20,}/,   // OpenAI project keys
+  /sk-[A-Za-z0-9]{20,}/, // OpenAI
+  /sk-proj-[A-Za-z0-9_-]{20,}/, // OpenAI project keys
   /anthropic-[A-Za-z0-9_-]{20,}/, // Anthropic
-  /ghp_[A-Za-z0-9]{36,}/,         // GitHub PAT
-  /ghs_[A-Za-z0-9]{36,}/,         // GitHub server token
-  /gho_[A-Za-z0-9]{36,}/,         // GitHub OAuth
+  /ghp_[A-Za-z0-9]{36,}/, // GitHub PAT
+  /ghs_[A-Za-z0-9]{36,}/, // GitHub server token
+  /gho_[A-Za-z0-9]{36,}/, // GitHub OAuth
   /github_pat_[A-Za-z0-9_]{20,}/, // GitHub fine-grained PAT
-  /xai-[A-Za-z0-9]{20,}/,         // xAI / Grok
-  /glpat-[A-Za-z0-9_-]{20,}/,     // GitLab PAT
+  /xai-[A-Za-z0-9]{20,}/, // xAI / Grok
+  /glpat-[A-Za-z0-9_-]{20,}/, // GitLab PAT
 ];
 
 /**
@@ -302,13 +353,13 @@ const SECRET_PATTERNS: RegExp[] = [
  * @param obj  - The configuration object (or sub-value) to scan.
  * @param path - Dot-separated path used in the warning message.
  */
-export function detectSecrets(obj: unknown, path = 'config'): void {
-  if (typeof obj === 'string') {
+export function detectSecrets(obj: unknown, path = "config"): void {
+  if (typeof obj === "string") {
     for (const pattern of SECRET_PATTERNS) {
       if (pattern.test(obj)) {
         console.warn(
           `⚠  Possible API key detected at \`${path}\`. ` +
-            'Use environment variables instead of hardcoding secrets in config files.',
+            "Use environment variables instead of hardcoding secrets in config files.",
         );
         break; // one warning per value is enough
       }
@@ -321,7 +372,7 @@ export function detectSecrets(obj: unknown, path = 'config'): void {
     return;
   }
 
-  if (obj !== null && typeof obj === 'object') {
+  if (obj !== null && typeof obj === "object") {
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       detectSecrets(value, `${path}.${key}`);
     }
@@ -339,8 +390,8 @@ function resolveModuleExport(mod: unknown): unknown {
   let current = mod;
   while (
     current !== null &&
-    typeof current === 'object' &&
-    'default' in current &&
+    typeof current === "object" &&
+    "default" in current &&
     (current as { default?: unknown }).default !== undefined
   ) {
     const next = (current as { default: unknown }).default;
@@ -356,7 +407,7 @@ function resolveModuleExport(mod: unknown): unknown {
  */
 async function loadConfigFile(filePath: string): Promise<unknown> {
   const resolved = resolve(filePath);
-  if (resolved.endsWith('.ts') || resolved.endsWith('.mts')) {
+  if (resolved.endsWith(".ts") || resolved.endsWith(".mts")) {
     const mod = await tsImport(resolved, import.meta.url);
     return resolveModuleExport(mod);
   }
@@ -372,11 +423,11 @@ async function loadConfigFile(filePath: string): Promise<unknown> {
  * @returns The parsed config object, or `null` if no key exists.
  */
 async function loadFromPackageJson(dir: string): Promise<unknown | null> {
-  const pkgPath = join(dir, 'package.json');
+  const pkgPath = join(dir, "package.json");
   if (!existsSync(pkgPath)) return null;
 
   try {
-    const raw = await readFile(pkgPath, 'utf-8');
+    const raw = await readFile(pkgPath, "utf-8");
     const pkg = JSON.parse(raw) as Record<string, unknown>;
     return pkg.frontguard ?? null;
   } catch {
@@ -403,7 +454,9 @@ async function loadFromPackageJson(dir: string): Promise<unknown | null> {
  * @returns Validated `FrontguardConfig` with all defaults applied.
  * @throws {Error} If no config is found or validation fails.
  */
-export async function loadConfig(configPath?: string): Promise<FrontguardConfig> {
+export async function loadConfig(
+  configPath?: string,
+): Promise<FrontguardConfig> {
   let rawConfig: unknown = null;
   const cwd = process.cwd();
 
@@ -414,8 +467,8 @@ export async function loadConfig(configPath?: string): Promise<FrontguardConfig>
       throw new Error(`Config file not found: ${configPath}`);
     }
 
-    if (fullPath.endsWith('.json')) {
-      const raw = await readFile(fullPath, 'utf-8');
+    if (fullPath.endsWith(".json")) {
+      const raw = await readFile(fullPath, "utf-8");
       rawConfig = JSON.parse(raw);
     } else {
       rawConfig = await loadConfigFile(fullPath);
@@ -427,8 +480,8 @@ export async function loadConfig(configPath?: string): Promise<FrontguardConfig>
     for (const filename of CONFIG_FILES) {
       const fullPath = join(cwd, filename);
       if (existsSync(fullPath)) {
-        if (filename.endsWith('.json')) {
-          const raw = await readFile(fullPath, 'utf-8');
+        if (filename.endsWith(".json")) {
+          const raw = await readFile(fullPath, "utf-8");
           rawConfig = JSON.parse(raw);
         } else {
           rawConfig = await loadConfigFile(fullPath);
@@ -446,8 +499,8 @@ export async function loadConfig(configPath?: string): Promise<FrontguardConfig>
   // 4. No config found ------------------------------------------------
   if (rawConfig === null) {
     throw new Error(
-      'No Frontguard config found. Run `frontguard init` to create one, ' +
-        'or create frontguard.config.ts in your project root.',
+      "No Frontguard config found. Run `frontguard init` to create one, " +
+        "or create frontguard.config.ts in your project root.",
     );
   }
 
@@ -460,10 +513,10 @@ export async function loadConfig(configPath?: string): Promise<FrontguardConfig>
   if (!result.success) {
     const issues = result.error.issues
       .map((issue) => {
-        const path = issue.path.length > 0 ? issue.path.join('.') : '(root)';
+        const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
         return `  Config error at \`${path}\`: ${issue.message}`;
       })
-      .join('\n');
+      .join("\n");
     throw new Error(`Invalid Frontguard config:\n${issues}`);
   }
 
@@ -476,15 +529,15 @@ export async function loadConfig(configPath?: string): Promise<FrontguardConfig>
 
 /** Known framework indicators: package-name → human-readable label. */
 const FRAMEWORK_INDICATORS: Record<string, string> = {
-  next: 'Next.js',
-  '@remix-run/react': 'Remix',
-  nuxt: 'Nuxt',
-  '@sveltejs/kit': 'SvelteKit',
-  gatsby: 'Gatsby',
-  astro: 'Astro',
-  '@angular/core': 'Angular',
-  'react-scripts': 'Create React App',
-  vite: 'Vite',
+  next: "Next.js",
+  "@remix-run/react": "Remix",
+  nuxt: "Nuxt",
+  "@sveltejs/kit": "SvelteKit",
+  gatsby: "Gatsby",
+  astro: "Astro",
+  "@angular/core": "Angular",
+  "react-scripts": "Create React App",
+  vite: "Vite",
 };
 
 /**
@@ -494,19 +547,22 @@ const FRAMEWORK_INDICATORS: Record<string, string> = {
  * @param projectDir - Absolute or relative path to the project root.
  * @returns The human-readable framework name, or `null` if none detected.
  */
-export async function detectFramework(projectDir: string): Promise<string | null> {
-  const pkgPath = join(resolve(projectDir), 'package.json');
+export async function detectFramework(
+  projectDir: string,
+): Promise<string | null> {
+  const pkgPath = join(resolve(projectDir), "package.json");
   if (!existsSync(pkgPath)) return null;
 
   try {
-    const raw = await readFile(pkgPath, 'utf-8');
+    const raw = await readFile(pkgPath, "utf-8");
     const pkg = JSON.parse(raw) as Record<string, unknown>;
 
     const deps = {
-      ...(typeof pkg.dependencies === 'object' && pkg.dependencies !== null
+      ...(typeof pkg.dependencies === "object" && pkg.dependencies !== null
         ? (pkg.dependencies as Record<string, string>)
         : {}),
-      ...(typeof pkg.devDependencies === 'object' && pkg.devDependencies !== null
+      ...(typeof pkg.devDependencies === "object" &&
+      pkg.devDependencies !== null
         ? (pkg.devDependencies as Record<string, string>)
         : {}),
     };
@@ -534,7 +590,7 @@ export interface GenerateConfigOptions {
   /** Detected or user-supplied framework name. */
   framework?: string | null;
   /** File format to generate. */
-  format?: 'ts' | 'js' | 'json';
+  format?: "ts" | "js" | "json";
 }
 
 /**
@@ -547,8 +603,10 @@ export interface GenerateConfigOptions {
  * @param options - Generation options.
  * @returns The config file contents as a string.
  */
-export function generateDefaultConfig(options: GenerateConfigOptions = {}): string {
-  const { framework = null, format = 'ts' } = options;
+export function generateDefaultConfig(
+  options: GenerateConfigOptions = {},
+): string {
+  const { framework = null, format = "ts" } = options;
 
   // Resolve framework metadata (port, typical routes, note).
   const info = getFrameworkInfo(framework);
@@ -557,35 +615,35 @@ export function generateDefaultConfig(options: GenerateConfigOptions = {}): stri
   const baseUrl = options.baseUrl ?? `http://localhost:${info.defaultPort}`;
 
   // Build framework-specific hints.
-  const frameworkComment = framework ? `// Detected: ${info.note}\n` : '';
-  const routesArrayLiteral = `[${info.typicalRoutes.map((r) => `'${r}'`).join(', ')}]`;
+  const frameworkComment = framework ? `// Detected: ${info.note}\n` : "";
+  const routesArrayLiteral = `[${info.typicalRoutes.map((r) => `'${r}'`).join(", ")}]`;
   // For file-system-routed frameworks, suggest discover instead of explicit routes.
   const routeHint = info.fileSystemRouting
     ? `// routes: ${routesArrayLiteral},  // or use discover for auto-crawl`
     : `routes: ${routesArrayLiteral},`;
 
   // JSON format
-  if (format === 'json') {
+  if (format === "json") {
     const config = {
       version: 1,
       baseUrl,
       routes: info.typicalRoutes,
       viewports: [375, 768, 1440],
-      browsers: ['chromium'],
+      browsers: ["chromium"],
       threshold: 0.1,
       ignore: [],
       smartRender: true,
       workers: 4,
       pageTimeout: 30000,
       maxHeight: 5000,
-      outputDir: './frontguard-report',
+      outputDir: "./frontguard-report",
     };
-    return JSON.stringify(config, null, 2) + '\n';
+    return JSON.stringify(config, null, 2) + "\n";
   }
 
   // JS / TS format — keep the scaffold self-contained so the CLI can load it
   // without importing @frontguard/cli (that would cycle back into this module).
-  const exportKeyword = format === 'ts' ? 'export default' : 'module.exports =';
+  const exportKeyword = format === "ts" ? "export default" : "module.exports =";
 
   return `${frameworkComment}${exportKeyword} {
   version: 1,
