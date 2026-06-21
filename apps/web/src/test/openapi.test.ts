@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { compileErrors, validate } from '@readme/openapi-parser'
+import type { OpenAPIV3_1 } from 'openapi-types'
 
 type OperationObject = {
   security?: Array<Record<string, string[]>>
@@ -10,7 +11,7 @@ type OperationObject = {
 
 type PathItemObject = Record<string, OperationObject | unknown>
 
-type OpenApiDocument = {
+type OpenApiDocument = OpenAPIV3_1.Document & {
   paths: Record<string, PathItemObject>
   components?: {
     securitySchemes?: Record<string, Record<string, unknown>>
