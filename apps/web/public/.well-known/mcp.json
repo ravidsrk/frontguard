@@ -1,0 +1,58 @@
+{
+  "name": "@frontguard/mcp",
+  "description": "Frontguard MCP server for querying visual regressions, suggested fixes, recent runs, and baseline approvals.",
+  "version": "0.2.2",
+  "package": {
+    "registry": "npm",
+    "name": "@frontguard/mcp"
+  },
+  "api": {
+    "baseUrl": "https://api.frontguard.dev"
+  },
+  "transport": {
+    "type": "stdio"
+  },
+  "run": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "@frontguard/mcp"
+    ],
+    "env": {
+      "FRONTGUARD_API_URL": "https://api.frontguard.dev",
+      "FRONTGUARD_API_KEY": "fg_live_xxx"
+    }
+  },
+  "env": [
+    {
+      "name": "FRONTGUARD_API_URL",
+      "required": true,
+      "description": "Frontguard API base URL.",
+      "default": "https://api.frontguard.dev"
+    },
+    {
+      "name": "FRONTGUARD_API_KEY",
+      "required": true,
+      "description": "Frontguard API key.",
+      "example": "fg_live_xxx"
+    }
+  ],
+  "tools": [
+    {
+      "name": "list_regressions",
+      "description": "Return the visual regressions Frontguard detected on a given GitHub PR (or run id). Each row carries a `diffId` you can pass to `get_suggested_fix`."
+    },
+    {
+      "name": "get_suggested_fix",
+      "description": "Return the AI-generated patch for a single diff (keyed by the `diffId` from `list_regressions`)."
+    },
+    {
+      "name": "accept_baseline",
+      "description": "Promote every screenshot in a run to the new baseline (run-scoped \u2014 not per-diff). Requires `run_id` and `confirm_all_regressions_reviewed: true` after you have reviewed every regression from `list_regressions`."
+    },
+    {
+      "name": "recent_runs",
+      "description": "List the most recent runs the API key has access to. Optional `repo` and `branch` filters narrow the results."
+    }
+  ]
+}
