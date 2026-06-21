@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, ravidsrk/upgrade-latest]
   pull_request:
-    branches: [main]
+    branches: [main, ravidsrk/upgrade-latest]
 
 jobs:
   test:
