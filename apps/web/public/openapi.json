@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Frontguard Cloud API",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "OpenAPI contract for the agent and CI-facing Frontguard Cloud API surface. This document is derived from packages/cloud-api/src/index.ts and the mounted route modules under packages/cloud-api/src/routes, and intentionally excludes browser session, OAuth, Stripe billing, and API-key bootstrap routes.",
     "x-generated-from": [
       "packages/cloud-api/src/index.ts",
@@ -44,9 +44,7 @@
     "/health": {
       "get": {
         "operationId": "getHealth",
-        "tags": [
-          "Health"
-        ],
+        "tags": ["Health"],
         "summary": "Health check",
         "description": "Public health check. This route is not behind API-key authentication.",
         "security": [],
@@ -70,9 +68,7 @@
     "/v1/run": {
       "post": {
         "operationId": "createRun",
-        "tags": [
-          "Runs"
-        ],
+        "tags": ["Runs"],
         "summary": "Submit a visual regression run",
         "security": [
           {
@@ -109,13 +105,8 @@
                         "path": "/pricing"
                       }
                     ],
-                    "viewports": [
-                      375,
-                      1440
-                    ],
-                    "browsers": [
-                      "chromium"
-                    ],
+                    "viewports": [375, 1440],
+                    "browsers": ["chromium"],
                     "threshold": 0.01,
                     "github": {
                       "owner": "acme",
@@ -178,9 +169,7 @@
     "/v1/runs": {
       "get": {
         "operationId": "listRuns",
-        "tags": [
-          "Runs"
-        ],
+        "tags": ["Runs"],
         "summary": "List recent runs",
         "security": [
           {
@@ -232,9 +221,7 @@
     "/v1/runs/{id}": {
       "get": {
         "operationId": "getRun",
-        "tags": [
-          "Runs"
-        ],
+        "tags": ["Runs"],
         "summary": "Get run status and result metadata",
         "security": [
           {
@@ -284,9 +271,7 @@
       },
       "delete": {
         "operationId": "deleteRun",
-        "tags": [
-          "Runs"
-        ],
+        "tags": ["Runs"],
         "summary": "Delete a run",
         "security": [
           {
@@ -335,9 +320,7 @@
     "/v1/reports/{id}": {
       "get": {
         "operationId": "getReport",
-        "tags": [
-          "Reports"
-        ],
+        "tags": ["Reports"],
         "summary": "Fetch an HTML report for a completed run",
         "security": [
           {
@@ -414,9 +397,7 @@
     "/v1/baselines/{runId}/approve": {
       "post": {
         "operationId": "approveBaseline",
-        "tags": [
-          "Runs"
-        ],
+        "tags": ["Runs"],
         "summary": "Approve baselines for a run",
         "security": [
           {
@@ -468,9 +449,7 @@
     "/v1/usage": {
       "get": {
         "operationId": "getUsage",
-        "tags": [
-          "Runs"
-        ],
+        "tags": ["Runs"],
         "summary": "Get monthly usage for the authenticated API key",
         "security": [
           {
@@ -514,9 +493,7 @@
     "/v1/screenshots/{runId}": {
       "get": {
         "operationId": "listScreenshots",
-        "tags": [
-          "Screenshots"
-        ],
+        "tags": ["Screenshots"],
         "summary": "List screenshot metadata for a run",
         "security": [
           {
@@ -568,9 +545,7 @@
     "/v1/screenshots/{runId}/{id}/raw": {
       "get": {
         "operationId": "getScreenshotRaw",
-        "tags": [
-          "Screenshots"
-        ],
+        "tags": ["Screenshots"],
         "summary": "Fetch raw PNG screenshot bytes",
         "security": [
           {
@@ -633,9 +608,7 @@
     "/v1/monitors": {
       "get": {
         "operationId": "listMonitors",
-        "tags": [
-          "Monitors"
-        ],
+        "tags": ["Monitors"],
         "summary": "List monitors",
         "security": [
           {
@@ -677,9 +650,7 @@
       },
       "post": {
         "operationId": "createMonitor",
-        "tags": [
-          "Monitors"
-        ],
+        "tags": ["Monitors"],
         "summary": "Create a monitor",
         "security": [
           {
@@ -739,9 +710,7 @@
     "/v1/monitors/{id}": {
       "get": {
         "operationId": "getMonitor",
-        "tags": [
-          "Monitors"
-        ],
+        "tags": ["Monitors"],
         "summary": "Get a monitor",
         "security": [
           {
@@ -791,9 +760,7 @@
       },
       "patch": {
         "operationId": "updateMonitor",
-        "tags": [
-          "Monitors"
-        ],
+        "tags": ["Monitors"],
         "summary": "Update a monitor",
         "security": [
           {
@@ -856,9 +823,7 @@
       },
       "delete": {
         "operationId": "deleteMonitor",
-        "tags": [
-          "Monitors"
-        ],
+        "tags": ["Monitors"],
         "summary": "Delete a monitor",
         "security": [
           {
@@ -907,9 +872,7 @@
     "/v1/monitors/{id}/runs": {
       "get": {
         "operationId": "listMonitorRuns",
-        "tags": [
-          "Monitors"
-        ],
+        "tags": ["Monitors"],
         "summary": "List monitor run history",
         "security": [
           {
@@ -964,9 +927,7 @@
     "/v1/monitors/{id}/test-alert": {
       "post": {
         "operationId": "testMonitorAlert",
-        "tags": [
-          "Monitors"
-        ],
+        "tags": ["Monitors"],
         "summary": "Send a sample alert for a monitor",
         "security": [
           {
@@ -1021,9 +982,7 @@
     "/v1/monitors/{id}/snooze": {
       "post": {
         "operationId": "snoozeMonitor",
-        "tags": [
-          "Monitors"
-        ],
+        "tags": ["Monitors"],
         "summary": "Snooze monitor alerts",
         "security": [
           {
@@ -1088,9 +1047,7 @@
     "/v1/dashboard": {
       "get": {
         "operationId": "getApiDashboard",
-        "tags": [
-          "Dashboard"
-        ],
+        "tags": ["Dashboard"],
         "summary": "Render the API-key guarded dashboard HTML",
         "description": "Read-only HTML dashboard mounted at /v1/dashboard. This is distinct from the session-cookie browser dashboard, which is intentionally excluded from this contract.",
         "security": [
@@ -1135,9 +1092,7 @@
     "/v1/teams": {
       "get": {
         "operationId": "listTeams",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "List teams for the caller",
         "security": [
           {
@@ -1179,9 +1134,7 @@
       },
       "post": {
         "operationId": "createTeam",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Create a team",
         "security": [
           {
@@ -1238,9 +1191,7 @@
     "/v1/teams/invitations/accept": {
       "post": {
         "operationId": "acceptTeamInvitation",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Accept a team invitation",
         "security": [
           {
@@ -1303,9 +1254,7 @@
     "/v1/teams/{id}": {
       "get": {
         "operationId": "getTeam",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Get team details",
         "security": [
           {
@@ -1358,9 +1307,7 @@
       },
       "patch": {
         "operationId": "updateTeam",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Rename or update a team",
         "security": [
           {
@@ -1426,9 +1373,7 @@
       },
       "delete": {
         "operationId": "deleteTeam",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Delete a team",
         "security": [
           {
@@ -1483,9 +1428,7 @@
     "/v1/teams/{id}/invitations": {
       "post": {
         "operationId": "createTeamInvitation",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Invite a team member",
         "security": [
           {
@@ -1556,9 +1499,7 @@
     "/v1/teams/{id}/members/{userId}": {
       "patch": {
         "operationId": "updateTeamMemberRole",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Change a team member role",
         "security": [
           {
@@ -1630,9 +1571,7 @@
       },
       "delete": {
         "operationId": "removeTeamMember",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Remove a team member",
         "security": [
           {
@@ -1693,9 +1632,7 @@
     "/v1/teams/{id}/members/{userId}/reviewer": {
       "patch": {
         "operationId": "setTeamMemberReviewer",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Set a member's baseline reviewer flag",
         "security": [
           {
@@ -1766,9 +1703,7 @@
     "/v1/teams/{id}/projects": {
       "get": {
         "operationId": "listTeamProjects",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "List team projects",
         "security": [
           {
@@ -1818,9 +1753,7 @@
       },
       "post": {
         "operationId": "createTeamProject",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Create a team project",
         "security": [
           {
@@ -1888,9 +1821,7 @@
     "/v1/teams/{id}/projects/{projectId}": {
       "delete": {
         "operationId": "deleteTeamProject",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Delete a team project",
         "security": [
           {
@@ -1948,9 +1879,7 @@
     "/v1/teams/{teamId}/projects/{projectId}/runs": {
       "get": {
         "operationId": "listProjectRuns",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "List project-scoped runs",
         "security": [
           {
@@ -2005,9 +1934,7 @@
     "/v1/teams/{teamId}/projects/{projectId}/baseline": {
       "get": {
         "operationId": "getProjectBaseline",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Get a project's approved baseline run",
         "security": [
           {
@@ -2062,9 +1989,7 @@
     "/v1/teams/{teamId}/projects/{projectId}/runs/{runId}/review": {
       "post": {
         "operationId": "reviewProjectRunBaseline",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Review a project run baseline",
         "security": [
           {
@@ -2138,9 +2063,7 @@
     "/v1/teams/{teamId}/projects/{projectId}/runs/{runId}/reviews": {
       "get": {
         "operationId": "listProjectRunReviews",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "List review decisions for a project run",
         "security": [
           {
@@ -2198,9 +2121,7 @@
     "/v1/teams/{id}/activity": {
       "get": {
         "operationId": "listTeamActivity",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "List team activity",
         "security": [
           {
@@ -2252,9 +2173,7 @@
     "/v1/teams/{id}/usage": {
       "get": {
         "operationId": "getTeamUsage",
-        "tags": [
-          "Teams"
-        ],
+        "tags": ["Teams"],
         "summary": "Get aggregated team usage",
         "security": [
           {
@@ -2434,9 +2353,7 @@
                 "value": {
                   "error": "Invalid request: missing or invalid field(s): url",
                   "details": {
-                    "url": [
-                      "url must be a valid URL"
-                    ]
+                    "url": ["url must be a valid URL"]
                   }
                 }
               },
@@ -2611,16 +2528,11 @@
     "schemas": {
       "HealthResponse": {
         "type": "object",
-        "required": [
-          "status",
-          "version"
-        ],
+        "required": ["status", "version"],
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "ok"
-            ]
+            "enum": ["ok"]
           },
           "version": {
             "type": "string",
@@ -2631,9 +2543,7 @@
       },
       "ErrorResponse": {
         "type": "object",
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "properties": {
           "error": {
             "type": "string"
@@ -2674,9 +2584,7 @@
       },
       "RunRequest": {
         "type": "object",
-        "required": [
-          "url"
-        ],
+        "required": ["url"],
         "properties": {
           "url": {
             "type": "string",
@@ -2703,9 +2611,7 @@
               "minimum": 320,
               "maximum": 3840
             },
-            "default": [
-              1440
-            ]
+            "default": [1440]
           },
           "browsers": {
             "type": "array",
@@ -2713,9 +2619,7 @@
             "items": {
               "$ref": "#/components/schemas/Browser"
             },
-            "default": [
-              "chromium"
-            ]
+            "default": ["chromium"]
           },
           "threshold": {
             "type": "number",
@@ -2750,9 +2654,7 @@
       },
       "RunRouteRequest": {
         "type": "object",
-        "required": [
-          "path"
-        ],
+        "required": ["path"],
         "properties": {
           "path": {
             "type": "string",
@@ -2767,17 +2669,11 @@
       },
       "Browser": {
         "type": "string",
-        "enum": [
-          "chromium",
-          "firefox",
-          "webkit"
-        ]
+        "enum": ["chromium", "firefox", "webkit"]
       },
       "AiConfig": {
         "type": "object",
-        "required": [
-          "provider"
-        ],
+        "required": ["provider"],
         "properties": {
           "provider": {
             "type": "string"
@@ -2790,10 +2686,7 @@
       },
       "GitHubLinkage": {
         "type": "object",
-        "required": [
-          "owner",
-          "repo"
-        ],
+        "required": ["owner", "repo"],
         "properties": {
           "owner": {
             "type": "string"
@@ -2812,21 +2705,14 @@
       },
       "RunQueuedResponse": {
         "type": "object",
-        "required": [
-          "id",
-          "status",
-          "reportUrl",
-          "statusUrl"
-        ],
+        "required": ["id", "status", "reportUrl", "statusUrl"],
         "properties": {
           "id": {
             "type": "string"
           },
           "status": {
             "type": "string",
-            "enum": [
-              "queued"
-            ]
+            "enum": ["queued"]
           },
           "reportUrl": {
             "type": "string",
@@ -2860,12 +2746,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "queued",
-              "running",
-              "completed",
-              "failed"
-            ]
+            "enum": ["queued", "running", "completed", "failed"]
           },
           "url": {
             "type": "string"
@@ -2926,10 +2807,7 @@
             ]
           },
           "reportUrl": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "reportHtml": {
             "type": "string"
@@ -2957,9 +2835,7 @@
       },
       "RunRoute": {
         "type": "object",
-        "required": [
-          "path"
-        ],
+        "required": ["path"],
         "properties": {
           "path": {
             "type": "string"
@@ -3043,10 +2919,7 @@
       },
       "RunListResponse": {
         "type": "object",
-        "required": [
-          "runs",
-          "total"
-        ],
+        "required": ["runs", "total"],
         "properties": {
           "runs": {
             "type": "array",
@@ -3062,9 +2935,7 @@
       },
       "DeletedResponse": {
         "type": "object",
-        "required": [
-          "deleted"
-        ],
+        "required": ["deleted"],
         "properties": {
           "deleted": {
             "type": "boolean"
@@ -3074,9 +2945,7 @@
       },
       "UpdatedResponse": {
         "type": "object",
-        "required": [
-          "updated"
-        ],
+        "required": ["updated"],
         "properties": {
           "updated": {
             "type": "boolean"
@@ -3086,9 +2955,7 @@
       },
       "RemovedResponse": {
         "type": "object",
-        "required": [
-          "removed"
-        ],
+        "required": ["removed"],
         "properties": {
           "removed": {
             "type": "boolean"
@@ -3098,10 +2965,7 @@
       },
       "ApproveBaselineResponse": {
         "type": "object",
-        "required": [
-          "approved",
-          "runId"
-        ],
+        "required": ["approved", "runId"],
         "properties": {
           "approved": {
             "type": "boolean"
@@ -3114,12 +2978,7 @@
       },
       "UsageResponse": {
         "type": "object",
-        "required": [
-          "runs",
-          "screenshots",
-          "period",
-          "limits"
-        ],
+        "required": ["runs", "screenshots", "period", "limits"],
         "properties": {
           "runs": {
             "type": "integer"
@@ -3129,16 +2988,11 @@
           },
           "period": {
             "type": "string",
-            "enum": [
-              "current_month"
-            ]
+            "enum": ["current_month"]
           },
           "limits": {
             "type": "object",
-            "required": [
-              "runs",
-              "screenshots"
-            ],
+            "required": ["runs", "screenshots"],
             "properties": {
               "runs": {
                 "type": "integer",
@@ -3180,17 +3034,10 @@
           },
           "type": {
             "type": "string",
-            "enum": [
-              "baseline",
-              "current",
-              "diff"
-            ]
+            "enum": ["baseline", "current", "diff"]
           },
           "sizeBytes": {
-            "type": [
-              "integer",
-              "null"
-            ]
+            "type": ["integer", "null"]
           },
           "url": {
             "type": "string"
@@ -3200,10 +3047,7 @@
       },
       "ScreenshotListResponse": {
         "type": "object",
-        "required": [
-          "screenshots",
-          "total"
-        ],
+        "required": ["screenshots", "total"],
         "properties": {
           "screenshots": {
             "type": "array",
@@ -3312,10 +3156,7 @@
       },
       "MonitorCreateRequest": {
         "type": "object",
-        "required": [
-          "name",
-          "url"
-        ],
+        "required": ["name", "url"],
         "properties": {
           "name": {
             "type": "string",
@@ -3332,9 +3173,7 @@
             "items": {
               "type": "string"
             },
-            "default": [
-              "/"
-            ]
+            "default": ["/"]
           },
           "viewports": {
             "type": "array",
@@ -3343,9 +3182,7 @@
               "minimum": 320,
               "maximum": 3840
             },
-            "default": [
-              1440
-            ]
+            "default": [1440]
           },
           "intervalMinutes": {
             "type": "integer",
@@ -3417,10 +3254,7 @@
       },
       "MonitorListResponse": {
         "type": "object",
-        "required": [
-          "monitors",
-          "total"
-        ],
+        "required": ["monitors", "total"],
         "properties": {
           "monitors": {
             "type": "array",
@@ -3436,13 +3270,7 @@
       },
       "MonitorScreenshotRef": {
         "type": "object",
-        "required": [
-          "r2Key",
-          "route",
-          "viewport",
-          "browser",
-          "type"
-        ],
+        "required": ["r2Key", "route", "viewport", "browser", "type"],
         "properties": {
           "r2Key": {
             "type": "string"
@@ -3458,11 +3286,7 @@
           },
           "type": {
             "type": "string",
-            "enum": [
-              "baseline",
-              "current",
-              "diff"
-            ]
+            "enum": ["baseline", "current", "diff"]
           }
         },
         "additionalProperties": false
@@ -3490,11 +3314,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "passed",
-              "regression",
-              "error"
-            ]
+            "enum": ["passed", "regression", "error"]
           },
           "regressionsCount": {
             "type": "integer"
@@ -3531,10 +3351,7 @@
       },
       "MonitorRunListResponse": {
         "type": "object",
-        "required": [
-          "runs",
-          "total"
-        ],
+        "required": ["runs", "total"],
         "properties": {
           "runs": {
             "type": "array",
@@ -3550,18 +3367,11 @@
       },
       "AlertDeliveryResult": {
         "type": "object",
-        "required": [
-          "channel",
-          "ok"
-        ],
+        "required": ["channel", "ok"],
         "properties": {
           "channel": {
             "type": "string",
-            "enum": [
-              "slack",
-              "email",
-              "pagerduty"
-            ]
+            "enum": ["slack", "email", "pagerduty"]
           },
           "ok": {
             "type": "boolean"
@@ -3574,10 +3384,7 @@
       },
       "TestAlertResponse": {
         "type": "object",
-        "required": [
-          "sent",
-          "deliveries"
-        ],
+        "required": ["sent", "deliveries"],
         "properties": {
           "sent": {
             "type": "boolean"
@@ -3605,15 +3412,10 @@
       },
       "SnoozeResponse": {
         "type": "object",
-        "required": [
-          "snoozedUntil"
-        ],
+        "required": ["snoozedUntil"],
         "properties": {
           "snoozedUntil": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           }
         },
@@ -3621,21 +3423,11 @@
       },
       "TeamRole": {
         "type": "string",
-        "enum": [
-          "owner",
-          "admin",
-          "member",
-          "viewer"
-        ]
+        "enum": ["owner", "admin", "member", "viewer"]
       },
       "Team": {
         "type": "object",
-        "required": [
-          "id",
-          "name",
-          "plan",
-          "createdAt"
-        ],
+        "required": ["id", "name", "plan", "createdAt"],
         "properties": {
           "id": {
             "type": "string"
@@ -3666,9 +3458,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "role"
-            ],
+            "required": ["role"],
             "properties": {
               "role": {
                 "$ref": "#/components/schemas/TeamRole"
@@ -3679,12 +3469,7 @@
       },
       "TeamMember": {
         "type": "object",
-        "required": [
-          "teamId",
-          "userId",
-          "role",
-          "createdAt"
-        ],
+        "required": ["teamId", "userId", "role", "createdAt"],
         "properties": {
           "teamId": {
             "type": "string"
@@ -3707,12 +3492,7 @@
       },
       "TeamProject": {
         "type": "object",
-        "required": [
-          "id",
-          "teamId",
-          "name",
-          "createdAt"
-        ],
+        "required": ["id", "teamId", "name", "createdAt"],
         "properties": {
           "id": {
             "type": "string"
@@ -3739,9 +3519,7 @@
       },
       "TeamCreateRequest": {
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "properties": {
           "name": {
             "type": "string",
@@ -3764,10 +3542,7 @@
       },
       "TeamListResponse": {
         "type": "object",
-        "required": [
-          "teams",
-          "total"
-        ],
+        "required": ["teams", "total"],
         "properties": {
           "teams": {
             "type": "array",
@@ -3783,12 +3558,7 @@
       },
       "TeamDetailResponse": {
         "type": "object",
-        "required": [
-          "team",
-          "members",
-          "projects",
-          "role"
-        ],
+        "required": ["team", "members", "projects", "role"],
         "properties": {
           "team": {
             "anyOf": [
@@ -3836,44 +3606,27 @@
         },
         "anyOf": [
           {
-            "required": [
-              "email"
-            ]
+            "required": ["email"]
           },
           {
-            "required": [
-              "githubLogin"
-            ]
+            "required": ["githubLogin"]
           }
         ],
         "additionalProperties": false
       },
       "TeamInvitationCreateResponse": {
         "type": "object",
-        "required": [
-          "id",
-          "email",
-          "githubLogin",
-          "role",
-          "token",
-          "emailed"
-        ],
+        "required": ["id", "email", "githubLogin", "role", "token", "emailed"],
         "properties": {
           "id": {
             "type": "string"
           },
           "email": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "email"
           },
           "githubLogin": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "role": {
             "$ref": "#/components/schemas/TeamRole"
@@ -3890,9 +3643,7 @@
       },
       "AcceptInvitationRequest": {
         "type": "object",
-        "required": [
-          "token"
-        ],
+        "required": ["token"],
         "properties": {
           "token": {
             "type": "string",
@@ -3903,17 +3654,11 @@
       },
       "AcceptInvitationResponse": {
         "type": "object",
-        "required": [
-          "joined",
-          "teamId",
-          "role"
-        ],
+        "required": ["joined", "teamId", "role"],
         "properties": {
           "joined": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           },
           "teamId": {
             "type": "string"
@@ -3926,9 +3671,7 @@
       },
       "MemberRoleUpdateRequest": {
         "type": "object",
-        "required": [
-          "role"
-        ],
+        "required": ["role"],
         "properties": {
           "role": {
             "$ref": "#/components/schemas/TeamRole"
@@ -3938,9 +3681,7 @@
       },
       "ReviewerUpdateRequest": {
         "type": "object",
-        "required": [
-          "reviewer"
-        ],
+        "required": ["reviewer"],
         "properties": {
           "reviewer": {
             "type": "boolean"
@@ -3950,10 +3691,7 @@
       },
       "ReviewerUpdateResponse": {
         "type": "object",
-        "required": [
-          "updated",
-          "reviewer"
-        ],
+        "required": ["updated", "reviewer"],
         "properties": {
           "updated": {
             "type": "boolean"
@@ -3966,9 +3704,7 @@
       },
       "ProjectCreateRequest": {
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "properties": {
           "name": {
             "type": "string",
@@ -3987,10 +3723,7 @@
       },
       "ProjectListResponse": {
         "type": "object",
-        "required": [
-          "projects",
-          "total"
-        ],
+        "required": ["projects", "total"],
         "properties": {
           "projects": {
             "type": "array",
@@ -4006,9 +3739,7 @@
       },
       "BaselineResponse": {
         "type": "object",
-        "required": [
-          "baseline"
-        ],
+        "required": ["baseline"],
         "properties": {
           "baseline": {
             "$ref": "#/components/schemas/Run"
@@ -4018,16 +3749,11 @@
       },
       "BaselineReviewRequest": {
         "type": "object",
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "approved",
-              "rejected"
-            ]
+            "enum": ["approved", "rejected"]
           },
           "comment": {
             "type": "string",
@@ -4038,13 +3764,7 @@
       },
       "BaselineApproval": {
         "type": "object",
-        "required": [
-          "id",
-          "runId",
-          "reviewerUserId",
-          "status",
-          "createdAt"
-        ],
+        "required": ["id", "runId", "reviewerUserId", "status", "createdAt"],
         "properties": {
           "id": {
             "type": "string"
@@ -4060,10 +3780,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "approved",
-              "rejected"
-            ]
+            "enum": ["approved", "rejected"]
           },
           "comment": {
             "type": "string"
@@ -4077,24 +3794,15 @@
       },
       "BaselineReviewResponse": {
         "type": "object",
-        "required": [
-          "reviewed",
-          "status",
-          "approval"
-        ],
+        "required": ["reviewed", "status", "approval"],
         "properties": {
           "reviewed": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           },
           "status": {
             "type": "string",
-            "enum": [
-              "approved",
-              "rejected"
-            ]
+            "enum": ["approved", "rejected"]
           },
           "approval": {
             "$ref": "#/components/schemas/BaselineApproval"
@@ -4104,10 +3812,7 @@
       },
       "BaselineApprovalListResponse": {
         "type": "object",
-        "required": [
-          "reviews",
-          "total"
-        ],
+        "required": ["reviews", "total"],
         "properties": {
           "reviews": {
             "type": "array",
@@ -4123,12 +3828,7 @@
       },
       "TeamActivity": {
         "type": "object",
-        "required": [
-          "id",
-          "teamId",
-          "action",
-          "createdAt"
-        ],
+        "required": ["id", "teamId", "action", "createdAt"],
         "properties": {
           "id": {
             "type": "string"
@@ -4159,10 +3859,7 @@
       },
       "TeamActivityListResponse": {
         "type": "object",
-        "required": [
-          "activity",
-          "total"
-        ],
+        "required": ["activity", "total"],
         "properties": {
           "activity": {
             "type": "array",
@@ -4203,11 +3900,7 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": [
-                "userId",
-                "runsCount",
-                "screenshotsCount"
-              ],
+              "required": ["userId", "runsCount", "screenshotsCount"],
               "properties": {
                 "userId": {
                   "type": "string"

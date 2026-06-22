@@ -17,12 +17,12 @@ Agents have two public integration paths:
 
 ## MCP tools and API routes
 
-| MCP tool | API route | Agent use |
-| --- | --- | --- |
-| `recent_runs` | `GET /v1/runs` | Browse recent runs the key can access. |
-| `list_regressions` | `GET /v1/runs` | Find the latest run for a PR or run id and return regression rows with `diffId`s. |
-| `get_suggested_fix` | `GET /v1/runs/:id` | Load the run behind a `diffId` and return the stored AI fix for that route, viewport, and browser. |
-| `accept_baseline` | `POST /v1/baselines/:runId/approve` | Promote every screenshot in a reviewed run to the new baseline. |
+| MCP tool            | API route                           | Agent use                                                                                          |
+| ------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `recent_runs`       | `GET /v1/runs`                      | Browse recent runs the key can access.                                                             |
+| `list_regressions`  | `GET /v1/runs`                      | Find the latest run for a PR or run id and return regression rows with `diffId`s.                  |
+| `get_suggested_fix` | `GET /v1/runs/:id`                  | Load the run behind a `diffId` and return the stored AI fix for that route, viewport, and browser. |
+| `accept_baseline`   | `POST /v1/baselines/:runId/approve` | Promote every screenshot in a reviewed run to the new baseline.                                    |
 
 Useful REST routes for agent workflows:
 
@@ -45,3 +45,8 @@ For "on PR N, what regressed and how do we fix it?":
 2. For each returned `diffId`, call `get_suggested_fix`.
 3. Review the route, viewport, browser, classification, report URL, and suggested patch before editing code.
 4. After all regressions are intentionally accepted, call `accept_baseline` with the run id and `confirm_all_regressions_reviewed: true`.
+
+## Machine-readable companions
+
+- `/openapi.json` — the OpenAPI 3.1 contract for the REST API.
+- `/.well-known/mcp.json` — the MCP server discovery manifest.
