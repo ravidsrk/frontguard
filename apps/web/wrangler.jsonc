@@ -4,6 +4,12 @@
   "compatibility_date": "2026-06-12",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
+  // Serve static assets (public/ files like /agents.md, /openapi.json,
+  // /.well-known/mcp.json) before invoking the SSR worker, so uploaded assets
+  // are served at their paths instead of the worker 404-ing them.
+  "assets": {
+    "run_worker_first": false
+  },
   "observability": {
     "enabled": true
   }
