@@ -2,6 +2,7 @@
   "name": "@frontguard/mcp",
   "description": "Frontguard MCP server for querying visual regressions, suggested fixes, recent runs, and baseline approvals.",
   "version": "0.2.2",
+  "documentation": "https://frontguard.dev/agents.md",
   "package": {
     "registry": "npm",
     "name": "@frontguard/mcp"
@@ -14,10 +15,7 @@
   },
   "run": {
     "command": "npx",
-    "args": [
-      "-y",
-      "@frontguard/mcp"
-    ],
+    "args": ["-y", "@frontguard/mcp"],
     "env": {
       "FRONTGUARD_API_URL": "https://api.frontguard.dev",
       "FRONTGUARD_API_KEY": "fg_live_xxx"
