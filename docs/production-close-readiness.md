@@ -6,8 +6,9 @@ T_FINAL output artifact. The frozen canonical inventory remains
 modify). Live coordinator ledger:
 [`docs/production-close-progress.md`](./production-close-progress.md).*
 
-**BASE:** `ravidsrk/production-close` @ `aad7733` (ledger-only delta after
-code-equivalent merge `9a659e1` from PR #107).
+**BASE:** `ravidsrk/production-close` includes PR #108 merge `29d6231`.
+Engineering gates ran on `aad7733` (ledger-only delta after code-equivalent
+merge `9a659e1` from PR #107).
 
 **Engineering gates:** Full `npm ci && npm run build && npm test` green on
 `aad7733` (2026-06-20). Gates first ran on code-equivalent `9a659e1`; re-checked
@@ -48,7 +49,7 @@ human-owned, NOT done).
 | #105 | `validation-methodology` | A / C16 | val-5 | MERGED |
 | #106 | `a10-doc-reconcile` | FINAL / A10DOC | fix-progress, SECURITY.md, launch-readiness | MERGED |
 | #107 | `a10-release-prep` | FINAL / A10REL | VERSION, CHANGELOG, 0.2.1 prep | MERGED (`9a659e1`) |
-| **#108** | **T_FINAL** | FINAL | acceptance gate + this doc | **PR_OPEN** (pending merge) |
+| **#108** | **T_FINAL** | FINAL | acceptance gate + this doc | **MERGED (`29d6231`)** |
 
 ---
 
@@ -181,8 +182,9 @@ or marketplace submit. Full procedures in
    commits. Recommend evaluators use local install or wait for OPS O11 publish
    of `0.2.1`.
 5. **T_FINAL merge posture:** PR #108 records acceptance walk and flips
-   launch-readiness to final CONDITIONAL GO. `PHASE=COMPLETE` and T_FINAL
-   `MERGED ✓` apply only after PR #108 merges — not before.
+   launch-readiness to final CONDITIONAL GO. PR #108 merged via `29d6231`;
+   the final coordinator ledger now records `PHASE=COMPLETE` and T_FINAL
+   `MERGED ✓`.
 6. **Layout drift:** cluster-specs `touches` reference `apps/landing` /
    `apps/docs/content` paths that no longer exist. Fixers located live
    equivalents under `apps/web/**`; REVIEW_DOC acceptance grep rules still govern.
@@ -205,4 +207,5 @@ or marketplace submit. Full procedures in
 
 | Date | Commit | Change |
 |------|--------|--------|
-| 2026-06-20 | PR #108 (pending) | T_FINAL output: acceptance walk, CONDITIONAL GO verdict, OPS queue O1–O15 documented as NOT done |
+| 2026-06-20 | PR #108 (`29d6231`) | T_FINAL output: acceptance walk, CONDITIONAL GO verdict, OPS queue O1–O15 documented as NOT done |
+| 2026-06-23 | Final ledger close | Codex post-merge audit PASS; T_FINAL REVIEWED/MERGED/ACCEPT marked complete |
