@@ -9,7 +9,7 @@ Flags: PLANNED / BUILT / REVIEWED / SHIPPED. Terminal = all four true.
 - Design: project `1672c1a0-ad29-455b-8025-5d38a1d1728e` (readable via DesignSync). Extracted verbatim to docs/design-extract/tanstack/.
 - Approach: FULL TanStack migration → new `apps/web` on Cloudflare Workers; cut over (remove apps/landing + apps/docs); port entire content floor. Merge: auto-merge to main.
 - Planning docs (frozen): docs/design-spec.md, docs/product-probe.md, docs/gap-plan.md.
-- Phase: BUILD.
+- Phase: **COMPLETE** (all rows PLANNED=t BUILT=t REVIEWED=t SHIPPED=t).
 
 ## Planning ledger
 
@@ -29,23 +29,24 @@ Flags: PLANNED / BUILT / REVIEWED / SHIPPED. Terminal = all four true.
   RELAY LESSON: after worker_done, must `task-update --status completed` the round-1 task to free the terminal before re-dispatching a fix (else "already has an active dispatch").
   CUTOVER NOTE: apps/web/scripts/generate-docs-content.mjs reads apps/docs (one-time import tool, NOT in build). T-DEPLOY-CI must remove/neutralize it when apps/docs is deleted so CI/regeneration doesn't break.
 ### Build wave B (after wave A merges)
-- T-SEO-ASSETS:  PLANNED=t BUILT=f REVIEWED=f SHIPPED=f  — assets + sitemap rebuild + llms + 404 + tests. branch ravidsrk/web-seo-assets.
-- T-DEPLOY-CI:   PLANNED=t BUILT=f REVIEWED=f SHIPPED=f  — cutover: deploy-web.yml (Workers), remove apps/landing+apps/docs, unify action ref, CI. branch ravidsrk/web-deploy-cutover. [dep: ALL]
-- T_FINAL:       PLANNED=t BUILT=f REVIEWED=f SHIPPED=f  — verification → docs/adopt-readiness.md. branch ravidsrk/web-readiness. [dep: ALL]
+- T-SEO-ASSETS:  PLANNED=t BUILT=t REVIEWED=t SHIPPED=t  — PR#68 MERGED (01388a8). DONE.
+- T-DEPLOY-CI:   PLANNED=t BUILT=t REVIEWED=t SHIPPED=t  — PR#69 MERGED (33747dd). DONE.
+- T_FINAL:       PLANNED=t BUILT=t REVIEWED=t SHIPPED=t  — main CI green; docs/adopt-readiness.md written. DONE.
 
 ## Live workers / worktrees / branches
 
 Coordinator handle: term_bcfc5804-42a0-4c27-9091-0b50b1eda328.
 WAVE A: all merged + worktrees/branches removed (foundation/home/marketing/docs).
-WAVE B in progress:
-- T-SEO-ASSETS: PLANNED=t BUILT=t REVIEWED=t SHIPPED=t — PR#68 MERGED (01388a8). Codex FAIL r1 (missing head tags) → fix r2 restored sized favicons/apple-touch/theme-color/author/keywords/referrer/X-Content-Type-Options + og:image dims; verified + green. Worktree+branch removed. DONE.
-- T-DEPLOY-CI (cutover): PLANNED=t BUILT=t REVIEWED=t SHIPPED=t — PR#69 MERGED (33747dd). Codex PASS + thorough coordinator verification. apps/landing+apps/docs removed; Workers deploy wired; CI rewired; action refs @v0. Worktree+branch removed. DONE.
-- T_FINAL: PLANNED=t BUILT=t REVIEWED=t SHIPPED=t — main CI (test 20&22/e2e/lint/docs-links/build) GREEN on 33747dd; all worktrees clean; no open PRs; docs/adopt-readiness.md written. DONE.
+WAVE B: all merged + worktrees/branches removed (seo-assets, deploy-cutover, readiness).
 
 ## TERMINAL — all rows PLANNED=t BUILT=t REVIEWED=t SHIPPED=t. adopt-readiness.md exists.
-RESIDUAL (external, flagged in report + readiness): Deploy Web workflow fails on CLOUDFLARE_API_TOKEN lacking Workers Scripts:Edit (was Pages-scoped) — account owner must update the secret + re-run. Code/workflow correct.
-- NOTE: user is hands-on (fixed Node-20 CI + manually merged PR#64). Re-fetch origin/main before each new worktree/merge; user may push.
 
-## Next ready wave
+**Residual (external):** Live Workers deploy requires `CLOUDFLARE_API_TOKEN` with Workers Scripts:Edit. Agent-ready static surfaces (PRs #144–#153) and `run_worker_first=false` (PR #153) are on `main`; redeploy `apps/web` to publish them live.
 
-- WAIT on wave A worker_done (loop 3). Per finisher: verify build → open PR → codex build-blind review → merge to main → cleanup. After all 3 merge: wave B (T-SEO-ASSETS), then T-DEPLOY-CI cutover, then T_FINAL.
+## Changelog
+
+| Date | Change |
+|------|--------|
+| 2026-06-17 | T_FINAL complete; adopt-readiness.md written |
+| 2026-06-29 | Ledger reconciled — wave B flags corrected; stale "next wave" removed |
+
