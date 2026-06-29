@@ -1,18 +1,8 @@
 # Frontguard Roadmap
 
-*Last updated: 2026-06-17 (v0.2.0 ship). Anchored to [`docs/research.md`](./research.md) (mid-2026 competitive landscape, 16 competitors fetched live) and [`docs/product-completion-plan.md`](./product-completion-plan.md) (the frozen v0.2 boundary).*
+*Last updated: 2026-06-29. Anchored to [`docs/research.md`](./research.md) (mid-2026 competitive landscape, 16 competitors fetched live) and [`docs/product-completion-plan.md`](./product-completion-plan.md) (the frozen v0.2 boundary).*
 
-> **Status note (2026-06-17):** **v0.2.0 has shipped.** Tag `v0.2.0` points at
-> `2cd1614`; five npm packages live (`@frontguard/cli`, `@frontguard/playwright`,
-> `@frontguard/mcp`, `@frontguard/netlify-plugin`, `create-frontguard-plugin`).
-> Engineering bar: 1,392 tests across nine workspaces all green; landing + docs
-> both build clean; `wrangler deploy --dry-run` produces a unified Hono Workers
-> bundle. First real-world validation run on 2026-06-16 reported **0.0%
-> pixel-only false positives** across 43 recheck routes (well inside the
-> `<15%` launch gate); AI-accuracy gate still pending a provider key in the
-> harness env. See [`docs/launch-readiness.md`](./launch-readiness.md) for the
-> full go/no-go + the three operational follow-ups (DNS to Cloudflare,
-> four marketplace submissions, post-DNS `wrangler deploy`).
+> **Status note (2026-06-29):** **v0.2.2 is on npm.** Production-close (49/49 findings code-closed, PRs #94–#108), TanStack web adoption (PRs #63–#69), and agent-ready surfaces (PRs #144–#151) are merged to `main`. Engineering gates: full monorepo build + test green; `npm audit --omit=dev --audit-level=high` → 0 critical/high. **Remaining work is OPS/distribution** — DNS, `wrangler deploy`, Docker Hub publish, git tag `v0`, marketplace listings. See [`docs/production-close-readiness.md`](./production-close-readiness.md) and [`docs/launch-readiness.md`](./launch-readiness.md).
 
 ---
 
@@ -143,7 +133,7 @@ The "Datadog for frontend" move. The rendering, diffing, AI analysis, scheduler,
 
 ✅ **Third-party script monitoring** — Shipped (see above): detects when an ad/analytics/widget origin appears or disappears between runs.
 
-🟡 **Integration layer** — Slack + email + PagerDuty + generic webhooks work. *Remaining:* native Slack app and OpenTelemetry export (see follow-ups) to position Frontguard as "the visual layer you embed."
+🟡 **Integration layer** — Slack + email + PagerDuty + generic webhooks work. Native Slack app (`integrations/slack-app/`) and OpenTelemetry export (`packages/cloud-api/src/otel/`) are **shipped**. *Remaining:* marketplace listings and live deploy (OPS).
 
 ✅ **Performance visual correlation** — Budget-violation ↔ visual-diff correlation is shipped, as is **run-over-run CWV delta** correlation (a page that got slower since the last run is flagged and joined to its visual diff).
 
