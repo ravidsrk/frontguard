@@ -76,7 +76,7 @@
     "zod": "^4.4.3"
   },
   "optionalDependencies": {
-    "@axe-core/playwright": "^4.10.0",
+    "@axe-core/playwright": "^4.12.1",
     "@daytona/sdk": "^0.189.0",
     "better-sqlite3": "^11.10.0"
   },
