@@ -39,9 +39,13 @@ Run complete. KIND=BOTH (WEB + MCP + API). BASE = `ravidsrk/agent-ready`. Every 
 
 Confirmed across every artifact: NO internal/admin path (/auth, the session /dashboard, /v1/billing, /v1/keys) and NO secret (placeholder keys only) is published. Reads-open/writes-gated is faithful to the real access model (only GET /health is unauthenticated).
 
-## Human-owned follow-ups (NOT done)
+## Human-owned follow-ups
 
-- Deploy apps/web so the files are LIVE (only then do agents/ora see them); the openapi can also be served at `api.frontguard.dev/openapi.json` (a worker route) if desired.
-- Promote BASE → main (the meta-PR). NOT done.
-- Optionally scan the live site with ora.ai for the external agent-readiness score.
-- Remove the temporary `ci.yml` trigger entry for `ravidsrk/agent-ready` at BASE→main (or keep it harmlessly).
+- **Live deploy (OPS O2):** Agent surfaces exist in `apps/web/public/` on `main` (PRs #144–#153) but require a successful `Deploy Web` workflow run before `/agents.md`, `/openapi.json`, and `/.well-known/mcp.json` resolve on `frontguard.dev`. PR #153 set `assets.run_worker_first=false` so static assets serve before SSR.
+- **API mirror (code done):** `GET /openapi.json` on cloud-api serves the same contract once `api.frontguard.dev` is deployed (see `packages/cloud-api/src/index.ts`).
+- **Optional:** Scan the live site with ora.ai after deploy for an external agent-readiness score.
+
+## Run status
+
+**TERMINAL on `main`.** All 7 deliverables merged via PRs #144–#151; T_FINAL readiness report in PR #150. BASE promotion to `main` is complete.
+
