@@ -29,8 +29,14 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Read VERSION
+        id: version
+        run: echo "version=$(tr -d '\n' < VERSION)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
         with:
@@ -71,3 +77,48 @@ jobs:
             echo ''
             echo 'See `docs/distribution.mdx` for the full submission playbook.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  docker:
+    needs: release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Read VERSION
+        id: version
+        run: echo "version=$(tr -d '\n' < VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build CLI and pack tarball for Docker context
+        run: |
+          npm run build --workspace=packages/cli
+          npm pack ./packages/cli --pack-destination packages/cli/docker
+          mv packages/cli/docker/frontguard-cli-*.tgz packages/cli/docker/frontguard-cli.tgz
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push render image
+        uses: docker/build-push-action@v6
+        with:
+          context: packages/cli/docker
+          file: packages/cli/docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            frontguard/render:${{ steps.version.outputs.version }}
+            frontguard/render:latest
