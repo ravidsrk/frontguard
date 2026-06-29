@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'apps/web/**'
+      - 'scripts/sync-openapi.mjs'
   workflow_dispatch:
 
 jobs:
