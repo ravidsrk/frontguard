@@ -144,15 +144,15 @@ separate human decision.
 
 - **O10** — push lightweight `v0` tag to the stable commit so
   `uses: ravidsrk/frontguard@v0` resolves (see B6 in `docs/production-pending.md`).
-- **O9** — Docker Hub `frontguard/render:0.2.1` build+push (B5).
-- **O15** — enable Dependabot in repo settings so `.github/dependabot.yml` activates.
+- **O9** — Docker Hub `frontguard/render:0.2.2` build+push (B5). Release workflow
+  includes a `docker` job when `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN` secrets are set.
+- **O15** — `.github/dependabot.yml` merged; merge open dependabot PRs on origin.
 
 ---
 
 ## Downstream human gates (NOT done; human-owned)
 
-- BASE (`ravidsrk/adversarial-fresh`) → `main` promotion: human meta-PR.
-- Production deploy / `wrangler deploy` of cloud-api + integrations.
+- Production deploy / `wrangler deploy` of cloud-api + integrations + apps/web.
 - Any OPS apply above (D1 migrations on the live DB, live env/secret/binding setup).
 
 ---
