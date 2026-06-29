@@ -137,7 +137,7 @@ Production-ready acceptance criteria. T_FINAL walked 2026-06-20 on BASE
 |------|--------|----------------|
 | `frontguard/render:latest` pullable | **OPS** O9 | Docker Hub 404 |
 | `ravidsrk/frontguard@v0` tag + Action smoke | **OPS** O10 | Code shim merged PR#99 |
-| npm `@frontguard/*@0.2.1+` includes remediation | **OPS** O11 | Prep merged PR#107; not published |
+| `npm @frontguard/*@0.2.1+` includes remediation | **DONE** | `@frontguard/cli@0.2.2` on registry |
 
 ---
 
@@ -158,13 +158,13 @@ or marketplace submit. Full procedures in
 | O6 | VERIFY_AT_SCALE SEC-2: pin renderer IP post-SSRF (DNS-rebind) | SEC-2 (CODE_CLOSED PR#83) | Human ops | ✗ |
 | O7 | VERIFY_AT_SCALE REL-3: deploy DO/KV distributed rate limiter | REL-3 (CODE_CLOSED PR#85) | Human ops | ✗ |
 | O8 | VERIFY_AT_SCALE CONC-1/COST-1: 100 parallel `/v1/run` → rejection at cap | CONC-1/COST-1 (CLOSED PR#78) | Human ops | ✗ |
-| O9 | `docker buildx build` + `docker push` `frontguard/render:0.2.1` | install-4, docker-1, docs-3 | Human ops | ✗ |
+| O9 | `docker buildx build` + `docker push` `frontguard/render:0.2.2` | install-4, docker-1, docs-3 | Human ops | ✗ (release workflow job added) |
 | O10 | Push git tag `v0` → stable commit | int-3, docs-5 (Action ref resolves) | Human ops | ✗ |
-| O11 | Bump to 0.2.1, `scripts/release.sh`, publish `@frontguard/*` | npm staleness; supply-chain republish | Release eng | ✗ |
+| O11 | Publish `@frontguard/*@0.2.2+` | npm staleness | Release eng | **✓** (`@frontguard/cli@0.2.2` live) |
 | O12 | Submit marketplace listings (GitHub, Vercel, Netlify, Slack) | docs-6 | Human ops | ✗ |
 | O13 | Set `ENVIRONMENT=production` + real DB/bindings at deploy | SEC-6, OPS-2 (CLOSED) | Human ops | ✗ |
 | O14 | Wire dead-letter consumer / alerting for `background_failures` | OPS-3 (CLOSED) | Human ops | ✗ |
-| O15 | Enable Dependabot in repo settings | supply-6 | Human ops | ✗ |
+| O15 | Dependabot config + merge open bumps | supply-6 | Engineering | **partial** (`.github/dependabot.yml` live; PRs open) |
 
 ---
 
