@@ -58,6 +58,10 @@ jobs:
       # Fails if VERSION drifted from any version-coupled file (package.json,
       # action.yml, Dockerfile, README, cli/mcp version constants).
       - run: npm run sync-version:check
+      - name: Verify OpenAPI contract sync
+        run: |
+          node scripts/sync-openapi.mjs
+          git diff --exit-code packages/cloud-api/src/openapi.json
 
   docs-links:
     # Guards apps/web docs-content.ts against broken internal /docs links
