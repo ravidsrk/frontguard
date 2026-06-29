@@ -21,6 +21,6 @@
     "rootDir": "src",
     "types": ["node"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/openapi.json"],
   "exclude": ["node_modules", "dist", "src/snapshot-cli.ts"]
 }
