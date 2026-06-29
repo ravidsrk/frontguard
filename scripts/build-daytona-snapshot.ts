@@ -77,7 +77,7 @@ const DEFAULT_VERSION = 'v1';
 const SNAPSHOT_BASE = 'frontguard-playwright';
 
 /** Pinned Playwright base. Keep in sync with packages/cli/docker/Dockerfile. */
-const PLAYWRIGHT_BASE = 'mcr.microsoft.com/playwright:v1.61.0-jammy';
+const PLAYWRIGHT_BASE = 'mcr.microsoft.com/playwright:v1.61.1-jammy';
 
 // ---------------------------------------------------------------------------
 // Arg parsing — keep it tiny, no commander

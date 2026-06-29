@@ -45,7 +45,7 @@
 # enforces the same pin at image-build time even if `docker build` omits it.
 # =============================================================================
 
-FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.61.0-jammy
+FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.61.1-jammy
 
 LABEL org.opencontainers.image.title="frontguard-render" \
       org.opencontainers.image.description="Deterministic cross-OS rendering image for Frontguard visual regression tests" \
