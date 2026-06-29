@@ -122,11 +122,12 @@ Each is tagged with the findings it blocks from full closure.*
 - [ ] **O3** Set Worker secrets (`DASHBOARD_SESSION_SECRET` ≥32, `STRIPE_*`, `DAYTONA_API_KEY`, `GITHUB_*`, OAuth)
 - [ ] **O4** Apply D1 migrations 001→005 to staging then prod
 - [ ] **O5–O8** VERIFY_AT_SCALE: REL-1 waitUntil, SEC-2 DNS-rebind pin, REL-3 distributed limiter, CONC-1/COST-1 caps
-- [ ] **O9** `docker buildx build` + `docker push` `frontguard/render:0.2.1` — unblocks install-4, docker-1, docs-3
+- [ ] **O9** `docker buildx build` + `docker push` `frontguard/render:0.2.2` — unblocks install-4, docker-1, docs-3 (release workflow job added; needs `DOCKERHUB_*` secrets)
 - [ ] **O10** Push git tag `v0` — unblocks int-3, docs-5
-- [ ] **O11** Bump to 0.2.1, `scripts/release.sh`, publish `@frontguard/*` — unblocks npm consumers
+- [x] **O11** Publish `@frontguard/*` — **done at 0.2.2** on npm (2026-06-23+)
 - [ ] **O12** Submit marketplace listings (GitHub, Vercel, Netlify, Slack) — unblocks docs-6
-- [ ] **O13–O15** Production bindings, dead-letter alerting, Dependabot repo settings — unblocks supply-6
+- [ ] **O13–O14** Production bindings, dead-letter alerting
+- [x] **O15** Dependabot — `.github/dependabot.yml` merged; open PRs tracked on origin
 
 Full queue: [`production-close-progress.md`](./production-close-progress.md) § OPS / VERIFY_AT_SCALE.
 
