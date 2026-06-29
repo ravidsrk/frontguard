@@ -77,12 +77,12 @@
   },
   "optionalDependencies": {
     "@axe-core/playwright": "^4.12.1",
-    "@daytona/sdk": "^0.189.0",
+    "@daytona/sdk": "^0.192.0",
     "better-sqlite3": "^11.10.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^26.0.1",
+    "@types/node": "^26.0.0",
     "@types/pngjs": "^6.0.5",
     "@vitest/coverage-v8": "^4.1.9",
     "eslint": "^10.6.0",
