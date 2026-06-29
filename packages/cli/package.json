@@ -77,7 +77,7 @@
   },
   "optionalDependencies": {
     "@axe-core/playwright": "^4.10.0",
-    "@daytona/sdk": "^0.189.0",
+    "@daytona/sdk": "^0.192.0",
     "better-sqlite3": "^11.10.0"
   },
   "devDependencies": {
