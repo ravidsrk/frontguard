@@ -149,13 +149,13 @@ Live actions remain in `docs/arch-ops-actions.md`.
 | O6 | VERIFY_AT_SCALE SEC-2: pin renderer connection to validated IP (DNS-rebind) at Daytona/infra | B4 | SEC-2 (CODE_CLOSED PR#83) | Human ops | ✗ |
 | O7 | VERIFY_AT_SCALE REL-3: deploy DO/KV distributed rate limiter; load-test under concurrency | B4 | REL-3 (CODE_CLOSED PR#85) | Human ops | ✗ |
 | O8 | VERIFY_AT_SCALE CONC-1/COST-1: 100 parallel `/v1/run` → rejection at cap; atomic reservation holds | B4 | CONC-1/COST-1 (CLOSED PR#78) | Human ops | ✗ |
-| O9 | `docker buildx build --platform linux/amd64 -t frontguard/render:0.2.1 -t :latest …` + `docker push`; smoke-pull; pin digest in docs | B5 | install-4, docker-1, docs-3 (truly closed) | Human ops | ✗ |
-| O10 | Push lightweight git tag `v0` → stable commit (`git tag v0 <sha> && git push origin v0`) | B6 | int-3, docs-5 (Action ref resolves) | Human ops | ✗ |
-| O11 | Bump to 0.2.1, run `scripts/release.sh` (or release workflow), publish `@frontguard/*`; verify `npm view @frontguard/cli@0.2.1` | B7 | npm staleness; supply-chain republish | Release eng | ✗ |
+| O9 | Release workflow `docker` job publishes `frontguard/render:$VERSION` when `DOCKERHUB_*` secrets set | B5 | install-4, docker-1, docs-3 | Human ops | partial |
+| O10 | Push lightweight git tag `v0` → stable commit (`git tag v0 <sha> && git push origin v0`) | B6 | int-3, docs-5 (Action ref resolves) | Human ops | pending push |
+| O11 | Publish `@frontguard/*@0.2.2` on npm | B7 | npm staleness | Release eng | ✓ |
 | O12 | Submit marketplace listings: GitHub, Vercel, Netlify, Slack; fix `frontguard.dev/api/install` 404 | B8 | docs-6 | Human ops | ✗ |
 | O13 | SEC-6 / OPS-2: set `ENVIRONMENT=production` + real `DB`/bindings; replace placeholder wrangler IDs at deploy | Fresh OPS | SEC-6, OPS-2 (CLOSED) | Human ops | ✗ |
 | O14 | OPS-3: wire dead-letter consumer / alerting for `background_failures` table | Fresh OPS | OPS-3 (CLOSED) | Human ops | ✗ |
-| O15 | Enable Dependabot in repo settings (Security → Code security) so `.github/dependabot.yml` activates | A7/C11 | supply-6 | Human ops | ✗ |
+| O15 | `.github/dependabot.yml` + merged open bumps on `main` | A7/C11 | supply-6 | Engineering | partial |
 
 **Acceptance probes (REVIEW_DOC verification appendix — run post-OPS):**
 `curl -sf https://api.frontguard.dev/health` → 200 · `host api/app/github-app/telemetry.frontguard.dev` resolves ·

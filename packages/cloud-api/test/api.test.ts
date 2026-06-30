@@ -54,6 +54,22 @@ describe('GET /health', () => {
 });
 
 // ---------------------------------------------------------------------------
+// OpenAPI contract
+// ---------------------------------------------------------------------------
+describe('GET /openapi.json', () => {
+  it('returns the public OpenAPI document without auth', async () => {
+    const res = await app.request('/openapi.json');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('application/json');
+    const body = await res.json();
+    expect(body.openapi).toBe('3.1.0');
+    expect(body.paths['/health']).toBeDefined();
+    expect(body.paths['/v1/run']).toBeDefined();
+    expect(body.paths['/auth']).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // POST /v1/run — create a visual regression run
 // ---------------------------------------------------------------------------
 describe('POST /v1/run', () => {
