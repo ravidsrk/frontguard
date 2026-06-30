@@ -50,6 +50,7 @@ import {
   assertSafeRenderTarget,
 } from "./security/render-target.js";
 import { recordDeadLetter } from "./dead-letter.js";
+import { OPENAPI_SPEC } from "./openapi-spec.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -161,6 +162,12 @@ app.use("*", async (c, next) => {
 // Health check (outside /v1/* — no auth required)
 // ---------------------------------------------------------------------------
 app.get("/health", (c) => c.json({ status: "ok", version: PACKAGE_VERSION }));
+
+// Public OpenAPI contract (mirrors apps/web/public/openapi.json)
+app.get("/openapi.json", (c) => {
+  c.header("Cache-Control", "public, max-age=3600");
+  return c.json(OPENAPI_SPEC);
+});
 
 // ---------------------------------------------------------------------------
 // Auth + API-key management routes (mounted before the /v1 guard so the OAuth

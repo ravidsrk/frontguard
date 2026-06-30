@@ -44,11 +44,12 @@ Per-task PLAN→CODE(@grok)→REVIEW(@codex, build-blind)→SHIP(@claude, merge+
 
 ## Residual risks / action items
 
-1. HIGH — Live Workers deploy blocked on a credential. The `Deploy Web` workflow built the worker bundle successfully but `wrangler deploy` failed with Cloudflare `Authentication error [code: 10000]`: the existing `CLOUDFLARE_API_TOKEN` GitHub secret was scoped for Cloudflare **Pages** (the old deploys), and lacks **Workers Scripts:Edit** permission. ACTION (account owner only): update `CLOUDFLARE_API_TOKEN` to a token with "Edit Cloudflare Workers" (account-level Workers Scripts:Edit, plus account read or pin `account_id`), then re-run the `Deploy Web` workflow. Code + workflow are correct; this is purely a token-permission gap.
-2. LOW — Doc-link checker coverage caveat (Codex): the CI checker may under-match escaped `href` in the JSON-stringified `docs-content.ts`; this weakens the checker, not the site. Mitigated by app-level docs tests asserting link integrity.
-3. LOW — Post-deploy QA recommended once #1 is fixed: confirm social-card previews (OG/Twitter) render, and walk all routes on the live Workers URL across breakpoints.
-4. INFO — A pre-existing unrelated worktree `ravidsrk/new-landing` was left untouched (not part of this adoption).
+1. HIGH — Live Workers deploy requires `CLOUDFLARE_API_TOKEN` with **Workers Scripts:Edit** (was Pages-scoped). Re-run the `Deploy Web` workflow after updating the secret. PR #153 set `assets.run_worker_first=false` so `/agents.md`, `/openapi.json`, and `/.well-known/mcp.json` serve from `apps/web/public/` once deployed.
+2. LOW — Doc-link checker coverage caveat (Codex): the CI checker may under-match escaped `href` in the JSON-stringified `docs-content.ts`; mitigated by app-level docs tests.
+3. LOW — Post-deploy QA: confirm social-card previews (OG/Twitter) and agent surfaces on the live Workers URL.
+4. INFO — Cloud-api now mirrors the OpenAPI contract at `GET /openapi.json` once `api.frontguard.dev` is deployed.
 
 ## Verdict
 
-Design adoption is code-complete and merged: the product is the design, visually and feature-wise, on a single TanStack app, with the full content floor preserved and CI green. The one remaining step to go live is an external Cloudflare token permission update (residual risk #1).
+Design adoption is code-complete and merged on `main`. The remaining step is a successful Workers deploy (credential permission update + workflow re-run).
+

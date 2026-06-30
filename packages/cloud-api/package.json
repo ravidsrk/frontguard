@@ -26,7 +26,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "dev:node": "tsx watch src/index.ts",
-    "build": "tsup src/index.ts --format esm --dts",
+    "build": "node ../../scripts/sync-openapi.mjs && tsup src/index.ts --format esm --dts",
     "deploy": "tsx scripts/check-wrangler-placeholders.ts && wrangler deploy",
     "db:migrate": "wrangler d1 execute frontguard --file=src/db/schema.sql",
     "db:migrate:local": "wrangler d1 execute frontguard --local --file=src/db/schema.sql",
@@ -43,10 +43,10 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^26.0.0",
     "better-sqlite3": "^12.11.1",
-    "eslint": "^10.5.0",
+    "eslint": "^10.6.0",
     "tsup": "^8",
     "tsx": "^4",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.61.1"
+    "typescript-eslint": "^8.62.0"
   }
 }
