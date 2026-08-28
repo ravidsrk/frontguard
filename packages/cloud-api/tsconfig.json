@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ES2022",
+    "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022"],
     // Silences TS5101 for the baseUrl:"." that tsup's bundled rollup-plugin-dts
