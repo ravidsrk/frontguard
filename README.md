@@ -204,11 +204,11 @@ Frontguard ships with a plugin architecture (6 lifecycle hooks) and 5 built-in p
 
 | Plugin | Description | Key Features |
 |--------|-------------|--------------|
-| **Figma** (`src/plugins/figma.ts`) | Design-to-code comparison | Figma API integration, design token extraction, component mapping |
-| **Performance Budgets** (`src/plugins/perf-budgets.ts`) | Web Vitals & budgets | LCP/CLS/TTFB thresholds, violations correlated with the visual diff |
-| **Accessibility** (`src/plugins/accessibility.ts`) | axe-core audits | WCAG checks (contrast, alt text, target size, focus, headings) in the same render pass |
-| **Third-Party Scripts** (`src/plugins/third-party-scripts.ts`) | Script drift detection | Flags ad/analytics/widget origins that appear or disappear between runs |
-| **Monitor** (`src/plugins/monitor.ts`) | Production visual monitoring (CLI + optional cloud scheduler) | Live-URL checks, threshold alerting, history tracking |
+| **Figma** (`packages/cli/src/plugins/figma.ts`) | Design-to-code comparison | Figma API integration, design token extraction, component mapping |
+| **Performance Budgets** (`packages/cli/src/plugins/perf-budgets.ts`) | Web Vitals & budgets | LCP/CLS/TTFB thresholds, violations correlated with the visual diff |
+| **Accessibility** (`packages/cli/src/plugins/accessibility.ts`) | axe-core audits | WCAG checks (contrast, alt text, target size, focus, headings) in the same render pass |
+| **Third-Party Scripts** (`packages/cli/src/plugins/third-party-scripts.ts`) | Script drift detection | Flags ad/analytics/widget origins that appear or disappear between runs |
+| **Monitor** (`packages/cli/src/plugins/monitor.ts`) | Production visual monitoring (CLI + optional cloud scheduler) | Live-URL checks, threshold alerting, history tracking |
 
 **Plugin lifecycle hooks:** `beforeDiscover`, `afterDiscover`, `afterRender`, `afterCompare`, `afterRun`, `onError`
 
@@ -227,16 +227,29 @@ export default {
 ## Architecture
 
 ```
-src/
-├── cli/              # CLI entry point (Commander.js)
-├── core/             # Pipeline orchestrator, types, config, plugin system
-├── discovery/        # Route discovery (crawler + filesystem)
-├── render/           # Playwright rendering engine
-├── diff/             # Pixel diff + AI vision analysis
-├── storage/          # Git orphan branch baselines
-├── report/           # Console, JSON, HTML, GitHub PR reporters
-├── plugins/          # Figma, perf budgets, accessibility, third-party scripts, monitoring
-└── utils/            # Redaction, logging, retry
+packages/
+├── cli/src/          # @frontguard/cli — discover → render → diff → report
+│   ├── cli/          # Commander entry
+│   ├── core/         # Pipeline orchestrator, types, config, plugin system
+│   ├── discovery/    # Route discovery (crawler + filesystem)
+│   ├── render/       # Playwright rendering engine
+│   ├── diff/         # Pixel diff + AI vision analysis
+│   ├── storage/      # Git orphan branch baselines
+│   ├── report/       # Console, JSON, HTML, GitHub PR reporters
+│   ├── plugins/      # Figma, perf budgets, a11y, third-party, monitor
+│   └── utils/        # Redaction, logging, retry
+├── playwright/       # @frontguard/playwright
+├── mcp/              # @frontguard/mcp
+├── cloud-api/        # Cloudflare Workers + D1 + R2
+└── create-frontguard-plugin/
+apps/
+├── web/              # docs site
+└── demo/
+integrations/
+├── github-app/
+├── vercel/
+├── netlify/
+└── slack-app/
 ```
 
 Pipeline: `discover → filter → render → diff → analyze → report`
