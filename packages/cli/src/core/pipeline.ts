@@ -955,7 +955,15 @@ export async function runPipeline(
 export async function updateBaselines(
   config: FrontguardConfig,
   reporter: Reporter,
-): Promise<void> {
+): Promise<RunResult> {
+  const totalStart = performance.now();
+  const timing: RunTiming = {
+    discovery: 0,
+    render: 0,
+    compare: 0,
+    ai: 0,
+    total: 0,
+  };
   reporter.onStageStart('init', 'Updating baselines…');
 
   // Discover routes (shared logic with runPipeline)
@@ -969,7 +977,8 @@ export async function updateBaselines(
   logger.info(`Rendering ${routes.length} route(s) for baseline update…`);
   reporter.onStageStart('render', `Capturing screenshots for ${routes.length} route(s)…`);
 
-  const screenshots = await renderPages(routes, config);
+  const [screenshots, renderDuration] = await timed(() => renderPages(routes, config));
+  timing.render = renderDuration;
   const failedCaptures = screenshots.filter(
     (shot) => !Buffer.isBuffer(shot.buffer) || shot.buffer.length === 0,
   );
@@ -987,10 +996,13 @@ export async function updateBaselines(
 
   // Init storage and write all baselines
   reporter.onStageStart('compare', 'Writing baselines…');
+  const writeStart = performance.now();
   const storage = new GitOrphanStorage(process.cwd());
   await storage.init();
 
   let written = 0;
+  let writeFailures = 0;
+  const writtenScreenshots: ScreenshotResult[] = [];
   for (const shot of screenshots) {
     try {
       await storage.writeBaseline(
@@ -1000,6 +1012,7 @@ export async function updateBaselines(
         shot.buffer,
       );
       written++;
+      writtenScreenshots.push(shot);
 
       reporter.onStageProgress(
         'compare',
@@ -1008,6 +1021,7 @@ export async function updateBaselines(
         `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
       );
     } catch (err) {
+      writeFailures++;
       logger.error(
         `Failed to write baseline for ${shot.route.path}: ${err instanceof Error ? err.message : String(err)}`,
       );
@@ -1022,7 +1036,7 @@ export async function updateBaselines(
     routes: {},
   };
 
-  for (const shot of screenshots) {
+  for (const shot of writtenScreenshots) {
     const existing = manifest.routes[shot.route.path];
     manifest.routes[shot.route.path] = {
       viewports: [
@@ -1036,9 +1050,32 @@ export async function updateBaselines(
   }
   manifest.updatedAt = new Date().toISOString();
   await storage.writeManifest(manifest);
+  timing.compare = Math.round(performance.now() - writeStart);
+
+  if (writeFailures > 0) {
+    reporter.onStageComplete(
+      'compare',
+      `Failed to write ${writeFailures} of ${screenshots.length} baseline${screenshots.length === 1 ? '' : 's'}`,
+    );
+    throw new Error(
+      `Failed to write ${writeFailures} of ${screenshots.length} baseline${screenshots.length === 1 ? '' : 's'}`,
+    );
+  }
 
   reporter.onStageComplete('compare', `Wrote ${written} baseline(s)`);
   logger.info(`✅ Updated ${written} baseline(s) successfully`);
+
+  timing.total = Math.round(performance.now() - totalStart);
+  const result = buildResult(
+    screenshots.map((shot) => createNewPageResult(shot)),
+    timing,
+    totalStart,
+    config,
+  );
+  reporter.onStageStart('report', 'Generating baseline update report…');
+  reporter.onComplete(result);
+  reporter.onStageComplete('report', 'Done');
+  return result;
 }
 
 // ---------------------------------------------------------------------------
