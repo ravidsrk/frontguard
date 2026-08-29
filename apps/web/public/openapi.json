@@ -2625,7 +2625,8 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "default": 0.01
+            "default": 0.01,
+            "description": "Maximum changed-pixel ratio. For example, 0.01 allows a 1% diff."
           },
           "ai": {
             "anyOf": [
@@ -2770,7 +2771,10 @@
             }
           },
           "threshold": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Maximum changed-pixel ratio. For example, 0.01 allows a 1% diff."
           },
           "ai": {
             "anyOf": [
@@ -2869,7 +2873,10 @@
             "type": "string"
           },
           "diffPercentage": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Changed pixels in percentage points from 0 to 100."
           },
           "classification": {
             "type": "string"
@@ -3128,7 +3135,10 @@
             "type": "integer"
           },
           "alertThreshold": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Alert threshold as a changed-pixel ratio. For example, 0.05 means 5%."
           },
           "alerts": {
             "$ref": "#/components/schemas/MonitorAlerts"
@@ -3194,7 +3204,8 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "default": 0.05
+            "default": 0.05,
+            "description": "Alert threshold as a changed-pixel ratio. For example, 0.05 means 5%."
           },
           "alerts": {
             "$ref": "#/components/schemas/MonitorAlerts"
@@ -3241,7 +3252,8 @@
           "alertThreshold": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "description": "Alert threshold as a changed-pixel ratio. For example, 0.05 means 5%."
           },
           "alerts": {
             "$ref": "#/components/schemas/MonitorAlerts"

@@ -106,6 +106,40 @@ describe("docs content store", () => {
     expect(ghActions?.html).not.toMatch(/ravidsrk\/frontguard@(v1|main)/);
   });
 
+  it("documents threshold units at each public boundary", () => {
+    const cliCommands = articles.find((a) => a.id === "cli/commands")!;
+    expect(cliCommands.html).toContain("Changed-pixel ratio (0-1; 0.01 = 1%)");
+    expect(cliCommands.html).toContain("values over 1 are deprecated");
+    expect(cliCommands.html.replace(/<[^>]+>/g, " ")).toMatch(
+      /Alert threshold ratio \(0-1; 0\.05 = 5%\)\s+0\.05/,
+    );
+
+    const playwrightApi = articles.find((a) => a.id === "playwright/api")!;
+    expect(playwrightApi.html).toContain("Fraction of pixels that differ (0-1)");
+    expect(playwrightApi.html).toContain("diffPercentage &gt; threshold");
+    expect(playwrightApi.html).toContain("toBeLessThan(0.005)");
+
+    const ghActions = articles.find((a) => a.id === "ci-cd/github-actions")!;
+    expect(ghActions.html).toContain("Changed-pixel ratio (0-1; 0.01 = 1%)");
+    expect(ghActions.html).toContain("Config / 0.1");
+    expect(ghActions.html).not.toContain("ai-provider");
+    expect(ghActions.html).not.toContain("ai-model");
+
+    const backstop = articles.find((a) => a.id === "guides/migrate-from-backstopjs")!;
+    expect(backstop.html).toContain("route.threshold = s.misMatchThreshold / 100;");
+    expect(backstop.html).toContain("threshold: 0.001");
+    expect(backstop.html).not.toContain("misMatchThreshold → threshold (direct mapping)");
+
+    const productionMonitor = articles.find((a) => a.id === "guides/production-monitoring")!;
+    expect(productionMonitor.html.replace(/<[^>]+>/g, " ")).toMatch(
+      /Alert threshold ratio \(0-1; 0\.05 = 5%\)\s+0\.05/,
+    );
+
+    const allHtml = articles.map((a) => a.html).join("\n");
+    expect(allHtml).not.toMatch(/threshold percentage/i);
+    expect(allHtml).not.toMatch(/threshold \(0[-–]100\)/i);
+  });
+
   it("cross-os-rendering doc gates --docker on local build and image preflight", () => {
     const crossOs = articles.find((a) => a.id === "cross-os-rendering")!;
     expect(crossOs.html).toContain("not yet published");

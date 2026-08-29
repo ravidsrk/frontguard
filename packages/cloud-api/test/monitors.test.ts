@@ -231,9 +231,11 @@ describe('/v1/monitors routes (dev mode)', () => {
 
   it('sends a test alert to configured channels', async () => {
     let calls = 0;
+    let payload = '';
     const realFetch = globalThis.fetch;
-    globalThis.fetch = (async () => {
+    globalThis.fetch = (async (_input, init) => {
       calls++;
+      payload = String(init?.body);
       return new Response('{}', { status: 200 });
     }) as unknown as typeof fetch;
     try {
@@ -243,6 +245,7 @@ describe('/v1/monitors routes (dev mode)', () => {
       const body = await res.json();
       expect(body.sent).toBe(true);
       expect(calls).toBe(1);
+      expect(payload).toContain('*5.10%* changed (threshold 5.0%)');
     } finally {
       globalThis.fetch = realFetch;
     }

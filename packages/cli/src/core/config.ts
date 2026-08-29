@@ -651,7 +651,7 @@ export function generateDefaultConfig(
   ${routeHint}
   viewports: [375, 768, 1440],
   browsers: ['chromium'],
-  threshold: 0.1,
+  threshold: 0.1, // Changed-pixel ratio: 0.1 = 10%
   ignore: [],
   smartRender: true,
   workers: 4,

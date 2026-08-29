@@ -112,6 +112,11 @@ describe('createMonitorPlugin', () => {
     expect(() => plugin.setup!(makeContext())).toThrow('Invalid URL');
   });
 
+  it.each([-0.01, 1.01, Number.NaN])('setup rejects an out-of-range threshold %s', (alertThreshold) => {
+    const plugin = createMonitorPlugin({ urls: ['https://example.com'], alertThreshold });
+    expect(() => plugin.setup!(makeContext())).toThrow(/ratio from 0 to 1/);
+  });
+
   it('setup creates historyDir if specified', () => {
     const historyDir = join(tempDir, 'history');
     const plugin = createMonitorPlugin({ urls: ['https://example.com'], historyDir });
@@ -168,8 +173,12 @@ describe('createMonitorPlugin', () => {
       makeDiff({ diffPercentage: 10 }), // 10% > 5% threshold
     ];
 
-    plugin.afterCompare!(diffs, makeContext());
+    const context = makeContext();
+    plugin.afterCompare!(diffs, context);
     expect(diffs).toHaveLength(1);
+    expect(context.metadata.get('monitor:alerts')).toEqual([
+      expect.objectContaining({ diffPercentage: 10, threshold: 0.05 }),
+    ]);
 
     // History entry should be saved
     const historyDir = join(tempDir, 'history', urlToSlug('https://example.com'));
@@ -201,6 +210,21 @@ describe('createMonitorPlugin', () => {
     const files = readdirSync(historyDir).filter((f) => f.endsWith('.json'));
     const entry = JSON.parse(readFileSync(join(historyDir, files[0]), 'utf-8'));
     expect(entry.status).toBe('pass');
+  });
+
+  it('treats exact percentage equality as within threshold', () => {
+    const plugin = createMonitorPlugin({
+      urls: ['https://example.com'],
+      alertThreshold: 0.29,
+      historyDir: join(tempDir, 'history'),
+    });
+    plugin.setup!(makeContext());
+
+    plugin.afterCompare!([makeDiff({ diffPercentage: 29 })], makeContext());
+
+    const historyDir = join(tempDir, 'history', urlToSlug('https://example.com'));
+    const [file] = readdirSync(historyDir).filter((name) => name.endsWith('.json'));
+    expect(JSON.parse(readFileSync(join(historyDir, file), 'utf-8')).status).toBe('pass');
   });
 
   it('afterRun saves run summary to historyDir', async () => {
@@ -245,7 +269,7 @@ describe('AlertPayload structure', () => {
         {
           url: 'https://example.com',
           diffPercentage: 8.5,
-          threshold: 5,
+          threshold: 0.05,
           status: 'regression',
         },
       ],

@@ -217,6 +217,7 @@ describe('dashboard monitor CRUD via forms', () => {
     expect(monitors[0].name).toBe('My Site');
     expect(monitors[0].routes).toEqual(['/', '/pricing']);
     expect(monitors[0].intervalMinutes).toBe(30);
+    expect(monitors[0].alertThreshold).toBe(0.1);
     expect(monitors[0].alerts?.slack).toBe('https://hooks.slack.com/abc');
     expect(monitors[0].alerts?.email).toEqual(['a@x.com', 'b@x.com']);
   });
@@ -229,6 +230,19 @@ describe('dashboard monitor CRUD via forms', () => {
     });
     expect(res.status).toBe(302);
     expect(await getMemoryStore().listMonitors('bob')).toHaveLength(0);
+  });
+
+  it('falls back to the default for an out-of-range alert threshold', async () => {
+    await app.request('/dashboard/monitors', {
+      method: 'POST',
+      headers: {
+        ...(await sessionHeader('bob')),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'name=x&url=https://x.com&alertThreshold=2',
+    });
+
+    expect((await getMemoryStore().listMonitors('bob'))[0].alertThreshold).toBe(0.05);
   });
 
   it('toggles enabled state', async () => {
@@ -315,6 +329,21 @@ describe('alert config + snooze via dashboard', () => {
     expect(m!.alertThreshold).toBe(0.2);
     expect(m!.alerts?.slack).toBe('https://hooks.slack.com/z');
     expect(m!.alerts?.email).toEqual(['team@x.com']);
+  });
+
+  it('preserves the current threshold when an update is out of range', async () => {
+    const store = getMemoryStore();
+    await store.createMonitor(makeMonitor({ id: 'a1', userId: 'frank', alertThreshold: 0.2 }));
+    await app.request('/dashboard/monitors/a1/alerts', {
+      method: 'POST',
+      headers: {
+        ...(await sessionHeader('frank')),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'alertThreshold=-0.1',
+    });
+
+    expect((await store.getMonitor('a1'))!.alertThreshold).toBe(0.2);
   });
 
   it('sets and clears a snooze', async () => {

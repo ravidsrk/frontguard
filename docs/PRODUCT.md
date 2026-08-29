@@ -426,7 +426,7 @@ Developer pushes code to PR
 │  Layer 1: Pixel Diff (pixelmatch)        ← FAST, FREE  │
 │  ┌───────────────────────────────────┐                  │
 │  │ Baseline.webp vs Current.webp     │                  │
-│  │ Threshold: 0.1% pixel difference  │                  │
+│  │ Threshold: 10% pixel difference   │                  │
 │  │ ~90% of pages pass here → DONE    │                  │
 │  └───────────────┬───────────────────┘                  │
 │                  │ (failed gate)                         │
@@ -634,7 +634,7 @@ Shared fix patterns across the customer base. If 50 teams using Tailwind CSS all
      browsers: ['chromium'],  // Add 'firefox', 'webkit' for cross-browser
 
      // Comparison
-     threshold: 0.1,          // Pixel diff threshold (%)
+     threshold: 0.1,          // Changed-pixel ratio (0.1 = 10%)
 
      // AI analysis (BYOK)
      ai: {

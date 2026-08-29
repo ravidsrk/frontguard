@@ -31,6 +31,7 @@ export interface Monitor {
   routes: string[];
   viewports: number[];
   intervalMinutes: number;
+  /** Changed-pixel ratio from 0 to 1 that triggers an alert. */
   alertThreshold: number;
   alerts?: MonitorAlerts;
   enabled: boolean;

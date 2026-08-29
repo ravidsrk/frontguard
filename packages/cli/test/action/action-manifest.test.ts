@@ -165,6 +165,14 @@ describe('Action launch contract', () => {
     expect(template).not.toMatch(/^  ai-model:/m);
   });
 
+  it('does not override config threshold unless the input is explicit', () => {
+    const template = readAction(templateAction);
+    const thresholdInput = template.match(/^  threshold:\n([\s\S]*?)(?=^  [a-z-]+:|^outputs:)/m)?.[1] ?? '';
+    expect(thresholdInput).toContain('ratio between 0 and 1');
+    expect(thresholdInput).not.toMatch(/^    default:/m);
+    expect(template).toContain('if [ -n "$IN_THRESHOLD" ]; then CMD+=(--threshold "$IN_THRESHOLD"); fi');
+  });
+
   it('requires real Action execution to pass in the smoke workflow', () => {
     const workflow = readAction(smokeWorkflow);
     expect(workflow).not.toMatch(/continue-on-error:\s*true/);

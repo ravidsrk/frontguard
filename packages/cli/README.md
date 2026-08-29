@@ -118,7 +118,7 @@ export default {
 
   viewports: [375, 768, 1440],
   browsers: ["chromium"],
-  threshold: 0.1,
+  threshold: 0.1, // changed-pixel ratio: 0.1 = 10%
 
   // AI analysis (optional, BYOK)
   ai: {

@@ -99,16 +99,36 @@ describe('Threshold boundary tests', () => {
   // Baseline: solid red
   const baseline = createTestPng(W, H, 255, 0, 0);
 
-  it('diffPercentage ≈ 5% with threshold=0.1 → not regression (below threshold)', () => {
-    // 500 / 10000 = 5% diff → 0.05 < 0.1 threshold
-    const current = createTestPngWithDiff(W, H, Math.round(TOTAL * 0.05));
-    const result = compareScreenshot(makeScreenshot(current), baseline, 0.1, { enabled: false });
+  it.each([1, 3, 5])(
+    'reports an exact %d%% mutation in percentage points and accepts the inclusive ratio boundary',
+    (percent) => {
+      const ratio = percent / 100;
+      const current = createTestPngWithDiff(W, H, TOTAL * ratio);
+      const result = compareScreenshot(makeScreenshot(current), baseline, ratio, { enabled: false });
 
-    expect(result.status).not.toBe('regression');
-    // 0.05 < 0.1, so status should be 'changed' (below threshold, non-zero diff)
-    expect(result.status).toBe('changed');
-    expect(result.diffPercentage).toBeGreaterThan(0);
-    expect(result.diffPercentage).toBeLessThanOrEqual(10); // well below threshold*100
+      expect(result.diffPercentage).toBeCloseTo(percent, 5);
+      expect(result.status).toBe('changed');
+    },
+  );
+
+  it('classifies pixels immediately across a 3% threshold boundary', () => {
+    const below = compareScreenshot(
+      makeScreenshot(createTestPngWithDiff(W, H, 299)),
+      baseline,
+      0.03,
+      { enabled: false },
+    );
+    const above = compareScreenshot(
+      makeScreenshot(createTestPngWithDiff(W, H, 301)),
+      baseline,
+      0.03,
+      { enabled: false },
+    );
+
+    expect(below.diffPercentage).toBeCloseTo(2.99, 5);
+    expect(below.status).toBe('changed');
+    expect(above.diffPercentage).toBeCloseTo(3.01, 5);
+    expect(above.status).toBe('regression');
   });
 
   it('diffPercentage ≈ 15% with threshold=0.1 → regression (above threshold)', () => {

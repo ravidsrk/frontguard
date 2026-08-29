@@ -59,6 +59,7 @@ describe('generateDefaultConfig with framework metadata', () => {
   it('generic config has no framework comment', () => {
     const config = generateDefaultConfig({ format: 'ts' });
     expect(config).not.toContain('Detected:');
+    expect(config).toContain('threshold: 0.1, // Changed-pixel ratio: 0.1 = 10%');
   });
 
   it('JSON format uses typical routes', () => {

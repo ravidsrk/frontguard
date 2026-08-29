@@ -114,7 +114,11 @@ sessionDashboardRoutes.post('/monitors', async (c) => {
   const slack = String(form.slack ?? '').trim();
   const email = parseList(String(form.email ?? ''));
   const intervalMinutes = Number(form.intervalMinutes ?? 60) || 60;
-  const alertThreshold = Number(form.alertThreshold ?? 0.05);
+  const requestedThreshold = Number(form.alertThreshold ?? 0.05);
+  const alertThreshold =
+    Number.isFinite(requestedThreshold) && requestedThreshold >= 0 && requestedThreshold <= 1
+      ? requestedThreshold
+      : 0.05;
 
   const alerts =
     slack || email.length
@@ -129,7 +133,7 @@ sessionDashboardRoutes.post('/monitors', async (c) => {
     routes: routes.length ? routes : ['/'],
     viewports: [1440],
     intervalMinutes,
-    alertThreshold: Number.isFinite(alertThreshold) ? alertThreshold : 0.05,
+    alertThreshold,
     alerts,
     enabled: true,
     createdAt: new Date().toISOString(),
@@ -177,7 +181,9 @@ sessionDashboardRoutes.post('/monitors/:id/alerts', async (c) => {
         ? { ...(slack ? { slack } : {}), ...(email.length ? { email } : {}) }
         : undefined;
     const patch: Partial<Monitor> = { alerts };
-    if (Number.isFinite(threshold)) patch.alertThreshold = threshold;
+    if (Number.isFinite(threshold) && threshold >= 0 && threshold <= 1) {
+      patch.alertThreshold = threshold;
+    }
     await store.updateMonitor(id, patch);
   }
   return c.redirect(`/dashboard/monitors/${id}`, 302);

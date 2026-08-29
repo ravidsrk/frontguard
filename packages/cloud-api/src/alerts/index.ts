@@ -10,13 +10,16 @@
 
 import type { Monitor } from '../db/monitors.js';
 import type { Store } from '../db/store.js';
+import { compareDiffToThreshold } from '../threshold.js';
 
 /** A single regression or check-failure alert from a monitor run. */
 export interface MonitorAlert {
   url: string;
   route: string;
   viewport: number;
+  /** Changed pixels in percentage points (0-100). */
   diffPercentage: number;
+  /** Alert threshold as a ratio (0-1). */
   threshold: number;
   /** Regression (default) or a hard check failure (target down / sandbox error). */
   kind?: 'regression' | 'error';
@@ -34,10 +37,9 @@ export type AlertSeverity = 'low' | 'medium' | 'high';
 
 /** Maps (diff, threshold) to a severity tier. */
 export function alertSeverity(diffPercentage: number, threshold: number): AlertSeverity {
-  if (threshold <= 0) return diffPercentage >= 0.1 ? 'high' : diffPercentage >= 0.02 ? 'medium' : 'low';
-  const ratio = diffPercentage / threshold;
-  if (ratio >= 4) return 'high';
-  if (ratio >= 2) return 'medium';
+  if (threshold <= 0) return diffPercentage >= 10 ? 'high' : diffPercentage >= 2 ? 'medium' : 'low';
+  if (compareDiffToThreshold(diffPercentage, threshold * 4) >= 0) return 'high';
+  if (compareDiffToThreshold(diffPercentage, threshold * 2) >= 0) return 'medium';
   return 'low';
 }
 
@@ -47,12 +49,11 @@ export function alertSeverity(diffPercentage: number, threshold: number): AlertS
  * 0=0%, 1=<1%, 2=1–5%, 3=5–10%, 4=10–25%, 5=≥25%.
  */
 export function diffBucket(diffPercentage: number): number {
-  const pct = diffPercentage * 100;
-  if (pct <= 0) return 0;
-  if (pct < 1) return 1;
-  if (pct < 5) return 2;
-  if (pct < 10) return 3;
-  if (pct < 25) return 4;
+  if (diffPercentage <= 0) return 0;
+  if (diffPercentage < 1) return 1;
+  if (diffPercentage < 5) return 2;
+  if (diffPercentage < 10) return 3;
+  if (diffPercentage < 25) return 4;
   return 5;
 }
 
@@ -115,7 +116,7 @@ export function buildSlackPayload(monitor: Monitor, alerts: MonitorAlert[]): unk
       if (a.kind === 'error') {
         return `• Check failed — ${a.message ?? 'target unreachable or sandbox error'}`;
       }
-      return `• \`${a.route}\` @ ${a.viewport}px — *${(a.diffPercentage * 100).toFixed(2)}%* changed (threshold ${(a.threshold * 100).toFixed(1)}%)`;
+      return `• \`${a.route}\` @ ${a.viewport}px — *${a.diffPercentage.toFixed(2)}%* changed (threshold ${(a.threshold * 100).toFixed(1)}%)`;
     })
     .join('\n');
   const headline = isError
@@ -150,7 +151,7 @@ export function buildEmailHtml(monitor: Monitor, alerts: MonitorAlert[]): string
       if (a.kind === 'error') {
         return `<tr><td colspan="3">${escapeHtml(a.message ?? 'Check failed')}</td></tr>`;
       }
-      return `<tr><td>${escapeHtml(a.route)}</td><td>${a.viewport}px</td><td>${(a.diffPercentage * 100).toFixed(2)}%</td></tr>`;
+      return `<tr><td>${escapeHtml(a.route)}</td><td>${a.viewport}px</td><td>${a.diffPercentage.toFixed(2)}%</td></tr>`;
     })
     .join('');
   return `<h2>🚨 Frontguard — ${isError ? 'monitor check failed' : `${alerts.length} visual regression(s)`}</h2>
@@ -192,8 +193,8 @@ export function buildPagerDutyPayload(
         regressions: alerts.map((a) => ({
           route: a.route,
           viewport: a.viewport,
-          diff_percentage: Number((a.diffPercentage * 100).toFixed(2)),
-          threshold: Number((a.threshold * 100).toFixed(2)),
+          diff_percentage: Number(a.diffPercentage.toFixed(2)),
+          threshold: a.threshold,
         })),
       },
     },

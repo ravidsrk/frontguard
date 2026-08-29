@@ -31,7 +31,7 @@ const monitor: Monitor = {
 };
 
 const alerts: MonitorAlert[] = [
-  { url: 'https://example.com', route: '/', viewport: 1440, diffPercentage: 0.12, threshold: 0.05 },
+  { url: 'https://example.com', route: '/', viewport: 1440, diffPercentage: 12, threshold: 0.05 },
 ];
 
 describe('alert payload builders', () => {
@@ -62,7 +62,11 @@ describe('alert payload builders', () => {
     expect(p.payload.summary).toContain('1 visual regression');
     expect(p.payload.source).toBe(monitor.url);
     expect(p.payload.severity).toBe('warning');
-    expect(JSON.stringify(p.payload.custom_details)).toContain('12');
+    expect(p.payload.custom_details).toEqual({
+      monitor: 'Prod',
+      url: 'https://example.com',
+      regressions: [{ route: '/', viewport: 1440, diff_percentage: 12, threshold: 0.05 }],
+    });
   });
 });
 
@@ -170,37 +174,37 @@ describe('dispatchAlerts', () => {
 
 describe('alertSeverity', () => {
   it('tiers by ratio of diff to threshold', () => {
-    expect(alertSeverity(0.05, 0.05)).toBe('low'); // 1×
-    expect(alertSeverity(0.12, 0.05)).toBe('medium'); // 2.4×
-    expect(alertSeverity(0.25, 0.05)).toBe('high'); // 5×
+    expect(alertSeverity(5, 0.05)).toBe('low'); // 1x
+    expect(alertSeverity(12, 0.05)).toBe('medium'); // 2.4x
+    expect(alertSeverity(25, 0.05)).toBe('high'); // 5x
   });
   it('handles zero threshold without dividing by zero', () => {
-    expect(alertSeverity(0.5, 0)).toBe('high');
-    expect(alertSeverity(0.03, 0)).toBe('medium');
-    expect(alertSeverity(0.001, 0)).toBe('low');
+    expect(alertSeverity(50, 0)).toBe('high');
+    expect(alertSeverity(5, 0)).toBe('medium');
+    expect(alertSeverity(0.1, 0)).toBe('low');
   });
 });
 
 describe('diffBucket', () => {
   it('bins diff percentages coarsely so tiny noise dedups', () => {
     expect(diffBucket(0)).toBe(0);
-    expect(diffBucket(0.005)).toBe(1); // 0.5%
-    expect(diffBucket(0.03)).toBe(2); // 3%
-    expect(diffBucket(0.08)).toBe(3); // 8%
-    expect(diffBucket(0.15)).toBe(4); // 15%
-    expect(diffBucket(0.5)).toBe(5); // 50%
+    expect(diffBucket(0.5)).toBe(1);
+    expect(diffBucket(3)).toBe(2);
+    expect(diffBucket(8)).toBe(3);
+    expect(diffBucket(15)).toBe(4);
+    expect(diffBucket(50)).toBe(5);
   });
 });
 
 describe('alertFingerprint', () => {
   it('is order-independent', () => {
     const a: MonitorAlert[] = [
-      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.2, threshold: 0.05 },
-      { url: 'u', route: '/b', viewport: 375, diffPercentage: 0.3, threshold: 0.05 },
+      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 20, threshold: 0.05 },
+      { url: 'u', route: '/b', viewport: 375, diffPercentage: 30, threshold: 0.05 },
     ];
     const b: MonitorAlert[] = [
-      { url: 'u', route: '/b', viewport: 375, diffPercentage: 0.3, threshold: 0.05 },
-      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.2, threshold: 0.05 },
+      { url: 'u', route: '/b', viewport: 375, diffPercentage: 30, threshold: 0.05 },
+      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 20, threshold: 0.05 },
     ];
     expect(alertFingerprint(a)).toBe(alertFingerprint(b));
   });
@@ -208,10 +212,10 @@ describe('alertFingerprint', () => {
   it('dedups within the same severity + bucket band (small fluctuations)', () => {
     // Both 6.1% and 6.4% land in bucket 3 (5–10%) with same severity tier.
     const a: MonitorAlert[] = [
-      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.061, threshold: 0.05 },
+      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 6.1, threshold: 0.05 },
     ];
     const b: MonitorAlert[] = [
-      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.064, threshold: 0.05 },
+      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 6.4, threshold: 0.05 },
     ];
     expect(alertFingerprint(a)).toBe(alertFingerprint(b));
   });
@@ -219,17 +223,17 @@ describe('alertFingerprint', () => {
   it('changes when severity escalates (P2-4: escalating regressions re-alert)', () => {
     // Same routes, but 6% → 30% pushes from medium to high + crosses buckets.
     const low: MonitorAlert[] = [
-      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.06, threshold: 0.05 },
+      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 6, threshold: 0.05 },
     ];
     const high: MonitorAlert[] = [
-      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.3, threshold: 0.05 },
+      { url: 'u', route: '/a', viewport: 1440, diffPercentage: 30, threshold: 0.05 },
     ];
     expect(alertFingerprint(low)).not.toBe(alertFingerprint(high));
   });
 
   it('differs for different route sets', () => {
-    const a: MonitorAlert[] = [{ url: 'u', route: '/a', viewport: 1440, diffPercentage: 0.2, threshold: 0.05 }];
-    const b: MonitorAlert[] = [{ url: 'u', route: '/c', viewport: 1440, diffPercentage: 0.2, threshold: 0.05 }];
+    const a: MonitorAlert[] = [{ url: 'u', route: '/a', viewport: 1440, diffPercentage: 20, threshold: 0.05 }];
+    const b: MonitorAlert[] = [{ url: 'u', route: '/c', viewport: 1440, diffPercentage: 20, threshold: 0.05 }];
     expect(alertFingerprint(a)).not.toBe(alertFingerprint(b));
   });
 });
@@ -241,7 +245,7 @@ describe('dispatchAlertsWithState (dedup + snooze)', () => {
     alerts: { slack: 'https://hook' }, enabled: true, createdAt: '2026-01-01T00:00:00Z',
   };
   const sample: MonitorAlert[] = [
-    { url: 'https://x.com', route: '/', viewport: 1440, diffPercentage: 0.2, threshold: 0.05 },
+    { url: 'https://x.com', route: '/', viewport: 1440, diffPercentage: 20, threshold: 0.05 },
   ];
   const okFetch = (async () => new Response('{}', { status: 200 })) as unknown as typeof fetch;
 
@@ -269,7 +273,7 @@ describe('dispatchAlertsWithState (dedup + snooze)', () => {
     await dispatchAlertsWithState({}, store, mon, sample, now, okFetch);
     const changed: MonitorAlert[] = [
       ...sample,
-      { url: 'https://x.com', route: '/pricing', viewport: 1440, diffPercentage: 0.3, threshold: 0.05 },
+      { url: 'https://x.com', route: '/pricing', viewport: 1440, diffPercentage: 30, threshold: 0.05 },
     ];
     const res = await dispatchAlertsWithState({}, store, mon, changed, now, okFetch);
     expect(res.reason).toBe('sent');
@@ -279,10 +283,10 @@ describe('dispatchAlertsWithState (dedup + snooze)', () => {
     const store = new InMemoryStore();
     const now = new Date('2026-01-01T12:00:00Z');
     const small: MonitorAlert[] = [
-      { url: 'https://x.com', route: '/', viewport: 1440, diffPercentage: 0.06, threshold: 0.05 },
+      { url: 'https://x.com', route: '/', viewport: 1440, diffPercentage: 6, threshold: 0.05 },
     ];
     const huge: MonitorAlert[] = [
-      { url: 'https://x.com', route: '/', viewport: 1440, diffPercentage: 0.5, threshold: 0.05 },
+      { url: 'https://x.com', route: '/', viewport: 1440, diffPercentage: 50, threshold: 0.05 },
     ];
     expect((await dispatchAlertsWithState({}, store, mon, small, now, okFetch)).reason).toBe('sent');
     // Same routes, but escalated severity — must re-alert.

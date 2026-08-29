@@ -38,6 +38,7 @@ import { discoverStorybookRoutesForConfig } from '../discovery/storybook.js';
 import { smartFilter } from '../graph/filter.js';
 import { renderPages } from '../render/playwright.js';
 import { compareScreenshot, createNewPageResult } from '../diff/pixel.js';
+import { compareDiffToThreshold } from '../diff/threshold.js';
 import { analyzeWithAI } from '../diff/ai-vision.js';
 import { judgeScreenshot } from '../diff/model-judge.js';
 import { fetchDesignReference } from '../plugins/figma.js';
@@ -572,10 +573,16 @@ export async function runPipeline(
               logger.debug(`New page: ${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`);
             } else {
               // Compare against existing baseline using the effective threshold
-              diff = compareScreenshot(shot, baseline, effectiveThreshold);
+              diff = compareScreenshot(shot, baseline, effectiveThreshold, {
+                enabled: config.ssimFallback,
+                ssimThreshold: config.ssimThreshold,
+              });
 
               // Mark regressions vs changes based on the effective threshold
-              if (diff.status === 'changed' && diff.diffPercentage > effectiveThreshold * 100) {
+              if (
+                diff.status === 'changed' &&
+                compareDiffToThreshold(diff.diffPercentage, effectiveThreshold) > 0
+              ) {
                 diff = { ...diff, status: 'regression' };
               }
             }

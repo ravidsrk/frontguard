@@ -148,6 +148,18 @@ describe('POST /v1/run', () => {
     expect(run.browsers).toEqual(['chromium']);
     expect(run.threshold).toBe(0.01);
   });
+
+  it('preserves an explicit zero threshold', async () => {
+    const createRes = await request('/v1/run', {
+      method: 'POST',
+      body: JSON.stringify({ url: 'https://example.com', threshold: 0 }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const { id } = await createRes.json();
+
+    const getRes = await request(`/v1/runs/${id}`);
+    expect((await getRes.json()).threshold).toBe(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

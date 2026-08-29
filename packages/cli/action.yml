@@ -21,9 +21,8 @@ inputs:
     required: false
     default: 'chromium'
   threshold:
-    description: 'Pixel diff threshold percentage (default: 0.1)'
+    description: 'Changed-pixel ratio between 0 and 1 (for example, 0.01 = 1%). Uses config or 0.1 when omitted.'
     required: false
-    default: '0.1'
   config:
     description: 'Path to frontguard.config.ts'
     required: false
@@ -167,7 +166,7 @@ runs:
           echo "Invalid browsers input: $IN_BROWSERS" >&2
           exit 1
         fi
-        if ! echo "$IN_THRESHOLD" | grep -Eq '^[0-9]+(\.[0-9]+)?$'; then
+        if [ -n "$IN_THRESHOLD" ] && ! echo "$IN_THRESHOLD" | grep -Eq '^[0-9]+(\.[0-9]+)?$'; then
           echo "Invalid threshold input: $IN_THRESHOLD" >&2
           exit 1
         fi
@@ -177,7 +176,7 @@ runs:
         if [ -n "$IN_ROUTES" ]; then CMD+=(--routes "$IN_ROUTES"); fi
         CMD+=(--viewports "$IN_VIEWPORTS")
         CMD+=(--browsers "$IN_BROWSERS")
-        CMD+=(--threshold "$IN_THRESHOLD")
+        if [ -n "$IN_THRESHOLD" ]; then CMD+=(--threshold "$IN_THRESHOLD"); fi
         if [ -n "$IN_CONFIG" ]; then CMD+=(--config "$IN_CONFIG"); fi
         if [ "$IN_UPDATE_BASELINES" = "true" ]; then CMD+=(--update-baselines); fi
         CMD+=(--output json)

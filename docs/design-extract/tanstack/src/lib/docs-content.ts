@@ -204,7 +204,7 @@ ${p('The default command. Runs the full discover → render → diff → analyze
   ${flagRow('-v, --viewports', 'Comma-separated viewport widths', '375,768,1440')}
   ${flagRow('-b, --browsers', 'chromium, firefox, webkit', 'chromium')}
   ${flagRow('-o, --output', 'Output format: console, json', 'console')}
-  ${flagRow('-t, --threshold', 'Pixel diff threshold (0–100)', '0.1')}
+  ${flagRow('-t, --threshold &lt;ratio&gt;', 'Changed-pixel ratio (0–1; 0.01 = 1%)', '0.1')}
 </div>
 <h3 style="font-size: 17px; font-weight: 600; color: #f5f1ea; margin: 28px 0 12px;">Exit codes</h3>
 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 36px;">
@@ -217,7 +217,7 @@ ${p('Runs visual checks against live production URLs instead of a local dev serv
 ${code(
   'terminal',
   `<span style="color: #564f48;"># one-off check</span>
-<span style="color: #7c746b;">$</span> frontguard monitor --url https://example.com --threshold 2
+<span style="color: #7c746b;">$</span> frontguard monitor --url https://example.com --threshold 0.02
 
 <span style="color: #564f48;"># daemon mode — check every 15 minutes, alert Slack</span>
 <span style="color: #7c746b;">$</span> frontguard monitor --url https://example.com --interval 15 --webhook \$SLACK_WEBHOOK`,
@@ -238,7 +238,7 @@ ${lead(`Frontguard is configured via ${ic('frontguard.config.ts')} in your proje
 
   viewports: [<span style="color: ${C.n};">375</span>, <span style="color: ${C.n};">768</span>, <span style="color: ${C.n};">1440</span>],
   browsers: [<span style="color: ${C.g};">'chromium'</span>],
-  threshold: <span style="color: ${C.n};">0.1</span>,
+  threshold: <span style="color: ${C.n};">0.1</span>, <span style="color: ${C.cm};">// 10% changed pixels</span>
 
   <span style="color: ${C.cm};">// AI analysis (optional, BYOK)</span>
   ai: { provider: <span style="color: ${C.g};">'openai'</span>, model: <span style="color: ${C.g};">'gpt-4o'</span> },
@@ -342,8 +342,7 @@ ${h2b('Action inputs')}
     ['url', 'No', 'Base URL to test (auto-detected from preview deploys if omitted).'],
     ['routes', 'No', 'Comma-separated routes (auto-discovered by default).'],
     ['viewports', 'No', 'Comma-separated viewport widths. Default 375,768,1440.'],
-    ['threshold', 'No', 'Pixel diff threshold percentage. Default 0.1.'],
-    ['ai-provider', 'No', 'openai or anthropic.'],
+    ['threshold', 'No', 'Changed-pixel ratio (0–1; 0.01 = 1%). Uses config or 0.1 when omitted.'],
     ['update-baselines', 'No', 'Accept current as new baselines. Default false.'],
   ]
     .map(
@@ -359,8 +358,8 @@ ${h2b('What the action does')}
 <div style="display: grid; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 40px;">
   ${[
     ['1', 'Setup Node.js 20.'],
-    ['2', 'Install Frontguard — npm install -g @frontguard/cli@latest.'],
-    ['3', 'Install browsers — npx playwright install --with-deps.'],
+    ['2', 'Install the exact Frontguard CLI version bundled by the Action.'],
+    ['3', 'Install browsers through the exact CLI package version bundled by the Action.'],
     ['4', 'Detect preview URL from Vercel, Netlify, Cloudflare, Railway, Render.'],
     ['5', 'Run the full pipeline with your configuration.'],
     ['6', 'Upload the HTML report as a build artifact.'],

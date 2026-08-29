@@ -11,10 +11,15 @@ type OperationObject = {
 
 type PathItemObject = Record<string, OperationObject | unknown>
 
+type SchemaObject = {
+  properties?: Record<string, Record<string, unknown>>
+}
+
 type OpenApiDocument = OpenAPIV3_1.Document & {
   paths: Record<string, PathItemObject>
   components?: {
     securitySchemes?: Record<string, Record<string, unknown>>
+    schemas?: Record<string, SchemaObject>
   }
 }
 
@@ -160,6 +165,34 @@ describe('public OpenAPI contract', () => {
       for (const prefix of forbidden) {
         expect(route === prefix || route.startsWith(`${prefix}/`), `${route} must not expose ${prefix}`).toBe(false)
       }
+    }
+  })
+
+  it('documents threshold ratios and diff percentage points', () => {
+    const schemas = readSpec().components?.schemas
+    expect(schemas?.RunRequest?.properties?.threshold).toEqual(expect.objectContaining({
+      minimum: 0,
+      maximum: 1,
+      default: 0.01,
+      description: expect.stringContaining('ratio'),
+    }))
+    expect(schemas?.Run?.properties?.threshold).toEqual(expect.objectContaining({
+      minimum: 0,
+      maximum: 1,
+      description: expect.stringContaining('ratio'),
+    }))
+    expect(schemas?.RunResult?.properties?.diffPercentage).toEqual(expect.objectContaining({
+      minimum: 0,
+      maximum: 100,
+      description: expect.stringContaining('percentage points'),
+    }))
+
+    for (const schemaName of ['Monitor', 'MonitorCreateRequest', 'MonitorUpdateRequest']) {
+      expect(schemas?.[schemaName]?.properties?.alertThreshold, schemaName).toEqual(expect.objectContaining({
+        minimum: 0,
+        maximum: 1,
+        description: expect.stringContaining('ratio'),
+      }))
     }
   })
 })

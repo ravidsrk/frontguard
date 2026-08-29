@@ -22,6 +22,7 @@ import type { Sandbox } from './types.js';
 import { LocalSandbox } from './local.js';
 import { DaytonaSandbox } from './daytona.js';
 import { logger } from '../utils/logger.js';
+import { compareDiffToThreshold } from '../diff/threshold.js';
 
 /** Selects a sandbox implementation. */
 export function createSandbox(kind: 'local' | 'daytona'): Sandbox {
@@ -115,12 +116,12 @@ export async function verifyFix(
 
     const afterDiff = diffPercentageBetween(diff.baselineImage, afterBuffer);
     const threshold =
-      (typeof diff.route.threshold === 'number' ? diff.route.threshold : config.threshold) * 100;
-    const verified = afterDiff <= threshold;
+      typeof diff.route.threshold === 'number' ? diff.route.threshold : config.threshold;
+    const verified = compareDiffToThreshold(afterDiff, threshold) <= 0;
 
     logger.debug(
       `Fix verification for ${diff.route.path}: after-fix diff ${afterDiff.toFixed(2)}% ` +
-        `(threshold ${threshold.toFixed(2)}%) → ${verified ? 'verified' : 'rejected'}`,
+        `(threshold ${(threshold * 100).toFixed(2)}%) → ${verified ? 'verified' : 'rejected'}`,
     );
 
     return { fixApplied: true, diffPercentage: afterDiff, verified };

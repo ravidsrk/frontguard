@@ -190,6 +190,7 @@ describe('scheduler', () => {
     const monitor = makeMonitor({
       routes: nestedRoutes,
       alerts: { slack: 'https://hook' },
+      alertThreshold: 0.29,
     });
     await store.createMonitor(monitor);
     const bucket = {
@@ -258,7 +259,7 @@ describe('scheduler', () => {
           route,
           viewport: 1440,
           status: i === 0 ? 'regression' : 'unchanged',
-          diffPercentage: i === 0 ? 0.2 : 0,
+          diffPercentage: i === 0 ? 40 : i === 1 ? 29 : 0,
           timestamp: t2.toISOString(),
         }));
       },
@@ -270,8 +271,9 @@ describe('scheduler', () => {
     expect(capturedRestore?.baselines.map((b) => b.route)).toEqual(
       expect.arrayContaining(nestedRoutes),
     );
-    expect(second.alerts.length).toBeGreaterThan(0);
+    expect(second.alerts).toHaveLength(1);
     expect(second.alerts[0].route).toBe('/foo/bar');
+    expect(second.alerts[0].diffPercentage).toBe(40);
     expect(dispatchSpy).toHaveBeenCalled();
   });
 

@@ -23,6 +23,8 @@ import {
 import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
 import { maybeRunInDocker } from './run.js';
+import { parseThresholdRatio } from './threshold.js';
+import { compareDiffToThreshold } from '../diff/threshold.js';
 import { sendTelemetry, isTelemetryEnabled, type TelemetryEvent } from '../utils/telemetry.js';
 import { ConsoleReporter } from '../report/console.js';
 import { JSONReporter } from '../report/json.js';
@@ -115,10 +117,12 @@ export async function buildConfig(
   }
 
   if (opts.threshold && typeof opts.threshold === 'string') {
-    const parsed = parseFloat(opts.threshold);
-    if (!isNaN(parsed)) {
-      // If user passes a percentage (e.g. 5), convert to fraction (0.05)
-      config.threshold = parsed > 1 ? parsed / 100 : parsed;
+    const parsed = parseThresholdRatio(opts.threshold);
+    config.threshold = parsed.ratio;
+    if (parsed.legacyPercentage) {
+      logger.warn(
+        `Threshold percentage syntax (${opts.threshold}) is deprecated; use the ratio ${parsed.ratio}.`,
+      );
     }
   }
 
@@ -252,7 +256,7 @@ export async function main(argv?: string[]): Promise<number> {
     .option('-b, --browsers <br>', 'Comma-separated browsers')
     .option('-c, --config <path>', 'Config file path')
     .option('-o, --output <format>', 'Output format: console, json', 'console')
-    .option('-t, --threshold <n>', 'Pixel diff threshold percentage (0-100)')
+    .option('-t, --threshold <ratio>', 'Changed-pixel ratio from 0 to 1 (0.01 = 1%)')
     .option('--verbose', 'Verbose output')
     .option('--debug', 'Debug output (includes Playwright traces)')
     .option('--update-baselines', 'Accept current screenshots as new baselines')
@@ -478,7 +482,7 @@ export async function main(argv?: string[]): Promise<number> {
     .description('Monitor live production URLs for visual regressions')
     .option('-u, --url <urls>', 'Comma-separated URLs to monitor (overrides config)')
     .option('-c, --config <path>', 'Config file path')
-    .option('-t, --threshold <n>', 'Alert threshold percentage (0-100)', '5')
+    .option('-t, --threshold <ratio>', 'Alert threshold ratio from 0 to 1 (0.05 = 5%)', '0.05')
     .option('--webhook <url>', 'Webhook URL for alerts (Slack, Discord, etc.)')
     .option('--history-dir <dir>', 'Directory to store run history', '.frontguard/monitor-history')
     .option('--interval <minutes>', 'Run repeatedly every N minutes (daemon mode)')
@@ -510,12 +514,13 @@ export async function main(argv?: string[]): Promise<number> {
           ? opts.url.split(',').map((u: string) => u.trim()).filter(Boolean)
           : undefined;
 
-        const thresholdPct = parseFloat(opts.threshold);
-        const alertThreshold = isNaN(thresholdPct)
-          ? 0.05
-          : thresholdPct > 1
-            ? thresholdPct / 100
-            : thresholdPct;
+        const parsedThreshold = parseThresholdRatio(opts.threshold as string);
+        const alertThreshold = parsedThreshold.ratio;
+        if (parsedThreshold.legacyPercentage) {
+          logger.warn(
+            `Threshold percentage syntax (${opts.threshold}) is deprecated; use the ratio ${alertThreshold}.`,
+          );
+        }
 
         const runOnce = async (): Promise<number> => {
           const config = await buildConfig({ ...opts, url: urls?.[0] ?? opts.url });
@@ -532,7 +537,9 @@ export async function main(argv?: string[]): Promise<number> {
           const reporter = new ConsoleReporter();
           logger.info(`🔍 Monitoring ${monitorUrls.length} URL(s)…`);
           const result = await runPipeline(config, reporter);
-          const regressions = result.summary.regressions + result.summary.warnings;
+          const regressions = result.diffs.filter(
+            (diff) => compareDiffToThreshold(diff.diffPercentage, alertThreshold) > 0,
+          ).length;
           if (regressions > 0) {
             logger.error(`⚠ ${regressions} URL(s) exceeded the alert threshold`);
             return 1;

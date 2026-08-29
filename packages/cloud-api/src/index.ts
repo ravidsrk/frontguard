@@ -442,7 +442,7 @@ app.post("/v1/run", async (c) => {
     routes,
     viewports,
     browsers,
-    threshold: data.threshold || 0.01,
+    threshold: data.threshold ?? 0.01,
     ai: data.ai
       ? { provider: data.ai.provider, model: data.ai.model ?? "" }
       : null,

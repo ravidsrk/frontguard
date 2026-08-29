@@ -128,8 +128,8 @@ Missing Infrastructure (nothing exists):
 **Dependencies:** None.
 
 **Acceptance criteria:**
-- [x] Config accepts both `routes: ["/", "/about"]` and `routes: [{ path: "/", threshold: 0.01 }, { path: "/blog", threshold: 0.5 }]`
-- [x] Mixed arrays work: `routes: ["/", { path: "/checkout", threshold: 0.01 }]`
+- [x] Config accepts both `routes: ["/", "/about"]` and `routes: [{ path: "/", threshold: 0.01 }, { path: "/blog", threshold: 0.005 }]`
+- [x] Mixed arrays work: `routes: ["/", { path: "/checkout", threshold: 0.0001 }]`
 - [x] Per-route threshold overrides global `threshold` during diff comparison
 - [x] Per-route `ignore` rules merge with (don't replace) global ignore rules
 - [x] Existing configs with string-only routes continue working (backward compatible)
@@ -353,7 +353,7 @@ The PR comment markdown format should be:
 - Scenario mapping: BackstopJS scenarios → Frontguard routes
 - Feature comparison table: what maps, what's new, what's different
 - `readySelector` → Frontguard's `smartRender` + `waitForSelector`
-- `misMatchThreshold` → `threshold` (direct mapping)
+- `misMatchThreshold` percentage points → `threshold` ratio (divide by 100)
 - `viewports` → `viewports` (direct mapping)
 - BackstopJS `reference`/`test` → Frontguard baselines
 - Step-by-step migration checklist
