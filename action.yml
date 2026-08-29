@@ -48,12 +48,6 @@ inputs:
   config:
     description: 'Path to frontguard.config.ts'
     required: false
-  ai-provider:
-    description: 'AI provider: openai or anthropic'
-    required: false
-  ai-model:
-    description: 'AI model name (e.g., gpt-4o, claude-3-5-sonnet-20241022)'
-    required: false
   update-baselines:
     description: 'Accept current screenshots as new baselines'
     required: false
@@ -66,10 +60,13 @@ inputs:
 outputs:
   result:
     description: 'JSON result of the visual regression test run'
+    value: ${{ steps.frontguard.outputs.result }}
   regressions:
     description: 'Number of regressions found'
+    value: ${{ steps.frontguard.outputs.regressions }}
   status:
     description: 'pass, fail, or error'
+    value: ${{ steps.frontguard.outputs.status }}
 
 runs:
   using: 'composite'
@@ -88,6 +85,7 @@ runs:
     - name: Install Playwright browsers
       shell: bash
       env:
+        FRONTGUARD_CLI_VERSION: '0.2.2'
         IN_BROWSERS: ${{ inputs.browsers }}
       run: |
         set -euo pipefail
@@ -96,7 +94,13 @@ runs:
           exit 1
         fi
         IFS=',' read -ra BROWSER_ARR <<< "$IN_BROWSERS"
-        npx playwright install --with-deps "${BROWSER_ARR[@]}"
+        npm exec --yes --package="@frontguard/cli@${FRONTGUARD_CLI_VERSION}" -- playwright install --with-deps "${BROWSER_ARR[@]}"
+
+    - name: Configure baseline commit identity
+      shell: bash
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
     - name: Detect Preview URL
       id: preview-url
@@ -210,17 +214,16 @@ runs:
 
         RUN_FAILED=0
         REGRESSIONS=""
-        if [ "$RUN_EXIT" -ne 0 ]; then
-          RUN_FAILED=1
-        fi
+        ERRORS=""
 
         if [ ! -s /tmp/frontguard-result.json ]; then
           RUN_FAILED=1
           printf '{}' > /tmp/frontguard-result.json
-        elif ! jq -e '(.summary.regressions | type) == "number"' /tmp/frontguard-result.json >/dev/null 2>&1; then
+        elif ! jq -e '(.summary.regressions | type) == "number" and (.summary.errors | type) == "number"' /tmp/frontguard-result.json >/dev/null 2>&1; then
           RUN_FAILED=1
         else
           REGRESSIONS=$(jq -r '.summary.regressions' /tmp/frontguard-result.json)
+          ERRORS=$(jq -r '.summary.errors' /tmp/frontguard-result.json)
         fi
 
         write_github_output result "$(cat /tmp/frontguard-result.json)"
@@ -234,12 +237,29 @@ runs:
 
         write_github_output regressions "$REGRESSIONS"
 
+        if [ "$ERRORS" -gt 0 ]; then
+          write_github_output status "error"
+          echo "Frontguard reported $ERRORS tool error(s)" >&2
+          exit 1
+        fi
+
         if [ "$REGRESSIONS" -gt 0 ]; then
           write_github_output status "fail"
           exit 1
         fi
 
+        if [ "$RUN_EXIT" -ne 0 ]; then
+          write_github_output status "error"
+          echo "Frontguard exited unexpectedly with code $RUN_EXIT" >&2
+          exit 1
+        fi
+
         write_github_output status "pass"
+
+    - name: Push updated baselines
+      if: inputs.update-baselines == 'true'
+      shell: bash
+      run: git push origin frontguard-baselines
 
     - name: Upload Report
       if: always()

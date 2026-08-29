@@ -11,6 +11,7 @@ const repoRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' })
 const rootAction = join(repoRoot, 'action.yml');
 const cliAction = join(repoRoot, 'packages/cli/action.yml');
 const templateAction = join(repoRoot, 'packages/cli/action.template.yml');
+const smokeWorkflow = join(repoRoot, '.github/workflows/action-smoke.yml');
 const version = readFileSync(join(repoRoot, 'VERSION'), 'utf8').trim();
 
 function readAction(path: string): string {
@@ -127,6 +128,47 @@ describe('DEP-4: Playwright is exact-pinned for deterministic renders', () => {
     };
     expect(pkg.dependencies.playwright).toBe('1.62.1');
     expect(pkg.dependencies.playwright).not.toMatch(/^\^/);
+  });
+});
+
+describe('Action launch contract', () => {
+  it('installs browsers through the Playwright dependency of the pinned CLI', () => {
+    for (const path of [rootAction, cliAction]) {
+      const yml = readAction(path);
+      expect(yml).toContain(
+        'npm exec --yes --package="@frontguard/cli@${FRONTGUARD_CLI_VERSION}" -- playwright install',
+      );
+      expect(yml).not.toContain('npx playwright install');
+    }
+  });
+
+  it('maps composite outputs to the Frontguard step outputs', () => {
+    for (const path of [rootAction, cliAction]) {
+      const yml = readAction(path);
+      expect(yml).toMatch(/result:\n\s+description:.*\n\s+value: \$\{\{ steps\.frontguard\.outputs\.result \}\}/);
+      expect(yml).toMatch(/regressions:\n\s+description:.*\n\s+value: \$\{\{ steps\.frontguard\.outputs\.regressions \}\}/);
+      expect(yml).toMatch(/status:\n\s+description:.*\n\s+value: \$\{\{ steps\.frontguard\.outputs\.status \}\}/);
+    }
+  });
+
+  it('configures a scoped Git author and pushes only explicit baseline updates', () => {
+    const template = readAction(templateAction);
+    expect(template).toContain('git config user.name "github-actions[bot]"');
+    expect(template).toContain('git config user.email "41898282+github-actions[bot]@users.noreply.github.com"');
+    expect(template).toContain("if: inputs.update-baselines == 'true'");
+    expect(template).toContain('git push origin frontguard-baselines');
+  });
+
+  it('does not advertise AI inputs that the CLI ignores', () => {
+    const template = readAction(templateAction);
+    expect(template).not.toMatch(/^  ai-provider:/m);
+    expect(template).not.toMatch(/^  ai-model:/m);
+  });
+
+  it('requires real Action execution to pass in the smoke workflow', () => {
+    const workflow = readAction(smokeWorkflow);
+    expect(workflow).not.toMatch(/continue-on-error:\s*true/);
+    expect(workflow).not.toContain("update-baselines: 'true'");
   });
 });
 
