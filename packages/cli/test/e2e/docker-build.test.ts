@@ -21,9 +21,9 @@ const cliDir = resolve(new URL('.', import.meta.url).pathname, '..', '..');
 const dockerCtxDir = join(cliDir, 'docker');
 const pkg = JSON.parse(readFileSync(join(cliDir, 'package.json'), 'utf-8')) as { version: string };
 
-/** Returns true if `docker --version` exits 0 on the host. */
+/** Returns true only when the Docker CLI can reach a running daemon. */
 function dockerAvailable(): boolean {
-  const r = spawnSync('docker', ['--version'], { stdio: 'ignore' });
+  const r = spawnSync('docker', ['info'], { stdio: 'ignore' });
   return r.status === 0;
 }
 
@@ -103,4 +103,3 @@ describe.skipIf(!HAVE_DOCKER)('docker image e2e', () => {
     }
   });
 });
-
