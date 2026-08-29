@@ -901,13 +901,8 @@ export async function runPipeline(
   // Stage 7: REPORT
   // -----------------------------------------------------------------------
   reporter.onStageStart('report', 'Generating report…');
-  try {
-    reporter.onComplete(result);
-    reporter.onStageComplete('report', 'Done');
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`Reporter failed: ${msg}`);
-  }
+  reporter.onComplete(result);
+  reporter.onStageComplete('report', 'Done');
 
   return result;
 

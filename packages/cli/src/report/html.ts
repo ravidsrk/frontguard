@@ -20,21 +20,29 @@ import { logger } from '../utils/logger.js';
 export class HTMLReporter implements Reporter {
   private errors: Error[] = [];
 
-  onStageStart(_stage: PipelineStage, _detail?: string): void {}
-  onStageProgress(_stage: PipelineStage, _current: number, _total: number, _detail?: string): void {}
-  onStageComplete(_stage: PipelineStage, _detail?: string): void {}
+  constructor(private readonly delegate?: Reporter) {}
+
+  onStageStart(stage: PipelineStage, detail?: string): void {
+    this.delegate?.onStageStart(stage, detail);
+  }
+
+  onStageProgress(stage: PipelineStage, current: number, total: number, detail?: string): void {
+    this.delegate?.onStageProgress(stage, current, total, detail);
+  }
+
+  onStageComplete(stage: PipelineStage, detail?: string): void {
+    this.delegate?.onStageComplete(stage, detail);
+  }
 
   onError(error: Error): void {
+    this.delegate?.onError(error);
     this.errors.push(error);
     logger.error(`Pipeline error captured for HTML report: ${error.message}`);
   }
 
   onComplete(result: RunResult): void {
-    try {
-      this.writeReport(result, result.config.outputDir);
-    } catch (err) {
-      logger.error(`Failed to write HTML report: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    this.delegate?.onComplete(result);
+    this.writeReport(result, result.config.outputDir);
   }
 
   /**

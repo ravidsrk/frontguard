@@ -133,6 +133,18 @@ describe('REL-5: compare temp directory', () => {
     expect(existsSync(tempDirs.created[0]!)).toBe(false);
   });
 
+  it('propagates report failures and still removes the temp dir', async () => {
+    const reporter = makeReporter();
+    reporter.onComplete = () => {
+      throw new Error('report write failed');
+    };
+
+    await expect(runPipeline(makeConfig(), reporter)).rejects.toThrow('report write failed');
+
+    expect(tempDirs.created).toHaveLength(1);
+    expect(existsSync(tempDirs.created[0]!)).toBe(false);
+  });
+
   it('uses mkdtemp under os.tmpdir with a frontguard- prefix', async () => {
     await runPipeline(makeConfig(), makeReporter());
     expect(tempDirs.created).toHaveLength(1);

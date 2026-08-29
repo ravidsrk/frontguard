@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { HTMLReporter } from '../../src/report/html.js';
 import { createTestPng } from '../fixtures/helpers.js';
 import type { RunResult, DiffResult, FrontguardConfig } from '../../src/core/types.js';
@@ -174,6 +174,15 @@ describe('HTMLReporter', () => {
     const html = reporter.generateReport(result);
 
     expect(html).toContain('data:image/png;base64,');
+  });
+
+  it('propagates report write failures', () => {
+    const reporter = new HTMLReporter();
+    vi.spyOn(reporter, 'writeReport').mockImplementation(() => {
+      throw new Error('disk full');
+    });
+
+    expect(() => reporter.onComplete(makeRunResult([makeDiff()]))).toThrow('disk full');
   });
 
   it('report includes AI analysis when present', () => {

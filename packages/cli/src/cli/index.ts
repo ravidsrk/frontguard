@@ -331,17 +331,7 @@ export async function main(argv?: string[]): Promise<number> {
 
         // Run the pipeline
         logger.info(`Running Frontguard against ${config.baseUrl}`);
-        const result = await runPipeline(config, reporter);
-
-        // Generate HTML report
-        try {
-          const htmlReporter = new HTMLReporter();
-          htmlReporter.onComplete(result);
-        } catch (err) {
-          logger.warn(
-            `HTML report generation failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
+        const result = await runPipeline(config, new HTMLReporter(reporter));
 
         // Print summary
         const { summary } = result;
