@@ -35,7 +35,7 @@ vi.mock('../../src/utils/logger.js', () => ({
   setLogLevel: vi.fn(),
 }));
 
-import { runPipeline } from '../../src/core/pipeline.js';
+import { runPipeline, updateBaselines } from '../../src/core/pipeline.js';
 
 function makeConfig(plugins?: FrontguardPlugin[]): FrontguardConfig {
   return {
@@ -84,6 +84,29 @@ beforeEach(() => {
 });
 
 describe('REL-5: compare temp directory', () => {
+  it('reports a failed capture as an error instead of a new page', async () => {
+    renderPages.mockResolvedValue([
+      {
+        ...shot(),
+        buffer: Buffer.alloc(0),
+        consoleErrors: ['Render error: chromium failed to launch'],
+      },
+    ]);
+
+    const result = await runPipeline(makeConfig(), makeReporter());
+
+    expect(result.diffs).toHaveLength(1);
+    expect(result.diffs[0]).toMatchObject({
+      route: { path: '/' },
+      viewport: 1440,
+      browser: 'chromium',
+      status: 'error',
+      error: 'Render error: chromium failed to launch',
+    });
+    expect(result.summary.errors).toBe(1);
+    expect(result.summary.newPages).toBe(0);
+  });
+
   it('gives two concurrent pipelines distinct temp dirs', async () => {
     await Promise.all([
       runPipeline(makeConfig(), makeReporter()),
@@ -114,5 +137,21 @@ describe('REL-5: compare temp directory', () => {
     await runPipeline(makeConfig(), makeReporter());
     expect(tempDirs.created).toHaveLength(1);
     expect(tempDirs.created[0]!.startsWith(join(tmpdir(), 'frontguard-compare-'))).toBe(true);
+  });
+});
+
+describe('baseline capture safety', () => {
+  it('refuses to update baselines when any capture failed', async () => {
+    renderPages.mockResolvedValue([
+      {
+        ...shot(),
+        buffer: Buffer.alloc(0),
+        consoleErrors: ['Render error: chromium failed to launch'],
+      },
+    ]);
+
+    await expect(updateBaselines(makeConfig(), makeReporter())).rejects.toThrow(
+      'Cannot update baselines: 1 capture failed',
+    );
   });
 });

@@ -541,28 +541,43 @@ export async function runPipeline(
         screenshots,
         COMPARE_BATCH_SIZE,
         async (shot, i) => {
-          const baseline = await storage.readBaseline(
-            shot.route.path,
-            shot.viewport,
-            shot.browser,
-          );
-
           let diff: DiffResult;
 
           // Resolve the effective threshold: per-route override wins over global.
           const effectiveThreshold = resolveThreshold(shot.route, config.threshold);
 
-          if (!baseline) {
-            // No baseline exists — this is a new page
-            diff = createNewPageResult(shot);
-            logger.debug(`New page: ${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`);
+          if (!Buffer.isBuffer(shot.buffer) || shot.buffer.length === 0) {
+            const renderError =
+              shot.consoleErrors.find((message) => message.startsWith('Render error:')) ??
+              shot.consoleErrors[0] ??
+              'Render produced no screenshot';
+            diff = {
+              route: shot.route,
+              viewport: shot.viewport,
+              browser: shot.browser,
+              status: 'error',
+              diffPercentage: 0,
+              error: renderError,
+            };
           } else {
-            // Compare against existing baseline using the effective threshold
-            diff = compareScreenshot(shot, baseline, effectiveThreshold);
+            const baseline = await storage.readBaseline(
+              shot.route.path,
+              shot.viewport,
+              shot.browser,
+            );
 
-            // Mark regressions vs changes based on the effective threshold
-            if (diff.status === 'changed' && diff.diffPercentage > effectiveThreshold * 100) {
-              diff = { ...diff, status: 'regression' };
+            if (!baseline) {
+              // No baseline exists — this is a new page
+              diff = createNewPageResult(shot);
+              logger.debug(`New page: ${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`);
+            } else {
+              // Compare against existing baseline using the effective threshold
+              diff = compareScreenshot(shot, baseline, effectiveThreshold);
+
+              // Mark regressions vs changes based on the effective threshold
+              if (diff.status === 'changed' && diff.diffPercentage > effectiveThreshold * 100) {
+                diff = { ...diff, status: 'regression' };
+              }
             }
           }
 
@@ -955,6 +970,19 @@ export async function updateBaselines(
   reporter.onStageStart('render', `Capturing screenshots for ${routes.length} route(s)…`);
 
   const screenshots = await renderPages(routes, config);
+  const failedCaptures = screenshots.filter(
+    (shot) => !Buffer.isBuffer(shot.buffer) || shot.buffer.length === 0,
+  );
+  if (failedCaptures.length > 0) {
+    const failureCount = failedCaptures.length;
+    reporter.onStageComplete(
+      'render',
+      `Failed: ${failureCount} capture${failureCount === 1 ? '' : 's'} produced no screenshot`,
+    );
+    throw new Error(
+      `Cannot update baselines: ${failureCount} capture${failureCount === 1 ? '' : 's'} failed`,
+    );
+  }
   reporter.onStageComplete('render', `Captured ${screenshots.length} screenshot(s)`);
 
   // Init storage and write all baselines
