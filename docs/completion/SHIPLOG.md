@@ -193,3 +193,35 @@ rather than just a green run: "it passes now" was precisely the evidence that fa
 ---
 
 **RESUME POINTER: `P2/T-11`**
+
+### PHASE 5 — P2 SAFETY & RECORD · 3 of 4 COMPLETE
+
+PR #211 merged (merge commit, branch deleted). Completion 40% -> 44%. Tasks 13/30.
+
+- **T-13 (G-25)** — `gitDiff` no longer builds a shell string; `execFileSync` with argv. No shell
+  is invoked from `graph/resolver.ts` at all now.
+- **T-12 (G-12)** — added `.env.example`, and found *why* one never existed: `.gitignore`'s
+  `.env.*` also matched `.env.example`, so every previous attempt was silently dropped. Added a
+  `!.env.example` negation and verified both directions — the template stages, a real `.env`
+  containing a secret stays ignored.
+- **T-11 (G-18)** — the 2026-06-14 plan is annotated superseded at its head and on §8. The repo no
+  longer contains two live definitions of done with the stale one claiming to be frozen.
+- **T-14 (G-19) — BLOCKED**, not skipped. CSP/HSTS/X-Frame-Options land in `apps/web`, and
+  `Deploy Web` is path-filtered to `apps/web/**`, so merging it deploys production. R15 forbids the
+  agent doing that unilaterally. Filed as **H-06**.
+
+Review: greptile 4/5, one P2 — the supersession banner shifted §8's line numbers, leaving
+`DEFINITION.md` citing a range that now lands in §7. Fixed by citing the section heading, which
+cannot rot on the next edit. Historical records keep the original numbers deliberately.
+
+Angle rescores with evidence: security 2 -> **3** (env contract published, shell interpolation
+gone, 0 vulnerabilities tree-wide, history verified clean), documentation 1 -> **2**.
+
+**Second look:** a defensive `git commit --amend --no-edit` I added "just in case" overwrote a
+good message with the word "placeholder", and the first commit bundled all three tasks under a
+message describing only one. Both caught by reading the log back before pushing, and split into
+one commit per task. Worth recording because the failure mode was a safety habit doing damage.
+
+---
+
+**RESUME POINTER: `P3/T-15` — T-14 blocked on H-06 (production deploy authorisation)**
