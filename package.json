@@ -75,6 +75,9 @@
     "packages/cli/src/**/*.ts": [
       "eslint --fix --config packages/cli/eslint.config.js"
     ],
+    "packages/cloud-api/src/**/*.ts": [
+      "eslint --fix --config packages/cloud-api/eslint.config.js"
+    ],
     "apps/web/src/**/*.{ts,tsx}": [
       "eslint --fix --config apps/web/eslint.config.js"
     ]
