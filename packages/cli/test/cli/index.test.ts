@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { execFile, execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -8,9 +9,15 @@ import { join, resolve } from 'node:path';
 /**
  * CLI tests use `tsx` to run the CLI entry point directly.
  * This avoids needing a build step and tests the actual CLI behavior.
+ *
+ * `tsx` is resolved through node's module resolution rather than a hardcoded
+ * path: npm workspaces hoist it to the repo-root `node_modules`, so the
+ * workspace-local path does not exist. Pointing `node` at a missing file makes
+ * it exit 1 with MODULE_NOT_FOUND, which silently masqueraded as the CLI
+ * returning the wrong exit code.
  */
 const CLI_PATH = resolve(import.meta.dirname, '../../src/cli/index.ts');
-const TSX_PATH = resolve(import.meta.dirname, '../../node_modules/tsx/dist/cli.mjs');
+const TSX_PATH = createRequire(import.meta.url).resolve('tsx/cli');
 
 function runCli(args: string[]): { stdout: string; stderr: string; exitCode: number } {
   try {
