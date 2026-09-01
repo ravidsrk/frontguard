@@ -185,10 +185,17 @@ describe('built CLI baseline lifecycle', () => {
     const reportDir = join(repoDir, 'frontguard-report');
     const imageDir = join(reportDir, 'images');
     const images = readdirSync(imageDir).sort();
+    // Report images are named by the HTML reporter's resolver
+    // (src/report/html.ts:274), whose prefix is
+    // `${routeIndex}_${routeFragment}_${viewport}_${browser}_${diffIndex}`.
+    // The leading route index disambiguates routes within one report and has
+    // been part of that naming since 5b9ff3e. This assertion previously used
+    // the pipeline's *temp file* naming (`${key}_baseline`, pipeline.ts:619),
+    // which is a different scheme and never matched what lands in the report.
     expect(images).toEqual([
-      '_root_375_chromium_0_baseline.png',
-      '_root_375_chromium_0_current.png',
-      '_root_375_chromium_0_diff.png',
+      '0__root_375_chromium_0_baseline.png',
+      '0__root_375_chromium_0_current.png',
+      '0__root_375_chromium_0_diff.png',
     ]);
     for (const image of images) {
       expect(statSync(join(imageDir, image)).size).toBeGreaterThan(0);
