@@ -9,10 +9,10 @@
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "e5295de7238647ff94b6170b13df738a56bd6fee",
-  "resume_pointer": "P2/T-11",
+  "current_commit": "f83b321375bd72c2a87d3c35d5ef01850afc50e1",
+  "resume_pointer": "P3/T-15 (T-14 blocked on H-06)",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
-  "completion_pct": 40,
+  "completion_pct": 44,
   "gate": {
     "status": "NOT_EVALUATED",
     "reason": "Definition of Complete not yet frozen (Phase 3)"
@@ -71,8 +71,8 @@
     {
       "id": 5,
       "name": "security",
-      "score": 2,
-      "rag": "A",
+      "score": 3,
+      "rag": "G",
       "na_reason": null,
       "weight": 14,
       "findings": [],
@@ -179,8 +179,8 @@
     {
       "id": 14,
       "name": "documentation",
-      "score": 1,
-      "rag": "R",
+      "score": 2,
+      "rag": "A",
       "na_reason": null,
       "weight": 3,
       "findings": [],
@@ -590,12 +590,12 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
-      "commit": null,
+      "status": "done",
+      "branch": "ravidsrk/p2-safety-and-record",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/211",
+      "commit": "f83b321375bd72c2a87d3c35d5ef01850afc50e1",
       "evidence": [],
-      "review": null,
+      "review": "greptile",
       "attempts": 0,
       "block_signature": null
     },
@@ -608,12 +608,12 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
-      "commit": null,
+      "status": "done",
+      "branch": "ravidsrk/p2-safety-and-record",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/211",
+      "commit": "f83b321375bd72c2a87d3c35d5ef01850afc50e1",
       "evidence": [],
-      "review": null,
+      "review": "greptile",
       "attempts": 0,
       "block_signature": null
     },
@@ -626,12 +626,12 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
-      "commit": null,
+      "status": "done",
+      "branch": "ravidsrk/p2-safety-and-record",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/211",
+      "commit": "f83b321375bd72c2a87d3c35d5ef01850afc50e1",
       "evidence": [],
-      "review": null,
+      "review": "greptile",
       "attempts": 0,
       "block_signature": null
     },
@@ -644,14 +644,14 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
+      "status": "blocked",
       "branch": null,
       "pr": null,
       "commit": null,
       "evidence": [],
       "review": null,
       "attempts": 0,
-      "block_signature": null
+      "block_signature": "touches apps/web; merging triggers the path-filtered Deploy Web workflow, i.e. a production deploy. R15 requires owner authorisation."
     },
     {
       "id": "T-15",
@@ -982,6 +982,18 @@
       "gates_launch": false,
       "verification": "agent updates release.yml and dry-runs publish",
       "status": "open"
+    },
+    {
+      "id": "H-06",
+      "instruction": "Authorise merging apps/web changes, which triggers the Deploy Web workflow and publishes to production frontguard.dev. This is what republishes /privacy, /terms and /status (currently 404).",
+      "unblocks": [
+        "T-14",
+        "T-25",
+        "T-27"
+      ],
+      "gates_launch": true,
+      "verification": "agent re-probes the live routes for 200 and truthful content",
+      "status": "open"
     }
   ],
   "assumptions": [
@@ -1072,6 +1084,12 @@
       "run_id": "20260901-1658",
       "commit": "e5295de7238647ff94b6170b13df738a56bd6fee",
       "completion_pct": 40,
+      "gate": "NOT_EVALUATED"
+    },
+    {
+      "run_id": "20260901-1658",
+      "commit": "f83b321375bd72c2a87d3c35d5ef01850afc50e1",
+      "completion_pct": 44,
       "gate": "NOT_EVALUATED"
     }
   ]
