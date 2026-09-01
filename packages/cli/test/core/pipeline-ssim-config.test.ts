@@ -98,7 +98,10 @@ describe('pipeline SSIM configuration', () => {
   it('initializes comparison storage in compare mode', async () => {
     await runPipeline(config(), reporter());
 
-    expect(mocks.storageConstructor).toHaveBeenCalledWith(process.cwd(), undefined, 'compare');
+    // Compare mode is the constructor default, so the pipeline passes no options.
+    // Asserting the exact single-argument call still fails if an update-mode
+    // options object is ever threaded through this path.
+    expect(mocks.storageConstructor).toHaveBeenCalledWith(process.cwd());
   });
 
   it('propagates baseline initialization failures before reading screenshots', async () => {

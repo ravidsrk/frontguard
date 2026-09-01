@@ -126,7 +126,7 @@ describe('updateBaselines', () => {
     });
     expect(output.completed).toHaveBeenCalledOnce();
     expect(output.completed).toHaveBeenCalledWith(result);
-    expect(mocks.storageConstructor).toHaveBeenCalledWith(process.cwd(), undefined, 'update');
+    expect(mocks.storageConstructor).toHaveBeenCalledWith(process.cwd(), { mode: 'update' });
     const version = readFileSync(new URL('../../../../VERSION', import.meta.url), 'utf8').trim();
     expect(mocks.writeManifest).toHaveBeenCalledWith(
       expect.objectContaining({ createdBy: `frontguard@${version}` }),
