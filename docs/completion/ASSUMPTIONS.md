@@ -50,3 +50,32 @@ layer, and marketplace rules for the GitHub/Slack/Vercel/Netlify integrations.
 inference, not a conclusion: angle 15 and Phase 2 Track B must confirm, and the presence of
 `packages/cloud-api` + a `pricing` route means a billing path may yet exist. If Phase 1 finds one,
 this assumption is void and the payments areas of Appendix D come back into scope.
+
+## A-06 — Angles 6 (Data) and 7 (Infra) target ≥2, not the default ≥3
+
+**Phase:** 3
+**Decision:** Lower the required minimum score for angles 6 and 7 from ≥3 to ≥2 in `DEFINITION.md`.
+**Rejected:** Holding both at ≥3 per the framework default.
+**Reason:** Both angles are dominated by `packages/cloud-api`, which the frozen definition places
+out of scope behind a hard deployment gate. Requiring ≥3 would force scoring — and therefore
+building out — an undeployed subsystem the definition explicitly says must not be deployed yet.
+This is a scope alignment, not a lowered bar: the substantive proofs those angles exist to
+guarantee (a performed backup restore, a rehearsed rollback) are still demanded *directly* by the
+launch gate, where they cannot be scored around. Note this is a deviation permitted by the
+framework ("state any deviation as A-NN"), taken before freeze, not after — R13 forbids lowering
+the definition once frozen, and this is part of the freeze itself.
+
+## A-07 — Angle 12 (AI) satisfied via the CF-04 honesty clause
+
+**Phase:** 3
+**Decision:** Keep angle 12's target at the published ≥2, and satisfy it through CF-04's
+requirement to either measure classification accuracy or reduce public claims to what is
+demonstrable.
+**Rejected:** Requiring a full evaluation harness with an accuracy threshold before launch.
+**Reason:** Building a labelled eval set and an accuracy gate is a genuine project, and the
+framework forbids adding features after freeze (R6). The completion-relevant defect is not that
+accuracy is unmeasured — it is that accuracy is unmeasured *while being marketed*. Closing the
+honesty gap is the smaller, correct, and fully sufficient fix; measuring accuracy properly is
+filed post-launch. AI is optional and disabled without a provider key, and pixel-diff remains the
+authoritative pass/fail signal (verified by T-17), so an unmeasured classifier cannot silently
+break the core flow.

@@ -10,8 +10,8 @@
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
   "current_commit": "5f0e141a65651fa34823866c2ee715c913dc2c45",
-  "resume_pointer": "PHASE_2",
-  "definition_frozen_at": null,
+  "resume_pointer": "P1/T-01",
+  "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 35,
   "gate": {
     "status": "NOT_EVALUATED",
@@ -313,10 +313,634 @@
           "evidence": "docs/completion/STATUS.md"
         }
       ]
+    },
+    {
+      "id": "P1",
+      "name": "Green baseline",
+      "status": "pending",
+      "exit_criteria": []
+    },
+    {
+      "id": "P2",
+      "name": "Safety and record",
+      "status": "pending",
+      "exit_criteria": []
+    },
+    {
+      "id": "P3",
+      "name": "Critical flows",
+      "status": "pending",
+      "exit_criteria": []
+    },
+    {
+      "id": "P4",
+      "name": "Operability",
+      "status": "pending",
+      "exit_criteria": []
+    },
+    {
+      "id": "P5",
+      "name": "Compliance",
+      "status": "pending",
+      "exit_criteria": []
+    },
+    {
+      "id": "P6",
+      "name": "Launch surfaces",
+      "status": "pending",
+      "exit_criteria": []
+    },
+    {
+      "id": "P7",
+      "name": "Rehearsal",
+      "status": "pending",
+      "exit_criteria": []
     }
   ],
-  "tasks": [],
-  "human_actions": [],
+  "tasks": [
+    {
+      "id": "T-01",
+      "phase": "P1",
+      "gaps": [
+        "G-02"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-02",
+      "phase": "P1",
+      "gaps": [
+        "G-03"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-03",
+      "phase": "P1",
+      "gaps": [
+        "G-06"
+      ],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-04",
+      "phase": "P1",
+      "gaps": [
+        "G-05"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-05",
+      "phase": "P1",
+      "gaps": [
+        "G-04"
+      ],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-06",
+      "phase": "P1",
+      "gaps": [
+        "G-09"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-07",
+      "phase": "P1",
+      "gaps": [
+        "G-13"
+      ],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-08",
+      "phase": "P1",
+      "gaps": [
+        "G-24"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-09",
+      "phase": "P1",
+      "gaps": [
+        "G-23"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-10",
+      "phase": "P1",
+      "gaps": [
+        "G-26"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-11",
+      "phase": "P2",
+      "gaps": [
+        "G-18"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-12",
+      "phase": "P2",
+      "gaps": [
+        "G-12"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-13",
+      "phase": "P2",
+      "gaps": [
+        "G-25"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-14",
+      "phase": "P2",
+      "gaps": [
+        "G-19"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-15",
+      "phase": "P3",
+      "gaps": [
+        "G-08"
+      ],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-16",
+      "phase": "P3",
+      "gaps": [
+        "G-14"
+      ],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-17",
+      "phase": "P3",
+      "gaps": [
+        "G-20"
+      ],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-18",
+      "phase": "P3",
+      "gaps": [
+        "G-22"
+      ],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-19",
+      "phase": "P3",
+      "gaps": [],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-20",
+      "phase": "P3",
+      "gaps": [],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-21",
+      "phase": "P4",
+      "gaps": [
+        "G-17"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-22",
+      "phase": "P4",
+      "gaps": [
+        "G-15"
+      ],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-23",
+      "phase": "P4",
+      "gaps": [
+        "G-16"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-24",
+      "phase": "P4",
+      "gaps": [
+        "G-27"
+      ],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-25",
+      "phase": "P5",
+      "gaps": [
+        "G-07"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-26",
+      "phase": "P5",
+      "gaps": [
+        "G-11"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-27",
+      "phase": "P6",
+      "gaps": [
+        "G-10"
+      ],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-28",
+      "phase": "P7",
+      "gaps": [
+        "G-28"
+      ],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-29",
+      "phase": "P7",
+      "gaps": [],
+      "size": "M",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    },
+    {
+      "id": "T-30",
+      "phase": "P7",
+      "gaps": [],
+      "size": "S",
+      "depends_on": [],
+      "owner": "agent",
+      "status": "todo",
+      "branch": null,
+      "pr": null,
+      "commit": null,
+      "evidence": [],
+      "review": null,
+      "attempts": 0,
+      "block_signature": null
+    }
+  ],
+  "human_actions": [
+    {
+      "id": "H-01",
+      "instruction": "Confirm Cloudflare D1 Time Travel retention window",
+      "unblocks": [
+        "T-22"
+      ],
+      "gates_launch": true,
+      "verification": "agent performs a restore into a scratch target and captures the transcript",
+      "status": "open"
+    },
+    {
+      "id": "H-02",
+      "instruction": "Rehearse wrangler rollback on a non-production Worker",
+      "unblocks": [
+        "T-23"
+      ],
+      "gates_launch": true,
+      "verification": "agent records the transcript and writes the runbook around it",
+      "status": "open"
+    },
+    {
+      "id": "H-03",
+      "instruction": "Choose and enable the red-main alert channel",
+      "unblocks": [
+        "T-21"
+      ],
+      "gates_launch": true,
+      "verification": "agent reddens a throwaway build and confirms the alert fires",
+      "status": "open"
+    },
+    {
+      "id": "H-04",
+      "instruction": "Decide the pricing story now that no hosted plan exists",
+      "unblocks": [
+        "T-27"
+      ],
+      "gates_launch": false,
+      "verification": "agent implements the copy and re-probes for a truthful 200",
+      "status": "open"
+    },
+    {
+      "id": "H-05",
+      "instruction": "Migrate npm publishing to OIDC trusted publishing",
+      "unblocks": [],
+      "gates_launch": false,
+      "verification": "agent updates release.yml and dry-runs publish",
+      "status": "open"
+    }
+  ],
   "assumptions": [
     {
       "id": "A-01",
@@ -363,6 +987,24 @@
         "report against a 100 denominator anyway"
       ],
       "reason": "Appendix B declares 'Weights (sum 100)' but the published values sum to 105 (71+34). Rescaling would silently alter the framework's relative priorities; using a 100 denominator would overstate completion. Normalising against 105 keeps every weight as published and the number reproducible."
+    },
+    {
+      "id": "A-06",
+      "phase": "P3",
+      "decision": "Angles 6 and 7 target >=2 rather than the default >=3",
+      "rejected": [
+        "hold both at >=3"
+      ],
+      "reason": "Both are dominated by cloud-api, which the frozen definition places out of scope behind a deployment gate; the substantive proofs (restore, rollback) are demanded directly by the launch gate instead. Deviation taken as part of the freeze, not after it."
+    },
+    {
+      "id": "A-07",
+      "phase": "P3",
+      "decision": "Angle 12 satisfied via the CF-04 honesty clause",
+      "rejected": [
+        "require a full AI eval harness with an accuracy threshold before launch"
+      ],
+      "reason": "The defect is marketing an unmeasured capability, not the absence of measurement. Closing the honesty gap is sufficient; building an eval set post-freeze would violate R6."
     }
   ],
   "research": [],
