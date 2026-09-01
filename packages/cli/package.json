@@ -62,7 +62,7 @@
     "url": "https://github.com/ravidsrk/frontguard/issues"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@storybook/csf-tools": "^8.6.14",

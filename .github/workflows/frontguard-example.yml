@@ -1,6 +1,6 @@
 # Repository-only pre-release verification fixture.
 #
-# This workflow runs the published @frontguard/cli@0.2.3 package directly
+# This workflow runs the published @frontguard/cli@0.2.2 package directly
 # against apps/demo. It does not invoke, validate, or claim acceptance of the
 # Frontguard GitHub Action. Keep it manual until a real run has produced review
 # evidence and the release workflow has published a newer package.
@@ -41,7 +41,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -52,11 +52,11 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-frontguard-0.2.3-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ runner.os }}-playwright-frontguard-0.2.2-${{ hashFiles('**/package-lock.json') }}
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        # @frontguard/cli@0.2.3 depends on this exact Playwright release.
+        # @frontguard/cli@0.2.2 depends on this exact Playwright release.
         run: npm exec --yes --package="playwright@1.61.0" -- playwright install --with-deps chromium
 
       - name: Validate manual controls
@@ -117,7 +117,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          npm exec --yes --package="@frontguard/cli@0.2.3" -- frontguard run \
+          npm exec --yes --package="@frontguard/cli@0.2.2" -- frontguard run \
             --config apps/demo/frontguard.config.ts \
             --update-baselines
           git push origin frontguard-baselines:frontguard-baselines
@@ -127,7 +127,7 @@ jobs:
         run: |
           set -uo pipefail
           set +e
-          npm exec --yes --package="@frontguard/cli@0.2.3" -- frontguard run \
+          npm exec --yes --package="@frontguard/cli@0.2.2" -- frontguard run \
             --config apps/demo/frontguard.config.ts \
             --output json > frontguard-result.json
           RUN_EXIT=$?
