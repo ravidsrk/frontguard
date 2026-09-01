@@ -197,6 +197,13 @@ describe('GitOrphanStorage maxBuffer (install-2)', () => {
   });
 
   it('does not create baseline state during comparison initialization', async () => {
+    // Pin the precondition: this asserts LOCAL comparison behaviour. In CI,
+    // compare mode deliberately fails closed when no origin remote exists
+    // (src/storage/git-orphan.ts:242-247), which is a different contract
+    // covered by its own tests. Without this stub the test inherits the
+    // ambient CI variable and passes or fails depending on the shell.
+    vi.stubEnv('CI', 'false');
+
     const storage = new GitOrphanStorage(repoDir);
 
     await storage.init();
