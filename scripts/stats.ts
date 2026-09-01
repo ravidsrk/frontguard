@@ -1,7 +1,7 @@
 /**
  * scripts/stats.ts — Derive canonical product stats at build time.
  *
- * Source of truth for: "N tests", "N source files", "vX.Y.Z", "N built-in plugins",
+ * Source of truth for: "N test files", "N source files", "vX.Y.Z", "N built-in plugins",
  * and "NKB bundle" — the numbers that appear in the README and the web app.
  *
  * Run with:  npx tsx scripts/stats.ts
@@ -116,7 +116,7 @@ function generated(): string {
 }
 
 function main(): void {
-  const tests = countTestFiles();
+  const testFiles = countTestFiles();
   const sourceFiles = countSourceFiles();
   const version = readVersion();
   const plugins = countPlugins();
@@ -124,7 +124,7 @@ function main(): void {
 
   const payload = {
     version,
-    tests,
+    testFiles,
     sourceFiles,
     plugins,
     bundleSize: {
@@ -135,7 +135,7 @@ function main(): void {
     },
     // Convenience shortcuts used throughout the docs prose.
     display: {
-      tests: `${tests} tests`,
+      testFiles: `${testFiles} test files`,
       sourceFiles: `${sourceFiles} source files`,
       plugins: `${plugins} built-in plugins`,
       version: `v${version}`,
@@ -152,7 +152,7 @@ function main(): void {
   console.log(
     [
       `Frontguard stats (v${version})`,
-      `  tests:        ${tests}`,
+      `  test files:   ${testFiles}`,
       `  source files: ${sourceFiles}`,
       `  plugins:      ${plugins}`,
       `  bundle:       ${bundle.tarballKB}KB (tarball) / ${bundle.unpackedKB}KB (unpacked)`,

@@ -347,7 +347,7 @@ function renderCreateForm(): string {
         <div><label>Interval (minutes)</label><input name="intervalMinutes" type="number" value="60" min="5"/></div>
       </div>
       <div class="grid2">
-        <div><label>Alert threshold (0–1)</label><input name="alertThreshold" type="number" step="0.01" value="0.05"/></div>
+        <div><label>Alert threshold (0–1)</label><input name="alertThreshold" type="number" min="0" max="1" step="0.01" value="0.05"/></div>
         <div><label>Slack webhook URL</label><input name="slack" type="url" placeholder="https://hooks.slack.com/…"/></div>
       </div>
       <label>Alert emails (comma-separated)</label>
@@ -427,7 +427,7 @@ export function renderMonitorDetail(monitor: Monitor, runs: MonitorRun[], now = 
   <div class="card">
     <form method="post" action="/dashboard/monitors/${id}/alerts">
       <div class="grid2">
-        <div><label>Alert threshold (0–1)</label><input name="alertThreshold" type="number" step="0.01" value="${monitor.alertThreshold}"/></div>
+        <div><label>Alert threshold (0–1)</label><input name="alertThreshold" type="number" min="0" max="1" step="0.01" value="${monitor.alertThreshold}"/></div>
         <div><label>Slack webhook URL</label><input name="slack" type="url" value="${slack}" placeholder="https://hooks.slack.com/…"/></div>
       </div>
       <label>Alert emails (comma-separated)</label>

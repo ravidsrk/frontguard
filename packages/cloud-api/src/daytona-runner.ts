@@ -49,6 +49,7 @@ export interface RunRequest {
   routes: Array<{ path: string }>;
   viewports: number[];
   browsers: string[];
+  /** Maximum changed-pixel ratio from 0 to 1. */
   threshold: number;
   ai?: { provider: string; model?: string };
   openaiKey?: string;
@@ -77,6 +78,7 @@ export interface RunResult {
     viewport: number;
     browser: string;
     status: string;
+    /** Changed pixels in percentage points from 0 to 100. */
     diffPercentage: number;
     classification?: string;
     explanation?: string;
@@ -173,7 +175,7 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
       routes: request.routes,
       viewports: request.viewports,
       browsers: request.browsers || ['chromium'],
-      threshold: request.threshold || 0.01,
+      threshold: request.threshold ?? 0.01,
       ...(request.ai ? { ai: request.ai } : {}),
     };
 

@@ -27,6 +27,7 @@ import {
   STORYBOOK_READY_SCRIPT,
 } from '../../src/discovery/storybook.js';
 import { resolveStoryFrontguardParameters } from '../../src/discovery/storybook-parameters.js';
+import { normalizeFrontguardParams } from '../../src/discovery/storybook-parameters.js';
 
 // ---------------------------------------------------------------------------
 // Mock Storybook server
@@ -334,6 +335,17 @@ describe('storyIframePath', () => {
     expect(storyIframePath('foo/bar baz')).toBe(
       '/iframe.html?id=foo%2Fbar%20baz&viewMode=story',
     );
+  });
+});
+
+describe('Storybook threshold parameters', () => {
+  it.each([-0.01, 1.01, Infinity])('rejects an out-of-range ratio %s', (threshold) => {
+    expect(normalizeFrontguardParams({ threshold })).toBeUndefined();
+  });
+
+  it('accepts ratio boundaries', () => {
+    expect(normalizeFrontguardParams({ threshold: 0 })).toEqual({ threshold: 0 });
+    expect(normalizeFrontguardParams({ threshold: 1 })).toEqual({ threshold: 1 });
   });
 });
 

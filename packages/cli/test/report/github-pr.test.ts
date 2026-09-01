@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { GitHubPRReporter } from '../../src/report/github-pr.js';
 import type { RunResult, DiffResult, FrontguardConfig } from '../../src/core/types.js';
 
@@ -62,6 +62,12 @@ function makeRunResult(diffs: DiffResult[], overrides?: Partial<RunResult>): Run
 // ---------------------------------------------------------------------------
 
 describe('GitHubPRReporter', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it('generateComment produces valid markdown with marker', () => {
     const reporter = new GitHubPRReporter({ owner: 'test', repo: 'repo', prNumber: 1 });
     const result = makeRunResult([
@@ -218,6 +224,32 @@ describe('GitHubPRReporter', () => {
     expect(comment).toContain('★');   // new
   });
 
+  it('shows each browser status in the route matrix without masking failures', () => {
+    const reporter = new GitHubPRReporter();
+    const result = makeRunResult([
+      makeDiff({ route: { path: '/dashboard' }, browser: 'chromium', status: 'pass' }),
+      makeDiff({
+        route: { path: '/dashboard' },
+        browser: 'firefox',
+        status: 'regression',
+        diffPercentage: 8,
+      }),
+      makeDiff({
+        route: { path: '/dashboard' },
+        browser: 'webkit',
+        status: 'error',
+        error: 'capture failed',
+      }),
+    ]);
+
+    const comment = reporter.generateComment(result);
+
+    expect(comment).toContain('| Route | Browser | 1440px |');
+    expect(comment).toContain('| `/dashboard` | chromium | ✓ |');
+    expect(comment).toContain('| `/dashboard` | firefox | ✘ |');
+    expect(comment).toContain('| `/dashboard` | webkit | ✘ |');
+  });
+
   it('includes warning section for changed pages', () => {
     const reporter = new GitHubPRReporter();
     const result = makeRunResult([
@@ -238,6 +270,23 @@ describe('GitHubPRReporter', () => {
 
     expect(comment).toContain('New Pages');
     expect(comment).toContain('/new-feature');
+    expect(comment).toContain('require baseline acceptance');
+    expect(comment).not.toContain('All visual tests passed');
+    expect(comment).toContain('frontguard update-baselines');
+    expect(comment).not.toContain('saved as the new baseline');
+  });
+
+  it('labels explicit baseline-update results as accepted', () => {
+    const reporter = new GitHubPRReporter();
+    const result = makeRunResult(
+      [makeDiff({ status: 'new', route: { path: '/accepted' } })],
+      { baselineUpdate: true },
+    );
+    const comment = reporter.generateComment(result);
+
+    expect(comment).toContain('explicitly accepted');
+    expect(comment).toContain('1 baseline explicitly accepted');
+    expect(comment).not.toContain('no accepted baseline yet');
   });
 
   it('large results are truncated under 60KB', () => {
@@ -274,6 +323,94 @@ describe('GitHubPRReporter', () => {
 
     expect(comment).toContain('Frontguard visual regression test');
     expect(comment).toContain('0.8s');
+    expect(comment).toContain('Report directory: `/tmp/frontguard-test-report`');
+  });
+
+  it('uses the GitHub Enterprise API URL from the Actions environment', async () => {
+    vi.stubEnv('GITHUB_TOKEN', 'token');
+    vi.stubEnv('GITHUB_API_URL', 'https://github.example.com/api/v3');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('[]', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reporter = new GitHubPRReporter({ owner: 'test', repo: 'repo', prNumber: 1 });
+
+    await reporter.postComment('report');
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://github.example.com/api/v3/repos/test/repo/issues/1/comments?per_page=100&page=1',
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      'https://github.example.com/api/v3/repos/test/repo/issues/1/comments',
+    );
+  });
+
+  it('does not recommend executing fork code through a privileged PR event', async () => {
+    vi.stubEnv('GITHUB_TOKEN', 'read-only-token');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('Resource not accessible by integration', { status: 403 })),
+    );
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const reporter = new GitHubPRReporter({ owner: 'test', repo: 'repo', prNumber: 1 });
+
+    await expect(reporter.postComment('report')).rejects.toThrow('403');
+
+    const output = logged.mock.calls.flat().join(' ');
+    expect(output).toContain('fork PR comments are unsupported');
+    expect(output).toContain('separate privileged workflow');
+    expect(output).not.toContain('use `pull_request_target`');
+  });
+
+  it('finds an existing Frontguard comment after the first page', async () => {
+    vi.stubEnv('GITHUB_TOKEN', 'token');
+    const firstPage = Array.from({ length: 100 }, (_, id) => ({ id, body: 'other' }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(firstPage), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([{ id: 101, body: '<!-- frontguard-report -->' }]), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reporter = new GitHubPRReporter({ owner: 'test', repo: 'repo', prNumber: 1 });
+
+    await reporter.postComment('updated report');
+
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      'https://api.github.com/repos/test/repo/issues/1/comments?per_page=100&page=2',
+    );
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      'https://api.github.com/repos/test/repo/issues/comments/101',
+    );
+    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: 'PATCH' });
+  });
+
+  it('aborts GitHub API requests after the configured timeout', async () => {
+    vi.stubEnv('GITHUB_TOKEN', 'token');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            'abort',
+            () => reject(init.signal?.reason ?? new Error('aborted')),
+            { once: true },
+          );
+        }),
+      ),
+    );
+    const reporter = new GitHubPRReporter({
+      owner: 'test',
+      repo: 'repo',
+      prNumber: 1,
+      requestTimeoutMs: 5,
+    });
+
+    await expect(reporter.postComment('report')).rejects.toThrow();
   });
 
   it('can be instantiated without options', () => {

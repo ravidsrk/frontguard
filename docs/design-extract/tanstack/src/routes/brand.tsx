@@ -28,7 +28,7 @@ const statuses = [
 const say = [
   'Name the real problem: false positives, flake, muted channels.',
   'Quote the classifier: "intentional change, not a regression."',
-  'Lead with BYOK, MIT, and self-hostable — earn trust with facts.',
+  'Lead with the local MIT CLI and optional BYOK analysis — earn trust with facts.',
   'Publish real numbers, including where it gets things wrong.',
 ]
 
@@ -213,7 +213,7 @@ function Brand() {
             <div style={s('font-size: 34px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; line-height: 1.1;')}>Catch the regression, not the noise.</div>
             <div style={s('height: 1px; background: #211e1b; margin: 28px 0;')} />
             <div style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; letter-spacing: 0.06em; margin-bottom: 14px;`)}>THE ONE-LINER</div>
-            <p style={s('font-size: 16px; line-height: 1.6; color: #c8c0b6; margin: 0; max-width: 620px;')}>Everyone adds visual regression tests. Then everyone mutes the channel they post to. Frontguard uses AI vision to tell a real regression from noise — so a red run means something again.</p>
+            <p style={s('font-size: 16px; line-height: 1.6; color: #c8c0b6; margin: 0; max-width: 620px;')}>Frontguard starts with deterministic pixel comparison. Optional model-assisted analysis can classify changed screenshots and explain its output, but published validation has not measured model accuracy.</p>
           </div>
           <div style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 20px;')}>
             <div style={s('border: 1px solid #1f3a28; background: #0e1410; padding: 26px 24px;')}>

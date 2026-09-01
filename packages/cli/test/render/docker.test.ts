@@ -6,6 +6,7 @@
  * error path (docker not installed → DockerNotInstalledError).
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   buildDockerArgs,
@@ -264,6 +265,8 @@ describe('runDocker', () => {
       runner,
     });
     expect(runCallOf(calls)!.args).toContain(DEFAULT_IMAGE);
+    const version = readFileSync(new URL('../../../../VERSION', import.meta.url), 'utf8').trim();
+    expect(DEFAULT_IMAGE).toBe(`frontguard/render:${version}`);
   });
 
   it('throws DockerNotInstalledError when preflight fails (non-zero exit)', async () => {
@@ -344,6 +347,8 @@ describe('runDocker', () => {
       // cryptic `pull access denied`.
       expect(message).toContain('frontguard/render:unpublished');
       expect(message).toContain('docker build');
+      expect(message).toContain('npm pack ./packages/cli');
+      expect(message).toContain('frontguard-cli.tgz');
       expect(message).toContain('packages/cli/docker');
       // Both inspect strategies were tried before giving up; `docker run` never
       // ran (no point pulling an image that does not exist).

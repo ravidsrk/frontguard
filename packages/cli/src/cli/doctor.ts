@@ -7,13 +7,13 @@
  * AI keys) only warn.
  *
  * Checks performed:
- *   1. Node.js version >= 18
+ *   1. Node.js version >= 20
  *   2. Playwright installed (resolvable)
- *   3. At least one Playwright browser available (executable present)
+ *   3. Every configured Playwright browser available (executable present)
  *   4. Config file found and parseable
  *   5. AI keys present (advisory — warn only)
  *   6. Git repository present
- *   7. Baseline branch exists (advisory — created on first run)
+ *   7. Baseline branch exists (advisory — seeded by update-baselines)
  *
  * @module cli/doctor
  */
@@ -21,7 +21,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { loadConfig } from '../core/config.js';
-import type { BrowserEngine } from '../core/types.js';
+import type { BrowserEngine, FrontguardConfig } from '../core/types.js';
 
 /** Status of a single diagnostic check. */
 export type CheckStatus = 'pass' | 'fail' | 'warn';
@@ -44,7 +44,10 @@ export interface CheckResult {
 }
 
 /** Minimum supported Node.js major version. */
-const MIN_NODE_MAJOR = 18;
+const MIN_NODE_MAJOR = 20;
+
+/** Browser used when no config can be loaded. Mirrors the config schema default. */
+const DEFAULT_BROWSERS: BrowserEngine[] = ['chromium'];
 
 /** Default baseline branch name (matches git-orphan storage default). */
 const DEFAULT_BASELINE_BRANCH = 'frontguard-baselines';
@@ -102,43 +105,47 @@ export async function checkPlaywrightInstalled(): Promise<CheckResult> {
 }
 
 /**
- * Checks that at least one Playwright browser is installed by resolving
+ * Checks that every required Playwright browser is installed by resolving
  * each engine's executable path and verifying the file exists on disk.
  */
-export async function checkBrowsersAvailable(): Promise<CheckResult> {
-  const engines: BrowserEngine[] = ['chromium', 'firefox', 'webkit'];
-  const available: string[] = [];
-
-  let pw: typeof import('playwright');
-  try {
-    pw = await import('playwright');
-  } catch {
-    return {
-      name: 'Browser binaries',
-      status: 'fail',
-      message: 'cannot check browsers — Playwright is not installed',
-      fix: 'Install Playwright first: npm install playwright',
-      critical: true,
+export async function checkBrowsersAvailable(
+  requiredBrowsers: BrowserEngine[] = DEFAULT_BROWSERS,
+  isAvailable?: (browser: BrowserEngine) => boolean,
+): Promise<CheckResult> {
+  let browserAvailable = isAvailable;
+  if (!browserAvailable) {
+    let pw: typeof import('playwright');
+    try {
+      pw = await import('playwright');
+    } catch {
+      return {
+        name: 'Browser binaries',
+        status: 'fail',
+        message: 'cannot check browsers — Playwright is not installed',
+        fix: 'Install Playwright first: npm install playwright',
+        critical: true,
+      };
+    }
+    browserAvailable = (browser) => {
+      const execPath = pw[browser].executablePath();
+      return Boolean(execPath && existsSync(execPath));
     };
   }
 
-  for (const engine of engines) {
+  const required = [...new Set(requiredBrowsers)];
+  const missing = required.filter((browser) => {
     try {
-      const browserType = pw[engine];
-      const execPath = browserType.executablePath();
-      if (execPath && existsSync(execPath)) {
-        available.push(engine);
-      }
+      return !browserAvailable(browser);
     } catch {
-      // executablePath() throws when the browser is not installed — skip.
+      return true;
     }
-  }
+  });
 
-  if (available.length > 0) {
+  if (missing.length === 0) {
     return {
       name: 'Browser binaries',
       status: 'pass',
-      message: `available: ${available.join(', ')}`,
+      message: `all required browsers available: ${required.join(', ')}`,
       critical: true,
     };
   }
@@ -146,10 +153,31 @@ export async function checkBrowsersAvailable(): Promise<CheckResult> {
   return {
     name: 'Browser binaries',
     status: 'fail',
-    message: 'no Playwright browser binaries found',
-    fix: 'Install browsers: npx playwright install',
+    message: `missing required browser binaries: ${missing.join(', ')}`,
+    fix: `Install required browsers: npx playwright install ${missing.join(' ')}`,
     critical: true,
   };
+}
+
+/** Load config from a specific directory without leaving process.cwd changed. */
+async function loadConfigFrom(cwd: string): Promise<FrontguardConfig> {
+  const originalCwd = process.cwd();
+  const needsChdir = cwd !== originalCwd;
+  if (needsChdir) process.chdir(cwd);
+  try {
+    return await loadConfig();
+  } finally {
+    if (needsChdir) process.chdir(originalCwd);
+  }
+}
+
+/** Return configured browsers, or schema defaults when no valid config loads. */
+export async function getRequiredBrowsers(cwd: string = process.cwd()): Promise<BrowserEngine[]> {
+  try {
+    return (await loadConfigFrom(cwd)).browsers;
+  } catch {
+    return [...DEFAULT_BROWSERS];
+  }
 }
 
 /**
@@ -158,13 +186,8 @@ export async function checkBrowsersAvailable(): Promise<CheckResult> {
  * `frontguard run --url` works without a config file.
  */
 export async function checkConfig(cwd: string = process.cwd()): Promise<CheckResult> {
-  // `loadConfig` discovers config relative to process.cwd(), so chdir into
-  // the target directory for the duration of the check, then restore.
-  const originalCwd = process.cwd();
-  const needsChdir = cwd !== originalCwd;
-  if (needsChdir) process.chdir(cwd);
   try {
-    const config = await loadConfig();
+    const config = await loadConfigFrom(cwd);
     return {
       name: 'Configuration',
       status: 'pass',
@@ -195,8 +218,6 @@ export async function checkConfig(cwd: string = process.cwd()): Promise<CheckRes
       fix: 'Fix the config errors above, or regenerate with `frontguard init`.',
       critical: true,
     };
-  } finally {
-    if (needsChdir) process.chdir(originalCwd);
   }
 }
 
@@ -267,7 +288,7 @@ export function checkGitRepo(cwd: string = process.cwd()): CheckResult {
 
 /**
  * Checks whether the baseline branch exists (locally or on origin).
- * Advisory only — the branch is created automatically on first run.
+ * Advisory only — `frontguard update-baselines` creates and populates it.
  */
 export function checkBaselineBranch(
   cwd: string = process.cwd(),
@@ -305,7 +326,7 @@ export function checkBaselineBranch(
     name: 'Baseline branch',
     status: 'warn',
     message: `'${branch}' not found`,
-    fix: 'It will be created automatically on your first `frontguard run`.',
+    fix: 'Accept the initial state with `frontguard update-baselines`, then push the branch for CI.',
     critical: false,
   };
 }
@@ -316,10 +337,11 @@ export function checkBaselineBranch(
 
 /** Runs every diagnostic check and returns the collected results. */
 export async function runChecks(cwd: string = process.cwd()): Promise<CheckResult[]> {
+  const requiredBrowsers = await getRequiredBrowsers(cwd);
   return [
     checkNodeVersion(),
     await checkPlaywrightInstalled(),
-    await checkBrowsersAvailable(),
+    await checkBrowsersAvailable(requiredBrowsers),
     await checkConfig(cwd),
     checkAiKeys(),
     checkGitRepo(cwd),

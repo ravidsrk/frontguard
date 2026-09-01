@@ -1,5 +1,6 @@
 import type { Run } from './types.js';
 import { PACKAGE_VERSION } from './version.js';
+import { compareDiffToThreshold } from './threshold.js';
 
 export function generateReportHtml(run: Run): string {
   const resultsRows = (run.results || [])
@@ -8,7 +9,7 @@ export function generateReportHtml(run: Run): string {
       <tr>
         <td>${escapeHtml(r.route)}</td>
         <td>${r.viewport}px</td>
-        <td class="${r.diffPercentage > (run.threshold * 100) ? 'diff-fail' : 'diff-pass'}">${r.diffPercentage.toFixed(2)}%</td>
+        <td class="${compareDiffToThreshold(r.diffPercentage, run.threshold) > 0 ? 'diff-fail' : 'diff-pass'}">${r.diffPercentage.toFixed(2)}%</td>
         <td><span class="badge badge-${r.status === 'captured' ? 'ok' : 'warn'}">${escapeHtml(r.status)}</span></td>
         <td>${escapeHtml(r.classification || '—')}</td>
         <td>${escapeHtml(r.timestamp)}</td>
@@ -17,7 +18,7 @@ export function generateReportHtml(run: Run): string {
     .join('\n');
 
   const totalDiffs = (run.results || []).filter(
-    (r) => r.diffPercentage > run.threshold * 100
+    (r) => compareDiffToThreshold(r.diffPercentage, run.threshold) > 0
   ).length;
 
   return `<!DOCTYPE html>

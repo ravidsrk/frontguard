@@ -5,6 +5,7 @@ export interface Run {
   routes: Array<{ path: string }>;
   viewports: number[];
   browsers: string[];
+  /** Maximum changed-pixel ratio from 0 to 1. */
   threshold: number;
   ai: { provider: string; model: string } | null;
   createdAt: string;
@@ -56,6 +57,7 @@ export interface RunResult {
   /** Browser engine this result was captured in (chromium/firefox/webkit). */
   browser?: string;
   status: string;
+  /** Changed pixels in percentage points from 0 to 100. */
   diffPercentage: number;
   classification?: string;
   timestamp: string;

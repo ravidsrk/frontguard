@@ -1,5 +1,6 @@
 export default {
-  baseUrl: process.env.PREVIEW_URL || 'http://localhost:3000',
+  version: 1,
+  baseUrl: process.env.PREVIEW_URL || 'http://127.0.0.1:3000',
   routes: [
     { path: '/' },
     { path: '/pricing' },
@@ -8,5 +9,4 @@ export default {
   viewports: [375, 1440],
   browsers: ['chromium'],
   threshold: 0.01,
-  ai: { provider: 'openai' },
 };

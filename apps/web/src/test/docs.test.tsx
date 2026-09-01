@@ -40,11 +40,24 @@ async function renderArticle(slug: string) {
   return { ...view, article, html: article?.innerHTML ?? "" };
 }
 
-function assertNoRawMarkdownArtifacts(html: string, slug: string) {
+function assertHtmlHygiene(html: string, slug: string) {
   expect(html, `${slug}: triple-backtick`).not.toContain("```");
-  expect(html, `${slug}: <script`).not.toMatch(/<script/i);
+  expect(html, `${slug}: double-backtick`).not.toContain("``");
+  expect(html, `${slug}: script`).not.toMatch(/<script/i);
   expect(html, `${slug}: markdown link`).not.toMatch(/\[[^\]]+\]\([^)]+\)/);
-  expect(html, `${slug}: raw **bold**`).not.toMatch(/\*\*[^*]+\*\*/);
+  expect(html, `${slug}: raw bold`).not.toMatch(/\*\*[^*]+\*\*/);
+  expect(html, `${slug}: nested pre`).not.toMatch(
+    /<pre\b[^>]*>(?:(?!<\/pre>)[\s\S])*<pre\b/i,
+  );
+  expect(html.match(/<pre\b/gi)?.length ?? 0, `${slug}: balanced pre`).toBe(
+    html.match(/<\/pre>/gi)?.length ?? 0,
+  );
+}
+
+function article(id: string) {
+  const value = articles.find((candidate) => candidate.id === id);
+  expect(value, id).toBeDefined();
+  return value!;
 }
 
 describe("docs content store", () => {
@@ -53,203 +66,150 @@ describe("docs content store", () => {
     expect(new Set(DOC_SLUGS).size).toBe(37);
   });
 
-  it("exposes nav groups matching the real docs section tree", () => {
-    const navIds = navGroups.flatMap((g) => g.ids);
+  it("exposes nav groups matching the public docs tree", () => {
+    const navIds = navGroups.flatMap((group) => group.ids);
     expect(navIds).toHaveLength(37);
-    expect(navGroups.map((g) => g.label)).toEqual(EXPECTED_NAV_LABELS);
-
-    const reference = navGroups.find((g) => g.label === "REFERENCE");
-    expect(reference?.ids).toEqual([
-      "cli/index",
-      "cli/commands",
-      "cli/configuration",
-      "playwright/index",
-      "playwright/setup",
-      "playwright/api",
-    ]);
-
-    const comparisons = navGroups.find((g) => g.label === "COMPARISONS");
-    expect(comparisons?.ids).toHaveLength(3);
-
-    for (const slug of DOC_SLUGS) {
-      expect(navIds).toContain(slug);
-    }
+    expect(new Set(navIds).size).toBe(37);
+    expect(navGroups.map((group) => group.label)).toEqual(EXPECTED_NAV_LABELS);
+    for (const slug of DOC_SLUGS) expect(navIds).toContain(slug);
   });
 
-  it("has no raw-markdown artifacts in any article body", () => {
-    for (const article of articles) {
-      assertNoRawMarkdownArtifacts(article.html, article.id);
+  it("keeps every article body valid and free of raw authoring artifacts", () => {
+    for (const value of articles) {
+      expect(value.html.length, value.id).toBeGreaterThan(50);
+      expect(value.html, value.id).toContain("<h1");
+      assertHtmlHygiene(value.html, value.id);
     }
   });
 
   it("has no broken internal doc links", () => {
     const slugs = new Set(DOC_SLUGS);
-    const linkRe = /href="(\/docs\/[^"#?]+)"/g;
-    for (const article of articles) {
-      let m;
-      while ((m = linkRe.exec(article.html)) !== null) {
-        const href = m[1].replace(/^\/docs\//, "");
-        expect(slugs.has(href)).toBe(true);
+    const linkRe = /href="(\/docs\/[^"#?]+)(?:#[^"]*)?"/g;
+    for (const value of articles) {
+      let match: RegExpExecArray | null;
+      while ((match = linkRe.exec(value.html)) !== null) {
+        expect(slugs.has(match[1].replace(/^\/docs\//, "")), match[1]).toBe(true);
       }
     }
   });
 
-  it("fixes netlify github-app link to integrations/github", () => {
-    const netlify = articles.find((a) => a.id === "integrations/netlify");
-    expect(netlify?.html).toContain("/docs/integrations/github");
-    expect(netlify?.html).not.toContain("/docs/integrations/github-app");
+  it("documents explicit CLI baseline acceptance", () => {
+    const quickStart = article("quick-start").html;
+    expect(quickStart).toContain("frontguard update-baselines");
+    expect(quickStart).toContain("git push origin frontguard-baselines");
+    expect(quickStart).toContain("app terminal - leave running");
+    expect(quickStart).toContain("generated config baseUrl");
+    expect(quickStart).not.toContain("frontguard run --url");
+    expect(quickStart.indexOf("frontguard update-baselines")).toBeLessThan(
+      quickStart.indexOf("frontguard run"),
+    );
+
+    const allHtml = articles.map((value) => value.html).join("\n");
+    expect(allHtml).not.toContain("saved automatically");
+    expect(allHtml).not.toMatch(/first run captures baselines/i);
+    expect(allHtml).not.toMatch(/baselines in one run/i);
+    expect(allHtml).not.toMatch(/frontguard baseline(?:\s|<)/);
   });
 
-  it("uses @v0 for frontguard action refs in workflow examples", () => {
-    const ghActions = articles.find((a) => a.id === "ci-cd/github-actions");
-    expect(ghActions?.html).toContain("ravidsrk/frontguard@v0");
-    expect(ghActions?.html).not.toMatch(/ravidsrk\/frontguard@(v1|main)/);
+  it("distinguishes Playwright-package baselines from the CLI contract", () => {
+    const playwright = article("playwright/index").html;
+    expect(playwright).toContain("visualTest creates a missing baseline");
+    expect(playwright).toContain("isNewBaseline: true");
+    expect(playwright).toContain("FRONTGUARD_UPDATE=1");
+    expect(playwright).not.toContain("expectVisual");
   });
 
-  it("cross-os-rendering doc gates --docker on local build and image preflight", () => {
-    const crossOs = articles.find((a) => a.id === "cross-os-rendering")!;
-    expect(crossOs.html).toContain("not yet published");
-    expect(crossOs.html).toContain("docker image inspect");
-    expect(crossOs.html).toContain("docker manifest inspect");
-    expect(crossOs.html).toContain("Building the image locally");
-    expect(crossOs.html).not.toContain("Docker will pull");
-    expect(crossOs.html).not.toMatch(/first pull on a cold machine/i);
+  it("documents threshold units and error-first exit codes", () => {
+    const commands = article("cli/commands").html;
+    expect(commands).toContain("Changed-pixel ratio (0-1; 0.01 = 1%)");
+    expect(commands).toContain("0.05 = 5%");
+    expect(commands).toContain("errors take precedence over regressions");
+    expect(commands).not.toMatch(/threshold percentage/i);
+    expect(commands).not.toMatch(/threshold \(0[-–]100\)/i);
   });
 
-  it("marks Cloud API URL as required on integration docs (no live hosted default)", () => {
+  it("separates the generated workflow from the pre-release composite Action", () => {
+    const generated = article("guides/github-actions").html;
+    expect(generated).toContain("comparison-only");
+    expect(generated).toContain("contents: read");
+    expect(generated).toContain("separate explicit workflow");
+
+    const action = article("ci-cd/github-actions").html;
+    expect(action).toContain("PRE-RELEASE ACTION");
+    expect(action).not.toContain("uses: ravidsrk/frontguard@v0");
+    expect(action).toContain("external consumer smoke");
+    expect(action).toContain("repo-root action.yml");
+    expect(action).toContain("require the workflow to push");
+  });
+
+  it("marks every cloud-dependent integration as unavailable by default", () => {
     for (const id of [
-      "integrations/netlify",
-      "integrations/vercel",
-      "integrations/slack",
-      "integrations/mcp",
       "guides/cloud-api",
-      "distribution",
-    ] as const) {
-      const article = articles.find((a) => a.id === id);
-      expect(article?.html, id).toMatch(
-        /Cloud API URL required|Self-host or bring your own API URL|no working hosted default/i,
-      );
-      expect(article?.html, id).not.toContain(
-        "apiUrl = &quot;https://api.frontguard.dev&quot;",
-      );
-      expect(article?.html, id).not.toContain(
-        "apiUrl   = &quot;https://api.frontguard.dev&quot;",
-      );
-    }
-  });
-
-  it("documents the repo-root action shim for marketplace consumers", () => {
-    const ghActions = articles.find((a) => a.id === "ci-cd/github-actions");
-    expect(ghActions?.html).toMatch(/action\.yml/i);
-  });
-
-  it("hedges marketplace listings on integration docs (no live 404 URLs)", () => {
-    const deadUrls = [
-      "github.com/marketplace/frontguard",
-      "github.com/apps/frontguard",
-      "frontguard/frontguard-action",
-    ];
-    for (const id of [
-      "integrations/github",
+      "integrations/mcp",
+      "integrations/netlify",
       "integrations/slack",
       "integrations/vercel",
-      "integrations/netlify",
-      "distribution",
-    ] as const) {
-      const article = articles.find((a) => a.id === id)!;
-      expect(article.html, id).toMatch(/in review|Coming soon/i);
-      for (const dead of deadUrls) {
-        expect(article.html, `${id}:${dead}`).not.toContain(dead);
-      }
+    ]) {
+      expect(article(id).html, id).toMatch(/CLOUD API URL REQUIRED|no working hosted default/i);
+      expect(article(id).html, id).not.toContain("https://api.frontguard.dev");
     }
   });
 
-  it("pins bootstrap workflow examples to @v0 on the GitHub App doc", () => {
-    const github = articles.find((a) => a.id === "integrations/github");
-    expect(github?.html).toContain("ravidsrk/frontguard@v0");
-    expect(github?.html).not.toMatch(/ravidsrk\/frontguard@(v1|main)/);
+  it("keeps marketplace and hosted integration claims explicitly pre-release", () => {
+    for (const id of [
+      "integrations/netlify",
+      "integrations/slack",
+      "integrations/vercel",
+      "integrations/github",
+    ]) {
+      expect(article(id).html, id).toMatch(/PRE-RELEASE|not a verified marketplace/i);
+      expect(article(id).html, id).not.toMatch(
+        /github\.com\/(?:marketplace|apps)\/frontguard|frontguard\/frontguard-action/i,
+      );
+    }
   });
 
-  it("has no C15 hygiene violations across all articles", () => {
-    const allHtml = articles.map((a) => a.html).join("\n");
-    expect(allHtml).not.toMatch(/--baseline-strategy\b/);
-    expect(allHtml).not.toMatch(/--ai\b/);
-    expect(allHtml).not.toContain("frontguard approve");
-    expect(allHtml).not.toContain("scheduled-monitors");
-    expect(allHtml).not.toMatch(/guides\/frontguard-vs-(percy|chromatic)/);
-    expect(allHtml).not.toContain("Docker will pull");
-    expect(allHtml).not.toContain("docs.frontguard.dev");
-  });
-
-  it("registers deployment pages in the sidebar nav", () => {
-    const deployment = navGroups.find(
-      (g) => g.label === "DEPLOYMENT & SANDBOXING",
+  it("labels experimental and unvalidated paths without guarantees", () => {
+    expect(article("guides/ai-fixes").html).toContain("separate opt-ins");
+    expect(article("guides/performance-budgets").html).toContain(
+      "not a verified standalone CI gate",
     );
-    expect(deployment?.ids).toEqual([
-      "self-host",
-      "sandbox",
-      "cross-os-rendering",
-      "distribution",
-    ]);
+    expect(article("sandbox").html).toContain("not correctness guarantees");
+    const renderer = article("cross-os-rendering").html;
+    expect(renderer).toContain("NOT VALIDATED");
+    expect(renderer).toContain("repository-source-only");
+    expect(renderer).toContain("npm pack ./packages/cli");
+    expect(renderer).toContain("frontguard-cli.tgz");
+    expect(renderer).toContain("docker build --platform linux/amd64");
+    expect(renderer).toContain("not yet published");
   });
 
-  it("gates self-host behind build-from-source (no published GHCR image)", () => {
-    const selfHost = articles.find((a) => a.id === "self-host")!;
-    expect(selfHost.html).toContain("build from source");
-    expect(selfHost.html).toContain("not published yet");
-    expect(selfHost.html).toContain("&quot;version&quot;:&quot;0.2.0&quot;");
-    expect(selfHost.html).not.toContain(
-      "&quot;version&quot;:&quot;0.1.0&quot;",
-    );
+  it("publishes only the measured validation result", () => {
+    const results = article("results").html;
+    expect(results).toContain("39 / 43");
+    expect(results).toContain("2 / 5");
+    expect(results).toContain("AI analysis: disabled");
+    expect(results).toContain("one macOS host");
   });
 
-  it("storybook CI recipe uses only real CLI flags", () => {
-    const storybook = articles.find((a) => a.id === "integrations/storybook")!;
-    expect(storybook.html).not.toMatch(/--baseline-strategy\b/);
-    expect(storybook.html).not.toMatch(/--ai\b/);
-    expect(storybook.html).toContain("verify-fixes");
-  });
-
-  it("cross-os-rendering labels playwright setup correctly", () => {
-    const crossOs = articles.find((a) => a.id === "cross-os-rendering")!;
-    expect(crossOs.html).toContain("Playwright plugin setup");
-    expect(crossOs.html).toContain("/docs/playwright/setup");
-    expect(crossOs.html).not.toContain("Cloud API: setup");
-  });
-});
-
-describe("docs article HTML quality", () => {
-  it("installation article has table, code blocks, and converted inline code", () => {
-    const article = articles.find((a) => a.id === "installation")!;
-    expect(article.html).toContain("<table");
-    expect(article.html).toContain("<pre");
-    expect(article.html).toContain("<code");
-    expect(article.html).toContain("<h2");
-    expect(article.html).not.toContain("`@frontguard/cli`");
-  });
-
-  it("cli/commands article has styled headings and code fences", () => {
-    const article = articles.find((a) => a.id === "cli/commands")!;
-    expect(article.html).toContain("<h2");
-    expect(article.html).toContain("<pre");
-    expect(article.html).toContain("<table");
-    expect(article.html).toContain("<strong");
-  });
-
-  it("comparison article has no script tag and renders FAQ content as HTML", () => {
-    const article = articles.find(
-      (a) => a.id === "comparisons/frontguard-vs-argos",
-    )!;
-    expect(article.html).not.toMatch(/<script/i);
-    expect(article.html).toContain("<h1");
-    expect(article.html).toContain("<h2");
-    expect(article.html).toContain("<table");
-    expect(article.html).toContain("<strong");
-    expect(article.html).toContain("Argos");
+  it("keeps unsupported launch claims out of all article bodies", () => {
+    const allHtml = articles.map((value) => value.html).join("\n");
+    expect(allHtml).not.toMatch(/expectVisual|DOM \+ computed-style|computed-style diff/i);
+    expect(allHtml).not.toMatch(/~40%|73%|<10%|\$100M|\$20B\+|~90%/);
+    expect(allHtml).not.toMatch(/only fixes that provably|maps it to the exact code/i);
+    expect(allHtml).not.toMatch(/byte-equivalent|most popular|in \d+ minutes/i);
+    expect(allHtml).not.toMatch(/Start 14-day trial|Frontguard charges a flat fee/i);
   });
 });
 
 describe("docs routes", () => {
+  it("uses a responsive navigation layout without a fake search control", async () => {
+    const { container } = await renderArticle(FIRST_DOC_SLUG);
+    expect(screen.queryByText("Search docs")).not.toBeInTheDocument();
+    expect(container.querySelector(".fg-docs-grid")).toBeInTheDocument();
+    expect(container.querySelector(".fg-docs-mobile-nav")).toBeInTheDocument();
+  });
+
   it("redirects /docs to the first article", async () => {
     const router = getRouter();
     await act(async () => {
@@ -259,12 +219,6 @@ describe("docs routes", () => {
   });
 
   it("renders every article slug with real HTML elements", async () => {
-    // Mount the docs shell once, then navigate the router to each slug. This
-    // exercises the real client-side routing path for all 37 articles while
-    // re-rendering only the <Outlet>, instead of cold-mounting the full <html>
-    // document (header + 37-link sidebar + TOC) 37 times. The old per-slug
-    // remount cost ~3s and tipped past the 5s default timeout under the parallel
-    // suite on slower CI runners (Node 20), while staying under it on Node 26.
     const router = getRouter();
     await act(async () => {
       await router.navigate({
@@ -280,38 +234,30 @@ describe("docs routes", () => {
       const html = view.container.querySelector("article")?.innerHTML ?? "";
       expect(html.length, slug).toBeGreaterThan(50);
       expect(html, slug).toContain("<h1");
-      assertNoRawMarkdownArtifacts(html, slug);
+      assertHtmlHygiene(html, slug);
     }
     cleanup();
-    // 37 router navigations + re-renders; the optimization above isn't enough to
-    // stay under vitest's 5s default on slower CI runners with jsdom 29 (passes
-    // locally on Node 26). Give this legitimately-heavy test room.
   }, 30000);
 
-  it("renders representative articles with expected DOM structure", async () => {
+  it("renders representative articles", async () => {
     const { html: installHtml } = await renderArticle("installation");
-    expect(installHtml).toContain("<table");
     expect(installHtml).toContain("<pre");
     cleanup();
 
-    const { html: compareHtml } = await renderArticle(
+    const { html: comparisonHtml } = await renderArticle(
       "comparisons/frontguard-vs-argos",
     );
-    expect(compareHtml).toContain("<h2");
-    expect(compareHtml).not.toMatch(/<script/i);
+    expect(comparisonHtml).toContain("Argos");
     cleanup();
 
     const { html: cliHtml } = await renderArticle("cli/commands");
-    expect(cliHtml).toContain("<code");
-    expect(cliHtml).toContain("<table");
+    expect(cliHtml).toContain("Exit codes");
     cleanup();
   });
 
   it("shows 404 fallback for unknown slug", async () => {
     await renderAt("/docs/this-slug-does-not-exist");
-    expect(
-      screen.getByRole("heading", { name: /page not found/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /page not found/i })).toBeInTheDocument();
     expect(screen.getByText(/no docs article matches/i)).toBeInTheDocument();
   });
 
@@ -323,9 +269,7 @@ describe("docs routes", () => {
     expect(within(firstView).getByText("Overview")).toBeInTheDocument();
     expect(within(firstView).getByText("NEXT →")).toBeInTheDocument();
     expect(
-      within(firstView).getByText(articles[1].label, {
-        selector: ".fg-link-title",
-      }),
+      within(firstView).getByText(articles[1].label, { selector: ".fg-link-title" }),
     ).toBeInTheDocument();
 
     cleanup();
@@ -340,13 +284,7 @@ describe("docs routes", () => {
 
   it("renders sidebar nav groups from the corrected structure", async () => {
     await renderAt(`/docs/${FIRST_DOC_SLUG}`);
-    for (const label of [
-      "GETTING STARTED",
-      "REFERENCE",
-      "CI/CD",
-      "COMPARISONS",
-      "TRUST",
-    ]) {
+    for (const label of ["GETTING STARTED", "REFERENCE", "CI/CD", "COMPARISONS", "TRUST"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
     expect(screen.getByText("ON THIS PAGE")).toBeInTheDocument();

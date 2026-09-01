@@ -23,10 +23,10 @@ describe('/comparisons', () => {
     await renderComparisons()
     const items = screen.getAllByTestId('alternative')
     expect(items).toHaveLength(4)
-    expect(within(items[0]).getByText('↗ pricing cliff')).toBeInTheDocument()
-    expect(within(items[1]).getByText('◐ Storybook-locked')).toBeInTheDocument()
-    expect(within(items[2]).getByText('✕ low activity')).toBeInTheDocument()
-    expect(within(items[3]).getByText('✕ archived')).toBeInTheDocument()
+    expect(within(items[0]).getByText('hosted review workflow')).toBeInTheDocument()
+    expect(within(items[1]).getByText('Storybook-centered')).toBeInTheDocument()
+    expect(within(items[2]).getByText('low recent activity')).toBeInTheDocument()
+    expect(within(items[3]).getByText('sunset')).toBeInTheDocument()
   })
 
   it('renders a 15-row × 6-vendor matrix with exact floor values', async () => {
@@ -42,12 +42,12 @@ describe('/comparisons', () => {
       expect(screen.getByRole('rowheader', { name: row.capability })).toBeInTheDocument()
     }
 
-    expect(screen.getByText('$29/mo')).toBeInTheDocument()
+    expect(screen.getByText('Waitlist')).toBeInTheDocument()
     expect(screen.getByText('$199/mo')).toBeInTheDocument()
     expect(screen.getByText('$179/mo')).toBeInTheDocument()
-    expect(screen.getByText('Spend cap')).toBeInTheDocument()
+    expect(screen.getByText('n/a (CLI)')).toBeInTheDocument()
     expect(screen.getByText('$0.008')).toBeInTheDocument()
-    expect(screen.getByText('✕ quiet')).toBeInTheDocument()
+    expect(screen.getByText('Low activity')).toBeInTheDocument()
   })
 
   it('renders four head-to-head cards and four migration links', async () => {
@@ -74,5 +74,11 @@ describe('/comparisons', () => {
     expect(screen.getByText('$179/mo')).toBeInTheDocument()
     expect(container.textContent).toContain('Percy')
     expect(container.textContent).toContain('$0.008')
+  })
+
+  it('describes explicit baseline acceptance', async () => {
+    const { container } = await renderComparisons()
+    expect(container.textContent).toContain('accept them with one baseline-update command')
+    expect(container.textContent).not.toContain('you have baselines in one run')
   })
 })

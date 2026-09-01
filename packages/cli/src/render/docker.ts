@@ -4,14 +4,13 @@
  * Frontguard's local renderer uses Playwright bound to whatever browsers the
  * developer happens to have on disk. Glyph rendering, sub-pixel anti-aliasing,
  * and emoji tables differ between macOS, Linux, and Windows even when the
- * Playwright browser version is identical — so a baseline taken on macOS will
- * always diff against the same page captured in CI on Linux.
+ * Playwright browser version is identical, so a baseline taken on macOS can
+ * differ from the same page captured in CI on Linux.
  *
  * The Docker adapter solves this by re-executing the CLI inside the pinned
  * `frontguard/render` image (see packages/cli/docker/Dockerfile). The image
- * carries the exact Playwright minor, the exact Chromium/Firefox/WebKit
- * builds, and a deterministic font stack — so the rendered bytes are
- * cross-OS reproducible.
+ * carries a pinned Playwright release, browser builds, architecture, and font
+ * set. This reduces variation but does not establish cross-host equivalence.
  *
  * Implementation strategy
  * -----------------------
@@ -33,13 +32,14 @@
 import { spawn, type SpawnOptions } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { CLI_VERSION } from '../version.js';
 
 /**
  * Default tag for the rendering image. Overridable via the
  * `FRONTGUARD_DOCKER_IMAGE` env var so cloud / CI runners can point at a
  * pre-pulled internal mirror without rebuilding the CLI.
  */
-export const DEFAULT_IMAGE = 'frontguard/render:latest';
+export const DEFAULT_IMAGE = `frontguard/render:${CLI_VERSION}`;
 
 /**
  * Env vars Frontguard wants forwarded into the container. We allow-list these
@@ -135,7 +135,11 @@ export class DockerImageUnavailableError extends Error {
       message ??
         `--docker: image "${image}" is not available locally and cannot be pulled from any registry.\n\n` +
           'This image is not yet published to Docker Hub for this release. To use --docker today,\n' +
-          'build the image locally:\n\n' +
+          'build the image locally from the repository root:\n\n' +
+          '    npm ci\n' +
+          '    npm run build --workspace=packages/cli\n' +
+          '    npm pack ./packages/cli --pack-destination packages/cli/docker\n' +
+          '    mv packages/cli/docker/frontguard-cli-*.tgz packages/cli/docker/frontguard-cli.tgz\n' +
           `    docker build --platform linux/amd64 -t ${image} packages/cli/docker\n\n` +
           'Or point the CLI at a pre-built image you control via the FRONTGUARD_DOCKER_IMAGE env var.\n\n' +
           'See packages/cli/docker/Dockerfile and https://frontguard.dev/docs/cross-os-rendering\n' +
@@ -183,15 +187,14 @@ export function buildDockerArgs(opts: {
 
   const args: string[] = ['run', '--rm'];
 
-  // Pin the container architecture. The render image's whole purpose is
-  // byte-equivalent baselines across a mixed fleet (arm64 dev laptops +
-  // amd64 CI runners). Chromium's rasterizer emits different sub-pixel
+  // Pin the container architecture to remove one source of variance across
+  // a mixed fleet (arm64 dev laptops + amd64 CI runners). Chromium's rasterizer emits different sub-pixel
   // anti-aliasing per architecture, so we force a single platform — by
   // default linux/amd64 — so the same machine code rasterizes everywhere.
   // This MUST come before the image positional or docker silently ignores
   // it. `FRONTGUARD_DOCKER_PLATFORM` is an escape hatch for users who
-  // genuinely want a different (e.g. arm64-native) build; the default stays
-  // linux/amd64 to preserve byte-equivalence.
+  // genuinely want a different (e.g. arm64-native) build. Cross-host
+  // equivalence still requires measurement; the platform pin alone cannot prove it.
   const platform = env.FRONTGUARD_DOCKER_PLATFORM || 'linux/amd64';
   args.push('--platform', platform);
 

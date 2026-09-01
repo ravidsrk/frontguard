@@ -72,7 +72,7 @@ const statuses = [
 const say = [
   'Name the real problem: false positives, flake, muted channels.',
   'Quote the classifier: "intentional change, not a regression."',
-  'Lead with BYOK, MIT, and self-hostable — earn trust with facts.',
+  'Lead with the local MIT CLI and optional BYOK analysis — earn trust with facts.',
   'Publish real numbers, including where it gets things wrong.',
 ]
 
@@ -154,6 +154,7 @@ function Brand() {
             01 / THE MARK
           </h2>
           <div
+            className="fg-responsive-grid"
             style={s(
               'display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; margin-bottom: 24px;',
             )}
@@ -208,6 +209,7 @@ function Brand() {
           </div>
 
           <div
+            className="fg-responsive-grid"
             style={s(
               'display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 64px;',
             )}
@@ -314,7 +316,7 @@ function Brand() {
             ))}
           </div>
 
-          <div style={s('display: grid; grid-template-columns: 1fr 1.4fr; gap: 32px; margin-bottom: 64px;')}>
+          <div className="fg-responsive-grid" style={s('display: grid; grid-template-columns: 1fr 1.4fr; gap: 32px; margin-bottom: 64px;')}>
             <div>
               <div
                 style={s(
@@ -385,7 +387,7 @@ function Brand() {
           >
             03 / TYPOGRAPHY
           </h2>
-          <div style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;')}>
+          <div className="fg-responsive-grid" style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;')}>
             <div style={s('border: 1px solid #2a2622; background: #131210; padding: 32px;')}>
               <div
                 style={s(
@@ -510,7 +512,7 @@ function Brand() {
           >
             04 / VOICE
           </h2>
-          <div style={s('display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;')}>
+          <div className="fg-responsive-grid" style={s('display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;')}>
             {voice.map((v) => (
               <div
                 key={v.label}
@@ -563,12 +565,12 @@ function Brand() {
                 'font-size: 16px; line-height: 1.6; color: #c8c0b6; margin: 0; max-width: 620px;',
               )}
             >
-              Everyone adds visual regression tests. Then everyone mutes the channel they post to.
-              Frontguard uses AI vision to tell a real regression from noise — so a red run means
-              something again.
+              Frontguard starts with deterministic pixel comparison. Optional model-assisted
+              analysis can classify changed screenshots and explain its output, but published
+              validation has not measured model accuracy.
             </p>
           </div>
-          <div style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 20px;')}>
+          <div className="fg-responsive-grid" style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 20px;')}>
             <div style={s('border: 1px solid #1f3a28; background: #0e1410; padding: 26px 24px;')}>
               <div style={s(`font-family: ${MONO}; font-size: 12px; color: #4fb477; margin-bottom: 16px;`)}>
                 SAY

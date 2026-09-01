@@ -198,7 +198,7 @@ monitorRoutes.post("/:id/test-alert", async (c) => {
       url: m.url,
       route: m.routes[0] ?? "/",
       viewport: m.viewports[0] ?? 1440,
-      diffPercentage: m.alertThreshold + 0.1,
+      diffPercentage: Math.min(100, m.alertThreshold * 100 + 0.1),
       threshold: m.alertThreshold,
     },
   ];

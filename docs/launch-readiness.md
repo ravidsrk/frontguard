@@ -1,5 +1,12 @@
 # Frontguard — Launch Readiness
 
+> **Superseded for current launch decisions.** A fresh audit against `main` at
+> `78a5562` on 2026-08-29 found engineering blockers in the local baseline
+> lifecycle, GitHub Action, hosted CLI contract, baseline promotion, and durable
+> execution. The current verdict and execution gates are in
+> [`launch-audit-2026-08.md`](./launch-audit-2026-08.md). The document below is
+> retained as the June 2026 historical record.
+
 *Final go/no-go assessment for v0.2.0. Compiled at the close of the
 autonomous product-completion build that took Frontguard from "stalled
 mid-build, marketing site full of fabricated stats" to "complete product

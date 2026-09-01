@@ -114,7 +114,7 @@ export class CloudClient {
     return this.request<CloudRun>('GET', `/v1/runs/${encodeURIComponent(runId)}`);
   }
 
-  /** POST /v1/baselines/:runId/approve — accept the run's diffs as the new baseline. */
+  /** POST /v1/baselines/:runId/approve — record whole-run approval. */
   async approveBaseline(runId: string): Promise<{ approved: boolean; runId: string }> {
     return this.request<{ approved: boolean; runId: string }>(
       'POST',

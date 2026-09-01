@@ -241,7 +241,7 @@ async function executeTask(
     }
 
     // --- Navigate --------------------------------------------------------------
-    const url = `${config.baseUrl}${task.route.path}`;
+    const url = new URL(task.route.path, config.baseUrl).href;
     logger.debug(`Navigating to ${url} [${task.browser} ${task.viewport}px]`);
 
     await page.goto(url, {
@@ -429,5 +429,4 @@ function findConsensusScreenshot(buffers: Buffer[]): Buffer {
   logger.debug(`Anti-flake: ${buffers.length} renders, ${groups.length} unique frames, consensus group has ${groups[0].count} matches`);
   return groups[0].buffer;
 }
-
 

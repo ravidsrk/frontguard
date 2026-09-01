@@ -83,6 +83,7 @@ interface SerializedDiff {
 }
 
 interface SerializedRunResult {
+  baselineUpdate?: boolean;
   summary: RunResult['summary'];
   timing: RunResult['timing'];
   diffs: SerializedDiff[];
@@ -105,6 +106,7 @@ interface SerializedRunResult {
  */
 function serializeRunResult(result: RunResult): SerializedRunResult {
   return {
+    baselineUpdate: result.baselineUpdate,
     summary: result.summary,
     timing: result.timing,
     diffs: result.diffs.map(serializeDiff),

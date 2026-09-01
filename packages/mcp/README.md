@@ -31,8 +31,8 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
       "command": "npx",
       "args": ["-y", "@frontguard/mcp"],
       "env": {
-        "FRONTGUARD_API_KEY": "fg_live_xxx",
-        "FRONTGUARD_API_URL": "https://api.frontguard.dev"
+        "FRONTGUARD_API_KEY": "<frontguard-api-key>",
+        "FRONTGUARD_API_URL": "https://your-frontguard-api.example.com"
       }
     }
   }
@@ -50,8 +50,8 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
       "command": "npx",
       "args": ["-y", "@frontguard/mcp"],
       "env": {
-        "FRONTGUARD_API_KEY": "fg_live_xxx",
-        "FRONTGUARD_API_URL": "https://api.frontguard.dev"
+        "FRONTGUARD_API_KEY": "<frontguard-api-key>",
+        "FRONTGUARD_API_URL": "https://your-frontguard-api.example.com"
       }
     }
   }
@@ -84,7 +84,7 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
 |------|-------|---------|
 | `list_regressions` | `pr_id` (number or run id), optional `repo` | regressions on the PR with stable `diffId`s |
 | `get_suggested_fix` | `diff_id` from `list_regressions` | AI-generated patch (`fixType`, `patch`, `confidence`, `explanation`) |
-| `accept_baseline` | `run_id`, `confirm_all_regressions_reviewed: true` | promotes the **entire run** to the new baseline (run-scoped, not per-diff) |
+| `accept_baseline` | `run_id`, `confirm_all_regressions_reviewed: true` | records approval for the **entire run**; screenshot promotion is not implemented |
 | `recent_runs` | optional `repo`, `branch`, `limit` | newest-first run summary list |
 
 Every tool returns JSON in the MCP `text` content channel; agents parse it directly.
@@ -93,7 +93,7 @@ Every tool returns JSON in the MCP `text` content channel; agents parse it direc
 
 - _"What regressed on PR 42 in acme/shop?"_ → calls `list_regressions({ pr_id: 42, repo: 'acme/shop' })`.
 - _"Show me the suggested fix for the first one."_ → `get_suggested_fix({ diff_id })`.
-- _"OK, apply that and accept the baseline."_ → agent writes the patch to your CSS, reviews every regression from `list_regressions`, then calls `accept_baseline({ run_id, confirm_all_regressions_reviewed: true })`.
+- _"OK, apply that and record my review."_ → agent writes the patch to your CSS, reviews every regression from `list_regressions`, then calls `accept_baseline({ run_id, confirm_all_regressions_reviewed: true })`. This records approval only; use the CLI baseline workflow to promote screenshots.
 
 ## Local-only mode
 

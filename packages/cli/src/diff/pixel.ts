@@ -18,6 +18,7 @@
 
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
+import { compareDiffToThreshold } from './threshold.js';
 import type { ScreenshotResult, DiffResult } from '../core/types.js';
 import { computeSSIM } from './ssim.js';
 import { logger } from '../utils/logger.js';
@@ -163,7 +164,7 @@ export function compareScreenshot(
     status = 'changed';
   } else if (diffPercentage === 0) {
     status = 'pass';
-  } else if (diffPercentage / 100 > threshold) {
+  } else if (compareDiffToThreshold(diffPercentage, threshold) > 0) {
     status = 'regression';
   } else {
     status = 'changed';
@@ -193,7 +194,7 @@ export function compareScreenshot(
   if (
     ssimEnabled &&
     diffPercentage > 0 &&
-    diffPercentage < threshold * 100 * 2 // borderline zone (< 2× the threshold in %)
+    compareDiffToThreshold(diffPercentage, threshold * 2) < 0 // borderline zone (< 2x threshold)
   ) {
     let ssim: number | undefined;
     try {

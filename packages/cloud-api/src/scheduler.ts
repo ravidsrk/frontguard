@@ -28,6 +28,7 @@ import type { Run } from './types.js';
 import { getScreenshotStore, type R2Bucket } from './storage/screenshots.js';
 import { persistScreenshots, type PendingScreenshot } from './storage/persist-screenshots.js';
 import type { BaselineRestore } from './daytona-runner.js';
+import { compareDiffToThreshold } from './threshold.js';
 import {
   baselineRestoreFromRefs,
   buildMonitorScreenshotRefs,
@@ -227,7 +228,7 @@ export async function runMonitor(
       }
 
       alerts = (run.results ?? [])
-        .filter((r) => r.status === 'regression' || r.diffPercentage > monitor.alertThreshold)
+        .filter((r) => compareDiffToThreshold(r.diffPercentage, monitor.alertThreshold) > 0)
         .map((r) => ({
           url: monitor.url,
           route: r.route,

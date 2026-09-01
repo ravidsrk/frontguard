@@ -13,6 +13,7 @@ import type { DiffResult, ScreenshotResult, RunResult } from '../core/types.js';
 import { logger } from '../utils/logger.js';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
+import { compareDiffToThreshold } from '../diff/threshold.js';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -338,7 +339,7 @@ export function createFigmaPlugin(config: FigmaConfig): FrontguardPlugin {
           );
 
           const diffPercentage = totalPixels > 0 ? (numDiffPixels / totalPixels) * 100 : 0;
-          const status = diffPercentage / 100 <= tolerance ? 'pass' : 'changed';
+          const status = compareDiffToThreshold(diffPercentage, tolerance) <= 0 ? 'pass' : 'changed';
 
           complianceResults.push({
             routePath: diff.route.path,

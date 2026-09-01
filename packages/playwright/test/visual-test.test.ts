@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { test as playwrightTest, type TestInfo } from '@playwright/test';
 import { PNG } from 'pngjs';
 import { visualTest } from '../src/visual-test.js';
 
@@ -26,10 +27,19 @@ function createPNG(
 }
 
 /** Create a mock Playwright Page object */
-function createMockPage(screenshotBuffer: Buffer, viewport = { width: 1280, height: 720 }) {
+function createMockPage(
+  screenshotBuffer: Buffer,
+  viewport = { width: 1280, height: 720 },
+  browserName = 'chromium'
+) {
   return {
     screenshot: vi.fn().mockResolvedValue(screenshotBuffer),
     viewportSize: vi.fn().mockReturnValue(viewport),
+    context: vi.fn().mockReturnValue({
+      browser: vi.fn().mockReturnValue({
+        browserType: vi.fn().mockReturnValue({ name: vi.fn().mockReturnValue(browserName) }),
+      }),
+    }),
     addInitScript: vi.fn().mockResolvedValue(undefined),
     reload: vi.fn().mockResolvedValue(undefined),
     clock: { setFixedTime: vi.fn().mockResolvedValue(undefined) },
@@ -46,6 +56,20 @@ function rmDir(dir: string) {
   }
 }
 
+function createTestInfo(testId: string, projectName = 'desktop'): TestInfo {
+  return {
+    file: '/repo/tests/checkout.spec.ts',
+    project: {
+      name: projectName,
+      testDir: '/repo/tests',
+      use: { browserName: 'chromium' },
+    },
+    testId,
+    title: 'renders checkout',
+    titlePath: ['checkout.spec.ts', 'checkout', 'renders checkout'],
+  } as TestInfo;
+}
+
 describe('visualTest', () => {
   beforeEach(() => {
     rmDir(TEST_BASELINE_DIR);
@@ -55,6 +79,7 @@ describe('visualTest', () => {
 
   afterEach(() => {
     rmDir(TEST_BASELINE_DIR);
+    vi.restoreAllMocks();
   });
 
   it('first run creates a new baseline', async () => {
@@ -159,6 +184,34 @@ describe('visualTest', () => {
     expect(result.passed).toBe(true);
     expect(result.isNewBaseline).toBe(true);
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'does not overwrite or pass when an existing baseline cannot be read',
+    async () => {
+      const baselineImage = createPNG(100, 100, [255, 0, 0, 255]);
+      const currentImage = createPNG(100, 100, [0, 0, 255, 255]);
+      const first = await visualTest(createMockPage(baselineImage), 'read-error', {
+        baselineDir: TEST_BASELINE_DIR,
+      });
+      fs.chmodSync(first.baselinePath, 0o200);
+
+      let operationError: unknown;
+      let result: Awaited<ReturnType<typeof visualTest>> | undefined;
+      try {
+        result = await visualTest(createMockPage(currentImage), 'read-error', {
+          baselineDir: TEST_BASELINE_DIR,
+        });
+      } catch (error) {
+        operationError = error;
+      } finally {
+        fs.chmodSync(first.baselinePath, 0o600);
+      }
+
+      expect(operationError).toMatchObject({ code: 'EACCES' });
+      expect(result).toBeUndefined();
+      expect(fs.readFileSync(first.baselinePath)).toEqual(baselineImage);
+    }
+  );
 
   it('uses page.clock.setFixedTime when freezeTime is set (works on loaded page)', async () => {
     const img = createPNG(50, 50, [128, 128, 128, 255]);
@@ -267,5 +320,57 @@ describe('visualTest', () => {
     });
 
     expect(result.baselinePath).toContain('1920x1080');
+  });
+
+  it('scopes readable baseline paths by every available Playwright identity', async () => {
+    const img = createPNG(50, 50, [128, 128, 128, 255]);
+    const testInfo = vi.spyOn(playwrightTest, 'info');
+
+    testInfo.mockReturnValue(createTestInfo('test-a'));
+    const base = await visualTest(createMockPage(img), 'checkout', {
+      baselineDir: TEST_BASELINE_DIR,
+    });
+
+    testInfo.mockReturnValue(createTestInfo('test-b'));
+    const otherTest = await visualTest(createMockPage(img), 'checkout', {
+      baselineDir: TEST_BASELINE_DIR,
+    });
+
+    testInfo.mockReturnValue(createTestInfo('test-a', 'mobile'));
+    const otherProject = await visualTest(createMockPage(img), 'checkout', {
+      baselineDir: TEST_BASELINE_DIR,
+    });
+
+    testInfo.mockReturnValue(createTestInfo('test-a'));
+    const otherBrowser = await visualTest(
+      createMockPage(img, { width: 1280, height: 720 }, 'firefox'),
+      'checkout',
+      { baselineDir: TEST_BASELINE_DIR }
+    );
+
+    const otherCaller = await visualTest(createMockPage(img), 'checkout/summary', {
+      baselineDir: TEST_BASELINE_DIR,
+    });
+    const otherViewport = await visualTest(createMockPage(img, { width: 390, height: 844 }), 'checkout', {
+      baselineDir: TEST_BASELINE_DIR,
+    });
+
+    const paths = [
+      base.baselinePath,
+      otherTest.baselinePath,
+      otherProject.baselinePath,
+      otherBrowser.baselinePath,
+      otherCaller.baselinePath,
+      otherViewport.baselinePath,
+    ];
+    expect(new Set(paths).size).toBe(paths.length);
+
+    const readablePath = path.basename(base.baselinePath);
+    expect(readablePath).toContain('renders-checkout');
+    expect(readablePath).toContain('desktop');
+    expect(readablePath).toContain('chromium');
+    expect(readablePath).toContain(process.platform);
+    expect(readablePath).toContain('checkout');
+    expect(readablePath).toContain('1280x720');
   });
 });

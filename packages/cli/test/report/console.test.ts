@@ -140,6 +140,34 @@ describe('ConsoleReporter', () => {
     expect(output).toContain('✓');
   });
 
+  it('does not report new pages as matching or saved baselines', () => {
+    const reporter = new ConsoleReporter();
+    const result = makeRunResult([makeDiff({ route: { path: '/new' }, status: 'new' })]);
+
+    reporter.onComplete(result);
+
+    const output = collectOutput(logSpy);
+    expect(output).not.toContain('All pages match baselines');
+    expect(output).toContain('were not accepted as baselines');
+    expect(output).toContain('frontguard update-baselines');
+  });
+
+  it('reports explicit baseline updates as accepted and committed', () => {
+    const reporter = new ConsoleReporter();
+    const result = makeRunResult(
+      [makeDiff({ route: { path: '/new' }, status: 'new' })],
+      { baselineUpdate: true },
+    );
+
+    reporter.onComplete(result);
+
+    const output = collectOutput(logSpy);
+    expect(output).toContain('BASELINES UPDATED');
+    expect(output).toContain('accepted and committed locally');
+    expect(output).toContain('git push origin frontguard-baselines');
+    expect(output).not.toContain('were not accepted as baselines');
+  });
+
   // -----------------------------------------------------------------------
   // Regressions
   // -----------------------------------------------------------------------
@@ -320,5 +348,31 @@ describe('ConsoleReporter', () => {
     const output = collectOutput(logSpy);
     expect(output).toContain('375px');
     expect(output).toContain('1440px');
+  });
+
+  it('shows each browser status in the route matrix without masking failures', () => {
+    const reporter = new ConsoleReporter();
+    const result = makeRunResult([
+      makeDiff({ route: { path: '/dashboard' }, browser: 'chromium', status: 'pass' }),
+      makeDiff({
+        route: { path: '/dashboard' },
+        browser: 'firefox',
+        status: 'regression',
+        diffPercentage: 8,
+      }),
+      makeDiff({
+        route: { path: '/dashboard' },
+        browser: 'webkit',
+        status: 'error',
+        error: 'capture failed',
+      }),
+    ]);
+
+    reporter.onComplete(result);
+
+    const rows = collectOutput(logSpy).split('\n').filter((line) => line.includes('/dashboard'));
+    expect(rows.find((line) => line.includes('chromium'))).toContain('✓');
+    expect(rows.find((line) => line.includes('firefox'))).toContain('✘');
+    expect(rows.find((line) => line.includes('webkit'))).toContain('✘');
   });
 });

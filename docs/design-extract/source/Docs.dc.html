@@ -83,18 +83,18 @@
       <sc-if value="{{ isIntro }}" hint-placeholder-val="{{ true }}">
       <article>
         <h1 style="font-size: 42px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px; line-height: 1.05;">Introduction</h1>
-        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">Frontguard is an AI-powered visual regression testing tool for frontend teams. It renders every page in your app, compares it against approved baselines, and uses AI vision to classify each diff as a <strong style="color: #f5f1ea; font-weight: 600;">regression</strong>, an <strong style="color: #f5f1ea; font-weight: 600;">intentional change</strong>, or a <strong style="color: #f5f1ea; font-weight: 600;">content update</strong> — then explains why and suggests a verified fix.</p>
-        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">The goal is simple: a red run should mean something. Pixel-diff tools fire on non-bugs so often that teams stop trusting them — so Frontguard's job is to tell a real regression apart from noise, not just count changed pixels.</p>
-        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 34px;">It's CLI-first, MIT licensed, and fully self-hostable. No per-screenshot pricing, no dashboard lock-in. Bring your own AI key.</p>
+        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">Frontguard is a local visual regression testing CLI. It renders configured pages, compares screenshots against explicitly approved baselines, and can optionally ask a model to classify and explain changed screenshots for human review.</p>
+        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">Frontguard starts with deterministic pixel comparison and records the changed evidence. Optional model-assisted analysis can classify that evidence, but published validation has not measured model accuracy.</p>
+        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 34px;">The MIT-licensed CLI runs without a Frontguard account. AI is optional and uses your selected provider account.</p>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 40px;">
           <div class="fg-card" style="border: 1px solid #2a2622; background: #131210; padding: 22px; transition: border-color .15s ease;">
             <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4fb477; margin-bottom: 10px;">DETECT</div>
-            <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #b8b0a6;">Pixel diff + DOM and computed-style diff across every viewport and browser. Anti-flake multi-render kills false positives.</p>
+            <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #b8b0a6;">Pixel comparison across configured viewports and browsers, with thresholds, masks, and optional multi-render consensus.</p>
           </div>
           <div class="fg-card" style="border: 1px solid #2a2622; background: #131210; padding: 22px; transition: border-color .15s ease;">
             <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #e8862e; margin-bottom: 10px;">UNDERSTAND</div>
-            <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #b8b0a6;">AI vision classifies each diff, maps it to the exact code change, and explains the root cause in plain language.</p>
+            <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #b8b0a6;">When configured, model-assisted analysis classifies a changed screenshot and returns an explanation for human review.</p>
           </div>
         </div>
 
@@ -102,12 +102,12 @@
           <span style="font-family: 'JetBrains Mono', monospace; color: #e8862e; font-size: 15px;">▍</span>
           <div>
             <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #e8862e; margin-bottom: 5px; letter-spacing: 0.03em;">PREREQUISITES</div>
-            <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #c8c0b6;">Node.js 20+ and npm 9+. AI analysis is optional — pixel and DOM diff run locally without any key.</p>
+            <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #c8c0b6;">Node.js 20+ and npm 9+. AI analysis is optional; pixel comparison runs locally without any provider key.</p>
           </div>
         </div>
 
         <h2 style="font-size: 26px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 16px;">The pipeline</h2>
-        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 22px;">Frontguard runs a six-stage pipeline. Each stage is independent with error boundaries — one page failing doesn't kill the run. A fast pixel gate means ~90% of pages never reach the AI.</p>
+        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 22px;">Frontguard runs a six-stage local pipeline. One page failing does not stop the remaining comparisons, and AI runs only for changed screenshots when configured.</p>
         <div style="display: grid; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 40px;">
           <sc-for list="{{ stages }}" as="s" hint-placeholder-count="6">
             <div style="background: #0d0c0b; padding: 16px 20px; display: grid; grid-template-columns: 70px 120px 1fr; gap: 18px; align-items: center;">
@@ -163,7 +163,7 @@
       <sc-if value="{{ isQuick }}" hint-placeholder-val="{{ false }}">
       <article>
         <h1 style="font-size: 42px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px; line-height: 1.05;">Quick start</h1>
-        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 30px;">Run your first visual check in two minutes. The first run captures baselines; every subsequent run diffs against them.</p>
+        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 30px;">Start the app, explicitly capture reviewed baselines, then run comparisons against them.</p>
 
         <div style="display: grid; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 30px;">
           <sc-for list="{{ quickSteps }}" as="q" hint-placeholder-count="4">
@@ -179,7 +179,7 @@
         </div>
 
         <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 40px 0 16px;">Reading the output</h2>
-        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">Every route × viewport gets a status. Regressions exit non-zero, so the run fails CI.</p>
+        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">Every route × viewport gets a status. Regressions and unaccepted new screenshots exit 1; no comparisons or a tool error exit 2.</p>
         <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 24px;">
           <div style="border-bottom: 1px solid #211e1b; background: #161412; padding: 9px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #564f48;">frontguard run</div>
           <pre style="margin: 0; padding: 18px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.85; color: #b8b0a6; overflow-x: auto;"><span style="color: #4fb477;">  ✓ /</span>           375 768 1440  <span style="color: #4fb477;">PASS</span>
@@ -233,9 +233,9 @@
 
         <h3 style="font-size: 17px; font-weight: 600; color: #f5f1ea; margin: 28px 0 12px;">Exit codes</h3>
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 36px;">
-          <div style="border: 1px solid #1f3a28; background: #0e1410; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #4fb477;">0</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">All passed (or only warnings / new pages)</p></div>
-          <div style="border: 1px solid #3a1f1f; background: #170f0e; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #e5484d;">1</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">Regressions detected</p></div>
-          <div style="border: 1px solid #2a2622; background: #131210; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #e8862e;">2</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">Pipeline errors (but no regressions)</p></div>
+          <div style="border: 1px solid #1f3a28; background: #0e1410; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #4fb477;">0</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">All passed or warnings only</p></div>
+          <div style="border: 1px solid #3a1f1f; background: #170f0e; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #e5484d;">1</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">Regressions or unaccepted new screenshots</p></div>
+          <div style="border: 1px solid #2a2622; background: #131210; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #e8862e;">2</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">No comparisons or any tool error; errors take precedence</p></div>
         </div>
 
         <h2 style="font-size: 26px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 16px;">frontguard monitor</h2>
@@ -243,7 +243,7 @@
         <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 40px;">
           <div style="border-bottom: 1px solid #211e1b; background: #161412; padding: 9px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #564f48;">terminal</div>
           <pre style="margin: 0; padding: 18px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.85; color: #d8d0c5; overflow-x: auto;"><span style="color: #564f48;"># one-off check</span>
-<span style="color: #7c746b;">$</span> frontguard monitor --url https://example.com --threshold 2
+<span style="color: #7c746b;">$</span> frontguard monitor --url https://example.com --threshold 0.02
 
 <span style="color: #564f48;"># daemon mode — check every 15 minutes, alert Slack</span>
 <span style="color: #7c746b;">$</span> frontguard monitor --url https://example.com --interval 15 --webhook $SLACK_WEBHOOK</pre>
@@ -354,9 +354,9 @@ test(<span style="color: #98c379;">'checkout page'</span>, <span style="color: #
       <sc-if value="{{ isCicd }}" hint-placeholder-val="{{ false }}">
       <article>
         <h1 style="font-size: 42px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px; line-height: 1.05;">GitHub Actions</h1>
-        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 30px;">Frontguard provides an official GitHub Action. It auto-detects preview URLs from Vercel, Netlify, Cloudflare, Railway and Render, runs the pipeline, and posts a PR comment with before/after/diff thumbnails.</p>
+        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 30px;">The repository includes a pre-release GitHub Action manifest, but external consumer smoke is pending. There is no public copy-ready Action workflow yet; use the generated CLI workflow until publication, tag advancement, and both smoke controls pass.</p>
 
-        <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Quick setup</h2>
+        <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Release status</h2>
         <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 34px;">
           <div style="border-bottom: 1px solid #211e1b; background: #161412; padding: 9px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #564f48;">.github/workflows/visual-regression.yml</div>
           <pre style="margin: 0; padding: 18px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.8; color: #b8b0a6; overflow-x: auto;"><span style="color: #5b8def;">name</span>: Visual Regression Tests
@@ -370,17 +370,14 @@ test(<span style="color: #98c379;">'checkout page'</span>, <span style="color: #
     <span style="color: #5b8def;">steps</span>:
       - <span style="color: #5b8def;">uses</span>: actions/checkout@v4
       - <span style="color: #5b8def;">name</span>: Run Frontguard
-        <span style="color: #5b8def;">uses</span>: ravidsrk/frontguard@v0
-        <span style="color: #5b8def;">with</span>:
-          <span style="color: #5b8def;">url</span>: <span style="color: #98c379;">${{ env.PREVIEW_URL }}</span>  <span style="color: #564f48;"># or let it auto-detect</span>
-        <span style="color: #5b8def;">env</span>:
-          <span style="color: #5b8def;">FRONTGUARD_OPENAI_KEY</span>: <span style="color: #98c379;">${{ secrets.FRONTGUARD_OPENAI_KEY }}</span></pre>
+        <span style="color: #5b8def;">run</span>: npx -p @frontguard/cli frontguard run --url ${{ env.PREVIEW_URL }}
+        <span style="color: #5b8def;">#</span> External consumer Action smoke is still pending.</pre>
         </div>
 
         <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Action inputs</h2>
         <div style="border: 1px solid #2a2622; margin-bottom: 36px;">
           <div style="display: grid; grid-template-columns: 170px 110px 1fr; gap: 14px; padding: 12px 20px; background: #161412; border-bottom: 1px solid #211e1b; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #564f48; letter-spacing: 0.04em;"><span>INPUT</span><span>REQUIRED</span><span>DESCRIPTION</span></div>
-          <sc-for list="{{ actionInputs }}" as="i" hint-placeholder-count="6">
+          <sc-for list="{{ actionInputs }}" as="i" hint-placeholder-count="8">
             <div style="display: grid; grid-template-columns: 170px 110px 1fr; gap: 14px; padding: 12px 20px; border-bottom: 1px solid #211e1b; align-items: baseline;">
               <code style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #e8862e;">{{ i.input }}</code>
               <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8c847a;">{{ i.req }}</span>
@@ -419,17 +416,17 @@ test(<span style="color: #98c379;">'checkout page'</span>, <span style="color: #
           <div style="border: 1px solid #2a2622; background: #131210; padding: 20px 22px;">
             <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #f5f1ea; margin-bottom: 12px;">OpenAI</div>
             <code style="display: block; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #d8d0c5; margin-bottom: 14px;"><span style="color: #7c746b;">export </span>FRONTGUARD_OPENAI_KEY=sk-…</code>
-            <div style="font-size: 13px; color: #8c847a; line-height: 1.7;"><span style="color: #e8862e; font-family: 'JetBrains Mono', monospace;">gpt-4o</span> — best accuracy<br><span style="color: #e8862e; font-family: 'JetBrains Mono', monospace;">gpt-4o-mini</span> — faster, lower cost</div>
+            <div style="font-size: 13px; color: #8c847a; line-height: 1.7;">Select the model explicitly in configuration; Frontguard has not published a comparative accuracy benchmark.</div>
           </div>
           <div style="border: 1px solid #2a2622; background: #131210; padding: 20px 22px;">
             <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #f5f1ea; margin-bottom: 12px;">Anthropic</div>
             <code style="display: block; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #d8d0c5; margin-bottom: 14px;"><span style="color: #7c746b;">export </span>FRONTGUARD_ANTHROPIC_KEY=sk-ant-…</code>
-            <div style="font-size: 13px; color: #8c847a; line-height: 1.7;"><span style="color: #e8862e; font-family: 'JetBrains Mono', monospace;">claude-sonnet-4</span> — best accuracy<br><span style="color: #e8862e; font-family: 'JetBrains Mono', monospace;">claude-3-5-haiku</span> — faster, lower cost</div>
+            <div style="font-size: 13px; color: #8c847a; line-height: 1.7;">Select the model explicitly in configuration; Frontguard has not published a comparative accuracy benchmark.</div>
           </div>
         </div>
 
-        <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Cost optimization</h2>
-        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 16px;">AI only runs on pages with a detected diff — the pixel fast-gate catches 90%+ as passing, so they never hit the API.</p>
+        <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Cost controls</h2>
+        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 16px;">AI is optional and runs only on detected changes. Frontguard has not published a measured percentage of pages that avoid the provider call.</p>
         <ul style="list-style: none; padding: 0; margin: 0 0 32px; display: grid; gap: 12px;">
           <li style="display: flex; gap: 12px; font-size: 14.5px; color: #c8c0b6; line-height: 1.5;"><span style="color: #4fb477; font-family: 'JetBrains Mono', monospace;">✓</span>Use a cheap model (gpt-4o-mini / haiku) for triage, full models for PR-blocking checks</li>
           <li style="display: flex; gap: 12px; font-size: 14.5px; color: #c8c0b6; line-height: 1.5;"><span style="color: #4fb477; font-family: 'JetBrains Mono', monospace;">✓</span>Limit AI to the primary viewport if cost is a concern</li>
@@ -450,7 +447,7 @@ test(<span style="color: #98c379;">'checkout page'</span>, <span style="color: #
       <sc-if value="{{ isAiFixes }}" hint-placeholder-val="{{ false }}">
       <article>
         <h1 style="font-size: 42px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px; line-height: 1.05;">AI Fixes &amp; the fix-pattern database</h1>
-        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 30px;">Every competitor stops at "here's what changed." Frontguard goes further: here's a fix, and it re-rendered the page with the fix applied to confirm it works. Over time it learns which fixes you accept and reuses them.</p>
+        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 30px;">CSS suggestion generation and sandbox verification are experimental, separate opt-ins. Unverified suggestions remain labeled, and a verification result is not a correctness guarantee.</p>
 
         <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Verifying fixes in a sandbox</h2>
         <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">A suggested fix is only useful if it works. With <code style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #e8862e; background: #1a130b; padding: 2px 6px;">verifyFixes: true</code>, Frontguard applies the patch, re-renders, and re-compares:</p>
@@ -476,7 +473,7 @@ fixSandbox: <span style="color: #98c379;">'local'</span>, <span style="color: #5
 <span style="color: #7c746b;">$</span> frontguard reject-fix &lt;id&gt;   <span style="color: #564f48;"># negative signal</span>
 <span style="color: #7c746b;">$</span> frontguard export-patterns &gt; fix-patterns.json</pre>
         </div>
-        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 40px;">A pattern is reused once it has been accepted ≥3 times with no rejections — so a one-off accept never overrides the model. Verified fixes are recorded as accepted automatically.</p>
+        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 40px;">A pattern is reused once it has been accepted ≥3 times with no rejections. A verified fix is automatically recorded as an accepted local signal when the database is available; that does not update screenshot baselines or replace patch review.</p>
       </article>
       </sc-if>
 
@@ -484,7 +481,7 @@ fixSandbox: <span style="color: #98c379;">'local'</span>, <span style="color: #5
       <sc-if value="{{ isPlugins }}" hint-placeholder-val="{{ false }}">
       <article>
         <h1 style="font-size: 42px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px; line-height: 1.05;">Custom Plugins</h1>
-        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 30px;">Frontguard ships a plugin architecture that lets you extend every stage of the pipeline through six lifecycle hooks. Five plugins are built in; writing your own is a plain object.</p>
+        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 30px;">Frontguard ships a plugin architecture with nine lifecycle hooks. Five plugins are built in; writing your own is a plain object.</p>
 
         <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Built-in plugins</h2>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 36px;">
@@ -497,9 +494,9 @@ fixSandbox: <span style="color: #98c379;">'local'</span>, <span style="color: #5
         </div>
 
         <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Lifecycle hooks</h2>
-        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 16px;">Hooks are called in order. All are optional — implement only what you need. Hooks that return a value replace the input for the next plugin in the chain.</p>
-        <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 16px; padding: 18px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #d8d0c5; line-height: 1.7; overflow-x: auto;">setup → beforeDiscover → afterDiscover → beforeRender →<br>afterRender → afterCompare → afterRun → teardown</div>
-        <p style="font-size: 14px; line-height: 1.6; color: #8c847a; margin: 0 0 32px;">Plugins are called in registration order; <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #e8862e;">teardown</code> runs LIFO. Plugin names must be unique.</p>
+        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 16px;">Seven hooks run at pipeline stages, bracketed by setup and teardown. Hooks that transform pipeline data pass that result to the next plugin; onError may suppress an error by returning true.</p>
+        <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 16px; padding: 18px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #d8d0c5; line-height: 1.7; overflow-x: auto;">setup → beforeDiscover → afterDiscover → beforeRender → afterRender → afterCompare → afterRun → onError → teardown</div>
+        <p style="font-size: 14px; line-height: 1.6; color: #8c847a; margin: 0 0 32px;">Plugins run in registration order. Plugin names must be unique, and behavior should be tested against the pinned CLI version.</p>
 
         <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Example: a Slack plugin</h2>
         <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 40px;">
@@ -530,19 +527,26 @@ fixSandbox: <span style="color: #98c379;">'local'</span>, <span style="color: #5
         <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">Baselines are stored in a Git orphan branch (<code style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #e8862e; background: #1a130b; padding: 2px 6px;">frontguard-baselines</code>) by default. This keeps baseline images out of your main branch history while still being version-controlled. The manifest tracks which routes, viewports and browsers were captured and when.</p>
 
         <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Docker</h2>
-        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 16px;">An official image bundles Node, Playwright and the browsers, so there's nothing to install in CI.</p>
+        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 16px;">The renderer is currently repository-source-only. From a clean clone, prepare the local npm tarball that the Dockerfile requires before building the pinned image.</p>
         <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 36px;">
           <div style="border-bottom: 1px solid #211e1b; background: #161412; padding: 9px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #564f48;">terminal</div>
-          <pre style="margin: 0; padding: 18px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.85; color: #d8d0c5; overflow-x: auto;"><span style="color: #7c746b;">$</span> docker run --rm -v $PWD:/app \
-    -e FRONTGUARD_OPENAI_KEY=$OPENAI_KEY \
-    ghcr.io/ravidsrk/frontguard run --url https://staging.example.com</pre>
+          <pre style="margin: 0; padding: 18px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.85; color: #d8d0c5; overflow-x: auto;"><span style="color: #7c746b;">$</span> npm ci
+<span style="color: #7c746b;">$</span> npm run build --workspace=packages/cli
+<span style="color: #7c746b;">$</span> npm pack ./packages/cli --pack-destination packages/cli/docker
+<span style="color: #7c746b;">$</span> mv packages/cli/docker/frontguard-cli-*.tgz packages/cli/docker/frontguard-cli.tgz
+<span style="color: #7c746b;">$</span> docker build --platform linux/amd64 -t frontguard/render:0.2.3 packages/cli/docker</pre>
+        </div>
+        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 16px;">After the image is built, invoke it from a configured project. A container cannot reach a host app through localhost, so this staging example overrides baseUrl deliberately.</p>
+        <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 36px;">
+          <div style="border-bottom: 1px solid #211e1b; background: #161412; padding: 9px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #564f48;">configured project terminal</div>
+          <pre style="margin: 0; padding: 18px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.85; color: #d8d0c5; overflow-x: auto;"><span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard run --docker --url https://staging.example.com</pre>
         </div>
 
         <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Optional cloud platform</h2>
-        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">For teams that want a hosted dashboard, baseline approvals, monitoring schedules and usage metering, the cloud platform runs on Cloudflare Workers + D1 + R2 and is self-deployable. The CLI never depends on it.</p>
+        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">Cloud source exists for evaluation, but hosted and production self-host onboarding remain pre-release. The supported CLI path does not depend on that service.</p>
         <div style="border: 1px solid #3a2a18; background: #1a130b; padding: 18px 20px; margin-bottom: 40px; display: flex; gap: 14px;">
           <span style="font-family: 'JetBrains Mono', monospace; color: #e8862e; font-size: 15px;">▍</span>
-          <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #c8c0b6;">No per-screenshot pricing, no vendor lock-in. Everything that runs in the hosted product is open source and can run on your own infrastructure.</p>
+          <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #c8c0b6;">Do not treat the checked-in cloud packages as a verified production deployment guide or support commitment.</p>
         </div>
       </article>
       </sc-if>
@@ -551,7 +555,7 @@ fixSandbox: <span style="color: #98c379;">'local'</span>, <span style="color: #5
       <sc-if value="{{ isResults }}" hint-placeholder-val="{{ false }}">
       <article>
         <h1 style="font-size: 42px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px; line-height: 1.05;">Validation &amp; results</h1>
-        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 30px;">Frontguard's value depends on the AI correctly classifying visual changes. Accuracy is measured with two validation harnesses and tracked over time — not asserted.</p>
+        <p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 30px;">The published validation result is a local execution snapshot, not an AI-accuracy or cross-platform benchmark.</p>
 
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 36px;">
           <sc-for list="{{ trustStats }}" as="t" hint-placeholder-count="3">
@@ -562,15 +566,16 @@ fixSandbox: <span style="color: #98c379;">'local'</span>, <span style="color: #5
           </sc-for>
         </div>
 
-        <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Synthetic validation</h2>
-        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 16px;">Ten programmatic before/after pairs with known ground truth, run against your own key:</p>
+        <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Published evidence</h2>
+        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 16px;">Review the recorded commands, fixture failures, environment, and completed route rechecks:</p>
         <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 28px;">
-          <pre style="margin: 0; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.8; color: #d8d0c5; overflow-x: auto;"><span style="color: #7c746b;">$</span> npx tsx scripts/validate-ai.ts</pre>
+          <pre style="margin: 0; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.8; color: #d8d0c5; overflow-x: auto;">validation/results-v0.2.md</pre>
         </div>
-        <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">Real-world validation</h2>
-        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 16px;">Validates against actual GitHub PRs through the full clone → render → diff → analyze pipeline:</p>
+        <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 0 0 14px;">What remains unvalidated</h2>
+        <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 16px;">The run did not seed known visual regressions, measure model precision or recall, compare operating systems, or prove public Action and hosted workflows.</p>
         <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 40px;">
-          <pre style="margin: 0; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.8; color: #d8d0c5; overflow-x: auto;"><span style="color: #7c746b;">$</span> npx tsx scripts/validate-ai-real.ts --repo shadcn-ui/ui --pr 1234</pre>
+          <pre style="margin: 0; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.8; color: #d8d0c5; overflow-x: auto;">AI analysis: disabled
+Host matrix: one macOS host</pre>
         </div>
       </article>
       </sc-if>
@@ -697,10 +702,10 @@ class Component extends DCLogic {
       stages: [
         { num: '01', title: 'Discover', desc: 'Crawl, filesystem scan, or config — finds every route automatically.' },
         { num: '02', title: 'Filter', desc: 'Dependency graph renders only pages affected by your changed files.' },
-        { num: '03', title: 'Render', desc: 'Playwright captures each route × viewport × browser, anti-flake.' },
-        { num: '04', title: 'Diff', desc: 'pixelmatch fast gate, then DOM + computed-style comparison.' },
-        { num: '05', title: 'Analyze', desc: 'AI vision classifies, explains the root cause, scores confidence.' },
-        { num: '06', title: 'Report', desc: 'Console, JSON, HTML, and a GitHub PR comment with visual diffs.' },
+        { num: '03', title: 'Render', desc: 'Playwright captures each route × viewport × browser with configurable consensus.' },
+        { num: '04', title: 'Diff', desc: 'Pixel comparison with an SSIM fallback.' },
+        { num: '05', title: 'Analyze', desc: 'Optional BYOK analysis classifies and explains changed screenshots.' },
+        { num: '06', title: 'Report', desc: 'Console, JSON, and HTML artifacts with visual evidence.' },
       ],
       frameworks: ['Next.js', 'Remix', 'SvelteKit', 'Nuxt', 'Astro'],
       envVars: [
@@ -711,9 +716,10 @@ class Component extends DCLogic {
       ],
       quickSteps: [
         { n: '1', title: 'Initialize', desc: 'Auto-detect your framework and scaffold a config (plus a GitHub Action with --ci).', cmd: 'npx -p @frontguard/cli frontguard init --ci' },
-        { n: '2', title: 'Check your environment', desc: 'Verify Node, Playwright, browsers and git are ready.', cmd: 'npx -p @frontguard/cli frontguard doctor' },
-        { n: '3', title: 'Run', desc: 'First run captures baselines; subsequent runs diff against them.', cmd: 'npx -p @frontguard/cli frontguard run --url http://localhost:3000' },
-        { n: '4', title: 'Accept changes', desc: 'After an intentional redesign, accept the current screenshots as new baselines.', cmd: 'npx -p @frontguard/cli frontguard update-baselines' },
+        { n: '2', title: 'Start the app', desc: 'In a separate app terminal, use the project’s dev-server command (npm run dev is one example), leave it running, and wait for the configured baseUrl.', cmd: 'npm run dev' },
+        { n: '3', title: 'Capture baselines', desc: 'Review the running app, then explicitly accept its screenshots.', cmd: 'npx -p @frontguard/cli frontguard update-baselines' },
+        { n: '4', title: 'Publish baselines', desc: 'Push the orphan branch before CI comparisons.', cmd: 'git push origin frontguard-baselines' },
+        { n: '5', title: 'Compare', desc: 'Run again after a change using the generated config; unaccepted new pages and regressions exit non-zero.', cmd: 'npx -p @frontguard/cli frontguard run' },
       ],
       statuses: [
         { glyph: '✓', label: 'PASS', desc: 'within threshold', hex: '#4fb477' },
@@ -735,7 +741,7 @@ class Component extends DCLogic {
         { flag: '-v, --viewports', desc: 'Comma-separated viewport widths', def: '375,768,1440' },
         { flag: '-b, --browsers', desc: 'chromium, firefox, webkit', def: 'chromium' },
         { flag: '-o, --output', desc: 'Output format: console, json', def: 'console' },
-        { flag: '-t, --threshold', desc: 'Pixel diff threshold (0–100)', def: '0.1' },
+        { flag: '-t, --threshold', desc: 'Changed-pixel ratio (0–1; 0.01 = 1%)', def: '0.1' },
       ],
       coreOpts: [
         { opt: 'baseUrl', desc: 'Required. Base URL of the app under test', def: '—' },
@@ -755,14 +761,16 @@ class Component extends DCLogic {
         { input: 'url', req: 'No', desc: 'Base URL to test (auto-detected from preview deploys if omitted).' },
         { input: 'routes', req: 'No', desc: 'Comma-separated routes (auto-discovered by default).' },
         { input: 'viewports', req: 'No', desc: 'Comma-separated viewport widths. Default 375,768,1440.' },
-        { input: 'threshold', req: 'No', desc: 'Pixel diff threshold percentage. Default 0.1.' },
-        { input: 'ai-provider', req: 'No', desc: 'openai or anthropic.' },
+        { input: 'browsers', req: 'No', desc: 'Comma-separated browsers. Default chromium.' },
+        { input: 'threshold', req: 'No', desc: 'Changed-pixel ratio (0–1; 0.01 = 1%). Uses config or 0.1 when omitted.' },
+        { input: 'config', req: 'No', desc: 'Path to frontguard.config.ts.' },
         { input: 'update-baselines', req: 'No', desc: 'Accept current as new baselines. Default false.' },
+        { input: 'github-token', req: 'No', desc: 'GitHub token for PR comments. Defaults to github.token.' },
       ],
       actionSteps: [
         { n: '1', desc: 'Setup Node.js 20.' },
-        { n: '2', desc: 'Install Frontguard — npm install -g @frontguard/cli@latest.' },
-        { n: '3', desc: 'Install browsers — npx playwright install --with-deps.' },
+        { n: '2', desc: 'Install the exact Frontguard CLI version bundled by the Action.' },
+        { n: '3', desc: 'Install browsers through the exact CLI package version bundled by the Action.' },
         { n: '4', desc: 'Detect preview URL from Vercel, Netlify, Cloudflare, Railway, Render.' },
         { n: '5', desc: 'Run the full pipeline with your configuration.' },
         { n: '6', desc: 'Upload the HTML report as a build artifact.' },
@@ -781,9 +789,9 @@ class Component extends DCLogic {
         { name: 'Monitor', desc: 'Production visual monitoring, threshold alerting, history.' },
       ],
       trustStats: [
-        { stat: '395', label: 'tests across 26 test files in the core CLI' },
-        { stat: '10', label: 'synthetic ground-truth cases with known classifications' },
-        { stat: 'PR-level', label: 'real-world validation against live GitHub pull requests' },
+        { stat: '39 / 43', label: 'route rechecks completed in the published harness' },
+        { stat: '2 / 5', label: 'fixture repositories booted successfully' },
+        { stat: 'AI OFF', label: 'classifier accuracy was not measured in that run' },
       ],
     };
   }

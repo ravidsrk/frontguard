@@ -136,6 +136,8 @@ export interface FrontguardPlugin {
 export class PluginManager {
   private plugins: FrontguardPlugin[] = [];
   private context: PluginContext | null = null;
+  private setupPlugins: FrontguardPlugin[] | null = null;
+  private teardownStarted = false;
 
   /** Number of registered plugins. */
   get count(): number {
@@ -165,8 +167,12 @@ export class PluginManager {
    */
   async setup(ctx: PluginContext): Promise<void> {
     this.context = ctx;
+    this.setupPlugins = [];
+    this.teardownStarted = false;
 
     for (const plugin of this.plugins) {
+      // Include the currently setting-up plugin so partial setup can clean up.
+      this.setupPlugins.push(plugin);
       if (plugin.setup) {
         await plugin.setup(this.context);
       }
@@ -206,7 +212,10 @@ export class PluginManager {
    * the last plugin set up is the first to be torn down.
    */
   async teardown(): Promise<void> {
-    const reversed = [...this.plugins].reverse();
+    if (this.teardownStarted) return;
+    this.teardownStarted = true;
+
+    const reversed = [...(this.setupPlugins ?? this.plugins)].reverse();
     for (const plugin of reversed) {
       if (plugin.teardown) {
         try {
@@ -219,6 +228,7 @@ export class PluginManager {
         }
       }
     }
+    this.setupPlugins = [];
   }
 
   /** Get the shared plugin context (available after setup). */

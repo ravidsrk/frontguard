@@ -1,5 +1,5 @@
 /**
- * Anonymous, opt-out usage telemetry.
+ * Anonymous, opt-in usage telemetry.
  *
  * Sends a small, PII-free event after each command so we can understand which
  * features are used and prioritise work. Telemetry is:
@@ -8,8 +8,7 @@
  * - **Opt-in** — disabled by default until a hosted collector is live. Enable
  *   with `FRONTGUARD_TELEMETRY=1`, `telemetry: true` in config, or opt out via
  *   `--no-telemetry`, `FRONTGUARD_TELEMETRY=0`, `DO_NOT_TRACK=1`.
- * - **Non-blocking** — fire-and-forget with a short timeout; never slows or
- *   fails the CLI.
+ * - **Bounded** — waits at most 1.5 seconds and never fails the CLI.
  *
  * @module utils/telemetry
  */
@@ -109,7 +108,7 @@ export function showFirstRunNotice(): void {
 }
 
 /**
- * Sends a telemetry event. Fire-and-forget: resolves quickly and never throws.
+ * Sends a telemetry event with a 1.5-second deadline and never throws.
  *
  * @param event - The event to send.
  * @param opts  - Enable/endpoint overrides (used by tests).

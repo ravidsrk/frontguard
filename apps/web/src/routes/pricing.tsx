@@ -10,7 +10,7 @@ export const Route = createFileRoute('/pricing')({
     ...buildSeoHead({
       title: 'Pricing — Frontguard',
       description:
-        'The CLI is free forever under MIT. Pro hosted cloud at $29/mo. No per-screenshot pricing cliff, no dashboard lock-in.',
+        'The Frontguard CLI is free under MIT. Hosted plans are pre-release and available only for design-partner conversations.',
       path: '/pricing',
     }),
     scripts: [
@@ -63,53 +63,53 @@ const tiers: Tier[] = [
       'Unlimited screenshots & routes',
       'Multi-browser & multi-viewport',
       'AI analysis (bring your own key)',
-      'AI fix generation + sandbox verification',
+      'Experimental fix generation + opt-in verification',
       'Git-native baselines',
-      'GitHub Action + PR comments',
-      'All 5 plugins, self-hostable',
+      'Generated CI workflow + HTML artifact',
+      'All 5 built-in plugins',
     ],
   },
   {
-    name: 'PRO',
+    name: 'HOSTED (PLANNED)',
     accent: '#e8862e',
     border: '#3a2a18',
     bg: '#15110c',
-    price: '$29',
-    per: '/ month',
+    price: 'Waitlist',
+    per: '',
     featured: true,
-    tagline: 'A hosted dashboard and managed baselines for solo devs and small teams.',
+    tagline: 'Pre-release hosted concepts for teams willing to help validate the workflow.',
     cta: 'Join the waitlist',
     ctaHref: 'mailto:hello@frontguard.dev?subject=Pro%20waitlist',
     external: true,
-    featuresLabel: 'EVERYTHING IN OPEN SOURCE, PLUS',
+    featuresLabel: 'PLANNED — NOT GENERALLY AVAILABLE',
     features: [
-      'Hosted dashboard & report history',
-      'Managed baseline storage (R2)',
-      'Slack & PagerDuty alerts',
-      'Cross-OS reference rendering',
-      'Priority support',
+      'Candidate hosted dashboard & report history',
+      'Candidate managed baseline storage',
+      'Candidate team notifications',
+      'Reference rendering under evaluation',
+      'Design-partner feedback channel',
     ],
   },
   {
-    name: 'TEAM',
+    name: 'TEAM (PLANNED)',
     accent: '#5b8def',
     border: '#2a2622',
     bg: '#131210',
-    price: "Let's talk",
+    price: 'Design partner',
     per: '',
     featured: false,
-    tagline: 'Multi-tenant teams, roles, approvals and SSO for organizations.',
+    tagline: 'A roadmap discussion, not a generally available enterprise service or SLA.',
     cta: 'Contact us',
     ctaHref: 'mailto:hello@frontguard.dev?subject=Enterprise%20Frontguard',
     external: true,
-    featuresLabel: 'EVERYTHING IN PRO, PLUS',
+    featuresLabel: 'ROADMAP — NOT GENERALLY AVAILABLE',
     features: [
-      'Teams, roles & invitations',
-      'Baseline approval workflows',
-      'Activity feed & audit log',
-      'Usage metering & seat billing',
-      'OpenTelemetry metrics export',
-      'SSO & dedicated support',
+      'Candidate team roles & invitations',
+      'Candidate baseline review workflows',
+      'Candidate activity and audit surfaces',
+      'No production billing flow today',
+      'No production SSO flow today',
+      'No support SLA today',
     ],
   },
 ]
@@ -118,34 +118,34 @@ const matrix = [
   { cap: 'CLI — render, diff, report', v1: '✓', c1: YES, v2: '✓', c2: YES, v3: '✓', c3: YES },
   { cap: 'AI analysis (BYOK)', v1: '✓', c1: YES, v2: '✓', c2: YES, v3: '✓', c3: YES },
   { cap: 'AI fix generation & verification', v1: '✓', c1: YES, v2: '✓', c2: YES, v3: '✓', c3: YES },
-  { cap: 'Hosted dashboard & history', v1: '—', c1: NO, v2: '✓', c2: YES, v3: '✓', c3: YES },
-  { cap: 'Managed baseline storage', v1: 'Git', c1: INK, v2: 'R2', c2: AMBER, v3: 'R2', c3: AMBER },
-  { cap: 'Production monitoring scheduler', v1: 'CLI', c1: INK, v2: '—', c2: NO, v3: '✓', c3: YES },
-  { cap: 'Slack / PagerDuty alerts', v1: 'Webhook', c1: INK, v2: '✓', c2: YES, v3: '✓', c3: YES },
-  { cap: 'Teams, roles & approvals', v1: '—', c1: NO, v2: '—', c2: NO, v3: '✓', c3: YES },
-  { cap: 'SSO & audit log', v1: '—', c1: NO, v2: '—', c2: NO, v3: '✓', c3: YES },
+  { cap: 'Hosted dashboard & history', v1: '—', c1: NO, v2: 'Planned', c2: AMBER, v3: 'Planned', c3: AMBER },
+  { cap: 'Managed baseline storage', v1: 'Git', c1: INK, v2: 'Planned', c2: AMBER, v3: 'Planned', c3: AMBER },
+  { cap: 'Production monitoring scheduler', v1: 'CLI', c1: INK, v2: '—', c2: NO, v3: 'Planned', c3: AMBER },
+  { cap: 'Slack / PagerDuty alerts', v1: 'Webhook', c1: INK, v2: 'Planned', c2: AMBER, v3: 'Planned', c3: AMBER },
+  { cap: 'Teams, roles & approvals', v1: '—', c1: NO, v2: '—', c2: NO, v3: 'Planned', c3: AMBER },
+  { cap: 'SSO & audit log', v1: '—', c1: NO, v2: '—', c2: NO, v3: 'Planned', c3: AMBER },
 ]
 
 const faqs = [
   {
     q: 'How do I install Frontguard?',
-    a: 'Run npm install @frontguard/cli to install the engine, then npx -p @frontguard/cli frontguard init to write a typed config and npx -p @frontguard/cli frontguard run --url <your URL> to do your first scan. The Playwright plugin is a thin wrapper: npm install -D @frontguard/cli @frontguard/playwright.',
+    a: 'Run npm install @frontguard/cli, initialize the config, start your app, and review it before running frontguard update-baselines. Push the frontguard-baselines branch before CI comparisons. The Playwright adapter installs with npm install -D @frontguard/cli @frontguard/playwright.',
   },
   {
     q: 'How does Frontguard handle cross-OS rendering differences?',
-    a: "Playwright's own docs warn that local rendering varies by OS and hardware. Frontguard ships a pinned Docker renderer image with Chromium, Firefox, and WebKit so baselines render byte-equivalently on macOS, Linux, and CI. Enable with frontguard run --docker.",
+    a: "Playwright rendering can vary by OS and hardware. The renderer is currently repository-source-only and requires the documented npm pack/tarball preparation before frontguard run --docker; cross-host byte equivalence has not yet been validated and no image is published.",
   },
   {
     q: 'Can I self-host the cloud?',
-    a: 'Yes. The cloud (Hono on Cloudflare Workers with D1 and R2) is MIT-licensed and runs locally via docker-compose up — miniflare for the Worker runtime, SQLite in place of D1, and a local-disk adapter in place of R2.',
+    a: 'The MIT-licensed cloud source is available for evaluation, but its Docker Compose path is not a verified clean-checkout deployment and no supported self-host quick start or SLA exists yet.',
   },
   {
     q: 'What environment variables does Frontguard read?',
-    a: 'For AI: FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY. The Playwright plugin also accepts unprefixed OPENAI_API_KEY / ANTHROPIC_API_KEY when present. For the hosted cloud: FRONTGUARD_API_URL and FRONTGUARD_API_KEY. frontguard doctor reads exactly the same env names the runtime reads.',
+    a: 'For AI: FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY. The Playwright plugin also accepts unprefixed OPENAI_API_KEY / ANTHROPIC_API_KEY when present. MCP and cloud-development tools require an explicit FRONTGUARD_API_URL and FRONTGUARD_API_KEY; there is no live hosted default. frontguard doctor reads the same AI names as the runtime.',
   },
   {
     q: 'OpenAI or Anthropic — which should I use?',
-    a: 'Either works. Frontguard sends the diff image, the DOM snapshot, console errors, and axe-core findings. Claude Sonnet is the default when both keys are present; GPT-4o is the fallback. Switch with ai.provider in frontguard.config.ts.',
+    a: 'Choose the provider and model explicitly in frontguard.config.ts. When AI is enabled, Frontguard sends screenshot evidence, basic route metadata, and optional accessibility findings directly to that provider; it does not send a DOM snapshot or console log.',
   },
   {
     q: 'Does Frontguard work with Storybook?',
@@ -153,11 +153,11 @@ const faqs = [
   },
   {
     q: 'Is there an MCP server for in-IDE agents?',
-    a: '@frontguard/mcp exposes list_regressions(pr_id), get_suggested_fix(diff_id), accept_baseline(run_id — run-scoped), and recent_runs(repo, branch) to Claude Code, Cursor, Cline, and Copilot. Run as npx -y @frontguard/mcp and drop the snippet into your mcp.json.',
+    a: '@frontguard/mcp is a pre-release interface for list_regressions, get_suggested_fix, recent_runs, and whole-run approval. It requires an explicit verified API deployment. accept_baseline records approval but does not promote screenshots.',
   },
   {
     q: "What's the data retention policy for screenshots?",
-    a: 'The CLI never sends screenshots anywhere except the AI provider you configured. On the hosted cloud, baselines and diff thumbnails are stored in R2 under your team scope; default retention is 30 days on Pro, configurable up to 1 year on Enterprise.',
+    a: 'The local CLI keeps baselines in git and reports on disk unless you configure AI or image upload. The pre-release cloud has no production retention commitment: general run images are not automatically pruned, team deletion attempts object cleanup on a best-effort basis, and operators must reconcile failures.',
   },
 ]
 
@@ -237,13 +237,14 @@ function Pricing() {
             'font-size: 18px; line-height: 1.55; color: #b8b0a6; margin: 0 auto; max-width: 560px;',
           )}
         >
-          No per-screenshot pricing cliff. No dashboard lock-in. Run the full CLI for free,
-          forever — and add a hosted layer only when your team needs one.
+          Run the local CLI for free without an account. Hosted plans are not generally
+          available; the waitlist is for design-partner conversations, not purchase.
         </p>
       </header>
 
       <section style={s('max-width: 1200px; margin: 0 auto; padding: 8px 28px 40px;')}>
         <div
+          className="fg-responsive-grid"
           style={s(
             'display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; align-items: stretch;',
           )}
@@ -262,7 +263,7 @@ function Pricing() {
                     `position: absolute; top: -1px; right: 24px; background: #e8862e; color: #0d0c0b; font-family: ${MONO}; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; padding: 4px 10px; white-space: nowrap;`,
                   )}
                 >
-                  MOST POPULAR
+                  PRE-RELEASE
                 </span>
               )}
               <div
@@ -324,8 +325,8 @@ function Pricing() {
             `text-align: center; font-family: ${MONO}; font-size: 12.5px; color: #6b645c; margin: 28px 0 0;`,
           )}
         >
-          The hosted platform is itself open source — every Pro and Team feature can run on your
-          own Cloudflare account.
+          Cloud source is included for evaluation, but the hosted and self-host onboarding paths
+          are pre-release and do not carry a production support commitment.
         </p>
       </section>
 
@@ -362,14 +363,14 @@ function Pricing() {
                 `padding: 16px 14px; text-align: center; font-family: ${MONO}; font-size: 12px; color: #e8862e; font-weight: 700;`,
               )}
             >
-              Pro
+              Hosted (planned)
             </div>
             <div
               style={s(
                 `padding: 16px 14px; text-align: center; font-family: ${MONO}; font-size: 12px; color: #8c847a;`,
               )}
             >
-              Team
+              Team (planned)
             </div>
           </div>
           {matrix.map((row) => (
@@ -448,15 +449,15 @@ function Pricing() {
               'font-size: 40px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;',
             )}
           >
-            Start free. Upgrade if you outgrow it.
+            Start with the free local CLI.
           </h2>
           <p
             style={s(
               'font-size: 17px; color: #b8b0a6; margin: 0 auto 32px; max-width: 460px; line-height: 1.55;',
             )}
           >
-            Install the CLI and run your first visual check in two minutes — no account, no credit
-            card.
+            Install the CLI without an account, start your app, explicitly accept reviewed
+            baselines, then run the comparison again.
           </p>
           <div
             style={s(

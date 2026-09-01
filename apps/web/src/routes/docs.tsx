@@ -14,7 +14,7 @@ import {
 
 const SEO_TITLE = 'Documentation — Frontguard'
 const SEO_DESCRIPTION =
-  'Frontguard docs: install the CLI, configure visual regression tests, run AI analysis, wire up CI/CD, and self-host the cloud.'
+  'Frontguard docs: install the local CLI, configure visual comparisons, add optional AI analysis, and evaluate pre-release integrations.'
 const DOCS_PATH = '/docs'
 const DOCS_COLLECTION_ID = `${canonicalUrl(DOCS_PATH)}#collection`
 
@@ -78,8 +78,8 @@ function DocsLayout() {
 
   return (
     <div style={s('background: #0d0c0b; color: #b8b0a6; min-height: 100vh;')}>
-      <header style={s('position: sticky; top: 0; z-index: 50; background: rgba(13,12,11,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid #211e1b;')}>
-        <div style={s('display: flex; align-items: center; justify-content: space-between; padding: 0 28px; height: 60px;')}>
+      <header className="fg-docs-header" style={s('position: sticky; top: 0; z-index: 50; background: rgba(13,12,11,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid #211e1b;')}>
+        <div className="fg-docs-header-inner" style={s('display: flex; align-items: center; justify-content: space-between; padding: 0 28px; height: 60px;')}>
           <div style={s('display: flex; align-items: center; gap: 26px;')}>
             <Link to="/" className="fg-navlink" style={s('display: flex; align-items: center; gap: 11px; text-decoration: none; color: #f5f1ea;')}>
               <Shield w={20} h={24} />
@@ -88,18 +88,27 @@ function DocsLayout() {
             <span style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; border: 1px solid #2a2622; padding: 3px 9px;`)}>DOCS</span>
           </div>
           <div style={s(`display: flex; align-items: center; gap: 22px; font-family: ${MONO}; font-size: 13px;`)}>
-            <div style={s('display: flex; align-items: center; gap: 9px; border: 1px solid #2a2622; background: #131210; padding: 7px 12px; color: #564f48; font-size: 12px;')}>
-              <span>Search docs</span>
-              <span style={s('border: 1px solid #322d28; padding: 1px 6px; font-size: 10px; color: #6b645c;')}>⌘K</span>
-            </div>
             <Link to="/" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>home</Link>
             <a href="https://github.com/ravidsrk/frontguard" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>github</a>
           </div>
         </div>
       </header>
 
-      <div style={s('display: grid; grid-template-columns: 256px minmax(0, 1fr) 224px; max-width: 1400px; margin: 0 auto;')}>
-        <aside style={s('border-right: 1px solid #211e1b; padding: 34px 0 80px;')}>
+      <nav className="fg-docs-mobile-nav" aria-label="Documentation sections">
+        {navGroups.map((group) => (
+          <Link
+            key={group.label}
+            to="/docs/$"
+            params={{ _splat: group.ids[0] ?? 'index' }}
+            aria-label={group.label}
+          >
+            {group.label.toLowerCase()}
+          </Link>
+        ))}
+      </nav>
+
+      <div className="fg-docs-grid" style={s('display: grid; grid-template-columns: 256px minmax(0, 1fr) 224px; max-width: 1400px; margin: 0 auto;')}>
+        <aside className="fg-docs-sidebar" style={s('border-right: 1px solid #211e1b; padding: 34px 0 80px;')}>
           <div style={s('position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; padding-right: 4px;')}>
             {navGroups.map((group) => (
               <div key={group.label} style={s('margin-bottom: 24px; padding: 0 22px;')}>
@@ -124,11 +133,11 @@ function DocsLayout() {
           </div>
         </aside>
 
-        <main style={s('padding: 44px 60px 120px; min-width: 0;')}>
+        <main className="fg-docs-main" style={s('padding: 44px 60px 120px; min-width: 0;')}>
           <Outlet />
         </main>
 
-        <aside style={s('padding: 44px 24px; border-left: 1px solid #211e1b;')}>
+        <aside className="fg-docs-toc" style={s('padding: 44px 24px; border-left: 1px solid #211e1b;')}>
           <div style={s('position: sticky; top: 84px;')}>
             <div style={s(`font-family: ${MONO}; font-size: 10.5px; color: #564f48; letter-spacing: 0.1em; margin-bottom: 14px;`)}>ON THIS PAGE</div>
             {cur.toc.map((t) => (

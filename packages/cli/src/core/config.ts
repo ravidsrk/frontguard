@@ -9,13 +9,16 @@
  */
 
 import { z } from "zod";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { tsImport } from "tsx/esm/api";
 import type { FrontguardConfig } from "./types.js";
-import { getFrameworkInfo } from "../templates/index.js";
+import {
+  FRAMEWORK_TEMPLATES,
+  getFrameworkInfo,
+} from "../templates/index.js";
 
 // ---------------------------------------------------------------------------
 // Zod Sub-Schemas
@@ -527,19 +530,6 @@ export async function loadConfig(
 // Framework Detection
 // ---------------------------------------------------------------------------
 
-/** Known framework indicators: package-name → human-readable label. */
-const FRAMEWORK_INDICATORS: Record<string, string> = {
-  next: "Next.js",
-  "@remix-run/react": "Remix",
-  nuxt: "Nuxt",
-  "@sveltejs/kit": "SvelteKit",
-  gatsby: "Gatsby",
-  astro: "Astro",
-  "@angular/core": "Angular",
-  "react-scripts": "Create React App",
-  vite: "Vite",
-};
-
 /**
  * Detects the frontend framework used in a project directory by
  * inspecting its `package.json` dependencies.
@@ -547,14 +537,12 @@ const FRAMEWORK_INDICATORS: Record<string, string> = {
  * @param projectDir - Absolute or relative path to the project root.
  * @returns The human-readable framework name, or `null` if none detected.
  */
-export async function detectFramework(
-  projectDir: string,
-): Promise<string | null> {
+export function detectFramework(projectDir: string): string | null {
   const pkgPath = join(resolve(projectDir), "package.json");
   if (!existsSync(pkgPath)) return null;
 
   try {
-    const raw = await readFile(pkgPath, "utf-8");
+    const raw = readFileSync(pkgPath, "utf-8");
     const pkg = JSON.parse(raw) as Record<string, unknown>;
 
     const deps = {
@@ -567,8 +555,10 @@ export async function detectFramework(
         : {}),
     };
 
-    for (const [pkgName, label] of Object.entries(FRAMEWORK_INDICATORS)) {
-      if (pkgName in deps) return label;
+    for (const info of Object.values(FRAMEWORK_TEMPLATES)) {
+      if (info.dependencyNames.some((pkgName) => pkgName in deps)) {
+        return info.name;
+      }
     }
   } catch {
     // Malformed package.json — fall through
@@ -651,7 +641,7 @@ export function generateDefaultConfig(
   ${routeHint}
   viewports: [375, 768, 1440],
   browsers: ['chromium'],
-  threshold: 0.1,
+  threshold: 0.1, // Changed-pixel ratio: 0.1 = 10%
   ignore: [],
   smartRender: true,
   workers: 4,

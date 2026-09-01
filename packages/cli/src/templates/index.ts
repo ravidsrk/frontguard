@@ -12,10 +12,14 @@
 export interface FrameworkInfo {
   /** Canonical framework name (e.g. `'Next.js'`). */
   name: string;
+  /** package.json dependencies that identify this framework. */
+  dependencyNames: readonly string[];
   /** Default dev-server port. */
   defaultPort: number;
   /** Command that starts the dev server. */
   devCommand: string;
+  /** Existing package.json scripts that can start this framework in CI. */
+  ciScripts: readonly string[];
   /** Routes commonly present in a fresh project. */
   typicalRoutes: string[];
   /** Whether routes are conventionally auto-discoverable (file-system routing). */
@@ -31,80 +35,100 @@ export interface FrameworkInfo {
 export const FRAMEWORK_TEMPLATES: Record<string, FrameworkInfo> = {
   'Next.js': {
     name: 'Next.js',
+    dependencyNames: ['next'],
     defaultPort: 3000,
     devCommand: 'next dev',
+    ciScripts: ['dev'],
     typicalRoutes: ['/', '/about'],
     fileSystemRouting: true,
     note: 'Next.js — routes are file-system based (pages/ or app/). Use discover for auto-crawl.',
   },
   Remix: {
     name: 'Remix',
+    dependencyNames: ['@remix-run/react', '@remix-run/node'],
     defaultPort: 3000,
     devCommand: 'remix dev',
+    ciScripts: ['dev'],
     typicalRoutes: ['/', '/about'],
     fileSystemRouting: true,
     note: 'Remix — routes live in app/routes. Use discover for auto-crawl.',
   },
   Nuxt: {
     name: 'Nuxt',
+    dependencyNames: ['nuxt'],
     defaultPort: 3000,
     devCommand: 'nuxt dev',
+    ciScripts: ['dev'],
     typicalRoutes: ['/', '/about'],
     fileSystemRouting: true,
     note: 'Nuxt — routes are file-system based (pages/). Use discover for auto-crawl.',
   },
   SvelteKit: {
     name: 'SvelteKit',
+    dependencyNames: ['@sveltejs/kit'],
     defaultPort: 5173,
     devCommand: 'vite dev',
+    ciScripts: ['dev'],
     typicalRoutes: ['/', '/about'],
     fileSystemRouting: true,
     note: 'SvelteKit — routes live in src/routes. Use discover for auto-crawl.',
   },
   Astro: {
     name: 'Astro',
+    dependencyNames: ['astro'],
     defaultPort: 4321,
     devCommand: 'astro dev',
+    ciScripts: ['dev'],
     typicalRoutes: ['/', '/about'],
     fileSystemRouting: true,
     note: 'Astro — routes are file-system based (src/pages).',
   },
   Gatsby: {
     name: 'Gatsby',
+    dependencyNames: ['gatsby'],
     defaultPort: 8000,
     devCommand: 'gatsby develop',
+    ciScripts: ['develop'],
     typicalRoutes: ['/', '/about'],
     fileSystemRouting: true,
     note: 'Gatsby — routes are file-system based (src/pages).',
   },
   Angular: {
     name: 'Angular',
+    dependencyNames: ['@angular/core'],
     defaultPort: 4200,
     devCommand: 'ng serve',
+    ciScripts: ['start'],
     typicalRoutes: ['/'],
     fileSystemRouting: false,
     note: 'Angular — define routes explicitly; they are not file-system based.',
   },
   Vite: {
     name: 'Vite',
+    dependencyNames: ['vite'],
     defaultPort: 5173,
     devCommand: 'vite',
+    ciScripts: ['dev'],
     typicalRoutes: ['/'],
     fileSystemRouting: false,
     note: 'Vite — single-page app; define routes explicitly.',
   },
   'Create React App': {
     name: 'Create React App',
+    dependencyNames: ['react-scripts'],
     defaultPort: 3000,
     devCommand: 'react-scripts start',
+    ciScripts: ['start'],
     typicalRoutes: ['/'],
     fileSystemRouting: false,
     note: 'Create React App — single-page app; define routes explicitly.',
   },
   generic: {
     name: 'generic',
+    dependencyNames: [],
     defaultPort: 3000,
     devCommand: 'npm run dev',
+    ciScripts: ['dev', 'start', 'develop'],
     typicalRoutes: ['/', '/about', '/contact'],
     fileSystemRouting: false,
     note: 'No framework detected — using sensible defaults.',

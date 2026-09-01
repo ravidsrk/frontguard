@@ -37,7 +37,7 @@ import {
 } from './tools/index.js';
 
 const SERVER_NAME = '@frontguard/mcp';
-const SERVER_VERSION = '0.2.2';
+const SERVER_VERSION = '0.2.3';
 
 /**
  * Build a fresh {@link McpServer} with all Frontguard tools registered.
@@ -49,7 +49,7 @@ export function createServer(): McpServer {
     {
       capabilities: { tools: {} },
       instructions:
-        'Frontguard MCP server. Use `list_regressions` to see what visual regressions a PR has, `get_suggested_fix` to read the AI patch for a specific diff, `accept_baseline` to promote an entire run as the new baseline (run-scoped — review every regression first), and `recent_runs` to browse history.',
+        'Frontguard MCP server. Use `list_regressions` to see what visual regressions a PR has, `get_suggested_fix` to read the AI patch for a specific diff, and `recent_runs` to browse history. `accept_baseline` currently records whole-run approval but does not promote screenshots; use the CLI or composite Action for baseline updates.',
     },
   );
 
@@ -80,9 +80,9 @@ export function createServer(): McpServer {
   server.registerTool(
     'accept_baseline',
     {
-      title: 'Accept the entire run as the new baseline',
+      title: 'Record whole-run baseline approval',
       description:
-        'Promote every screenshot in a run to the new baseline (run-scoped — not per-diff). Requires `run_id` and `confirm_all_regressions_reviewed: true` after you have reviewed every regression from `list_regressions`.',
+        'Record run-scoped whole-run approval after `confirm_all_regressions_reviewed: true`. Screenshot promotion is not implemented yet; use the CLI or composite Action to update baselines.',
       inputSchema: acceptBaselineInputSchema,
       outputSchema: acceptBaselineOutputSchema,
     },

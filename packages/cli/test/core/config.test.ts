@@ -172,57 +172,53 @@ describe('detectFramework', () => {
   let tempDir: string;
   let cleanup: () => void;
 
+  const frameworkCases = [
+    { dependency: 'next', framework: 'Next.js' },
+    { dependency: '@remix-run/react', framework: 'Remix' },
+    { dependency: '@remix-run/node', framework: 'Remix' },
+    { dependency: 'nuxt', framework: 'Nuxt' },
+    { dependency: '@sveltejs/kit', framework: 'SvelteKit' },
+    { dependency: 'gatsby', framework: 'Gatsby' },
+    { dependency: 'astro', framework: 'Astro' },
+    { dependency: '@angular/core', framework: 'Angular' },
+    { dependency: 'react-scripts', framework: 'Create React App' },
+    { dependency: 'vite', framework: 'Vite' },
+  ];
+
   afterEach(() => {
     cleanup?.();
   });
 
-  it('detects Next.js from package.json dependencies', async () => {
+  it.each(frameworkCases)('detects $framework from $dependency', ({ dependency, framework }) => {
     ({ dir: tempDir, cleanup } = createTempDir());
     writeFiles(tempDir, {
       'package.json': JSON.stringify({
-        dependencies: { next: '^14.0.0', react: '^18.0.0' },
+        dependencies: { [dependency]: '^1.0.0' },
       }),
     });
 
-    const result = await detectFramework(tempDir);
-    expect(result).toBe('Next.js');
+    expect(detectFramework(tempDir)).toBe(framework);
   });
 
-  it('detects Remix from package.json', async () => {
-    ({ dir: tempDir, cleanup } = createTempDir());
-    writeFiles(tempDir, {
-      'package.json': JSON.stringify({
-        dependencies: { '@remix-run/react': '^2.0.0' },
-      }),
-    });
-
-    const result = await detectFramework(tempDir);
-    expect(result).toBe('Remix');
-  });
-
-  it('detects Create React App from react-scripts', async () => {
-    ({ dir: tempDir, cleanup } = createTempDir());
-    writeFiles(tempDir, {
-      'package.json': JSON.stringify({
-        dependencies: { 'react-scripts': '^5.0.0', react: '^18.0.0' },
-      }),
-    });
-
-    const result = await detectFramework(tempDir);
-    expect(result).toBe('Create React App');
-  });
-
-  it('detects Astro from devDependencies', async () => {
+  it('detects frameworks from devDependencies', () => {
     ({ dir: tempDir, cleanup } = createTempDir());
     writeFiles(tempDir, {
       'package.json': JSON.stringify({ devDependencies: { astro: '^4.0.0' } }),
     });
 
-    const result = await detectFramework(tempDir);
-    expect(result).toBe('Astro');
+    expect(detectFramework(tempDir)).toBe('Astro');
   });
 
-  it('returns null when no framework is detected', async () => {
+  it.each(['react', 'vue'])('does not return an unsupported %s label', (dependency) => {
+    ({ dir: tempDir, cleanup } = createTempDir());
+    writeFiles(tempDir, {
+      'package.json': JSON.stringify({ dependencies: { [dependency]: '^1.0.0' } }),
+    });
+
+    expect(detectFramework(tempDir)).toBeNull();
+  });
+
+  it('returns null when no framework is detected', () => {
     ({ dir: tempDir, cleanup } = createTempDir());
     writeFiles(tempDir, {
       'package.json': JSON.stringify({
@@ -230,14 +226,12 @@ describe('detectFramework', () => {
       }),
     });
 
-    const result = await detectFramework(tempDir);
-    expect(result).toBeNull();
+    expect(detectFramework(tempDir)).toBeNull();
   });
 
-  it('returns null when package.json does not exist', async () => {
+  it('returns null when package.json does not exist', () => {
     ({ dir: tempDir, cleanup } = createTempDir());
     // No files at all
-    const result = await detectFramework(tempDir);
-    expect(result).toBeNull();
+    expect(detectFramework(tempDir)).toBeNull();
   });
 });

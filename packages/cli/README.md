@@ -3,13 +3,12 @@
 [![CI](https://github.com/ravidsrk/frontguard/actions/workflows/ci.yml/badge.svg)](https://github.com/ravidsrk/frontguard/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@frontguard/cli)](https://www.npmjs.com/package/@frontguard/cli)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-44_files-brightgreen)](https://github.com/ravidsrk/frontguard/tree/main/packages/cli/test)
 
-**AI-powered frontend visual regression testing. Detect, understand, and fix visual bugs before production.**
+**Local visual regression testing with reviewed git baselines, inspectable reports, and optional model-assisted analysis.**
 
-Backend has Datadog, Sentry, PagerDuty — a $20B+ monitoring ecosystem. Frontend gets... manual QA and hoping for the best. Frontguard changes that.
+Frontguard runs without a hosted account and keeps the deterministic comparison path in your repository and CI environment.
 
-> **44 test files** · **multi-browser** · **AI vision analysis** · **self-hostable** · **MIT**
+> **multi-browser** · **optional AI analysis** · **local-first** · **MIT**
 >
 > _Numbers are derived from source by [`scripts/stats.ts`](https://github.com/ravidsrk/frontguard/blob/main/scripts/stats.ts); see [`scripts/stats.json`](https://github.com/ravidsrk/frontguard/blob/main/scripts/stats.json) for the canonical snapshot._
 
@@ -27,44 +26,50 @@ Or run it without installing — note `npx` needs the package name (`-p @frontgu
 npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
-## What's New in 0.2.0
+## Current CLI Scope
 
-The "earn trust" release. The core engine is joined by an AI auto-fix moat, a cloud platform, production monitoring, and a full integration surface:
+The supported path is the local CLI. Hosted cloud, MCP, GitHub App, and Docker Compose onboarding remain pre-release:
 
-- **AI fix generation + sandbox verification** — `--generate-fixes` produces minimal CSS patches; `--verify-fixes` applies them in a sandbox (local or Daytona), re-renders, and re-compares against baseline.
+- **Experimental AI fixes** — `--generate-fixes` and `--verify-fixes` are separate opt-ins; unverified suggestions remain labeled for review.
 - **Fix-pattern database** — `accept-fix` / `reject-fix` / `export-patterns` train and share a local pattern store that the pipeline reuses before calling the AI.
 - **`frontguard doctor`** — environment diagnostics for sources of non-determinism (Node, Playwright/Chromium, browsers, config, git).
 - **`frontguard monitor`** — live production-URL monitoring with daemon polling, history, and webhook alerts.
 - **Accessibility + performance-budget plugins** — axe-core WCAG audits and LCP/CLS/TTFB budgets in the same render pass, correlated with the visual diff.
-- **PR thumbnail grid + cloud platform** — before/after/diff thumbnails backed by R2/S3/GitHub-artifact uploads, plus a self-hostable cloud API and integrations.
+- **Inspectable artifacts** — HTML reports retain baseline/current/diff images; remote thumbnails require an explicit image-upload backend.
 
-See the [full CHANGELOG](https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md) and the [AI-accuracy validation results](https://github.com/ravidsrk/frontguard/tree/main/validation) for the complete picture.
+See the [full CHANGELOG](https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md) and the [validation results](https://github.com/ravidsrk/frontguard/tree/main/validation). The published run used AI-disabled local comparisons and is not an AI-accuracy or cross-OS benchmark.
 
 ## What It Does
 
 ```
-Developer pushes code → Frontguard renders every page → Compares to baselines →
-AI explains what changed and why → Suggests fixes → Posts PR comment
+Developer runs Frontguard → Pages render → Pixels compare to reviewed baselines →
+Console, JSON, and HTML evidence are written → Optional AI assists with changed screenshots
 ```
 
-- **Detect** — Pixel diff + DOM diff catches what humans miss
-- **Understand** — AI explains _why_ something broke, not just "pixels differ"
-- **Fix** — Verified code fixes, re-rendered to confirm they actually work
+- **Detect** — Pixel comparison finds changes above the configured threshold
+- **Understand** — Optional AI returns a confidence-scored explanation for human review
+- **Fix** — Experimental CSS suggestions and sandbox verification are separate opt-ins
 
 ## Quick Start
 
 ```bash
-# Initialize config (auto-detects your framework; --ci adds a GitHub Action)
+# Frontguard terminal: initialize and check the environment
 npx -p @frontguard/cli frontguard init --ci
-
-# Verify your environment (Node, Playwright, browsers, git, config)
 npx -p @frontguard/cli frontguard doctor
+```
 
-# Run visual regression tests
-npx -p @frontguard/cli frontguard run --url http://localhost:3000
+**App terminal (leave this running):** use your project's dev-server command (for example, the command below) and wait for the `baseUrl` generated in `frontguard.config.ts` to respond.
 
-# Accept current screenshots as new baselines
+```bash
+npm run dev
+```
+
+**Frontguard terminal:** review the running app, then capture baselines and compare using the generated config.
+
+```bash
 npx -p @frontguard/cli frontguard update-baselines
+git push origin frontguard-baselines
+npx -p @frontguard/cli frontguard run
 ```
 
 Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on your `PATH` and you can drop the `npx -p @frontguard/cli` prefix (e.g. `frontguard run`).
@@ -90,7 +95,7 @@ Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on 
 - **Zero-config route discovery** — Auto-crawls your app to find all pages
 - **Multi-browser** — Chromium, Firefox, WebKit via Playwright
 - **AI-powered analysis** — BYOK (OpenAI/Anthropic) classifies regressions vs intentional changes
-- **AI fix-verify** — Generates CSS patches and re-renders to confirm they fix the diff
+- **Experimental AI fix verification** — Suggested CSS patches are re-rendered only when `verifyFixes` is enabled; reports label the result verified or unverified
 - **Smart rendering** — Dependency graph renders only pages affected by your changes
 - **Preview deployments** — Auto-detects Vercel/Netlify preview URLs
 - **Git-native baselines** — Stored in orphan branch, zero main branch bloat
@@ -118,7 +123,7 @@ export default {
 
   viewports: [375, 768, 1440],
   browsers: ["chromium"],
-  threshold: 0.1,
+  threshold: 0.1, // changed-pixel ratio: 0.1 = 10%
 
   // AI analysis (optional, BYOK)
   ai: {
@@ -134,26 +139,14 @@ export default {
 ## How It Works
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  ROUTE DISCOVERY │───▶│  RENDER PAGES    │───▶│  PIXEL DIFF     │
-│  Crawl / Config  │    │  Playwright ×    │    │  pixelmatch     │
-│  / Filesystem    │    │  viewports ×     │    │  fast gate      │
-│                  │    │  browsers        │    │  (90% pass here)│
-└─────────────────┘    └──────────────────┘    └────────┬────────┘
-                                                        │ changed
-                                                        ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  PR COMMENT     │◀───│  AI ANALYSIS     │◀───│  DOM DIFF       │
-│  Visual diffs   │    │  GPT-4V / Claude │    │  Structural +   │
-│  Explanation    │    │  Classify +      │    │  computed styles │
-│  Fix suggestion │    │  explain + fix   │    │                 │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+ROUTE DISCOVERY → PLAYWRIGHT RENDER → PIXEL COMPARISON → CONSOLE / JSON / HTML
+                                                └──────→ OPTIONAL BYOK AI ANALYSIS
 ```
 
 ## CLI Output
 
 ```
- frontguard v0.2.2
+ frontguard v0.2.3
 
  🔍 Discovering routes... found 47 routes
  📊 12/47 routes affected by changed files
@@ -170,8 +163,9 @@ export default {
  ───────────────────────────────────────────
 
   ✘ /dashboard @ 375px
-    AI: "Sidebar overlaps main content on mobile.
-         flex-direction change in Dashboard.module.css:28"
+    AI: "At 375px, the current screenshot shows the sidebar overlapping
+         the main content; the baseline keeps both regions separate."
+    Guidance: Review responsive stacking for this viewport.
     Severity: 🔴 Critical (confidence: 94%)
 
   1 regression · 1 warning · 9 passed · 1 new
@@ -179,7 +173,7 @@ export default {
 
 ## Plugins
 
-Frontguard ships with a plugin architecture (6 lifecycle hooks) and 5 built-in plugins:
+Frontguard ships with a plugin architecture (9 lifecycle hooks) and 5 built-in plugins:
 
 | Plugin                                                         | Description                                                   | Key Features                                                                           |
 | -------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -189,7 +183,7 @@ Frontguard ships with a plugin architecture (6 lifecycle hooks) and 5 built-in p
 | **Third-Party Scripts** (`src/plugins/third-party-scripts.ts`) | Script drift detection                                        | Flags ad/analytics/widget origins that appear or disappear between runs                |
 | **Monitor** (`src/plugins/monitor.ts`)                         | Production visual monitoring (CLI + optional cloud scheduler) | Live-URL checks, threshold alerting, history tracking                                  |
 
-**Plugin lifecycle hooks:** `beforeDiscover`, `afterDiscover`, `afterRender`, `afterCompare`, `afterRun`, `onError`
+**Plugin lifecycle hooks:** `setup`, `beforeDiscover`, `afterDiscover`, `beforeRender`, `afterRender`, `afterCompare`, `afterRun`, `onError`, `teardown`
 
 ```typescript
 // frontguard.config.ts
@@ -227,11 +221,9 @@ Each stage is independent with error boundaries — one page failing doesn't kil
 FRONTGUARD_OPENAI_KEY=sk-...
 FRONTGUARD_ANTHROPIC_KEY=...
 
-# GitHub PR comments
-GITHUB_TOKEN=ghp_...
 ```
 
-> AI keys are optional. Frontguard works without them — pixel diff and DOM diff run locally. AI analysis (classification, explanations, fix suggestions) activates only when a key is provided.
+> AI keys are optional. Frontguard works without them using local pixel comparison. AI analysis activates only when configured and sends screenshot evidence directly to the selected provider.
 
 ## Documentation
 

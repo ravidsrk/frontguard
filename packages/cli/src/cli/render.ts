@@ -22,6 +22,7 @@ import { Command } from 'commander';
 import { writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import type { BrowserEngine } from '../core/types.js';
+import { CLI_VERSION as VERSION } from '../version.js';
 
 /** Allowed browser engines (mirrors `sandbox/daytona.ts`). */
 const ALLOWED_BROWSERS: readonly BrowserEngine[] = ['chromium', 'firefox', 'webkit'];
@@ -50,9 +51,6 @@ export interface RenderCliOptions {
   /** Writable stream for logs and errors. Defaults to `process.stderr`. */
   stderr?: NodeJS.WritableStream;
 }
-
-/** CLI version — kept in sync with the parent CLI. */
-const VERSION = '0.2.2';
 
 /**
  * Validates a render URL: must be a well-formed http(s) URL with no control

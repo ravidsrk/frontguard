@@ -27,7 +27,7 @@ const DEAD_MARKETPLACE_URLS = [
   'github.com/apps/frontguard',
   'frontguard/frontguard-action',
 ];
-const ID_RE = /\{\s*id:\s*"([^"]+)"/g;
+const ID_RE = /(?:\{\s*id:\s*["']([^"']+)["']|makeArticle\(\s*["']([^"']+)["'])/g;
 const LINK_RE = /href="(\/docs\/[^"#?]+)"/g;
 const FORBIDDEN_PATTERNS = [
   { re: /--baseline-strategy\b/, label: 'nonexistent --baseline-strategy flag' },
@@ -37,6 +37,30 @@ const FORBIDDEN_PATTERNS = [
   { re: /guides\/frontguard-vs-(percy|chromatic)/, label: 'stale guides/ comparison path' },
   { re: /Docker will pull/, label: 'unpublished registry pull promise' },
   { re: /docs\.frontguard\.dev/, label: 'stale docs.frontguard.dev host' },
+  { re: /threshold \(0[–-]100\)/i, label: 'stale 0-100 threshold units' },
+  { re: /pixel diff threshold percentage/i, label: 'stale threshold percentage units' },
+  { re: /\bai-provider\b/i, label: 'unsupported ai-provider Action input' },
+  {
+    re: /only warnings\s*\/\s*new pages|pipeline errors \(but no regressions\)/i,
+    label: 'stale exit-code semantics',
+  },
+  {
+    re: /posts? a PR comment with [^.\n]*thumbnails/i,
+    label: 'unqualified generally-available PR thumbnail claim',
+  },
+  { re: /\bbest accuracy\b|90%\+/i, label: 'unmeasured AI accuracy claim' },
+  {
+    re: /re-rendered the page with the fix applied to confirm it works/i,
+    label: 'unqualified verified-fix guarantee',
+  },
+  {
+    re: /\b(?:6|six) lifecycle hooks\b/i,
+    label: 'stale lifecycle hook count',
+  },
+  {
+    re: /beforeDiscover\s*(?:→|&rarr;|·)\s*afterDiscover\s*(?:→|&rarr;|·)\s*afterRender/i,
+    label: 'lifecycle sequence missing beforeRender',
+  },
 ];
 
 const SCAN_TARGETS = [
@@ -53,27 +77,23 @@ const SCAN_TARGETS = [
 const violations = [];
 
 function scanText(text, label, lines = false) {
-  if (lines) {
-    const rows = text.split('\n');
-    rows.forEach((line, i) => {
-      if (BAD_ACTION_REF.test(line)) {
-        violations.push(`${label}:${i + 1}  non-canonical action ref (use @v0)`);
-      }
-      for (const dead of DEAD_MARKETPLACE_URLS) {
-        if (line.includes(dead)) {
-          violations.push(`${label}:${i + 1}  dead marketplace URL (listing not live) → ${dead}`);
-        }
-      }
-    });
-    return;
-  }
+  const chunks = lines
+    ? text.split('\n').map((line, index) => ({ text: line, label: `${label}:${index + 1}` }))
+    : [{ text, label }];
 
-  if (BAD_ACTION_REF.test(text)) {
-    violations.push(`${label}  non-canonical action ref (use @v0)`);
-  }
-  for (const dead of DEAD_MARKETPLACE_URLS) {
-    if (text.includes(dead)) {
-      violations.push(`${label}  dead marketplace URL (listing not live) → ${dead}`);
+  for (const chunk of chunks) {
+    if (BAD_ACTION_REF.test(chunk.text)) {
+      violations.push(`${chunk.label}  non-canonical action ref (use @v0)`);
+    }
+    for (const dead of DEAD_MARKETPLACE_URLS) {
+      if (chunk.text.includes(dead)) {
+        violations.push(`${chunk.label}  dead marketplace URL (listing not live) → ${dead}`);
+      }
+    }
+    for (const { re, label: patternLabel } of FORBIDDEN_PATTERNS) {
+      if (re.test(chunk.text)) {
+        violations.push(`${chunk.label}  forbidden pattern (${patternLabel})`);
+      }
     }
   }
 }
@@ -83,7 +103,11 @@ const slugs = new Set();
 
 let m;
 while ((m = ID_RE.exec(docsContent)) !== null) {
-  slugs.add(m[1]);
+  slugs.add(m[1] ?? m[2]);
+}
+
+if (slugs.size !== 37) {
+  violations.push(`docs article inventory has ${slugs.size} entries; expected 37`);
 }
 
 while ((m = LINK_RE.exec(docsContent)) !== null) {
@@ -97,25 +121,23 @@ for (const target of SCAN_TARGETS) {
   scanText(readFileSync(target.path, 'utf8'), target.label, target.lines);
 }
 
-for (const { re, label } of FORBIDDEN_PATTERNS) {
-  if (re.test(docsContent)) {
-    violations.push(`forbidden pattern (${label})`);
-  }
-}
-
-const deployment = docsContent.match(/label: "DEPLOYMENT & SANDBOXING"[^}]+ids: \[([^\]]+)\]/);
+const deployment = docsContent.match(
+  /label:\s*["']DEPLOYMENT & SANDBOXING["'][\s\S]*?ids:\s*\[([^\]]+)\]/,
+);
 if (deployment) {
-  for (const id of ['"self-host"', '"sandbox"', '"cross-os-rendering"', '"distribution"']) {
-    if (!deployment[1].includes(id)) {
+  for (const id of ['self-host', 'sandbox', 'cross-os-rendering', 'distribution']) {
+    if (!new RegExp(`["']${id}["']`).test(deployment[1])) {
       violations.push(`DEPLOYMENT & SANDBOXING nav missing ${id}`);
     }
   }
+} else {
+  violations.push('DEPLOYMENT & SANDBOXING nav group not found');
 }
 
 if (violations.length > 0) {
   console.error(`✘ check-doc-links: ${violations.length} violation(s)\n`);
   for (const v of violations) console.error('  ' + v);
-  console.error('\nFix: pin action refs to `ravidsrk/frontguard@v0`; hedge or remove dead marketplace URLs.');
+  console.error('\nFix the reported action reference, dead URL, or stale documentation semantic.');
   process.exit(1);
 }
 

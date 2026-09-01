@@ -14,10 +14,10 @@ const MONO = "'JetBrains Mono', monospace"
 const stages = [
   { num: '01', title: 'Discover', desc: 'Crawl, filesystem scan, or config — finds every route automatically.' },
   { num: '02', title: 'Filter', desc: 'Dependency graph renders only pages affected by your changes.' },
-  { num: '03', title: 'Render', desc: 'Playwright × viewports × browsers. Anti-flake multi-render.' },
-  { num: '04', title: 'Diff', desc: 'pixelmatch fast gate, then DOM + computed-style diff.' },
-  { num: '05', title: 'Analyze', desc: 'AI vision classifies, explains, and scores confidence.' },
-  { num: '06', title: 'Report', desc: 'Console, JSON, HTML, and a GitHub PR comment with diffs.' },
+  { num: '03', title: 'Render', desc: 'Playwright × viewports × browsers, with configurable consensus.' },
+  { num: '04', title: 'Diff', desc: 'Pixel comparison with an SSIM fallback.' },
+  { num: '05', title: 'Analyze', desc: 'Optional BYOK analysis classifies, explains, and scores confidence.' },
+  { num: '06', title: 'Report', desc: 'Console, JSON, and HTML artifacts with visual evidence.' },
 ]
 
 const features = [
@@ -29,17 +29,17 @@ const features = [
   { tag: 'CONFIG', title: 'Per-route thresholds', desc: 'Strict on /checkout, relaxed on /blog — all in one file.' },
   { tag: 'DETECT', title: 'Framework detection', desc: 'Next.js, Remix, SvelteKit, Nuxt and Astro out of the box.' },
   { tag: 'SECURITY', title: 'Security hardened', desc: 'Shell-injection prevention, path-traversal guards, key redaction.' },
-  { tag: 'REPORT', title: 'PR thumbnails', desc: 'Baseline / current / diff images embedded right in the PR comment.' },
+  { tag: 'REPORT', title: 'Inspectable reports', desc: 'Baseline, current, and diff images remain in the HTML artifact.' },
 ]
 
 const comparison = [
   { cap: 'Open source (MIT)', fg: '✓', percy: '✕', chromatic: '◐', backstop: '✓', lostpixel: '◐' },
   { cap: 'CLI-first', fg: '✓', percy: '✕', chromatic: '✕', backstop: '✓', lostpixel: '✓' },
-  { cap: 'AI change classification', fg: '✓', percy: '✕', chromatic: '✕', backstop: '✕', lostpixel: '✕' },
-  { cap: 'AI fix verification', fg: '✓', percy: '✕', chromatic: '✕', backstop: '✕', lostpixel: '✕' },
-  { cap: 'Anti-flake rendering', fg: '✓', percy: '◐', chromatic: '◐', backstop: '✕', lostpixel: '✕' },
-  { cap: 'Self-hostable', fg: '✓', percy: '✕', chromatic: '✕', backstop: '✓', lostpixel: '◐' },
-  { cap: 'Free tier', fg: 'Forever', percy: 'Trial', chromatic: 'Hobby', backstop: 'Free', lostpixel: '✕' },
+  { cap: 'AI change classification', fg: '✓ optional', percy: '◐', chromatic: '✕', backstop: '✕', lostpixel: '✕' },
+  { cap: 'AI fix verification', fg: '◐ experimental', percy: '✕', chromatic: '✕', backstop: '✕', lostpixel: '✕' },
+  { cap: 'Multi-render consensus', fg: '◐ configurable', percy: '◐', chromatic: '◐', backstop: '✕', lostpixel: '✕' },
+  { cap: 'Runs without a hosted service', fg: '✓', percy: '✕', chromatic: '✕', backstop: '✓', lostpixel: '◐' },
+  { cap: 'Free tier', fg: 'Forever', percy: '5k/mo', chromatic: '5k/mo', backstop: 'Free', lostpixel: 'Sunset' },
 ]
 
 const plugins = [
@@ -51,22 +51,22 @@ const plugins = [
 ]
 
 const honest = [
-  { label: 'YOU BRING THE KEY', color: '#e8862e', body: 'AI runs on your own OpenAI or Anthropic key, so you pay per judged diff. The anti-flake gate keeps ~90% of pages away from the model — the bill stays small, and your screenshots never touch a server we run.' },
-  { label: 'YOU STAY IN THE LOOP', color: '#4fb477', body: 'Vision models misjudge edge cases. Frontguard never silently auto-approves — every classification and every fix is yours to accept or reject, and that feedback trains the local fix-pattern database.' },
-  { label: 'NUMBERS, NOT CLAIMS', color: '#5b8def', body: "It's young. We validate against real, live repositories and publish real false-positive rates rather than asserting accuracy. Trust is earned — tell us where the classifier gets it wrong." },
+  { label: 'YOU BRING THE KEY', color: '#e8862e', body: 'AI is optional and uses your selected OpenAI or Anthropic account. Screenshot evidence goes directly to that provider, not through a Frontguard proxy.' },
+  { label: 'YOU STAY IN THE LOOP', color: '#4fb477', body: 'High-confidence intentional classifications automatically downgrade regressions to warnings. With fix verification enabled, a verified fix is automatically recorded as an accepted local fix-pattern signal. Neither behavior updates baselines; review model output and patches.' },
+  { label: 'NUMBERS, NOT CLAIMS', color: '#5b8def', body: "It's young. The published harness discloses repository boot failures and that AI accuracy was not measured. Trust starts with visible limits." },
 ]
 
 const stats = [
-  { v: '~40%', c: '#e8862e', d: "of visual-diff runs fail for reasons that aren't real bugs" },
-  { v: '73%', c: '#f5f1ea', d: 'of teams have lost faith in test automation to flake' },
-  { v: '<10%', c: '#f5f1ea', d: 'of frontend teams run visual regression testing at all' },
-  { v: '$100M', c: '#f5f1ea', d: 'a single mobile CSS bug cost on Prime Day' },
+  { v: '39 / 43', c: '#e8862e', d: 'route rechecks completed in the published local harness' },
+  { v: '2 / 5', c: '#f5f1ea', d: 'fixture repositories booted successfully' },
+  { v: 'AI OFF', c: '#f5f1ea', d: 'classifier accuracy was not measured in that run' },
+  { v: '1 HOST', c: '#f5f1ea', d: 'macOS only; cross-OS equivalence remains unproven' },
 ]
 
 const pillars = [
-  { n: '01 / DETECT', c: '#4fb477', h: 'Find what changed', p: 'Pixel diff plus DOM and computed-style diff across every viewport and browser — catching what humans miss. Multi-render consensus kills the flaky-screenshot noise.' },
-  { n: '02 / UNDERSTAND', c: '#e8862e', h: 'Explain why it broke', p: 'AI vision classifies every diff — regression, intentional, or content update — maps it to the exact code change, and explains the root cause in plain language.' },
-  { n: '03 / FIX', c: '#5b8def', h: 'Verified, not guessed', p: 'Generate a fix, apply it, re-render, and compare again. Only fixes that provably resolve the regression are suggested — no hallucinated guesses.' },
+  { n: '01 / DETECT', c: '#4fb477', h: 'Find what changed', p: 'Pixel comparison across configured viewports and browsers, with masks, thresholds, and optional multi-render consensus.' },
+  { n: '02 / UNDERSTAND', c: '#e8862e', h: 'Explain why it broke', p: 'When configured, model-assisted analysis classifies changed screenshots and returns an explanation for human review.' },
+  { n: '03 / FIX', c: '#5b8def', h: 'Experimental verification', p: 'CSS suggestions and sandbox verification are separate opt-ins. Unverified suggestions remain labeled as such.' },
 ]
 
 const TERMINAL_HTML = `<span style="color: #e8862e;">🔍 Discovering routes...</span> found <span style="color: #f5f1ea;">47</span> routes
@@ -81,17 +81,18 @@ const TERMINAL_HTML = `<span style="color: #e8862e;">🔍 Discovering routes...<
 <span style="color: #3b3531;">───────────────────────────────────</span>
 <span style="color: #e5484d;">1 regression</span> · <span style="color: #e8862e;">1 warning</span> · <span style="color: #4fb477;">9 passed</span> · <span style="color: #5b8def;">1 new</span><span style="display: inline-block; width: 8px; height: 15px; background: #e8862e; vertical-align: -2px; margin-left: 4px; animation: fg-blink 1.1s step-end infinite;"></span>`
 
-const CLI_HTML = `<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard run \\
-    --url http://localhost:3000
+const CLI_HTML = `<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard run
 
 <span style="color: #4fb477;">  ✓ 11 passed</span>   <span style="color: #e5484d;">✘ 1 regression</span>
 <span style="color: #564f48;">  AI: "submit button lost its background"</span>`
 
-const PW_HTML = `<span style="color: #c678dd;">import</span> { expectVisual } <span style="color: #c678dd;">from</span> <span style="color: #98c379;">'@frontguard/playwright'</span>;
+const PW_HTML = `<span style="color: #c678dd;">import</span> { test, expect } <span style="color: #c678dd;">from</span> <span style="color: #98c379;">'@playwright/test'</span>;
+<span style="color: #c678dd;">import</span> { visualTest } <span style="color: #c678dd;">from</span> <span style="color: #98c379;">'@frontguard/playwright'</span>;
 
 test(<span style="color: #98c379;">'home page'</span>, <span style="color: #c678dd;">async</span> ({ page }) => {
   <span style="color: #c678dd;">await</span> page.goto(<span style="color: #98c379;">'/'</span>);
-  <span style="color: #c678dd;">await</span> expectVisual(page);
+  <span style="color: #c678dd;">const</span> result = <span style="color: #c678dd;">await</span> visualTest(page, <span style="color: #98c379;">'home-page'</span>);
+  expect(result.passed).toBe(<span style="color: #56b6c2;">true</span>);
 });`
 
 const CONFIG_HTML = `<span style="color: #c678dd;">export default</span> {
@@ -151,10 +152,10 @@ function Home() {
               Catch the regression,<br />not the noise.
             </h1>
             <p style={s('font-size: 18px; line-height: 1.55; color: #b8b0a6; margin: 0 0 32px; max-width: 490px;')}>
-              Teams add visual regression tests — then mute the channel they post to, because ~40% of failures aren't real bugs. Frontguard uses AI vision to label every diff a{' '}
+              Noisy screenshot checks lose trust quickly. Frontguard starts with deterministic pixel comparison and can use optional AI to label a changed screenshot as a{' '}
               <em style={s('color: #f5f1ea; font-style: normal;')}>regression</em>, an{' '}
               <em style={s('color: #f5f1ea; font-style: normal;')}>intentional change</em>, or{' '}
-              <em style={s('color: #f5f1ea; font-style: normal;')}>content</em> — so a red run means something again.
+              <em style={s('color: #f5f1ea; font-style: normal;')}>content</em>, with confidence and an explanation for human review.
             </p>
 
             <div style={s('display: flex; align-items: stretch; max-width: 440px; margin-bottom: 22px; border: 1px solid #322d28; background: #161412;')}>
@@ -199,9 +200,7 @@ function Home() {
                 AI ANALYSIS — REGRESSION · 94% CONFIDENCE
               </div>
               <p style={s('margin: 0; font-size: 13.5px; line-height: 1.55; color: #d8d0c5;')}>
-                "The sidebar overlaps main content on mobile. A{' '}
-                <span style={s("color: #e8862e; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;")}>flex-direction</span> change in{' '}
-                <span style={s("color: #f5f1ea; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;")}>Dashboard.module.css:28</span> removed column stacking."
+                "The current 375px screenshot shows the sidebar overlapping the main content; the baseline keeps both regions separate."
               </p>
             </div>
           </div>
@@ -274,8 +273,8 @@ function Home() {
       {/* ============ PIPELINE ============ */}
       <section id="how" style={s('max-width: 1200px; margin: 0 auto; padding: 84px 28px;')}>
         <p style={eyebrow('')}>// THE PIPELINE</p>
-        <h2 style={s('font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 14px;')}>Six stages, fully self-hostable.</h2>
-        <p style={s('font-size: 16px; color: #b8b0a6; margin: 0 0 44px; max-width: 580px;')}>Each stage is independent with error boundaries — one page failing doesn't kill the run. A fast pixel gate means ~90% of pages never hit the AI.</p>
+        <h2 style={s('font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 14px;')}>Six local stages, no Frontguard account required.</h2>
+        <p style={s('font-size: 16px; color: #b8b0a6; margin: 0 0 44px; max-width: 580px;')}>One page failing does not stop the remaining comparisons. AI is optional and runs only for changed screenshots when configured.</p>
         <div style={s('display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; border: 1px solid #2a2622;')}>
           {stages.map((st) => (
             <div key={st.num} style={s('padding: 22px 18px; border-right: 1px solid #2a2622; background: #131210; position: relative;')}>
@@ -293,8 +292,8 @@ function Home() {
           <div style={s('display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 56px; align-items: center;')}>
             <div>
               <p style={eyebrow('')}>// AI CLASSIFICATION</p>
-              <h2 style={s('font-size: 36px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;')}>Kills the #1 pain of visual testing: false positives.</h2>
-              <p style={s('font-size: 15.5px; line-height: 1.6; color: #b8b0a6; margin: 0 0 24px;')}>A diff isn't a bug. Frontguard tells a regression apart from an intentional redesign, so your suite stops crying wolf — and teams stop disabling it.</p>
+              <h2 style={s('font-size: 36px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;')}>Optional model-assisted classification for visual diffs.</h2>
+              <p style={s('font-size: 15.5px; line-height: 1.6; color: #b8b0a6; margin: 0 0 24px;')}>When configured, Frontguard asks your selected model to classify a changed screenshot and explain its output. Published validation has not measured model accuracy, so inspect each result before relying on it.</p>
               <ul style={s('list-style: none; padding: 0; margin: 0; display: grid; gap: 12px;')}>
                 {[
                   'Severity and confidence scoring on every issue',
@@ -315,11 +314,10 @@ function Home() {
                   <span style={s(`font-family: ${MONO}; font-size: 11px; color: #e5484d; border: 1px solid #4a2424; padding: 3px 9px;`)}>REGRESSION · 94%</span>
                 </div>
                 <p style={s('margin: 0; font-size: 13.5px; line-height: 1.55; color: #c8c0b6;')}>
-                  "The sidebar overlaps the main content on mobile. A flex-direction change in{' '}
-                  <span style={s(`color: #e8862e; font-family: ${MONO}; font-size: 12.5px;`)}>Dashboard.module.css:28</span> removed the column stacking."
+                  "The current 375px screenshot shows the sidebar overlapping the main content; the baseline keeps both regions separate."
                 </p>
                 <div style={s(`margin-top: 12px; padding-top: 12px; border-top: 1px solid #2a1818; font-family: ${MONO}; font-size: 12px; color: #8c847a;`)}>
-                  Suggested fix: restore <span style={s('color: #4fb477;')}>flex-direction: column</span> at the &lt; 768px breakpoint.
+                  Guidance: review responsive stacking at the &lt; 768px viewport.
                 </div>
               </div>
               <div style={s('border: 1px solid #1f3a28; background: #0e1410; padding: 20px 22px;')}>
@@ -379,7 +377,7 @@ function Home() {
       {/* ============ COMPARISON ============ */}
       <section id="compare" style={s('max-width: 1200px; margin: 0 auto; padding: 84px 28px;')}>
         <p style={eyebrow('')}>// HOW IT COMPARES</p>
-        <h2 style={s('font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 40px;')}>The only one with AI fix verification.</h2>
+        <h2 style={s('font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 40px;')}>Experimental CSS suggestion verification, clearly labeled.</h2>
         <div style={s('border: 1px solid #2a2622; overflow-x: auto;')}>
           <table style={s('width: 100%; border-collapse: collapse; font-size: 13.5px;')}>
             <thead>
@@ -410,8 +408,8 @@ function Home() {
       <section style={s('max-width: 1200px; margin: 0 auto; padding: 20px 28px 84px;')}>
         <div style={s('border: 1px solid #2a2622; background: #131210; padding: 36px 32px;')}>
           <div style={s('display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 28px;')}>
-            <h3 style={s('font-size: 22px; color: #f5f1ea; margin: 0; font-weight: 600; letter-spacing: -0.01em;')}>Extensible by design — 5 built-in plugins, 6 lifecycle hooks</h3>
-            <code style={s(`font-family: ${MONO}; font-size: 12px; color: #8c847a;`)}>beforeDiscover · afterDiscover · afterRender · afterCompare · afterRun · onError</code>
+            <h3 style={s('font-size: 22px; color: #f5f1ea; margin: 0; font-weight: 600; letter-spacing: -0.01em;')}>Extensible by design — 5 built-in plugins, 9 lifecycle hooks</h3>
+            <code style={s(`font-family: ${MONO}; font-size: 12px; color: #8c847a;`)}>setup · beforeDiscover · afterDiscover · beforeRender · afterRender · afterCompare · afterRun · onError · teardown</code>
           </div>
           <div style={s('display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;')}>
             {plugins.map((p) => (
@@ -446,7 +444,7 @@ function Home() {
             <Shield w={44} h={52} notch="#100f0e" line={2.5} />
           </span>
           <h2 style={s('font-size: 44px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;')}>Ship with confidence.</h2>
-          <p style={s('font-size: 17px; color: #b8b0a6; margin: 0 auto 34px; max-width: 480px; line-height: 1.55;')}>Free forever. No per-screenshot pricing cliff, no dashboard lock-in. Install it and run your first check in two minutes.</p>
+          <p style={s('font-size: 17px; color: #b8b0a6; margin: 0 auto 34px; max-width: 480px; line-height: 1.55;')}>The local CLI is free under MIT. Start your app, review and accept baselines explicitly, then run comparisons.</p>
           <div style={s('display: inline-flex; align-items: stretch; border: 1px solid #322d28; background: #161412; margin-bottom: 24px;')}>
             <span style={s(`font-family: ${MONO}; font-size: 14px; color: #e6e0d6; padding: 14px 20px; white-space: nowrap;`)}>
               <span style={s('color: #7c746b;')}>$ </span>npx -p @frontguard/cli frontguard init --ci

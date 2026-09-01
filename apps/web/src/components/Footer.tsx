@@ -27,7 +27,15 @@ const COLS: {
     links: [
       { label: 'GitHub', href: 'https://github.com/ravidsrk/frontguard' },
       { label: 'npm', href: 'https://www.npmjs.com/package/@frontguard/cli' },
-      { label: 'Contributing', href: 'https://github.com/ravidsrk/frontguard' },
+      { label: 'Support', href: 'https://github.com/ravidsrk/frontguard/issues' },
+    ],
+  },
+  {
+    head: 'LEGAL',
+    links: [
+      { label: 'Privacy', to: '/privacy' },
+      { label: 'Terms', to: '/terms' },
+      { label: 'Status', to: '/status' },
     ],
   },
 ]
@@ -38,10 +46,11 @@ const linkStyle = s(
 
 export function Footer() {
   return (
-    <footer style={s('border-top: 1px solid #211e1b; background: #0d0c0b;')}>
+    <footer className="fg-footer" style={s('border-top: 1px solid #211e1b; background: #0d0c0b;')}>
       <div
+        className="fg-footer-grid"
         style={s(
-          'max-width: 1200px; margin: 0 auto; padding: 48px 28px; display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 32px;',
+          'max-width: 1200px; margin: 0 auto; padding: 48px 28px; display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); gap: 32px;',
         )}
       >
         <div>
@@ -65,8 +74,8 @@ export function Footer() {
               'font-size: 13px; color: #6b645c; margin: 0; max-width: 280px; line-height: 1.55;',
             )}
           >
-            AI-powered frontend visual regression testing. MIT licensed,
-            self-hostable, free forever.
+            Local visual regression testing with optional AI assistance. MIT
+            licensed and free to run without a hosted account.
           </p>
         </div>
         {COLS.map((col) => (

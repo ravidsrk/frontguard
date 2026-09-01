@@ -9,25 +9,29 @@ actionable preflight error instead of a cryptic failure).
 
 ---
 
-## OPS — Publish frontguard/render multi-arch images
+## OPS — Publish the pinned frontguard/render image
 
-**Unblocks:** install-4, docker-1, docs-3 (full closure; code-side preflight + docs already shipped)
+**Unblocks:** renderer distribution. This does not establish cross-host render equivalence.
 
 **Action:**
 
 ```bash
+npm ci
+npm run build --workspace=packages/cli
+npm pack ./packages/cli --pack-destination packages/cli/docker
+mv packages/cli/docker/frontguard-cli-*.tgz packages/cli/docker/frontguard-cli.tgz
 docker buildx create --use   # if not already
 docker buildx build --platform linux/amd64 \
-  -t frontguard/render:v0.2.0 -t frontguard/render:latest \
+  -t frontguard/render:$(cat VERSION) -t frontguard/render:latest \
   --push packages/cli/docker
-# (arm64 not published — byte-equivalence requires linux/amd64 only; see docker-3 / docs-3)
+# Keep one architecture until a measured cross-host matrix justifies expansion.
 ```
 
 **Verification:**
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}' https://hub.docker.com/v2/repositories/frontguard/render/  # expect 200
-docker manifest inspect frontguard/render:v0.2.0  # expect a valid manifest
+docker manifest inspect frontguard/render:$(cat VERSION)  # expect a valid manifest
 ```
 
 **Owner:** ravidsrk
@@ -36,16 +40,57 @@ docker manifest inspect frontguard/render:v0.2.0  # expect a valid manifest
 
 ---
 
-## OPS — Redeploy frontguard.dev (ship the AggregateRating-free index.html)
+## OPS — Publish the next CLI and run the external Action smoke
 
-**Unblocks:** dist-11 (full closure; the source HTML and an SSG regression guard already shipped)
+**Unblocks:** the public `ravidsrk/frontguard@v0` integration.
 
-**Context:** `apps/landing/index.html` on `main` is already AggregateRating-free
-(offers-only SoftwareApplication JSON-LD), and `apps/landing/src/test/ssg-output.test.ts`
-now fails the build if any built route re-introduces an `AggregateRating` /
-`ratingValue` / `ratingCount` block. But the live deployment is stale and still
-serves the old `4.8/36` rating on a 0-star repo. The regression test cannot push
-bytes to the CDN — a redeploy of the built `apps/landing/dist/` is required.
+The source Action must not be treated as released while its pinned CLI version
+is unavailable. After the reviewed commit lands, publish the exact version from
+`VERSION`, then advance `v0` to that commit. From a separate public fixture
+repository, run both required controls without `continue-on-error`:
+
+1. Seed and push `frontguard-baselines`, then verify an unchanged page passes.
+2. Introduce a deliberate visual mutation and verify the Action turns red with
+   `status=fail`, not `status=error`.
+3. Verify the JSON output, report artifact, and PR comment are consumable from
+   the external repository.
+
+Do not advertise the Action as launch-ready until both controls pass against
+the public `ravidsrk/frontguard@v0` reference.
+
+**Owner:** ravidsrk
+
+**Date queued:** 2026-08-29
+
+---
+
+## OPS — Redeploy frontguard.dev from the canonical web app
+
+**Unblocks:** publication of the reviewed public truth, legal, and accessibility changes.
+
+**Context:** `apps/web` is the canonical public site. Its build checks semantic
+links, machine-readable files, and the generated route surface. The reviewed
+build must replace any stale deployment before its claims can be treated as live.
+
+**Action:**
+
+```bash
+npm ci
+npm run build --workspace=apps/web
+npm run deploy --workspace=apps/web
+```
+
+**Verification:**
+
+Load `/`, `/docs`, `/privacy`, `/terms`, and `/status` from the deployed origin.
+Confirm the Action remains marked pre-release and the legal links resolve.
+
+**Owner:** ravidsrk
+
+**Date queued:** 2026-08-30
+
+---
+
 ## OPS — Deploy cloud-api Worker (C7 data-model fixes)
 
 **Unblocks:** cloud-1, cloud-9, mcp-1, mcp-2, mcp-7, mcp-9 (full closure — the
@@ -54,12 +99,8 @@ code is merged; the live API only serves the fixes after a deploy)
 **Action:**
 
 ```bash
-# Build and redeploy the landing site (whatever ships apps/landing/dist/ —
-# Cloudflare Pages / Fly.io / Netlify per the project's deploy config).
-cd apps/landing && npm run build
-# then trigger the landing-site deploy for the freshly built dist/
-# from packages/cloud-api
-wrangler deploy
+npm run build --workspace=packages/cloud-api
+npm run deploy --workspace=packages/cloud-api
 ```
 
 **Verification:**

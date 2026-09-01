@@ -13,6 +13,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  applyRequiredEdits,
+  type RequiredEdit,
+} from "./sync-version-core.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CHECK = process.argv.includes("--check");
@@ -34,10 +38,8 @@ const PUBLISHABLE_PKGS = [
   "integrations/netlify",
 ];
 
-type Edit = { find: RegExp; replace: string; label: string };
-
 // Non-package.json files that hardcode the release version, with the exact pattern to rewrite.
-const FILE_EDITS: Array<{ file: string; edits: Edit[] }> = [
+const FILE_EDITS: Array<{ file: string; edits: RequiredEdit[] }> = [
   {
     file: "action.yml",
     edits: [
@@ -45,11 +47,13 @@ const FILE_EDITS: Array<{ file: string; edits: Edit[] }> = [
         find: /FRONTGUARD_CLI_VERSION: '[^']*'/g,
         replace: `FRONTGUARD_CLI_VERSION: '${version}'`,
         label: "FRONTGUARD_CLI_VERSION",
+        expected: 2,
       },
       {
         find: /packages\/cli@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
         replace: `packages/cli@${version}`,
         label: "sub-path comment",
+        expected: 1,
       },
     ],
   },
@@ -60,6 +64,7 @@ const FILE_EDITS: Array<{ file: string; edits: Edit[] }> = [
         find: /FRONTGUARD_CLI_VERSION: '[^']*'/g,
         replace: `FRONTGUARD_CLI_VERSION: '${version}'`,
         label: "FRONTGUARD_CLI_VERSION",
+        expected: 2,
       },
     ],
   },
@@ -70,26 +75,35 @@ const FILE_EDITS: Array<{ file: string; edits: Edit[] }> = [
         find: /@frontguard\/cli@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
         replace: `@frontguard/cli@${version}`,
         label: "pinned install",
+        expected: 1,
       },
     ],
   },
   {
-    file: "packages/cli/src/cli/index.ts",
+    file: "packages/cli/src/version.ts",
     edits: [
       {
-        find: /const VERSION = '[^']*';/g,
-        replace: `const VERSION = '${version}';`,
-        label: "cli --version",
+        find: /CLI_VERSION = '[^']*';/g,
+        replace: `CLI_VERSION = '${version}';`,
+        label: "shared CLI version",
+        expected: 1,
       },
     ],
   },
   {
-    file: "packages/cli/src/cli/render.ts",
+    file: ".github/workflows/frontguard-example.yml",
     edits: [
       {
-        find: /const VERSION = '[^']*';/g,
-        replace: `const VERSION = '${version}';`,
-        label: "render --version",
+        find: /playwright-frontguard-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?-/g,
+        replace: `playwright-frontguard-${version}-`,
+        label: "generated workflow cache version",
+        expected: 1,
+      },
+      {
+        find: /@frontguard\/cli@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
+        replace: `@frontguard/cli@${version}`,
+        label: "generated workflow CLI version",
+        expected: 2,
       },
     ],
   },
@@ -100,6 +114,73 @@ const FILE_EDITS: Array<{ file: string; edits: Edit[] }> = [
         find: /const SERVER_VERSION = '[^']*';/g,
         replace: `const SERVER_VERSION = '${version}';`,
         label: "mcp SERVER_VERSION",
+        expected: 1,
+      },
+    ],
+  },
+  {
+    file: "apps/web/public/.well-known/mcp.json",
+    edits: [
+      {
+        find: /("version":\s*")[^"]+("\s*,)/g,
+        replace: `$1${version}$2`,
+        label: "MCP discovery manifest version",
+        expected: 1,
+      },
+    ],
+  },
+  {
+    file: "apps/web/src/lib/docs-content.ts",
+    edits: [
+      {
+        find: /frontguard\/render:\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
+        replace: `frontguard/render:${version}`,
+        label: "local renderer tag",
+        expected: 2,
+      },
+    ],
+  },
+  {
+    file: "apps/web/src/routes/status.tsx",
+    edits: [
+      {
+        find: /Source version \d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
+        replace: `Source version ${version}`,
+        label: "release candidate status",
+        expected: 1,
+      },
+    ],
+  },
+  {
+    file: "docs/design-extract/source/Docs.dc.html",
+    edits: [
+      {
+        find: /frontguard\/render:\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
+        replace: `frontguard/render:${version}`,
+        label: "source mirror renderer tag",
+        expected: 1,
+      },
+    ],
+  },
+  {
+    file: "docs/design-extract/tanstack/src/lib/docs-content.ts",
+    edits: [
+      {
+        find: /frontguard\/render:\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
+        replace: `frontguard/render:${version}`,
+        label: "TanStack mirror renderer tag",
+        expected: 1,
+      },
+    ],
+  },
+  {
+    file: "packages/cli/docker/docker-compose.yml",
+    edits: [
+      {
+        find: /frontguard\/render:\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
+        replace: `frontguard/render:${version}`,
+        label: "local Compose renderer tag",
+        expected: 1,
       },
     ],
   },
@@ -110,6 +191,7 @@ const FILE_EDITS: Array<{ file: string; edits: Edit[] }> = [
         find: /frontguard v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
         replace: `frontguard v${version}`,
         label: "CLI-output example",
+        expected: 1,
       },
     ],
   },
@@ -128,16 +210,22 @@ function syncFile(rel: string, transform: (src: string) => string): void {
 
 // Publishable package.json versions (only the top-level "version" field).
 for (const pkg of PUBLISHABLE_PKGS) {
-  syncFile(`${pkg}/package.json`, (src) =>
-    src.replace(/("version":\s*")[^"]+(")/, `$1${version}$2`),
+  const file = `${pkg}/package.json`;
+  syncFile(file, (src) =>
+    applyRequiredEdits(file, src, [
+      {
+        find: /("version":\s*")[^"]+(")/,
+        replace: `$1${version}$2`,
+        label: "package version",
+        expected: 1,
+      },
+    ]),
   );
 }
 
 // Hardcoded version strings in source/config.
 for (const { file, edits } of FILE_EDITS) {
-  syncFile(file, (src) =>
-    edits.reduce((s, e) => s.replace(e.find, e.replace), src),
-  );
+  syncFile(file, (src) => applyRequiredEdits(file, src, edits));
 }
 
 if (CHECK) {

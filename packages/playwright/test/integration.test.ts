@@ -10,14 +10,16 @@ import { visualTest } from '../src/visual-test.js';
  * Real-browser integration tests (Part A3 gap). These launch an actual
  * headless Chromium, load static HTML, and exercise visualTest end to end.
  *
- * If Chromium cannot launch in this environment, the suite skips gracefully.
+ * Local runs may explicitly set FRONTGUARD_SKIP_BROWSER_TESTS=1. CI always
+ * attempts the launch so a missing or broken browser cannot produce a green run.
  */
 
 const workDir = join(tmpdir(), `fg-integration-${process.pid}`);
 const baselineDir = join(workDir, 'baselines');
+const isCI = process.env.CI !== undefined || process.env.GITHUB_ACTIONS !== undefined;
+const skipBrowserTests = process.env.FRONTGUARD_SKIP_BROWSER_TESTS === '1' && !isCI;
 
-let browser: Browser | null = null;
-let launchError: unknown = null;
+let browser: Browser;
 
 /** Write a tiny static HTML page to disk and return a file:// URL for it. */
 function writeHtml(file: string, boxColor: string): string {
@@ -34,28 +36,18 @@ function writeHtml(file: string, boxColor: string): string {
   return pathToFileURL(abs).href;
 }
 
-beforeAll(async () => {
-  fs.mkdirSync(workDir, { recursive: true });
-  try {
+describe.skipIf(skipBrowserTests)('visualTest real-browser integration', () => {
+  beforeAll(async () => {
+    fs.mkdirSync(workDir, { recursive: true });
     browser = await chromium.launch();
-  } catch (err) {
-    launchError = err;
-    browser = null;
-  }
-});
+  });
 
-afterAll(async () => {
-  if (browser) await browser.close();
-  fs.rmSync(workDir, { recursive: true, force: true });
-});
+  afterAll(async () => {
+    if (browser) await browser.close();
+    fs.rmSync(workDir, { recursive: true, force: true });
+  });
 
-describe('visualTest real-browser integration', () => {
   it('flags a regression when the page changes', async () => {
-    if (!browser) {
-      console.warn('Skipping: chromium failed to launch:', launchError);
-      return;
-    }
-
     const redUrl = writeHtml('red.html', 'red');
     const blueUrl = writeHtml('blue.html', 'blue');
 
@@ -79,17 +71,13 @@ describe('visualTest real-browser integration', () => {
   }, 60_000);
 
   it('passes when the page is unchanged', async () => {
-    if (!browser) {
-      console.warn('Skipping: chromium failed to launch:', launchError);
-      return;
-    }
-
     const url = writeHtml('stable.html', 'green');
     const page = await browser.newPage({ viewport: { width: 300, height: 300 } });
     try {
       await page.goto(url);
       const first = await visualTest(page, 'integration-stable', { baselineDir });
       expect(first.isNewBaseline).toBe(true);
+      expect(first.passed).toBe(true);
 
       await page.goto(url);
       const second = await visualTest(page, 'integration-stable', { baselineDir });
@@ -101,11 +89,6 @@ describe('visualTest real-browser integration', () => {
   }, 60_000);
 
   it('freezeTime actually freezes Date.now in the loaded page', async () => {
-    if (!browser) {
-      console.warn('Skipping: chromium failed to launch:', launchError);
-      return;
-    }
-
     const fixed = 1_700_000_000_000;
     const url = writeHtml('freeze.html', 'orange');
     const page = await browser.newPage({ viewport: { width: 300, height: 300 } });
@@ -114,7 +97,8 @@ describe('visualTest real-browser integration', () => {
       await page.goto(url);
 
       // This triggers the freezeTime path inside visualTest on the live page.
-      await visualTest(page, 'integration-freeze', { baselineDir, freezeTime: fixed });
+      const result = await visualTest(page, 'integration-freeze', { baselineDir, freezeTime: fixed });
+      expect(result.passed).toBe(true);
 
       const t1 = await page.evaluate(() => Date.now());
       await page.waitForTimeout(50);

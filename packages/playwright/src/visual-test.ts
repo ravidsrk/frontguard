@@ -1,8 +1,52 @@
-import type { Page } from '@playwright/test';
+import * as path from 'node:path';
+import { test as playwrightTest, type Page, type TestInfo } from '@playwright/test';
 import type { VisualTestOptions, VisualTestResult } from './types.js';
 import { compareImages } from './diff.js';
 import { analyzeWithAI } from './ai.js';
 import { BaselineStorage } from './storage.js';
+
+function currentTestInfo(): TestInfo | undefined {
+  try {
+    return playwrightTest.info();
+  } catch {
+    // visualTest can also be called with a standalone Playwright Page.
+    return undefined;
+  }
+}
+
+function readablePart(value: string, maxLength: number): string {
+  return value.slice(0, maxLength);
+}
+
+function getBaselineKey(page: Page, name: string): string {
+  const testInfo = currentTestInfo();
+  const viewport = page.viewportSize();
+  const browser = page.context().browser()?.browserType().name()
+    ?? testInfo?.project.use.browserName
+    ?? null;
+  const testFile = testInfo ? path.relative(testInfo.project.testDir, testInfo.file) : null;
+  const testName = testInfo ? testInfo.titlePath.slice(1).join(' ') : 'standalone';
+  const viewportName = viewport ? `${viewport.width}x${viewport.height}` : 'default';
+  const identity = {
+    test: testInfo ? { id: testInfo.testId, file: testFile, titlePath: testInfo.titlePath } : null,
+    project: testInfo?.project.name ?? null,
+    browser,
+    platform: process.platform,
+    caller: name,
+    viewport,
+  };
+  const readable = [
+    `test-${readablePart(`${testName} ${testFile ?? ''}`.trim(), 36)}`,
+    `name-${readablePart(name, 20)}`,
+    `project-${readablePart(testInfo?.project.name || 'default', 16)}`,
+    `browser-${readablePart(browser ?? 'unknown', 12)}`,
+    `platform-${readablePart(identity.platform, 10)}`,
+    `viewport-${readablePart(viewportName, 15)}`,
+  ].join('__');
+
+  // JSON preserves the complete, untruncated dimensions for storage's digest.
+  return `${readable}__identity-${JSON.stringify(identity)}`;
+}
 
 export async function visualTest(
   page: Page,
@@ -71,15 +115,12 @@ export async function visualTest(
   const currentBuffer = await page.screenshot({ fullPage: opts.fullPage, type: 'png' });
   const current = Buffer.from(currentBuffer);
 
-  // Get viewport info for filename
-  const viewport = page.viewportSize();
-  const vpStr = viewport ? `${viewport.width}x${viewport.height}` : 'default';
-  const baselineKey = `${name}-${vpStr}`;
+  const baselineKey = getBaselineKey(page, name);
 
   // Load or create baseline
   const baseline = storage.readBaseline(baselineKey);
 
-  if (!baseline || opts.update) {
+  if (baseline === null || opts.update) {
     storage.writeBaseline(baselineKey, current);
     return {
       passed: true,

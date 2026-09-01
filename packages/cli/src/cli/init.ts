@@ -3,7 +3,7 @@
  *
  * Generates a starter config file. When a `.storybook/main.{ts,js,mjs,cjs}`
  * file is present in the project, the emitted config additionally includes
- * a `storybook` block so the first run captures every story.
+ * a `storybook` block so baseline updates capture every story.
  *
  * Extracted from `cli/index.ts` so it can be unit tested without spawning
  * the CLI process.
@@ -20,7 +20,10 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { detectFramework, generateDefaultConfig } from '../core/config.js';
-import { generateGitHubActionsWorkflow } from '../templates/github-actions.js';
+import {
+  generateGitHubActionsWorkflow,
+  type PackageManager,
+} from '../templates/github-actions.js';
 import { getFrameworkInfo } from '../templates/index.js';
 import { logger } from '../utils/logger.js';
 
@@ -35,6 +38,114 @@ const STORYBOOK_CONFIG_FILES = [
 
 /** Default Storybook dev-server URL — the canonical SB default. */
 export const DEFAULT_STORYBOOK_URL = 'http://localhost:6006';
+
+const PACKAGE_MANAGER_LOCKFILES: Record<PackageManager, readonly string[]> = {
+  npm: ['package-lock.json'],
+  pnpm: ['pnpm-lock.yaml'],
+  yarn: ['yarn.lock'],
+  bun: ['bun.lock', 'bun.lockb'],
+};
+
+interface CiWorkflowConfig {
+  packageManager: PackageManager;
+  lockfile: string;
+  devScript: string;
+}
+
+type CiWorkflowResolution =
+  | { config: CiWorkflowConfig }
+  | { error: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function formatScriptList(scripts: readonly string[]): string {
+  const quoted = scripts.map((script) => `"${script}"`);
+  if (quoted.length <= 1) return quoted[0] ?? '';
+  return `${quoted.slice(0, -1).join(', ')} or ${quoted.at(-1)}`;
+}
+
+function resolveCiWorkflowConfig(
+  cwd: string,
+  framework: string | null,
+  useStorybook: boolean,
+): CiWorkflowResolution {
+  const packagePath = join(cwd, 'package.json');
+  if (!existsSync(packagePath)) {
+    return {
+      error: 'Cannot generate CI workflow: package.json was not found.',
+    };
+  }
+
+  let pkg: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(readFileSync(packagePath, 'utf-8')) as unknown;
+    if (!isRecord(parsed)) throw new Error('package.json must contain an object');
+    pkg = parsed;
+  } catch {
+    return {
+      error: 'Cannot generate CI workflow: package.json is not valid JSON.',
+    };
+  }
+
+  const expectedScripts = useStorybook
+    ? ['storybook']
+    : getFrameworkInfo(framework).ciScripts;
+  const scripts = isRecord(pkg.scripts) ? pkg.scripts : {};
+  const devScript = expectedScripts.find(
+    (script) => typeof scripts[script] === 'string' && scripts[script].trim() !== '',
+  );
+  if (!devScript) {
+    const target = useStorybook ? 'Storybook' : (framework ?? 'this project');
+    return {
+      error:
+        `Cannot generate CI workflow: package.json needs a non-empty ` +
+        `${formatScriptList(expectedScripts)} script to start ${target}.`,
+    };
+  }
+
+  const detectedManagers: Array<{
+    packageManager: PackageManager;
+    lockfile: string;
+  }> = [];
+  for (const packageManager of Object.keys(PACKAGE_MANAGER_LOCKFILES) as PackageManager[]) {
+    const lockfile = PACKAGE_MANAGER_LOCKFILES[packageManager].find((candidate) =>
+      existsSync(join(cwd, candidate)),
+    );
+    if (lockfile) detectedManagers.push({ packageManager, lockfile });
+  }
+
+  if (detectedManagers.length === 0) {
+    return {
+      error:
+        'Cannot generate CI workflow: no supported lockfile found ' +
+        '(package-lock.json, pnpm-lock.yaml, yarn.lock, bun.lock, or bun.lockb).',
+    };
+  }
+
+  const packageManagerHint =
+    typeof pkg.packageManager === 'string'
+      ? (/^(npm|pnpm|yarn|bun)(?:@|$)/.exec(pkg.packageManager)?.[1] as
+          | PackageManager
+          | undefined)
+      : undefined;
+  const selected = packageManagerHint
+    ? detectedManagers.find(({ packageManager }) => packageManager === packageManagerHint)
+    : detectedManagers.length === 1
+      ? detectedManagers[0]
+      : undefined;
+
+  if (!selected) {
+    return {
+      error:
+        'Cannot generate CI workflow: multiple package-manager lockfiles found. ' +
+        'Remove stale lockfiles or set package.json "packageManager" to select one.',
+    };
+  }
+
+  return { config: { ...selected, devScript } };
+}
 
 /**
  * Detects whether the directory `cwd` looks like a Storybook project.
@@ -160,30 +271,7 @@ export function runInit(opts: InitOptions = {}): InitResult {
 
   // --- Detect framework + Storybook -----------------------------------------
   logger.info('Detecting framework…');
-  // detectFramework is async-shaped because it reads package.json; we run it
-  // synchronously via existsSync + readFile here to keep init pure-sync. The
-  // CLI driver still calls runInit from an async action handler.
-  let framework: string | null = null;
-  try {
-    const pkgPath = join(cwd, 'package.json');
-    if (existsSync(pkgPath)) {
-      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>;
-      const deps: Record<string, string> = {
-        ...((pkg.dependencies as Record<string, string> | undefined) ?? {}),
-        ...((pkg.devDependencies as Record<string, string> | undefined) ?? {}),
-      };
-      if ('next' in deps) framework = 'Next.js';
-      else if ('@remix-run/react' in deps || '@remix-run/node' in deps) framework = 'Remix';
-      else if ('@sveltejs/kit' in deps) framework = 'SvelteKit';
-      else if ('nuxt' in deps) framework = 'Nuxt';
-      else if ('astro' in deps) framework = 'Astro';
-      else if ('vite' in deps) framework = 'Vite';
-      else if ('react' in deps) framework = 'React';
-      else if ('vue' in deps) framework = 'Vue';
-    }
-  } catch {
-    // Malformed package.json — fall through with framework = null
-  }
+  const framework = detectFramework(cwd);
   if (framework) logger.info(`Detected: ${framework}`);
   else logger.info('No specific framework detected — using defaults');
 
@@ -212,6 +300,18 @@ export function runInit(opts: InitOptions = {}): InitResult {
     return { exitCode: 1, framework, storybookConfig, storybookScaffolded: false };
   }
 
+  const workflowDir = join(cwd, '.github', 'workflows');
+  const workflowPath = join(workflowDir, 'frontguard.yml');
+  let ciWorkflowConfig: CiWorkflowConfig | null = null;
+  if (opts.ci && !existsSync(workflowPath)) {
+    const resolution = resolveCiWorkflowConfig(cwd, framework, useStorybook);
+    if ('error' in resolution) {
+      logger.error(resolution.error);
+      return { exitCode: 1, framework, storybookConfig, storybookScaffolded: false };
+    }
+    ciWorkflowConfig = resolution.config;
+  }
+
   // --- Generate config ------------------------------------------------------
   let content = generateDefaultConfig({ framework, format });
   if (useStorybook) {
@@ -225,18 +325,17 @@ export function runInit(opts: InitOptions = {}): InitResult {
 
   // --- Optional CI workflow -------------------------------------------------
   if (opts.ci) {
-    const fwInfo = getFrameworkInfo(framework);
-    const workflowDir = join(cwd, '.github', 'workflows');
-    const workflowPath = join(workflowDir, 'frontguard.yml');
     if (existsSync(workflowPath)) {
       logger.warn('.github/workflows/frontguard.yml already exists — skipping');
-    } else {
+    } else if (ciWorkflowConfig) {
       mkdirSync(workflowDir, { recursive: true });
-      const devCommand = useStorybook
-        ? 'npm run storybook -- --ci --quiet'
-        : 'npm run dev';
-      const port = useStorybook ? 6006 : fwInfo.defaultPort;
-      const workflow = generateGitHubActionsWorkflow({ devCommand, port });
+      const port = useStorybook ? 6006 : getFrameworkInfo(framework).defaultPort;
+      const workflow = generateGitHubActionsWorkflow({
+        devScript: ciWorkflowConfig.devScript,
+        packageManager: ciWorkflowConfig.packageManager,
+        lockfile: ciWorkflowConfig.lockfile,
+        port,
+      });
       writeFileSync(workflowPath, workflow, 'utf-8');
       logger.info('✅ Created .github/workflows/frontguard.yml');
     }
@@ -281,17 +380,21 @@ export function runInit(opts: InitOptions = {}): InitResult {
   if (useStorybook) {
     logger.info('  1. Start your Storybook (e.g. npm run storybook)');
     logger.info(`     Frontguard expects it at ${storybookUrl}`);
-    logger.info('  2. Run: npx -p @frontguard/cli frontguard run');
-    logger.info('  3. (Optional) Add `parameters.frontguard` to individual stories');
+    logger.info('  2. Accept the initial state:');
+    logger.info('     npx -p @frontguard/cli frontguard update-baselines');
+    logger.info('  3. Run comparisons: npx -p @frontguard/cli frontguard run');
+    logger.info('  4. (Optional) Add `parameters.frontguard` to individual stories');
     logger.info('     to set per-story viewports, threshold, or ignore rules.');
   } else {
     logger.info(`  1. Edit ${fileName} to set your baseUrl and routes`);
     logger.info('  2. Start your dev server (e.g. npm run dev)');
-    logger.info('  3. Run: npx -p @frontguard/cli frontguard run');
+    logger.info('  3. Accept the initial state:');
+    logger.info('     npx -p @frontguard/cli frontguard update-baselines');
+    logger.info('  4. Run comparisons: npx -p @frontguard/cli frontguard run');
   }
   logger.info('');
-  logger.info('On first run, Frontguard captures baselines.');
-  logger.info('Subsequent runs compare against them and report changes.');
+  logger.info('Baseline updates commit locally to the frontguard-baselines branch.');
+  logger.info('Before CI comparisons, push it: git push origin frontguard-baselines');
 
   return {
     exitCode: 0,

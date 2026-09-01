@@ -1,7 +1,13 @@
 # Frontguard for GitHub
 
-The Frontguard GitHub App turns every pull request into a visual-regression
-check run, with one-click install and zero CI config.
+The Frontguard GitHub App is a pre-release worker intended to turn pull
+requests into visual-regression Check Runs. It is not currently an end-to-end
+alternative to the CLI or composite Action.
+
+> **Current limitation:** a pull request received before its deployment URL
+> remains pending; later deployment events are cached but do not resume that
+> Check Run. Repository config and project baseline scope are not forwarded to
+> Cloud runs, and the bootstrap workflow does not start the target application.
 
 When a PR opens or its head commit changes the app:
 
@@ -14,20 +20,22 @@ When a PR opens or its head commit changes the app:
 5. Updates the Check Run when the run finishes — `success`, `failure`, or
    `neutral` with a summary of pages tested, regressions, and warnings.
 
-On install the app also opens a **bootstrap PR** in every repo that doesn't
-have a config yet — `frontguard.config.ts` plus a workflow file pinned to
-the tagged release of the action (`ravidsrk/frontguard@v0`).
+On install the app can open a **bootstrap PR** in a repo that has no config. Its
+generated workflow is pinned to `ravidsrk/frontguard@v0`, but it is only a
+scaffold: it must be adapted to start the app or provide a reachable preview URL
+before Frontguard can capture screenshots.
 
 ## Install
 
 The GitHub Marketplace listing is **in review** — there is no live one-click
-install URL yet. To use the GitHub App today, self-host the worker from
-[`integrations/github-app/`](./) (see [Self-hosting](#self-hosting) below).
+install URL yet. The worker can be self-hosted for development from
+[`integrations/github-app/`](./), but the limitations above still apply. Use
+the CLI or composite Action for working visual comparisons today.
 
 Once the listing is approved, installing is one-click from the GitHub
-Marketplace: pick the account (personal or organisation), choose the
-repositories to grant access to, and merge the bootstrap PR the app opens.
-Your next PR then gets a Frontguard check run.
+Marketplace: pick the account (personal or organisation) and choose the
+repositories to grant access to. General availability still depends on closing
+the pre-release limitations above.
 
 ### Choose repositories
 
@@ -35,22 +43,12 @@ The app supports either "All repositories" or a hand-picked subset. The
 `installation_repositories` event is honoured, so adding a repo later still
 triggers the bootstrap flow.
 
-### Configure the baseline branch
+### Baseline status
 
-Frontguard compares each PR head against a baseline. By default this is the
-repo's default branch (`main` / `master`). To target a different branch, set
-`baseline` in `frontguard.config.ts`:
-
-```ts
-import { defineConfig } from '@frontguard/cli';
-
-export default defineConfig({
-  baseUrl: 'http://localhost:3000',
-  routes: ['/'],
-  viewports: [375, 768, 1440],
-  threshold: 0.01,
-});
-```
+Baseline-branch selection and automatic refresh after merge are not implemented
+for GitHub App runs yet. Cloud baseline restoration currently requires a
+project-scoped run with an approved project baseline. Use the CLI or composite
+Action workflow to manage git-orphan baselines until that App flow ships.
 
 ## Self-hosting
 

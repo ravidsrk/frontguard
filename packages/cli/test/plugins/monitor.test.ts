@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -11,6 +11,7 @@ import {
   formatHistoryTable,
   createPollingController,
   runPollingLoop,
+  resolveMonitorUrls,
   type MonitorConfig,
   type AlertPayload,
   type HistoryEntry,
@@ -88,6 +89,7 @@ describe('createMonitorPlugin', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -110,6 +112,11 @@ describe('createMonitorPlugin', () => {
   it('setup validates config — throws on invalid URL', () => {
     const plugin = createMonitorPlugin({ urls: ['not-a-url'] });
     expect(() => plugin.setup!(makeContext())).toThrow('Invalid URL');
+  });
+
+  it.each([-0.01, 1.01, Number.NaN])('setup rejects an out-of-range threshold %s', (alertThreshold) => {
+    const plugin = createMonitorPlugin({ urls: ['https://example.com'], alertThreshold });
+    expect(() => plugin.setup!(makeContext())).toThrow(/ratio from 0 to 1/);
   });
 
   it('setup creates historyDir if specified', () => {
@@ -168,8 +175,12 @@ describe('createMonitorPlugin', () => {
       makeDiff({ diffPercentage: 10 }), // 10% > 5% threshold
     ];
 
-    plugin.afterCompare!(diffs, makeContext());
+    const context = makeContext();
+    plugin.afterCompare!(diffs, context);
     expect(diffs).toHaveLength(1);
+    expect(context.metadata.get('monitor:alerts')).toEqual([
+      expect.objectContaining({ diffPercentage: 10, threshold: 0.05 }),
+    ]);
 
     // History entry should be saved
     const historyDir = join(tempDir, 'history', urlToSlug('https://example.com'));
@@ -203,6 +214,65 @@ describe('createMonitorPlugin', () => {
     expect(entry.status).toBe('pass');
   });
 
+  it('treats exact percentage equality as within threshold', () => {
+    const plugin = createMonitorPlugin({
+      urls: ['https://example.com'],
+      alertThreshold: 0.29,
+      historyDir: join(tempDir, 'history'),
+    });
+    plugin.setup!(makeContext());
+
+    plugin.afterCompare!([makeDiff({ diffPercentage: 29 })], makeContext());
+
+    const historyDir = join(tempDir, 'history', urlToSlug('https://example.com'));
+    const [file] = readdirSync(historyDir).filter((name) => name.endsWith('.json'));
+    expect(JSON.parse(readFileSync(join(historyDir, file), 'utf-8')).status).toBe('pass');
+  });
+
+  it('records capture and tool errors as alerting errors even with a zero diff', async () => {
+    const historyDir = join(tempDir, 'history');
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const plugin = createMonitorPlugin({
+      urls: ['https://example.com'],
+      alertThreshold: 0.05,
+      alerts: { webhook: 'https://hooks.example.com/frontguard' },
+      historyDir,
+    });
+    const context = makeContext();
+    plugin.setup!(context);
+    const diffs = [
+      makeDiff({
+        status: 'pass',
+        diffPercentage: 0,
+        error: 'Render error: browser failed to launch',
+      }),
+    ];
+
+    plugin.afterCompare!(diffs, context);
+    await plugin.afterRun!(makeRunResult(diffs), context);
+
+    expect(diffs[0].status).toBe('error');
+    expect(context.metadata.get('monitor:alerts')).toEqual([
+      expect.objectContaining({
+        status: 'error',
+        diffPercentage: 0,
+        error: 'Render error: browser failed to launch',
+      }),
+    ]);
+    const historyFiles = readdirSync(join(historyDir, urlToSlug('https://example.com')));
+    const history = JSON.parse(readFileSync(join(historyDir, urlToSlug('https://example.com'), historyFiles[0]), 'utf-8'));
+    expect(history.status).toBe('error');
+
+    const webhookPayload = JSON.parse(fetchMock.mock.calls[0][1].body as string) as AlertPayload;
+    expect(webhookPayload.alerts[0].status).toBe('error');
+    expect(webhookPayload.summary).toEqual({ total: 1, passed: 0, alerted: 1 });
+
+    const summary = JSON.parse(readFileSync(join(historyDir, 'last-run.json'), 'utf-8'));
+    expect(summary).toMatchObject({ total: 1, passed: 0, alerted: 1 });
+    expect(summary.alerts[0].status).toBe('error');
+  });
+
   it('afterRun saves run summary to historyDir', async () => {
     const historyDir = join(tempDir, 'history');
     const plugin = createMonitorPlugin({
@@ -228,6 +298,27 @@ describe('createMonitorPlugin', () => {
   });
 });
 
+describe('resolveMonitorUrls', () => {
+  it('resolves config string and object routes against baseUrl', () => {
+    expect(
+      resolveMonitorUrls(
+        ['/pricing', 'account', { path: 'settings', threshold: 0.01 }],
+        'https://example.com/app/',
+      ),
+    ).toEqual([
+      'https://example.com/pricing',
+      'https://example.com/app/account',
+      'https://example.com/app/settings',
+    ]);
+  });
+
+  it('uses baseUrl when config has no routes', () => {
+    expect(resolveMonitorUrls(undefined, 'https://example.com/app')).toEqual([
+      'https://example.com/app',
+    ]);
+  });
+});
+
 describe('urlToSlug', () => {
   it('converts URLs to filesystem-safe slugs', () => {
     expect(urlToSlug('https://example.com')).toBe('example-com');
@@ -245,7 +336,7 @@ describe('AlertPayload structure', () => {
         {
           url: 'https://example.com',
           diffPercentage: 8.5,
-          threshold: 5,
+          threshold: 0.05,
           status: 'regression',
         },
       ],

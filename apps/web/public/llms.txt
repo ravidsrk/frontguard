@@ -1,13 +1,13 @@
 # Frontguard
 
-> AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.
+> Open-source frontend visual regression testing for web teams, with optional model-assisted review.
 
-Frontguard is an open-source CLI + cloud platform. The CLI is MIT-licensed and free forever. The hosted cloud (team baselines, history, flake-score badges) is the paid tier at $29/month per user.
+Frontguard is an open-source CLI with pre-release cloud components. The CLI is MIT-licensed and free forever. There is no generally available hosted cloud endpoint today.
 
 ## Key Pages
 
 - [Home](https://frontguard.dev/) — Product overview, install paths, comparison vs Percy / Chromatic / Argos
-- [Pricing](https://frontguard.dev/pricing) — Free CLI ($0, MIT), Pro ($29/mo), Team/Enterprise; compare-plans matrix and the 8-question FAQ
+- [Pricing](https://frontguard.dev/pricing) — Free CLI ($0, MIT); hosted and team plans are pre-release design-partner concepts
 - [Comparisons](https://frontguard.dev/comparisons) — Capability-by-capability vs Percy, Chromatic, BackstopJS, Lost Pixel, Argos, with sources
 - [Changelog](https://frontguard.dev/changelog) — Notable releases, newest first (Keep a Changelog)
 - [Brand](https://frontguard.dev/brand) — The amber shield mark, lockups, color tokens, typography, voice
@@ -15,29 +15,43 @@ Frontguard is an open-source CLI + cloud platform. The CLI is MIT-licensed and f
 - [GitHub](https://github.com/ravidsrk/frontguard) — Source code, issues, contributing
 - [npm: @frontguard/cli](https://www.npmjs.com/package/@frontguard/cli) — CLI package
 - [npm: @frontguard/playwright](https://www.npmjs.com/package/@frontguard/playwright) — Playwright plugin
-- [Validation results](https://github.com/ravidsrk/frontguard/blob/main/validation/results-v0.2.md) — Real-repo AI accuracy harness
+- [Validation results](https://github.com/ravidsrk/frontguard/blob/main/validation/results-v0.2.md) — Real-repo pixel-only validation; AI accuracy remains pending
 
 ## For Agents
 
 - [Agent task routing](https://frontguard.dev/agents.md) — Start here for MCP tools, cloud API routes, auth, limits, and safe task ordering
-- [OpenAPI contract](https://frontguard.dev/openapi.json) — Machine-readable OpenAPI 3.1 contract for the hosted cloud API at `https://api.frontguard.dev`
-- [MCP discovery manifest](https://frontguard.dev/.well-known/mcp.json) — Discovery for `@frontguard/mcp`; configure `FRONTGUARD_API_URL=https://api.frontguard.dev`
+- [OpenAPI contract](https://frontguard.dev/openapi.json) — Machine-readable contract for the pre-release cloud API; there is no live default hosted endpoint yet
+- [MCP discovery manifest](https://frontguard.dev/.well-known/mcp.json) — Discovery for `@frontguard/mcp`; point `FRONTGUARD_API_URL` at a verified deployment
 
 ## What Frontguard Does
 
-- Anti-flake consensus — three captures per route, majority wins; SSIM perceptual matching as fallback
-- AI classification — diff goes to GPT-4o or Claude Sonnet with DOM + axe-core findings inline; returns category + confidence + cause
-- Sandbox-verified fixes — every AI patch is applied in a local Playwright sandbox (or Daytona snapshot), re-rendered, and only shipped if the diff clears
-- Plugin architecture — six lifecycle hooks; built-ins for accessibility (axe-core), Figma compare, perf budgets, monitor, third-party-script drift
-- CI-native — composite GitHub Action, PR comment with baseline / current / diff thumbnails; GitLab CI, CircleCI, Jenkins via the same CLI
-- Self-hostable — Cloudflare Workers + D1 + R2, or docker-compose on your laptop with miniflare + SQLite + local-disk adapters
+- Configurable consensus — projects can opt into multiple captures per route; pixel comparison uses SSIM as a fallback
+- Optional AI classification — screenshot evidence, basic route metadata, and optional accessibility findings go directly to the configured OpenAI or Anthropic provider
+- Experimental fixes — CSS suggestions and sandbox verification are separate opt-ins; unverified suggestions remain labeled
+- Plugin architecture — nine lifecycle hooks; built-ins for accessibility (axe-core), Figma compare, perf budgets, monitor, third-party-script drift
+- CI-ready — generated workflows preserve JSON and HTML artifacts; source PR reporting remains pending external release validation
+- Cloud source included — Cloudflare Workers + D1 + R2 implementation is in the repository; hosted onboarding is pre-release and the Docker renderer is repository-source-only
 
 ## Install
 
-```
+```bash
 npm install @frontguard/cli
 npx -p @frontguard/cli frontguard init
-npx -p @frontguard/cli frontguard run --url http://localhost:3000
+```
+
+App terminal (leave running; use your project's command, such as the example below, and wait for the generated `baseUrl`):
+
+```bash
+npm run dev
+```
+
+Frontguard terminal (uses the generated config):
+
+```bash
+npx -p @frontguard/cli frontguard doctor
+npx -p @frontguard/cli frontguard update-baselines
+git push origin frontguard-baselines # before CI comparisons
+npx -p @frontguard/cli frontguard run
 ```
 
 Playwright plugin:
@@ -46,15 +60,9 @@ Playwright plugin:
 npm install -D @frontguard/cli @frontguard/playwright
 ```
 
-GitHub Action:
-
-```
-- uses: ravidsrk/frontguard@v0
-  with:
-    url: ${{ steps.preview.outputs.url }}
-  env:
-    FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
-```
+GitHub Action: external consumer smoke is pending, so no public copy-ready
+Action workflow is published yet. Use the CLI flow above until the release
+procedure in `docs/ops-actions.md` passes.
 
 ## Author
 

@@ -71,7 +71,7 @@ function extractStaticValue(node: AstNode | undefined | null): unknown {
   }
 }
 
-function normalizeFrontguardParams(raw: unknown): StoryFrontguardParameters | undefined {
+export function normalizeFrontguardParams(raw: unknown): StoryFrontguardParameters | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const src = raw as Record<string, unknown>;
   const next: StoryFrontguardParameters = {};
@@ -82,7 +82,12 @@ function normalizeFrontguardParams(raw: unknown): StoryFrontguardParameters | un
     );
     if (viewports.length > 0) next.viewports = viewports;
   }
-  if (typeof src.threshold === 'number' && Number.isFinite(src.threshold)) {
+  if (
+    typeof src.threshold === 'number' &&
+    Number.isFinite(src.threshold) &&
+    src.threshold >= 0 &&
+    src.threshold <= 1
+  ) {
     next.threshold = src.threshold;
   }
   if (Array.isArray(src.ignore)) {

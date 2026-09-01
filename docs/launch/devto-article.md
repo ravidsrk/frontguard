@@ -54,7 +54,7 @@ Frontguard is **CLI-first** and **Playwright-native**. There's no SaaS you're
 forced into, no dashboard you have to live in. You run:
 
 ```bash
-npx -p @frontguard/cli frontguard run --url http://localhost:3000
+npm exec --yes --package="@frontguard/cli@0.2.2" -- frontguard run --url http://localhost:3000
 ```
 
 …and it captures, diffs, and *judges*. Three ideas do the heavy lifting.
@@ -92,19 +92,20 @@ weighing down your working branches. No external blob store required.
 
 ## Open-source and self-hostable by default
 
-Frontguard is **MIT licensed**. The CLI (`@frontguard/cli`) and the
-Playwright integration (`@frontguard/playwright`) are on npm. You can run the
-whole thing in your own CI with your own model keys and never talk to a server
-we control. If you want a hosted option later, fine — but the floor is "you own
-all of it."
+Frontguard is **MIT licensed**. The latest registry-verified release of the CLI
+(`@frontguard/cli`) and Playwright integration (`@frontguard/playwright`) is
+`0.2.2`. You can run the whole thing in your own CI with your own model keys and
+never talk to a server we control. If you want a hosted option later, fine — but
+the floor is "you own all of it."
 
 ```ts
-// @frontguard/playwright — three lines in an existing test
-import { expectVisual } from "@frontguard/playwright";
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
 
-test("home page", async ({ page }) => {
-  await page.goto("/");
-  await expectVisual(page);
+test('home page', async ({ page }) => {
+  await page.goto('/');
+  const result = await visualTest(page, 'home page');
+  expect(result.passed).toBe(true);
 });
 ```
 

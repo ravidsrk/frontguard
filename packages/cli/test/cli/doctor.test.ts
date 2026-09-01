@@ -4,8 +4,10 @@ import {
   checkAiKeys,
   checkGitRepo,
   checkBaselineBranch,
+  checkBrowsersAvailable,
   checkConfig,
   formatReport,
+  getRequiredBrowsers,
   type CheckResult,
 } from '../../src/cli/doctor.js';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -25,17 +27,68 @@ describe('doctor: checkNodeVersion', () => {
   });
 
   it('passes for exactly the minimum version', () => {
-    expect(checkNodeVersion('v18.0.0').status).toBe('pass');
+    expect(checkNodeVersion('v20.0.0').status).toBe('pass');
   });
 
   it('fails for a version below the minimum', () => {
-    const r = checkNodeVersion('v16.20.0');
+    const r = checkNodeVersion('v18.20.0');
     expect(r.status).toBe('fail');
     expect(r.fix).toBeTruthy();
   });
 
   it('handles versions without a leading v', () => {
     expect(checkNodeVersion('22.1.0').status).toBe('pass');
+  });
+});
+
+describe('doctor: checkBrowsersAvailable', () => {
+  it('fails when any browser required by config is unavailable', async () => {
+    const r = await checkBrowsersAvailable(
+      ['chromium', 'firefox'],
+      (browser) => browser === 'chromium',
+    );
+
+    expect(r.status).toBe('fail');
+    expect(r.message).toContain('firefox');
+    expect(r.fix).toContain('firefox');
+  });
+
+  it('passes only when every required browser is available', async () => {
+    const r = await checkBrowsersAvailable(
+      ['chromium', 'firefox', 'webkit'],
+      () => true,
+    );
+
+    expect(r.status).toBe('pass');
+    expect(r.message).toContain('chromium, firefox, webkit');
+  });
+});
+
+describe('doctor: getRequiredBrowsers', () => {
+  it('loads the browser list from config', async () => {
+    const dir = makeTempDir();
+    try {
+      writeFileSync(
+        join(dir, 'frontguard.config.json'),
+        JSON.stringify({
+          baseUrl: 'http://localhost:3000',
+          browsers: ['firefox', 'webkit'],
+        }),
+      );
+
+      await expect(getRequiredBrowsers(dir)).resolves.toEqual(['firefox', 'webkit']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses the default config browser when no config is present', async () => {
+    const dir = makeTempDir();
+    try {
+      await expect(getRequiredBrowsers(dir)).resolves.toEqual(['chromium']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -124,6 +177,7 @@ describe('doctor: checkBaselineBranch', () => {
       execFileSync('git', ['init'], { cwd: dir, stdio: 'ignore' });
       const r = checkBaselineBranch(dir);
       expect(r.status).toBe('warn');
+      expect(r.fix).toContain('frontguard update-baselines');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
