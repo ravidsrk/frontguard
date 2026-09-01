@@ -9,10 +9,10 @@
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "7c69ba22413b8b1c648ec21ac8e801b8bf4b1460",
-  "resume_pointer": "P3/T-15 (T-14 blocked on H-06)",
+  "current_commit": "f5b0b6cfb79ffe6cca44c1a5436c30bcd51607ae",
+  "resume_pointer": "P3/T-15 (T-28 partially done; 6 PRs blocked on H-06)",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
-  "completion_pct": 44,
+  "completion_pct": 45,
   "gate": {
     "status": "NOT_EVALUATED",
     "reason": "Definition of Complete not yet frozen (Phase 3)"
@@ -45,8 +45,8 @@
     {
       "id": 3,
       "name": "code_quality",
-      "score": 2,
-      "rag": "A",
+      "score": 3,
+      "rag": "G",
       "na_reason": null,
       "weight": 4,
       "findings": [],
@@ -892,14 +892,16 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
+      "status": "active",
+      "branch": "various",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/216",
       "commit": null,
-      "evidence": [],
-      "review": null,
+      "evidence": [
+        "docs/completion/evidence/T-28-dependabot-triage.md"
+      ],
+      "review": "greptile",
       "attempts": 0,
-      "block_signature": null
+      "block_signature": "6 of 11 remain: all touch apps/web (or peer-couple to one that does), so merging them fires Deploy Web. Blocked on H-06."
     },
     {
       "id": "T-29",
@@ -1102,6 +1104,12 @@
       "run_id": "20260901-1658",
       "commit": "7c69ba22413b8b1c648ec21ac8e801b8bf4b1460",
       "completion_pct": 44,
+      "gate": "NOT_EVALUATED"
+    },
+    {
+      "run_id": "20260901-1658",
+      "commit": "f5b0b6cfb79ffe6cca44c1a5436c30bcd51607ae",
+      "completion_pct": 45,
       "gate": "NOT_EVALUATED"
     }
   ]
