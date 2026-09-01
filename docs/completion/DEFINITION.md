@@ -14,7 +14,7 @@ which was never retracted and still describes itself as the frozen boundary:
 
 | Bar | Source | Dated | Status |
 |---|---|---|---|
-| 1 | `docs/product-completion-plan.md:690-716` | 2026-06-14 | **SUPERSEDED by this document.** Its nine-flow scope — live GitHub App, hosted cloud API, MCP, self-host — is **not** the completion target. |
+| 1 | `docs/product-completion-plan.md` **§8, "The 'complete and full-fledged' test"** | 2026-06-14 | **SUPERSEDED by this document.** Its nine-flow scope — live GitHub App, hosted cloud API, MCP, self-host — is **not** the completion target. That file now carries a supersession banner at its head and on §8 itself. Cited by section, not line range: annotating it shifted the line numbers, and a pointer that rots the moment the target is edited is not worth having. |
 | 2 | `docs/launch-audit-2026-08.md:6-8` | 2026-08-29 | Consistent with this document (NO-GO, CLI/CI only). Retained as history. |
 | 3 | `README.md:29`, `apps/web/src/routes/status.tsx:19` | 2026-09-01 | **The public contract. This document formalises it.** |
 

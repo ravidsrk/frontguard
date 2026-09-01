@@ -1,3 +1,23 @@
+> # ⚠️ SUPERSEDED — 2026-09-01
+>
+> **This document is no longer the definition of done.** It was superseded by
+> [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md), which is the
+> current frozen Definition of Complete.
+>
+> It is kept for history. Do not plan against it, and do not treat §8 below as
+> the completion bar.
+>
+> **Why.** This plan (2026-06-14) defines "complete" as nine flows including a
+> live GitHub App, a hosted cloud API, MCP, and self-hosting. The supported
+> product as of 2026-09-01 — per `README.md:29` and the public `/status` page —
+> is the **local and CI visual regression CLI**. The hosted platform is
+> deliberately out of scope and gated behind explicit preconditions.
+>
+> Because this file still described itself as "the frozen boundary" while a
+> newer, narrower contract was live, the project was being measured against a
+> platform nobody is building, and read as far less finished than it is.
+> Superseding it in place is what stops that from recurring.
+
 # Frontguard — Product-Completion Plan
 
 *Authored 2026-06-14 by the orchestration coordinator. Anchored to
@@ -688,6 +708,12 @@ the task fails review and goes back to implementation.
 ---
 
 ## 8. The "complete and full-fledged" test
+
+> **SUPERSEDED.** This section is the stale done-bar referred to at the top of
+> this file. The nine criteria below require a live hosted platform that the
+> product no longer claims to offer. The current bar is the launch gate in
+> [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) §2, scoped to
+> the local and CI CLI. Retained verbatim below for history only.
 
 This plan ships if a new user can:
 

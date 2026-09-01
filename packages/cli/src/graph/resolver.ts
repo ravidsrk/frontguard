@@ -11,7 +11,7 @@
 
 import { existsSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { logger } from '../utils/logger.js';
 import type { Route } from '../core/types.js';
 
@@ -329,10 +329,16 @@ export function mapRoutesToFiles(
 
 /**
  * Executes a git command and returns stdout lines, or empty array on failure.
+ *
+ * Takes argv rather than a command string and uses execFileSync, so no shell is
+ * involved and nothing in `args` can be interpreted as shell syntax. Every
+ * caller currently passes literals, but a branch name, base ref, or config
+ * value threaded through here would otherwise be one commit away from command
+ * injection. src/storage/git-orphan.ts already does it this way.
  */
-function gitDiff(projectDir: string, args: string): string[] {
+function gitDiff(projectDir: string, args: string[]): string[] {
   try {
-    const output = execSync(`git ${args}`, {
+    const output = execFileSync('git', args, {
       cwd: projectDir,
       encoding: 'utf-8',
       timeout: 10_000,
@@ -369,7 +375,7 @@ export function getChangedFiles(projectDir: string): string[] {
   // Fast-check if remote exists before attempting remote diff
   let hasRemote = false;
   try {
-    execSync('git remote get-url origin', { cwd: resolvedDir, encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] });
+    execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: resolvedDir, encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] });
     hasRemote = true;
   } catch {
     // No remote configured — skip remote diff strategies
@@ -377,25 +383,25 @@ export function getChangedFiles(projectDir: string): string[] {
   }
 
   if (hasRemote) {
-    const prFilesMain = gitDiff(resolvedDir, 'diff --name-only origin/main...HEAD');
+    const prFilesMain = gitDiff(resolvedDir, ['diff', '--name-only', 'origin/main...HEAD']);
     for (const f of prFilesMain) allFiles.add(f);
   }
 
   // Strategy 2: Last commit diff
   if (allFiles.size === 0) {
-    const commitFiles = gitDiff(resolvedDir, 'diff --name-only HEAD~1');
+    const commitFiles = gitDiff(resolvedDir, ['diff', '--name-only', 'HEAD~1']);
     for (const f of commitFiles) allFiles.add(f);
   }
 
   // Strategy 3: Uncommitted changes
   if (allFiles.size === 0) {
-    const uncommitted = gitDiff(resolvedDir, 'diff --name-only HEAD');
+    const uncommitted = gitDiff(resolvedDir, ['diff', '--name-only', 'HEAD']);
     for (const f of uncommitted) allFiles.add(f);
   }
 
   // Strategy 4: Staged changes
   if (allFiles.size === 0) {
-    const stagedFiles = gitDiff(resolvedDir, 'diff --name-only --cached');
+    const stagedFiles = gitDiff(resolvedDir, ['diff', '--name-only', '--cached']);
     for (const f of stagedFiles) allFiles.add(f);
   }
 
