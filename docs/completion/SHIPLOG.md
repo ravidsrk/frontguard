@@ -225,3 +225,32 @@ one commit per task. Worth recording because the failure mode was a safety habit
 ---
 
 **RESUME POINTER: `P3/T-15` — T-14 blocked on H-06 (production deploy authorisation)**
+
+### R9 BREAKER — main went red after P2, fixed
+
+`main` went red on `299b1c1`, a **docs-only** merge. `test/discovery/storybook.test.ts` timed out
+at 5005ms. A docs diff cannot affect Storybook discovery, and that job had passed on #209–#212, so
+this was a load-dependent flake — but R9 makes a red `main` the next task regardless.
+
+**Root cause, and it is bigger than the flake.** All three vitest configs set `timeout`, but
+vitest's option is **`testTimeout`**. Unknown keys are dropped silently, so `packages/cli` (intended
+30s), `packages/cli` e2e (60s) and `packages/mcp` (15s) had every test running on the **5000ms
+default**. Proven empirically rather than from documentation: `testTimeout: 250` fails a 1200ms
+test at 250ms; `timeout: 250` lets it pass.
+
+This is also the true cause of the `launch-examples` timeout patched earlier in this run with an
+explicit per-test budget — that patch was treating the symptom. It stays, because it documents a
+genuinely slow tsc-bound test, but the config fix is the real remedy and removes the whole class.
+
+Fixed in PR #213. `main` green at `7c69ba2`. CLI 975/975, mcp 57/57, storybook 32/32.
+
+**Second look:** the Phase 1 flake check ran the suite twice and found the failure set
+*deterministic*, which is what routed these to "real regressions, not flakes". That conclusion was
+right for the five failures it examined and wrong as a general claim: running twice on an idle
+laptop cannot surface a load-dependent timeout on a shared runner. The honest lesson is that
+"deterministic locally" is not evidence of "deterministic in CI", and the config bug meant the
+repo had no timeout headroom anywhere to absorb it.
+
+---
+
+**RESUME POINTER: `P3/T-15` — T-14/T-25/T-27 blocked on H-06; T-21/T-22/T-23 blocked on H-01/H-02/H-03**

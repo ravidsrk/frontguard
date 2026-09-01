@@ -9,7 +9,7 @@
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "f83b321375bd72c2a87d3c35d5ef01850afc50e1",
+  "current_commit": "7c69ba22413b8b1c648ec21ac8e801b8bf4b1460",
   "resume_pointer": "P3/T-15 (T-14 blocked on H-06)",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 44,
@@ -1072,7 +1072,13 @@
     }
   ],
   "research": [],
-  "breakers_tripped": [],
+  "breakers_tripped": [
+    {
+      "rule": "R9",
+      "at": "post-P2",
+      "note": "main went red on 299b1c1 (docs-only merge) via a load-dependent storybook timeout. Root cause: all three vitest configs used `timeout` instead of `testTimeout`, so every test ran on the 5000ms default rather than the intended 30s/60s/15s. Fixed in PR #213; main green at 7c69ba2."
+    }
+  ],
   "history": [
     {
       "run_id": "20260901-1658",
@@ -1089,6 +1095,12 @@
     {
       "run_id": "20260901-1658",
       "commit": "f83b321375bd72c2a87d3c35d5ef01850afc50e1",
+      "completion_pct": 44,
+      "gate": "NOT_EVALUATED"
+    },
+    {
+      "run_id": "20260901-1658",
+      "commit": "7c69ba22413b8b1c648ec21ac8e801b8bf4b1460",
       "completion_pct": 44,
       "gate": "NOT_EVALUATED"
     }
