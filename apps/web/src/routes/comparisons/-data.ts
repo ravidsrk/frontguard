@@ -20,26 +20,26 @@ export interface MatrixRow {
 export const MATRIX: MatrixRow[] = [
   { capability: 'Open source', emphasize: true, cells: ['✓ MIT', '✕', '◐', '✓', '◐', '✓ MIT'] },
   { capability: 'CLI-first', cells: ['✓', '✕', '✕', '✓', '✓', '✓'] },
-  { capability: 'AI change classification', emphasize: true, cells: ['✓', '◐', '✕', '✕', '✕', '✕'] },
-  { capability: 'AI fix verification', emphasize: true, cells: ['✓', '✕', '✕', '✕', '✕', '✕'] },
-  { capability: 'Anti-flake rendering', cells: ['✓', '◐', '◐', '✕', '✕', '◐'] },
-  { capability: 'Cross-OS render normalisation', cells: ['✓', '✓', '✓', '✕', '✕', '✕'] },
-  { capability: 'Self-hostable', cells: ['✓', '✕', '✕', '✓', '◐', '◐'] },
+  { capability: 'AI change classification', emphasize: true, cells: ['✓ optional', '◐', '✕', '✕', '✕', '✕'] },
+  { capability: 'AI fix verification', emphasize: true, cells: ['◐ experimental', '✕', '✕', '✕', '✕', '✕'] },
+  { capability: 'Multi-render consensus', cells: ['◐ configurable', '◐', '◐', '✕', '✕', '◐'] },
+  { capability: 'Cross-OS render normalisation', cells: ['◐ unvalidated', '✓', '✓', '✕', '✕', '✕'] },
+  { capability: 'Runs without a hosted service', cells: ['✓', '✕', '✕', '✓', '◐', '◐'] },
   { capability: 'Storybook integration', cells: ['✓', '✓', '✓', '✕', '✓', '✓'] },
-  { capability: 'MCP server for in-IDE agents', cells: ['✓', '✕', '◐', '✕', '✕', '✕'] },
-  { capability: 'PR comment with thumbnail triplet', cells: ['✓', '✓', '✓', '✕', '◐', '✓'] },
-  { capability: 'Enterprise SSO/SAML', cells: ['◐', '✓', '✓', '✕', '✕', '✓'] },
+  { capability: 'MCP server for in-IDE agents', cells: ['◐ pre-release', '✕', '◐', '✕', '✕', '✕'] },
+  { capability: 'PR comment with thumbnail triplet', cells: ['◐ source only', '✓', '✓', '✕', '◐', '✓'] },
+  { capability: 'Enterprise SSO/SAML', cells: ['✕', '✓', '✓', '✕', '✕', '✓'] },
   { capability: 'Free tier', cells: ['Forever', '5k/mo', '5k/mo', 'Free', '✕', '5k/mo'] },
-  { capability: 'Pro entry', cells: ['$29/mo', '$199/mo', '$179/mo', 'n/a', 'n/a', '$100/mo'] },
-  { capability: 'Snapshot overage', cells: ['Spend cap', 'Quote', '$0.008', 'n/a', 'n/a', '$0.004'] },
-  { capability: 'Actively maintained', cells: ['✓', '✓', '✓', '✕ quiet', '✕', '✓'] },
+  { capability: 'Hosted entry', cells: ['Waitlist', '$199/mo', '$179/mo', 'n/a', 'n/a', '$100/mo'] },
+  { capability: 'Snapshot overage', cells: ['n/a (CLI)', 'Quote', '$0.008', 'n/a', 'n/a', '$0.004'] },
+  { capability: 'Project status', cells: ['Active', 'Active', 'Active', 'Low activity', 'Sunset', 'Active'] },
 ]
 
 export const ALTERNATIVES = [
-  { name: 'Percy', status: '↗ pricing cliff', color: '#e8862e' },
-  { name: 'Chromatic', status: '◐ Storybook-locked', color: '#e8862e' },
-  { name: 'BackstopJS', status: '✕ low activity', color: '#e5484d' },
-  { name: 'Lost Pixel', status: '✕ archived', color: '#e5484d' },
+  { name: 'Percy', status: 'hosted review workflow', color: '#8c847a' },
+  { name: 'Chromatic', status: 'Storybook-centered', color: '#8c847a' },
+  { name: 'BackstopJS', status: 'low recent activity', color: '#e8862e' },
+  { name: 'Lost Pixel', status: 'sunset', color: '#e5484d' },
 ] as const
 
 export const VERSUS = [
@@ -48,7 +48,7 @@ export const VERSUS = [
     their:
       'Polished hosted dashboard, broad framework SDKs, and mature review workflows backed by BrowserStack.',
     ours:
-      'CLI-first and free forever — no per-screenshot billing that punishes a growing suite. Plus AI explanations, not just a red diff to triage by hand.',
+      'A local MIT-licensed CLI with git-native baselines and optional BYOK explanations. It does not offer Percy’s mature hosted review surface.',
     cta: 'Read the comparison',
     href: 'comparisons/frontguard-vs-percy',
   },
@@ -65,7 +65,7 @@ export const VERSUS = [
     name: 'BackstopJS',
     their: 'A free, self-hosted classic — simple, scriptable, no vendor at all.',
     ours:
-      'Same self-hosted freedom, but with zero-config route discovery, anti-flake rendering, AI analysis, and active maintenance (BackstopJS has been quiet for years).',
+      'Adds route discovery, configurable multi-render consensus, and optional AI analysis while retaining a local workflow.',
     cta: 'Migration guide',
     href: 'guides/migrate-from-backstopjs',
   },
@@ -74,7 +74,7 @@ export const VERSUS = [
     their:
       'Modern, developer-friendly OSS-leaning tools with good CI ergonomics and Playwright trace support.',
     ours:
-      'The only one with AI change classification and verified fixes — and a flat, screenshot-count-independent price with full self-hosting.',
+      'A local CLI workflow with git-native baselines and optional model-assisted analysis; hosted Frontguard remains pre-release.',
     cta: 'Read the comparison',
     href: 'comparisons/frontguard-vs-argos',
   },

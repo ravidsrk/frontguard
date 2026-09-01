@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { getFrameworkInfo, FRAMEWORK_TEMPLATES } from '../../src/templates/index.js';
 import { generateGitHubActionsWorkflow } from '../../src/templates/github-actions.js';
 import { generateDefaultConfig } from '../../src/core/config.js';
+
+const cliVersion = readFileSync(new URL('../../../../VERSION', import.meta.url), 'utf8').trim();
 
 describe('getFrameworkInfo', () => {
   it('returns Next.js metadata with port 3000', () => {
@@ -30,8 +33,10 @@ describe('getFrameworkInfo', () => {
   it('every template has required fields', () => {
     for (const info of Object.values(FRAMEWORK_TEMPLATES)) {
       expect(info.name).toBeTruthy();
+      expect(Array.isArray(info.dependencyNames)).toBe(true);
       expect(info.defaultPort).toBeGreaterThan(0);
       expect(info.devCommand).toBeTruthy();
+      expect(info.ciScripts.length).toBeGreaterThan(0);
       expect(Array.isArray(info.typicalRoutes)).toBe(true);
     }
   });
@@ -84,10 +89,25 @@ describe('generateGitHubActionsWorkflow', () => {
     const yaml = generateGitHubActionsWorkflow();
     expect(yaml).toContain('name: Frontguard');
     expect(yaml).toContain('pull_request');
-    expect(yaml).toContain('npx -p @frontguard/cli frontguard run');
+    expect(yaml).toContain(
+      `npm exec --yes --package="@frontguard/cli@${cliVersion}" -- frontguard run`,
+    );
     expect(yaml).toContain('actions/checkout@v4');
     expect(yaml).toContain('fetch-depth: 0');
+    expect(yaml).toContain('contents: read');
+    expect(yaml).not.toContain('contents: write');
     expect(yaml).toContain('pull-requests: write');
+    expect(yaml).toContain('group: frontguard-${{ github.event.pull_request.number || github.ref }}');
+    expect(yaml).toContain('cancel-in-progress: true');
+    expect(yaml).toContain('actions/upload-artifact@v7');
+    expect(yaml).toContain('actions/upload-artifact@v3.2.2-node20');
+    expect(yaml).toContain("github.server_url == 'https://github.com'");
+    expect(yaml).toContain("github.server_url != 'https://github.com'");
+    expect(yaml).not.toContain('continue-on-error: true');
+    expect(yaml).toContain('id: frontguard');
+    expect(yaml).toContain('path: ${{ steps.frontguard.outputs.report-path }}');
+    expect(yaml).toContain('if-no-files-found: error');
+    expect(yaml).toContain("printf 'report-path<<%s\\n' \"$DELIM\"");
   });
 
   it('respects custom port', () => {
@@ -101,6 +121,14 @@ describe('generateGitHubActionsWorkflow', () => {
   });
 
   it('caches Playwright browsers', () => {
-    expect(generateGitHubActionsWorkflow()).toContain('actions/cache@v4');
+    const yaml = generateGitHubActionsWorkflow();
+    expect(yaml).toContain('actions/setup-node@v7');
+    expect(yaml).toContain('actions/cache@v6');
+    expect(yaml).toContain(`playwright-frontguard-${cliVersion}-`);
+    expect(yaml).toContain(
+      `npm exec --yes --package="@frontguard/cli@${cliVersion}" -- playwright install`,
+    );
+    expect(yaml).toContain('playwright install --with-deps chromium firefox webkit');
+    expect(yaml).not.toContain('npx playwright install');
   });
 });

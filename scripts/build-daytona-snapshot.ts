@@ -15,8 +15,8 @@
  *     the T11 image actually builds. Smoke test only — skip with
  *     `--skip-docker-build` if you don't have Docker on PATH.
  * 3.  Authenticates to Daytona via `DAYTONA_API_KEY` and publishes a snapshot
- *     named `frontguard-playwright-v1`. The snapshot runs the same install
- *     steps as the Dockerfile so the rendered output matches byte-for-byte.
+ *     named `frontguard-playwright-v1`. The snapshot mirrors the Dockerfile's
+ *     dependency stack to reduce render variance; equivalence is not assumed.
  *
  * No DAYTONA_API_KEY?
  * -------------------
@@ -255,9 +255,8 @@ async function publishSnapshot(args: { name: string; dryRun: boolean }): Promise
   }
 
   const daytona = new mod.Daytona();
-  // These runCommands intentionally mirror packages/cli/docker/Dockerfile so a
-  // sandbox booted from the snapshot renders bit-identically to a local
-  // `docker run`. Bump in sync with the Dockerfile.
+  // These runCommands intentionally mirror packages/cli/docker/Dockerfile to
+  // reduce dependency drift. Cross-host equivalence still requires measurement.
   const image = mod.Image.base(PLAYWRIGHT_BASE).runCommands(
     'apt-get update',
     'apt-get install -y --no-install-recommends fonts-liberation fonts-liberation2 fonts-dejavu-core fonts-dejavu-extra fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji fontconfig',

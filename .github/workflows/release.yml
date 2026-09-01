@@ -1,42 +1,106 @@
 name: Release
 
-# Triggered on version tags (e.g. v0.2.0, v1.2.3).
-# The single workflow that ships Frontguard:
-#   1. installs and builds everything
-#   2. runs scripts/release.sh --dry-run as a final sanity check
-#   3. runs scripts/release.sh with NPM_TOKEN to publish the public npm packages
-#   4. emits the marketplace submission checklist as a workflow summary
-#
-# Marketplace listings (GitHub App, Vercel, Netlify, Slack) require human
-# approval / owner credentials and are NOT submitted by this workflow — see
-# docs/distribution.mdx for the submission steps.
-
 on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Run without publishing (validation only)'
-        type: boolean
-        default: true
 
-permissions:
-  contents: read
-  id-token: write # required for npm provenance (--provenance)
+permissions: {}
 
 jobs:
-  release:
+  validate:
+    name: Validate release
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     outputs:
+      artifact_name: ${{ steps.context.outputs.artifact_name }}
+      release_sha: ${{ steps.context.outputs.release_sha }}
+      tag: ${{ steps.context.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
 
       - name: Read VERSION
         id: version
-        run: echo "version=$(tr -d '\n' < VERSION)" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Validate event and immutable tag target
+        id: context
+        shell: bash
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          release_sha="$(git rev-parse HEAD)"
+          tag=""
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            expected_tag="v$VERSION"
+            [ "$REF_TYPE" = "tag" ]
+            [ "$REF_NAME" = "$expected_tag" ]
+            [ "$GITHUB_REF" = "refs/tags/$expected_tag" ]
+
+            git fetch --no-tags origin "+refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+            git fetch --force --no-tags origin "refs/tags/$expected_tag:refs/release-guard/$expected_tag"
+            remote_tag_sha="$(git rev-parse "refs/release-guard/$expected_tag^{commit}")"
+            [ "$remote_tag_sha" = "$release_sha" ]
+            git merge-base --is-ancestor "$release_sha" "refs/remotes/origin/$DEFAULT_BRANCH"
+            tag="$expected_tag"
+          else
+            [ "$EVENT_NAME" = "workflow_dispatch" ]
+            echo "Manual dispatch is validation-only; publication jobs are disabled."
+          fi
+
+          echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=release-validation-$VERSION-${release_sha:0:12}" >> "$GITHUB_OUTPUT"
+
+      - name: Require successful CI on the release commit
+        if: github.event_name == 'push'
+        id: ci-approval
+        uses: actions/github-script@v7
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_SHA: ${{ steps.context.outputs.release_sha }}
+        with:
+          script: |
+            const response = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ci.yml',
+              branch: process.env.DEFAULT_BRANCH,
+              event: 'push',
+              head_sha: process.env.RELEASE_SHA,
+              status: 'success',
+              per_page: 100,
+            });
+            const approved = response.data.workflow_runs.find((run) =>
+              run.head_sha === process.env.RELEASE_SHA &&
+              run.head_branch === process.env.DEFAULT_BRANCH &&
+              run.event === 'push' &&
+              run.conclusion === 'success'
+            );
+            if (!approved) {
+              core.setFailed(`No successful CI push run approves ${process.env.RELEASE_SHA}`);
+              return;
+            }
+            core.info(`CI-approved commit: ${approved.html_url}`);
+            core.setOutput('run_url', approved.html_url);
 
       - uses: actions/setup-node@v7
         with:
@@ -44,7 +108,7 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
-      - name: Install jq
+      - name: Install release validation tools
         run: sudo apt-get update && sudo apt-get install -y jq shellcheck
 
       - name: Install dependencies
@@ -53,46 +117,200 @@ jobs:
       - name: Shellcheck release script
         run: shellcheck scripts/release.sh
 
-      - name: Dry-run release (sanity check)
-        run: ./scripts/release.sh --dry-run
+      - name: Run complete local release validation
+        shell: bash
+        env:
+          RELEASE_CI_URL: ${{ steps.ci-approval.outputs.run_url }}
+          RELEASE_EVIDENCE_DIR: ${{ runner.temp }}/release-evidence
+          RELEASE_SOURCE_SHA: ${{ steps.context.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          args=(--dry-run)
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            args+=(--require-prepared)
+          fi
+          ./scripts/release.sh "${args[@]}"
 
-      - name: Publish to npm
-        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run == 'false' }}
+      - name: Upload validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.context.outputs.artifact_name }}
+          path: ${{ runner.temp }}/release-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+  github-release:
+    name: Create immutable GitHub Release
+    needs: validate
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_type == 'tag' &&
+      github.ref_name == needs.validate.outputs.tag
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    outputs:
+      immutable: ${{ steps.release.outputs.immutable }}
+      release_url: ${{ steps.release.outputs.release_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.validate.outputs.release_sha }}
+
+      - name: Revalidate current remote tag target
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch --force --no-tags origin "refs/tags/$TAG:refs/release-guard/$TAG"
+          [ "$(git rev-parse "refs/release-guard/$TAG^{commit}")" = "$RELEASE_SHA" ]
+
+      - name: Download release evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.validate.outputs.artifact_name }}
+          path: ${{ runner.temp }}/release-evidence
+
+      - name: Create evidence archive
+        shell: bash
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/release-evidence
+          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          [ "$TAG" = "v$VERSION" ]
+          jq -e --arg sha "$RELEASE_SHA" --arg version "$VERSION" \
+            '.sourceSha == $sha and .version == $version and .releaseStatus == "prepared"' \
+            "$EVIDENCE_DIR/release-evidence.json" >/dev/null
+          archive="$RUNNER_TEMP/release-evidence-$TAG.tar.gz"
+          tar -czf "$archive" -C "$EVIDENCE_DIR" .
+          (
+            cd "$RUNNER_TEMP"
+            shasum -a 256 "$(basename "$archive")" > "$(basename "$archive").sha256"
+          )
+
+      - name: Publish GitHub Release and verify immutability
+        id: release
+        shell: bash
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/release-evidence
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/release-evidence-$TAG.tar.gz"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; it must already be immutable."
+          else
+            gh release create "$TAG" \
+              "$archive#Release validation evidence" \
+              "$archive.sha256#Evidence archive SHA-256" \
+              --draft \
+              --verify-tag \
+              --title "$TAG" \
+              --notes-file "$EVIDENCE_DIR/release-notes.md"
+            gh release edit "$TAG" --draft=false --latest
+          fi
+
+          release_json="$(gh api \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            "repos/$GITHUB_REPOSITORY/releases/tags/$TAG")"
+          immutable="$(jq -r '.immutable // false' <<< "$release_json")"
+          release_url="$(jq -r '.html_url' <<< "$release_json")"
+          [ "$immutable" = "true" ] || {
+            echo "::error::GitHub Release $TAG is not immutable. Enable release immutability before publishing packages."
+            exit 1
+          }
+          git fetch --force --no-tags origin "refs/tags/$TAG:refs/release-locked/$TAG"
+          locked_tag_sha="$(git rev-parse "refs/release-locked/$TAG^{commit}")"
+          [ "$locked_tag_sha" = "$RELEASE_SHA" ] || {
+            echo "::error::Immutable tag $TAG does not point to approved commit $RELEASE_SHA."
+            exit 1
+          }
+          echo "Immutable release: $release_url"
+          echo "immutable=true" >> "$GITHUB_OUTPUT"
+          echo "release_url=$release_url" >> "$GITHUB_OUTPUT"
+
+  publish-npm:
+    name: Publish npm packages
+    needs: [validate, github-release]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_type == 'tag' &&
+      github.ref_name == needs.validate.outputs.tag &&
+      needs.github-release.outputs.immutable == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.validate.outputs.release_sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish approved release
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_APPROVED_SHA: ${{ needs.validate.outputs.release_sha }}
+          RELEASE_EVIDENCE_DIR: ${{ runner.temp }}/npm-publication-evidence
+          RELEASE_IMMUTABLE: ${{ needs.github-release.outputs.immutable }}
+          RELEASE_SOURCE_SHA: ${{ needs.validate.outputs.release_sha }}
         run: ./scripts/release.sh --only-npm
 
       - name: Marketplace checklist
-        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run == 'false' }}
         run: |
           {
             echo '## Marketplace submission checklist'
             echo ''
-            echo 'npm publish is complete. The following surfaces still need manual submission:'
+            echo 'npm publication completed from an immutable release tag.'
             echo ''
-            echo '- [ ] **GitHub Marketplace** — https://github.com/marketplace/new (manifest: `integrations/github-app/manifest.yml`)'
-            echo '- [ ] **Vercel Marketplace** — https://vercel.com/dashboard/integrations/console (config: `integrations/vercel/frontguard.config.ts`)'
-            echo '- [ ] **Netlify Build Plugins** — https://app.netlify.com/integrations/build-plugins (manifest: `integrations/netlify/manifest.yml`)'
-            echo '- [ ] **Slack App Directory** — https://api.slack.com/apps (manifest: `integrations/slack-app/manifest.yml`)'
-            echo ''
-            echo 'See `docs/distribution.mdx` for the full submission playbook.'
+            echo '- [ ] **GitHub Marketplace** - https://github.com/marketplace/new'
+            echo '- [ ] **Vercel Marketplace** - https://vercel.com/dashboard/integrations/console'
+            echo '- [ ] **Netlify Build Plugins** - https://app.netlify.com/integrations/build-plugins'
+            echo '- [ ] **Slack App Directory** - https://api.slack.com/apps'
           } >> "$GITHUB_STEP_SUMMARY"
 
   docker:
-    needs: release
-    if: github.event_name == 'push'
+    name: Publish renderer image
+    needs: [validate, github-release, publish-npm]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_type == 'tag' &&
+      github.ref_name == needs.validate.outputs.tag &&
+      needs.github-release.outputs.immutable == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.release_sha }}
 
       - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'npm'
-
-      - name: Read VERSION
-        id: version
-        run: echo "version=$(tr -d '\n' < VERSION)" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         run: npm ci
@@ -120,5 +338,5 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            frontguard/render:${{ steps.version.outputs.version }}
+            frontguard/render:${{ needs.validate.outputs.version }}
             frontguard/render:latest

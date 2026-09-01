@@ -10,6 +10,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const negativeControl = process.env.FRONTGUARD_DEMO_NEGATIVE_CONTROL === '1';
+
   return (
     <html lang="en">
       <head>
@@ -28,7 +30,12 @@ export default function RootLayout({
             </div>
           </div>
         </nav>
-        <main>{children}</main>
+        <main
+          data-frontguard-negative-control={negativeControl ? 'enabled' : undefined}
+          style={negativeControl ? { transform: 'translateX(160px)' } : undefined}
+        >
+          {children}
+        </main>
         <footer className="border-t border-gray-800 px-6 py-8 text-center text-sm text-gray-500">
           © 2025 Acme Inc. Visual testing powered by{' '}
           <a href="https://github.com/ravidsrk/frontguard" className="text-indigo-400 hover:underline">

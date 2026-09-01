@@ -102,7 +102,7 @@ function DocArticle() {
 
       <article dangerouslySetInnerHTML={{ __html: cur.html }} />
 
-      <div style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 28px; margin-top: 16px; border-top: 1px solid #211e1b;')}>
+      <div className="fg-docs-pagination" style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 28px; margin-top: 16px; border-top: 1px solid #211e1b;')}>
         {prev ? (
           <Link to="/docs/$" params={{ _splat: prev.id }} className="fg-link" style={s('border: 1px solid #2a2622; padding: 18px 20px; text-decoration: none;')}>
             <div style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; margin-bottom: 6px;`)}>← PREVIOUS</div>

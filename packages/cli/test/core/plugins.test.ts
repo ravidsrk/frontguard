@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { PluginManager } from '../../src/core/plugins.js';
 import type { FrontguardPlugin, PluginContext } from '../../src/core/plugins.js';
 import type { Route, FrontguardConfig, DiffResult } from '../../src/core/types.js';
@@ -220,9 +220,22 @@ describe('PluginManager', () => {
         }),
       );
 
+      await pm.setup(makeContext());
       await pm.teardown();
 
       expect(order).toEqual(['third', 'second', 'first']);
+    });
+
+    it('runs each teardown at most once', async () => {
+      const teardown = vi.fn();
+      const pm = new PluginManager();
+      pm.register(makePlugin('once', { teardown }));
+      await pm.setup(makeContext());
+
+      await pm.teardown();
+      await pm.teardown();
+
+      expect(teardown).toHaveBeenCalledTimes(1);
     });
   });
 

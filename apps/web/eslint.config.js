@@ -21,7 +21,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/routes/**/*.{ts,tsx}'],
+    files: ['src/routes/**/*.{ts,tsx}', 'apps/web/src/routes/**/*.{ts,tsx}'],
     rules: {
       'react-refresh/only-export-components': 'off',
     },

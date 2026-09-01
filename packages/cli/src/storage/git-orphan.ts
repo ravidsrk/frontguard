@@ -14,6 +14,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { BaselineStorage, BaselineManifest, BrowserEngine } from '../core/types.js';
 import { logger } from '../utils/logger.js';
+import { CLI_VERSION } from '../version.js';
 
 /**
  * Buffer ceiling for every git child process (install-2).
@@ -61,6 +62,13 @@ export function gitSpawnErrorMessage(
   return `git ${command} failed: ${raw}`;
 }
 
+export type GitOrphanStorageMode = 'compare' | 'update';
+
+export interface GitOrphanStorageOptions {
+  branch?: string;
+  mode?: GitOrphanStorageMode;
+}
+
 /**
  * Converts a route path to a safe filesystem path for baseline storage.
  *
@@ -90,6 +98,12 @@ function baselinePath(route: string, viewport: number, browser: BrowserEngine): 
   return `baselines/${sanitizeRoutePath(route)}/${viewport}/${browser}.png`;
 }
 
+function gitErrorOutput(err: unknown): string {
+  const error = err as { message?: string; stderr?: string | Buffer };
+  const stderr = Buffer.isBuffer(error.stderr) ? error.stderr.toString('utf8') : error.stderr;
+  return [error.message, stderr].filter(Boolean).join('\n');
+}
+
 /**
  * Git orphan branch baseline storage implementation.
  *
@@ -101,16 +115,23 @@ function baselinePath(route: string, viewport: number, browser: BrowserEngine): 
  * - Not a git repo → clear error "frontguard requires a git repository"
  * - Permission denied → error with fix instructions
  * - Concurrent updates → detect, warn, retry once
- * - Branch missing → auto-create on first `init()`
+ * - Branch missing → create only in explicit update mode
  */
 export class GitOrphanStorage implements BaselineStorage {
   private readonly repoDir: string;
   private readonly branch: string;
+  private readonly mode: GitOrphanStorageMode;
+  private readRef: string | null;
   private initialized = false;
 
-  constructor(repoDir: string, branch = 'frontguard-baselines') {
+  constructor(
+    repoDir: string,
+    options: GitOrphanStorageOptions = {},
+  ) {
     this.repoDir = repoDir;
-    this.branch = branch;
+    this.branch = options.branch ?? 'frontguard-baselines';
+    this.mode = options.mode ?? 'compare';
+    this.readRef = null;
   }
 
   // ---------------------------------------------------------------------------
@@ -196,11 +217,15 @@ export class GitOrphanStorage implements BaselineStorage {
    * Initialise the orphan branch storage.
    *
    * 1. Verify we're inside a git repository.
-   * 2. Handle shallow clones — fetch the branch with depth=1.
-   * 3. If the orphan branch doesn't exist yet, create it with an
-   *    empty manifest commit and switch back to the original branch.
+   * 2. Fetch the baseline branch from origin when it exists remotely.
+   * 3. Pin comparisons to an immutable commit without changing local state.
+   * 4. Create a missing branch only for explicit baseline updates.
    */
   async init(): Promise<void> {
+    // Re-initialization must not leave stale state readable after a failed refresh.
+    this.initialized = false;
+    this.readRef = null;
+
     // Verify git repo
     if (!this.gitCheck('rev-parse', '--is-inside-work-tree')) {
       throw new Error(
@@ -209,25 +234,60 @@ export class GitOrphanStorage implements BaselineStorage {
       );
     }
 
-    // Handle shallow clones
-    const isShallow = this.git('rev-parse', '--is-shallow-repository');
-    if (isShallow === 'true') {
-      logger.debug('Shallow clone detected — fetching orphan branch');
+    // Refresh/adopt the remote branch before reading. A stale or missing local
+    // ref silently turns accepted screenshots into CHANGED or NEW results.
+    const hasLocalBranch = this.branchExists();
+    const ciValue = process.env.CI?.trim().toLowerCase();
+    const isCI = ciValue !== undefined && !['', '0', 'false', 'no', 'off'].includes(ciValue);
+    const strictCIComparison = isCI && this.mode === 'compare';
+    const hasOrigin = this.gitCheck('remote', 'get-url', 'origin');
+    if (strictCIComparison && !hasOrigin) {
+      throw new Error(
+        `CI comparison requires origin/${this.branch}; no "origin" remote is configured.`,
+      );
+    }
+
+    if (hasOrigin) {
       try {
-        this.git('fetch', 'origin', this.branch, '--depth=1');
-        // Create local tracking branch if fetch succeeded
-        if (!this.branchExists()) {
-          this.git('branch', this.branch, 'FETCH_HEAD');
+        if (this.remoteBranchExists()) {
+          const remoteCommit = this.fetchRemoteBranch();
+          if (this.mode === 'update') {
+            this.syncLocalBranch(remoteCommit);
+            this.readRef = this.branch;
+          } else {
+            this.readRef = this.comparisonReadRef(remoteCommit, strictCIComparison);
+          }
+        } else if (strictCIComparison) {
+          throw new Error(
+            `Published baseline branch origin/${this.branch} does not exist. ` +
+              'CI comparison refuses to use local baseline state.',
+          );
         }
-      } catch {
-        logger.debug('Branch not on remote yet (shallow), will create locally');
+      } catch (err) {
+        // Local development can continue offline with an existing baseline.
+        // CI must fail closed rather than compare against stale screenshots.
+        if (strictCIComparison || !hasLocalBranch || isCI) throw err;
+        logger.warn(
+          `Could not refresh origin/${this.branch}; using the existing local baseline branch`
+        );
+        this.readRef = this.mode === 'update'
+          ? this.branch
+          : this.git('rev-parse', this.branch);
       }
     }
 
-    // Create the orphan branch if it doesn't exist
-    if (!this.branchExists()) {
+    if (this.readRef === null && this.branchExists()) {
+      this.readRef = this.mode === 'update'
+        ? this.branch
+        : this.git('rev-parse', this.branch);
+    }
+
+    // Comparison mode is read-only. A missing branch means every capture is
+    // new, but must not create or commit baseline state.
+    if (this.mode === 'update' && !this.branchExists()) {
       logger.info(`Creating orphan branch "${this.branch}" for baseline storage`);
       await this.createOrphanBranch();
+      this.readRef = this.branch;
     }
 
     this.initialized = true;
@@ -247,11 +307,18 @@ export class GitOrphanStorage implements BaselineStorage {
   ): Promise<Buffer | null> {
     this.ensureInitialized();
     const path = baselinePath(route, viewport, browser);
+    if (this.readRef === null) return null;
 
     try {
-      return this.gitBuffer('show', `${this.branch}:${path}`);
-    } catch {
-      return null;
+      return this.gitBuffer('show', `${this.readRef}:${path}`);
+    } catch (err) {
+      const output = gitErrorOutput(err);
+      if (/fatal:\s+path ['"].+['"] does not exist in/i.test(output)) return null;
+      if (/exists on disk, but not in/i.test(output)) return null;
+      throw new Error(
+        `Could not read baseline "${path}" from "${this.readRef}": ` +
+          gitSpawnErrorMessage('show', err, this.repoDir),
+      );
     }
   }
 
@@ -269,6 +336,7 @@ export class GitOrphanStorage implements BaselineStorage {
     buffer: Buffer
   ): Promise<void> {
     this.ensureInitialized();
+    this.ensureWritable();
     const path = baselinePath(route, viewport, browser);
 
     await this.writeToOrphanBranch(
@@ -289,9 +357,10 @@ export class GitOrphanStorage implements BaselineStorage {
    */
   async readManifest(): Promise<BaselineManifest | null> {
     this.ensureInitialized();
+    if (this.readRef === null) return null;
 
     try {
-      const raw = this.git('show', `${this.branch}:manifest.json`);
+      const raw = this.git('show', `${this.readRef}:manifest.json`);
       return JSON.parse(raw) as BaselineManifest;
     } catch {
       return null;
@@ -303,6 +372,7 @@ export class GitOrphanStorage implements BaselineStorage {
    */
   async writeManifest(manifest: BaselineManifest): Promise<void> {
     this.ensureInitialized();
+    this.ensureWritable();
 
     await this.writeToOrphanBranch(
       (worktreeDir) => {
@@ -317,11 +387,12 @@ export class GitOrphanStorage implements BaselineStorage {
    * Check whether any baselines exist (orphan branch exists and has files).
    */
   async hasBaselines(): Promise<boolean> {
-    if (!this.branchExists()) return false;
+    this.ensureInitialized();
+    if (this.readRef === null) return false;
 
     try {
       // Check if the branch has any baselines/ entries
-      const tree = this.git('ls-tree', '--name-only', this.branch);
+      const tree = this.git('ls-tree', '--name-only', this.readRef);
       return tree.includes('baselines');
     } catch {
       return false;
@@ -339,6 +410,104 @@ export class GitOrphanStorage implements BaselineStorage {
     return this.gitCheck('rev-parse', '--verify', this.branch);
   }
 
+  /** Checks for the branch without confusing network/auth failures with absence. */
+  private remoteBranchExists(): boolean {
+    try {
+      execFileSync(
+        'git',
+        ['ls-remote', '--exit-code', '--heads', 'origin', this.branch],
+        {
+          cwd: this.repoDir,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30_000,
+          maxBuffer: GIT_MAX_BUFFER,
+        },
+      );
+      return true;
+    } catch (err) {
+      if ((err as { status?: number }).status === 2) return false;
+      throw new Error(
+        `Could not check origin/${this.branch}: ${gitSpawnErrorMessage('ls-remote', err, this.repoDir)}`
+      );
+    }
+  }
+
+  /** Fetches the remote tip into its tracking ref without moving a local branch. */
+  private fetchRemoteBranch(): string {
+    const remoteRef = `refs/remotes/origin/${this.branch}`;
+    this.git(
+      'fetch',
+      '--no-tags',
+      'origin',
+      `+refs/heads/${this.branch}:${remoteRef}`,
+    );
+
+    return this.git('rev-parse', remoteRef);
+  }
+
+  /** Chooses an immutable comparison ref while preserving unpublished local work. */
+  private comparisonReadRef(remoteCommit: string, strictCIComparison: boolean): string {
+    const remoteRef = `refs/remotes/origin/${this.branch}`;
+    if (!this.branchExists()) return remoteCommit;
+
+    const localCommit = this.git('rev-parse', this.branch);
+    if (localCommit === remoteCommit) return remoteCommit;
+
+    if (this.gitCheck('merge-base', '--is-ancestor', this.branch, remoteRef)) {
+      return remoteCommit;
+    }
+
+    if (this.gitCheck('merge-base', '--is-ancestor', remoteRef, this.branch)) {
+      if (strictCIComparison) {
+        throw new Error(
+          `Local baseline branch "${this.branch}" is ahead of origin/${this.branch}. ` +
+            'CI comparison refuses unpublished baseline commits.',
+        );
+      }
+      logger.debug(`Using unpublished local baseline branch "${this.branch}"`);
+      return localCommit;
+    }
+
+    throw new Error(
+      `Local baseline branch "${this.branch}" has diverged from origin/${this.branch}. ` +
+        'Publish or reconcile the baseline branch before running Frontguard.',
+    );
+  }
+
+  /** Adopts or fast-forwards the local branch for an explicit update. */
+  private syncLocalBranch(remoteCommit: string): void {
+    const remoteRef = `refs/remotes/origin/${this.branch}`;
+
+    if (!this.branchExists()) {
+      // `git branch --track` rejects explicitly fetched refs in single-branch
+      // shallow clones, so create the branch directly and configure tracking.
+      this.git('branch', this.branch, remoteRef);
+      this.git('config', `branch.${this.branch}.remote`, 'origin');
+      this.git('config', `branch.${this.branch}.merge`, `refs/heads/${this.branch}`);
+      logger.debug(`Adopted baseline branch from origin/${this.branch}`);
+      return;
+    }
+
+    const localCommit = this.git('rev-parse', this.branch);
+    if (localCommit === remoteCommit) return;
+
+    if (this.gitCheck('merge-base', '--is-ancestor', this.branch, remoteRef)) {
+      this.git('branch', '--force', this.branch, remoteRef);
+      logger.debug(`Fast-forwarded baseline branch from origin/${this.branch}`);
+      return;
+    }
+
+    if (this.gitCheck('merge-base', '--is-ancestor', remoteRef, this.branch)) {
+      logger.debug(`Local baseline branch is ahead of origin/${this.branch}`);
+      return;
+    }
+
+    throw new Error(
+      `Local baseline branch "${this.branch}" has diverged from origin/${this.branch}. ` +
+        `Publish or reconcile the baseline branch before running Frontguard.`
+    );
+  }
+
   /**
    * Creates the initial orphan branch with an empty manifest.
    *
@@ -347,18 +516,25 @@ export class GitOrphanStorage implements BaselineStorage {
    * is not available (very old git).
    */
   private async createOrphanBranch(): Promise<void> {
-    // Guard: refuse to create orphan branch if working tree is dirty
-    const status = this.git('status', '--porcelain');
-    if (status.length > 0) {
-      throw new Error(
-        'Working tree has uncommitted changes. Commit or stash before updating baselines.'
-      );
+    // A newly initialized repository has no HEAD for `git worktree add` to
+    // detach from. Seed the orphan commit in an isolated temporary repository.
+    if (!this.gitCheck('rev-parse', '--verify', 'HEAD')) {
+      await this.createOrphanFromTemporaryRepository();
+      return;
     }
 
     // Try worktree approach first (safer — never touches main working tree)
     if (this.supportsWorktree()) {
       await this.createOrphanViaWorktree();
     } else {
+      // The legacy checkout fallback touches the main working tree and cannot
+      // safely preserve uncommitted changes. Modern Git takes the path above.
+      const status = this.git('status', '--porcelain');
+      if (status.length > 0) {
+        throw new Error(
+          'Working tree has uncommitted changes. Commit or stash before updating baselines.'
+        );
+      }
       // Get the current branch/ref to restore after checkout-based fallback
       let originalRef: string;
       try {
@@ -368,6 +544,39 @@ export class GitOrphanStorage implements BaselineStorage {
         originalRef = this.git('rev-parse', 'HEAD');
       }
       await this.createOrphanViaCheckout(originalRef);
+    }
+  }
+
+  /** Creates the initial branch without requiring a commit in the user's repo. */
+  private async createOrphanFromTemporaryRepository(): Promise<void> {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'frontguard-seed-'));
+
+    try {
+      this.gitIn(tmpDir, 'init', '--quiet', `--initial-branch=${this.branch}`);
+      this.gitIn(tmpDir, 'config', 'user.name', 'Frontguard');
+      this.gitIn(tmpDir, 'config', 'user.email', 'frontguard@users.noreply.github.com');
+      this.gitIn(tmpDir, 'config', 'commit.gpgsign', 'false');
+
+      const manifest: BaselineManifest = {
+        schemaVersion: 1,
+        createdBy: `frontguard@${CLI_VERSION}`,
+        updatedAt: new Date().toISOString(),
+        routes: {},
+      };
+      writeFileSync(
+        join(tmpDir, 'manifest.json'),
+        JSON.stringify(manifest, null, 2) + '\n',
+      );
+      this.gitIn(tmpDir, 'add', 'manifest.json');
+      this.gitIn(tmpDir, 'commit', '--quiet', '-m', 'Initialize frontguard baselines');
+
+      this.git(
+        'fetch',
+        tmpDir,
+        `refs/heads/${this.branch}:refs/heads/${this.branch}`,
+      );
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
     }
   }
 
@@ -391,7 +600,7 @@ export class GitOrphanStorage implements BaselineStorage {
       // Write initial manifest into the temp worktree
       const manifest: BaselineManifest = {
         schemaVersion: 1,
-        createdBy: 'frontguard@0.1.0',
+        createdBy: `frontguard@${CLI_VERSION}`,
         updatedAt: new Date().toISOString(),
         routes: {},
       };
@@ -432,7 +641,7 @@ export class GitOrphanStorage implements BaselineStorage {
 
       const manifest: BaselineManifest = {
         schemaVersion: 1,
-        createdBy: 'frontguard@0.1.0',
+        createdBy: `frontguard@${CLI_VERSION}`,
         updatedAt: new Date().toISOString(),
         routes: {},
       };
@@ -483,7 +692,7 @@ export class GitOrphanStorage implements BaselineStorage {
         // Apply the write operation
         writeFn(worktreeDir);
 
-        // Stage, commit, and push from the worktree
+        // Stage and commit from the worktree. Callers decide when to push the branch.
         this.gitIn(worktreeDir, 'add', '-A');
 
         // Check if there are changes to commit
@@ -554,6 +763,12 @@ export class GitOrphanStorage implements BaselineStorage {
       throw new Error(
         'GitOrphanStorage not initialized. Call init() before reading or writing baselines.'
       );
+    }
+  }
+
+  private ensureWritable(): void {
+    if (this.mode !== 'update') {
+      throw new Error('Baseline writes require explicit update mode.');
     }
   }
 }

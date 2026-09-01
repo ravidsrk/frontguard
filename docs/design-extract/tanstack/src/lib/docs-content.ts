@@ -64,29 +64,29 @@ const C = { g: '#98c379', k: '#c678dd', cm: '#564f48', n: '#e8862e', y: '#5b8def
 /* ---------------- INTRODUCTION ---------------- */
 const introHtml = `
 ${h1('Introduction')}
-<p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">Frontguard is an AI-powered visual regression testing tool for frontend teams. It renders every page in your app, compares it against approved baselines, and uses AI vision to classify each diff as a <strong style="color: #f5f1ea; font-weight: 600;">regression</strong>, an <strong style="color: #f5f1ea; font-weight: 600;">intentional change</strong>, or a <strong style="color: #f5f1ea; font-weight: 600;">content update</strong> — then explains why and suggests a verified fix.</p>
-<p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">The goal is simple: a red run should mean something. Pixel-diff tools fire on non-bugs so often that teams stop trusting them — so Frontguard's job is to tell a real regression apart from noise, not just count changed pixels.</p>
-<p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 34px;">It's CLI-first, MIT licensed, and fully self-hostable. No per-screenshot pricing, no dashboard lock-in. Bring your own AI key.</p>
+<p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">Frontguard is an MIT-licensed visual regression CLI. It renders configured pages, compares screenshots against reviewed baselines, and can optionally ask your selected AI provider for a confidence-scored classification and explanation.</p>
+<p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">The deterministic path is local pixel comparison with inspectable image and HTML artifacts. Model output is optional assistance, not an autonomous approval.</p>
+<p style="font-size: 17px; line-height: 1.65; color: #c8c0b6; margin: 0 0 34px;">The CLI runs without a Frontguard account. Hosted cloud, MCP, GitHub App, and Docker Compose onboarding remain pre-release.</p>
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 40px;">
   <div style="border: 1px solid #2a2622; background: #131210; padding: 22px;">
     <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4fb477; margin-bottom: 10px;">DETECT</div>
-    <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #b8b0a6;">Pixel diff + DOM and computed-style diff across every viewport and browser. Anti-flake multi-render kills false positives.</p>
+    <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #b8b0a6;">Pixel comparison across configured viewports and browsers, with masks, thresholds, and configurable multi-render consensus.</p>
   </div>
   <div style="border: 1px solid #2a2622; background: #131210; padding: 22px;">
     <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #e8862e; margin-bottom: 10px;">UNDERSTAND</div>
-    <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #b8b0a6;">AI vision classifies each diff, maps it to the exact code change, and explains the root cause in plain language.</p>
+    <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #b8b0a6;">Optional model-assisted analysis classifies changed screenshots and returns an explanation for human review.</p>
   </div>
 </div>
-${callout('PREREQUISITES', 'Node.js 20+ and npm 9+. AI analysis is optional — pixel and DOM diff run locally without any key.')}
+${callout('PREREQUISITES', 'Node.js 20+ and npm 9+. AI analysis is optional; pixel comparison runs locally without a key.')}
 ${h2('The pipeline')}
-<p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 22px;">Frontguard runs a six-stage pipeline. Each stage is independent with error boundaries — one page failing doesn't kill the run. A fast pixel gate means ~90% of pages never reach the AI.</p>
+<p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 22px;">Frontguard runs a six-stage pipeline. One page failing does not stop the remaining comparisons. AI runs only for changed screenshots when a provider is configured.</p>
 <div style="display: grid; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 40px;">
   ${stageRow('01', 'Discover', 'Crawl, filesystem scan, or config — finds every route automatically.')}
   ${stageRow('02', 'Filter', 'Dependency graph renders only pages affected by your changed files.')}
-  ${stageRow('03', 'Render', 'Playwright captures each route × viewport × browser, anti-flake.')}
-  ${stageRow('04', 'Diff', 'pixelmatch fast gate, then DOM + computed-style comparison.')}
-  ${stageRow('05', 'Analyze', 'AI vision classifies, explains the root cause, scores confidence.')}
-  ${stageRow('06', 'Report', 'Console, JSON, HTML, and a GitHub PR comment with visual diffs.')}
+  ${stageRow('03', 'Render', 'Playwright captures each route × viewport × browser, with configurable consensus.')}
+  ${stageRow('04', 'Diff', 'Pixel comparison with an SSIM fallback.')}
+  ${stageRow('05', 'Analyze', 'Optional BYOK analysis classifies, explains, and scores confidence.')}
+  ${stageRow('06', 'Report', 'Console, JSON, and HTML artifacts with visual evidence.')}
 </div>`
 
 /* ---------------- INSTALLATION ---------------- */
@@ -119,7 +119,7 @@ ${h2b('Environment variables')}
 ${table2([
   ['FRONTGUARD_OPENAI_KEY', 'OpenAI API key for AI analysis (optional).'],
   ['FRONTGUARD_ANTHROPIC_KEY', 'Anthropic API key for AI analysis (alternative).'],
-  ['GITHUB_TOKEN', 'GitHub token for posting PR comments. Provided automatically in Actions.'],
+  ['GITHUB_TOKEN', 'Used by the source PR reporter; public Action behavior still needs external validation.'],
   ['FRONTGUARD_DEBUG', 'Set to 1 for full stack traces on errors.'],
 ])}`
 
@@ -140,15 +140,17 @@ const statusCard = (glyph: string, hex: string, label: string, desc: string) =>
   </div>`
 const quickHtml = `
 ${h1('Quick start')}
-${lead('Run your first visual check in two minutes. The first run captures baselines; every subsequent run diffs against them.')}
+${lead('Start the app, review and accept initial captures explicitly, then run comparisons against them.')}
 <div style="display: grid; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 30px;">
   ${quickStep('1', 'Initialize', 'Auto-detect your framework and scaffold a config (plus a GitHub Action with --ci).', 'npx -p @frontguard/cli frontguard init --ci')}
-  ${quickStep('2', 'Check your environment', 'Verify Node, Playwright, browsers and git are ready.', 'npx -p @frontguard/cli frontguard doctor')}
-  ${quickStep('3', 'Run', 'First run captures baselines; subsequent runs diff against them.', 'npx -p @frontguard/cli frontguard run --url http://localhost:3000')}
-  ${quickStep('4', 'Accept changes', 'After an intentional redesign, accept the current screenshots as new baselines.', 'npx -p @frontguard/cli frontguard update-baselines')}
+  ${quickStep('2', 'Start the app', 'In a separate app terminal, use the project’s dev-server command (npm run dev is one example), leave it running, and wait for the configured baseUrl.', 'npm run dev')}
+  ${quickStep('3', 'Check your environment', 'In a Frontguard terminal, verify Node, Playwright, browsers and git.', 'npx -p @frontguard/cli frontguard doctor')}
+  ${quickStep('4', 'Accept initial captures', 'Review the app, then explicitly accept its screenshots.', 'npx -p @frontguard/cli frontguard update-baselines')}
+  ${quickStep('5', 'Publish baselines', 'Push the orphan branch before CI comparisons.', 'git push origin frontguard-baselines')}
+  ${quickStep('6', 'Run comparisons', 'Later runs use the generated config and report changes without modifying accepted baselines.', 'npx -p @frontguard/cli frontguard run')}
 </div>
 <h2 style="font-size: 24px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 40px 0 16px;">Reading the output</h2>
-${p('Every route × viewport gets a status. Regressions exit non-zero, so the run fails CI.')}
+${p('Every route × viewport gets a status. Regressions and unaccepted new screenshots exit 1; no comparisons or a tool error exit 2.')}
 <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 24px;">
   <div style="border-bottom: 1px solid #211e1b; background: #161412; padding: 9px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #564f48;">frontguard run</div>
   <pre style="margin: 0; padding: 18px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.85; color: #b8b0a6; overflow-x: auto;"><span style="color: #4fb477;">  ✓ /</span>           375 768 1440  <span style="color: #4fb477;">PASS</span>
@@ -208,9 +210,9 @@ ${p('The default command. Runs the full discover → render → diff → analyze
 </div>
 <h3 style="font-size: 17px; font-weight: 600; color: #f5f1ea; margin: 28px 0 12px;">Exit codes</h3>
 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 36px;">
-  <div style="border: 1px solid #1f3a28; background: #0e1410; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #4fb477;">0</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">All passed (or only warnings / new pages)</p></div>
-  <div style="border: 1px solid #3a1f1f; background: #170f0e; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #e5484d;">1</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">Regressions detected</p></div>
-  <div style="border: 1px solid #2a2622; background: #131210; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #e8862e;">2</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">Pipeline errors (but no regressions)</p></div>
+  <div style="border: 1px solid #1f3a28; background: #0e1410; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #4fb477;">0</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">All passed or warnings only</p></div>
+  <div style="border: 1px solid #3a1f1f; background: #170f0e; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #e5484d;">1</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">Regressions or unaccepted new screenshots</p></div>
+  <div style="border: 1px solid #2a2622; background: #131210; padding: 16px;"><code style="font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #e8862e;">2</code><p style="margin: 8px 0 0; font-size: 13px; color: #8c847a; line-height: 1.5;">No comparisons or any tool error</p></div>
 </div>
 ${h2('frontguard monitor')}
 ${p('Runs visual checks against live production URLs instead of a local dev server. Supports one-off checks, daemon polling, and webhook alerts.')}
@@ -314,7 +316,7 @@ ${callout('', "The plugin reuses your test's already-rendered page — no second
 /* ---------------- GITHUB ACTIONS ---------------- */
 const cicdHtml = `
 ${h1('GitHub Actions')}
-${lead('Frontguard provides an official GitHub Action. It auto-detects preview URLs from Vercel, Netlify, Cloudflare, Railway and Render, runs the pipeline, and posts a PR comment with before/after/diff thumbnails.')}
+${lead('The repository includes a pre-release GitHub Action manifest that auto-detects common preview URLs, runs the pipeline, and uploads the HTML report. The public v0 consumer path and source PR reporter still require external release validation.')}
 ${h2b('Quick setup')}
 <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 34px;">
   <div style="border-bottom: 1px solid #211e1b; background: #161412; padding: 9px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #564f48;">.github/workflows/visual-regression.yml</div>
@@ -342,8 +344,11 @@ ${h2b('Action inputs')}
     ['url', 'No', 'Base URL to test (auto-detected from preview deploys if omitted).'],
     ['routes', 'No', 'Comma-separated routes (auto-discovered by default).'],
     ['viewports', 'No', 'Comma-separated viewport widths. Default 375,768,1440.'],
+    ['browsers', 'No', 'Comma-separated browsers. Default chromium.'],
     ['threshold', 'No', 'Changed-pixel ratio (0–1; 0.01 = 1%). Uses config or 0.1 when omitted.'],
+    ['config', 'No', 'Path to frontguard.config.ts.'],
     ['update-baselines', 'No', 'Accept current as new baselines. Default false.'],
+    ['github-token', 'No', 'GitHub token for PR comments. Defaults to github.token.'],
   ]
     .map(
       ([a, b, c]) => `<div style="display: grid; grid-template-columns: 170px 110px 1fr; gap: 14px; padding: 12px 20px; border-bottom: 1px solid #211e1b; align-items: baseline;">
@@ -383,21 +388,22 @@ ${h2b('Classification')}
   <div style="border: 1px solid #1f3a28; background: #0e1410; padding: 18px;"><div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4fb477; margin-bottom: 8px;">intentional</div><p style="margin: 0; font-size: 13.5px; color: #b8b0a6; line-height: 1.5;">Deliberate design change — looks correct.</p></div>
   <div style="border: 1px solid #2a2622; background: #131210; padding: 18px;"><div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #5b8def; margin-bottom: 8px;">content_update</div><p style="margin: 0; font-size: 13.5px; color: #b8b0a6; line-height: 1.5;">Dynamic content changed (text, images) — not a code issue.</p></div>
 </div>
+${p('An intentional classification at 0.8 confidence or higher automatically downgrades a regression to a warning. Inspect the model output before relying on that CI result.')}
 ${h2b('Supported providers')}
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 32px;">
   <div style="border: 1px solid #2a2622; background: #131210; padding: 20px 22px;">
     <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #f5f1ea; margin-bottom: 12px;">OpenAI</div>
     <code style="display: block; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #d8d0c5; margin-bottom: 14px;"><span style="color: #7c746b;">export </span>FRONTGUARD_OPENAI_KEY=sk-…</code>
-    <div style="font-size: 13px; color: #8c847a; line-height: 1.7;"><span style="color: #e8862e; font-family: 'JetBrains Mono', monospace;">gpt-4o</span> — best accuracy<br><span style="color: #e8862e; font-family: 'JetBrains Mono', monospace;">gpt-4o-mini</span> — faster, lower cost</div>
+    <div style="font-size: 13px; color: #8c847a; line-height: 1.7;">Select the model explicitly in configuration; Frontguard has not published a comparative accuracy benchmark.</div>
   </div>
   <div style="border: 1px solid #2a2622; background: #131210; padding: 20px 22px;">
     <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #f5f1ea; margin-bottom: 12px;">Anthropic</div>
     <code style="display: block; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #d8d0c5; margin-bottom: 14px;"><span style="color: #7c746b;">export </span>FRONTGUARD_ANTHROPIC_KEY=sk-ant-…</code>
-    <div style="font-size: 13px; color: #8c847a; line-height: 1.7;"><span style="color: #e8862e; font-family: 'JetBrains Mono', monospace;">claude-sonnet-4</span> — best accuracy<br><span style="color: #e8862e; font-family: 'JetBrains Mono', monospace;">claude-3-5-haiku</span> — faster, lower cost</div>
+    <div style="font-size: 13px; color: #8c847a; line-height: 1.7;">Select the model explicitly in configuration; Frontguard has not published a comparative accuracy benchmark.</div>
   </div>
 </div>
-${h2b('Cost optimization')}
-${p('AI only runs on pages with a detected diff — the pixel fast-gate catches 90%+ as passing, so they never hit the API.')}
+${h2b('Cost controls')}
+${p('AI is optional and runs only on detected changes. Frontguard has not published a measured percentage of pages that avoid the provider call.')}
 <ul style="list-style: none; padding: 0; margin: 0 0 32px; display: grid; gap: 12px;">
   ${[
     'Use a cheap model (gpt-4o-mini / haiku) for triage, full models for PR-blocking checks',
@@ -415,7 +421,7 @@ ${callout('BYOK — BRING YOUR OWN KEY', 'Frontguard never stores, proxies, or l
 /* ---------------- AI FIXES ---------------- */
 const aiFixesHtml = `
 ${h1('AI Fixes &amp; the fix-pattern database')}
-${lead(`Every competitor stops at "here's what changed." Frontguard goes further: here's a fix, and it re-rendered the page with the fix applied to confirm it works. Over time it learns which fixes you accept and reuses them.`)}
+${lead(`CSS suggestion generation and sandbox verification are experimental, separate opt-ins. Unverified suggestions remain labeled, and a verification result is not a correctness guarantee.`)}
 ${h2b('Verifying fixes in a sandbox')}
 ${p(`A suggested fix is only useful if it works. With ${ic('verifyFixes: true')}, Frontguard applies the patch, re-renders, and re-compares:`)}
 <div style="display: grid; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 30px;">
@@ -446,12 +452,12 @@ ${p('Frontguard keeps a local SQLite store of the fixes you accept and reject. T
 <span style="color: #7c746b;">$</span> frontguard reject-fix &lt;id&gt;   <span style="color: #564f48;"># negative signal</span>
 <span style="color: #7c746b;">$</span> frontguard export-patterns &gt; fix-patterns.json</pre>
 </div>
-<p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 40px;">A pattern is reused once it has been accepted ≥3 times with no rejections — so a one-off accept never overrides the model. Verified fixes are recorded as accepted automatically.</p>`
+<p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 40px;">A pattern is reused once it has been accepted ≥3 times with no rejections. A verified fix is automatically recorded as an accepted local signal when the database is available; that does not update screenshot baselines or replace patch review.</p>`
 
 /* ---------------- CUSTOM PLUGINS ---------------- */
 const pluginsHtml = `
 ${h1('Custom Plugins')}
-${lead('Frontguard ships a plugin architecture that lets you extend every stage of the pipeline through six lifecycle hooks. Five plugins are built in; writing your own is a plain object.')}
+${lead('Frontguard ships a plugin architecture with nine lifecycle hooks. Five plugins are built in; writing your own is a plain object.')}
 ${h2b('Built-in plugins')}
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 36px;">
   ${[
@@ -470,9 +476,9 @@ ${h2b('Built-in plugins')}
     .join('')}
 </div>
 ${h2b('Lifecycle hooks')}
-${p('Hooks are called in order. All are optional — implement only what you need. Hooks that return a value replace the input for the next plugin in the chain.')}
-<div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 16px; padding: 18px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #d8d0c5; line-height: 1.7; overflow-x: auto;">setup → beforeDiscover → afterDiscover → beforeRender →<br>afterRender → afterCompare → afterRun → teardown</div>
-<p style="font-size: 14px; line-height: 1.6; color: #8c847a; margin: 0 0 32px;">Plugins are called in registration order; <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #e8862e;">teardown</code> runs LIFO. Plugin names must be unique.</p>
+${p('Seven hooks run at pipeline stages, bracketed by setup and teardown. Hooks that transform pipeline data pass that result to the next plugin; onError may suppress an error by returning true.')}
+<div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 16px; padding: 18px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #d8d0c5; line-height: 1.7; overflow-x: auto;">setup → beforeDiscover → afterDiscover → beforeRender → afterRender → afterCompare → afterRun → onError → teardown</div>
+<p style="font-size: 14px; line-height: 1.6; color: #8c847a; margin: 0 0 32px;">Plugins run in registration order. Plugin names must be unique, and behavior should be tested against the pinned CLI version.</p>
 ${h2b('Example: a Slack plugin')}
 ${code(
   'plugins/slack.ts',
@@ -497,26 +503,30 @@ ${lead('The CLI is fully self-contained — it needs nothing but Node, a browser
 ${h2b('Git-native baselines')}
 ${p(`Baselines are stored in a Git orphan branch (${ic('frontguard-baselines')}) by default. This keeps baseline images out of your main branch history while still being version-controlled. The manifest tracks which routes, viewports and browsers were captured and when.`)}
 ${h2b('Docker')}
-${p('An official image bundles Node, Playwright and the browsers, so there\'s nothing to install in CI.')}
+${p('The renderer is currently repository-source-only. From a clean clone, prepare the local npm tarball that the Dockerfile requires before building the pinned image; no public image or cross-host byte-equivalence result is published.')}
 ${code(
   'terminal',
-  `<span style="color: #7c746b;">$</span> docker run --rm -v \$PWD:/app \\
-    -e FRONTGUARD_OPENAI_KEY=\$OPENAI_KEY \\
-    ghcr.io/ravidsrk/frontguard run --url https://staging.example.com`,
+  `<span style="color: #7c746b;">$</span> npm ci
+<span style="color: #7c746b;">$</span> npm run build --workspace=packages/cli
+<span style="color: #7c746b;">$</span> npm pack ./packages/cli --pack-destination packages/cli/docker
+<span style="color: #7c746b;">$</span> mv packages/cli/docker/frontguard-cli-*.tgz packages/cli/docker/frontguard-cli.tgz
+<span style="color: #7c746b;">$</span> docker build --platform linux/amd64 -t frontguard/render:0.2.3 packages/cli/docker`,
 )}
+${p('After the image is built, invoke it from a configured project. A container cannot reach a host app through localhost, so this staging example overrides baseUrl deliberately.')}
+${code('configured project terminal', `<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard run --docker --url https://staging.example.com`)}
 ${h2b('Optional cloud platform')}
-${p('For teams that want a hosted dashboard, baseline approvals, monitoring schedules and usage metering, the cloud platform runs on Cloudflare Workers + D1 + R2 and is self-deployable. The CLI never depends on it.')}
-${callout('', 'No per-screenshot pricing, no vendor lock-in. Everything that runs in the hosted product is open source and can run on your own infrastructure.')}`
+${p('Cloudflare Workers, D1, and R2 source is included for development, but its Compose path is not a verified clean-checkout deployment and there is no supported hosted or self-host quick start today. The CLI never depends on it.')}
+${callout('', 'Do not use the pre-release cloud for production data until deployment, migrations, retention, recovery, and tenant isolation have been independently verified.')}`
 
 /* ---------------- VALIDATION ---------------- */
 const resultsHtml = `
 ${h1('Validation &amp; results')}
-${lead(`Frontguard's value depends on the AI correctly classifying visual changes. Accuracy is measured with two validation harnesses and tracked over time — not asserted.`)}
+${lead(`The published validation run measured local route execution with AI disabled. It is not evidence of model accuracy or cross-OS equivalence.`)}
 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 36px;">
   ${[
-    ['395', 'tests across 26 test files in the core CLI'],
-    ['10', 'synthetic ground-truth cases with known classifications'],
-    ['PR-level', 'real-world validation against live GitHub pull requests'],
+    ['39 / 43', 'route rechecks completed in the published harness'],
+    ['2 / 5', 'fixture repositories booted successfully'],
+    ['AI OFF', 'classifier accuracy was not measured'],
   ]
     .map(
       ([stat, label]) => `<div style="border: 1px solid #2a2622; background: #131210; padding: 24px 22px;">
@@ -526,16 +536,12 @@ ${lead(`Frontguard's value depends on the AI correctly classifying visual change
     )
     .join('')}
 </div>
-${h2b('Synthetic validation')}
-${p('Ten programmatic before/after pairs with known ground truth, run against your own key:')}
+${h2b('Current evidence')}
+${p('Review the recorded commands, failures, and environment in the checked-in validation result:')}
 <div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 28px;">
-  <pre style="margin: 0; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.8; color: #d8d0c5; overflow-x: auto;"><span style="color: #7c746b;">$</span> npx tsx scripts/validate-ai.ts</pre>
+  <pre style="margin: 0; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.8; color: #d8d0c5; overflow-x: auto;">validation/results-v0.2.md</pre>
 </div>
-${h2b('Real-world validation')}
-${p('Validates against actual GitHub PRs through the full clone → render → diff → analyze pipeline:')}
-<div style="background: #121110; border: 1px solid #2a2622; margin-bottom: 40px;">
-  <pre style="margin: 0; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.8; color: #d8d0c5; overflow-x: auto;"><span style="color: #7c746b;">$</span> npx tsx scripts/validate-ai-real.ts --repo shadcn-ui/ui --pr 1234</pre>
-</div>`
+${callout('LIMIT', 'The run used one macOS host and did not seed AI classifications. Treat model accuracy and cross-host consistency as unvalidated.')}`
 
 export const articles: Article[] = [
   { id: 'intro', label: 'Introduction', section: 'Getting Started', toc: ['Overview', 'Detect / Understand', 'Prerequisites', 'The pipeline'], html: introHtml },

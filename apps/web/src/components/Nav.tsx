@@ -13,18 +13,20 @@ const LINKS = [
 export function Nav({ active }: { active?: string }) {
   return (
     <nav
+      className="fg-nav"
       style={s(
         'position: sticky; top: 0; z-index: 50; background: rgba(13,12,11,0.82); backdrop-filter: blur(12px); border-bottom: 1px solid #211e1b;',
       )}
     >
       <div
+        className="fg-nav-inner"
         style={s(
           'max-width: 1200px; margin: 0 auto; padding: 0 28px; height: 64px; display: flex; align-items: center; justify-content: space-between;',
         )}
       >
         <Link
           to="/"
-          className="fg-link"
+          className="fg-link fg-nav-brand"
           style={s(
             'display: flex; align-items: center; gap: 11px; text-decoration: none; color: #f5f1ea;',
           )}
@@ -39,6 +41,7 @@ export function Nav({ active }: { active?: string }) {
           </span>
         </Link>
         <div
+          className="fg-nav-links"
           style={s(
             "display: flex; align-items: center; gap: 28px; font-family: 'JetBrains Mono', monospace; font-size: 13px;",
           )}
@@ -57,7 +60,7 @@ export function Nav({ active }: { active?: string }) {
           ))}
           <a
             href="https://github.com/ravidsrk/frontguard"
-            className="fg-btn-primary"
+            className="fg-btn-primary fg-nav-cta"
             style={s(
               'background: #e8862e; color: #0d0c0b; font-weight: 700; padding: 9px 16px; text-decoration: none;',
             )}

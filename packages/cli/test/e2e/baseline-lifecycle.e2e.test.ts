@@ -23,7 +23,7 @@ function runCli(args: string[], cwd: string): Promise<CliRun> {
   return new Promise((resolveRun, reject) => {
     const child = spawn(process.execPath, [cliBin, ...args], {
       cwd,
-      env: { ...process.env, NODE_ENV: 'test', FRONTGUARD_TELEMETRY: '0' },
+      env: { ...process.env, CI: 'false', NODE_ENV: 'test', FRONTGUARD_TELEMETRY: '0' },
     });
     let stdout = '';
     let stderr = '';
@@ -121,6 +121,22 @@ describe('built CLI baseline lifecycle', () => {
       '--threshold', '0.001',
       '--output', 'json',
     ];
+
+    const firstComparison = await runCli(commonArgs, repoDir);
+    expect(firstComparison.exitCode, firstComparison.stderr).toBe(1);
+    expect(parseResult(firstComparison).summary).toMatchObject({
+      total: 1,
+      newPages: 1,
+      regressions: 0,
+      errors: 0,
+    });
+    expect(() =>
+      execFileSync(
+        'git',
+        ['cat-file', '-e', 'frontguard-baselines:baselines/_root/375/chromium.png'],
+        { cwd: repoDir, stdio: 'ignore' },
+      ),
+    ).toThrow();
 
     const seed = await runCli([...commonArgs, '--update-baselines'], repoDir);
     expect(seed.exitCode, seed.stderr).toBe(0);

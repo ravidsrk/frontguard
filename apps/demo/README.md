@@ -1,20 +1,23 @@
 # Frontguard Demo
 
-A sample Next.js app pre-configured with [Frontguard](https://github.com/ravidsrk/frontguard) — the open-source, AI-powered visual regression testing tool. Every pull request is automatically screenshotted, diffed, and analyzed. You get a PR comment explaining exactly what changed in plain English.
+A small Next.js target application for exercising Frontguard against real routes.
+It is a test fixture, not evidence of a successful GitHub Action or PR comment.
 
-![Frontguard PR comment with visual diff](public/screenshot.png)
+No PR screenshot is included yet. The previous `public/screenshot.png` was a
+text placeholder, not captured output, so it has been removed.
 
 ---
 
-## Try it in 60 seconds
+## Run the target app
 
-1. **Fork this repo**
-2. Add your OpenAI key as a repo secret: `Settings → Secrets → OPENAI_API_KEY`
-3. **Make a CSS change** — edit a color, font size, or spacing in any page
-4. **Open a pull request** against `main`
-5. Watch the GitHub Action run → Frontguard posts a visual diff comment on your PR
+From the repository root:
 
-That's it. No test files to write. No config to tweak.
+```bash
+npm ci
+npm run dev --workspace=apps/demo
+```
+
+Open http://127.0.0.1:3000.
 
 ---
 
@@ -26,23 +29,41 @@ That's it. No test files to write. No config to tweak.
 | Pricing | `/pricing` | 3 pricing tier cards |
 | About | `/about` | Team section with avatars, company stats |
 
-Frontguard tests all 3 pages at **2 viewports** (375px mobile, 1440px desktop) on every PR.
+`frontguard.config.ts` selects all three pages at two viewports (375px mobile
+and 1440px desktop). The repository does not run this fixture on every PR.
 
 ---
 
-## Local development
+## Run the published CLI
+
+The latest registry-verified release is pinned below. In a second terminal,
+review the target, then explicitly create baselines:
 
 ```bash
-npm install
-npm run dev
-# Open http://localhost:3000
+npm exec --yes --package="@frontguard/cli@0.2.2" -- frontguard run \
+  --config apps/demo/frontguard.config.ts \
+  --update-baselines
+git push origin frontguard-baselines
 ```
 
-## Run Frontguard locally
+Subsequent comparisons are read-only:
 
 ```bash
-npx -p @frontguard/cli frontguard run --url http://localhost:3000
+npm exec --yes --package="@frontguard/cli@0.2.2" -- frontguard run \
+  --config apps/demo/frontguard.config.ts
 ```
+
+Baseline updates create commits on the separate `frontguard-baselines` branch.
+They are never enabled implicitly by the example workflow.
+
+## Manual workflow fixture
+
+`.github/workflows/frontguard-example.yml` is intentionally limited to
+`workflow_dispatch` and runs the CLI directly. It is not an Action acceptance
+test. Dispatch it with `update_baselines=true` once to seed the persisted branch,
+then with both inputs false for a comparison. Set only
+`negative_control=true` to inject a known 160px layout shift; that run succeeds
+only when Frontguard reports a regression.
 
 ---
 
@@ -53,7 +74,6 @@ See [`frontguard.config.ts`](./frontguard.config.ts) for the full config. Key se
 - **routes** — pages to screenshot
 - **viewports** — screen widths to test
 - **threshold** — pixel diff sensitivity (0.01 = strict)
-- **ai.provider** — `openai` or `anthropic` for visual analysis
 
 ---
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type {
   FrontguardConfig,
   Reporter,
@@ -8,6 +9,7 @@ import type {
 
 const mocks = vi.hoisted(() => ({
   renderPages: vi.fn(),
+  storageConstructor: vi.fn(),
   init: vi.fn(),
   writeBaseline: vi.fn(),
   readManifest: vi.fn(),
@@ -20,6 +22,9 @@ vi.mock('../../src/render/playwright.js', () => ({
 
 vi.mock('../../src/storage/git-orphan.js', () => ({
   GitOrphanStorage: class {
+    constructor(...args: unknown[]) {
+      mocks.storageConstructor(...args);
+    }
     init = mocks.init;
     writeBaseline = mocks.writeBaseline;
     readManifest = mocks.readManifest;
@@ -86,12 +91,24 @@ beforeEach(() => {
 });
 
 describe('updateBaselines', () => {
+  it('fails without creating storage when rendering captures nothing', async () => {
+    mocks.renderPages.mockResolvedValue([]);
+    const output = reporter();
+
+    await expect(updateBaselines(config(), output)).rejects.toThrow(
+      'Cannot update baselines: no screenshots were captured',
+    );
+    expect(mocks.init).not.toHaveBeenCalled();
+    expect(output.completed).not.toHaveBeenCalled();
+  });
+
   it('returns and reports a machine-readable result for updated baselines', async () => {
     const output = reporter();
 
     const result = await updateBaselines(config(), output);
 
     expect(result).toMatchObject({
+      baselineUpdate: true,
       summary: {
         total: 1,
         newPages: 1,
@@ -109,6 +126,11 @@ describe('updateBaselines', () => {
     });
     expect(output.completed).toHaveBeenCalledOnce();
     expect(output.completed).toHaveBeenCalledWith(result);
+    expect(mocks.storageConstructor).toHaveBeenCalledWith(process.cwd(), undefined, 'update');
+    const version = readFileSync(new URL('../../../../VERSION', import.meta.url), 'utf8').trim();
+    expect(mocks.writeManifest).toHaveBeenCalledWith(
+      expect.objectContaining({ createdBy: `frontguard@${version}` }),
+    );
   });
 
   it('fails the update when a baseline cannot be persisted', async () => {

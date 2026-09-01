@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.3 (unreleased)
+
+### Patch Changes
+
+- Harden baseline lifecycle, exit semantics, Action integration, reporter
+  composition, telemetry privacy, and public documentation for the next OSS
+  beta release.
+
 ## 0.2.2
 
 ### Patch Changes

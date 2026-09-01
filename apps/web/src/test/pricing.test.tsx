@@ -21,10 +21,10 @@ describe('/pricing', () => {
     setClipboard(undefined)
   })
 
-  it('renders three tier prices from the product floor', async () => {
+  it('renders the free CLI and clearly pre-release hosted tiers', async () => {
     await renderPricing()
     const prices = screen.getAllByTestId('tier-price').map((el) => el.textContent)
-    expect(prices).toEqual(['$0', '$29', "Let's talk"])
+    expect(prices).toEqual(['$0', 'Waitlist', 'Design partner'])
   })
 
   it('renders floor-correct CTAs with external-link hygiene', async () => {
@@ -50,9 +50,10 @@ describe('/pricing', () => {
     expect(contact).toHaveAttribute('target', '_blank')
   })
 
-  it('flags Pro as most popular', async () => {
+  it('flags the hosted tier as pre-release', async () => {
     await renderPricing()
-    expect(screen.getByText(/most popular/i)).toBeInTheDocument()
+    expect(screen.getByText(/^pre-release$/i)).toBeInTheDocument()
+    expect(screen.queryByText(/most popular/i)).not.toBeInTheDocument()
   })
 
   it('renders all eight FAQ questions as native details accordions', async () => {
@@ -81,7 +82,7 @@ describe('/pricing', () => {
     const row = within(matrix).getByText('Production monitoring scheduler').closest('[data-testid="matrix-row"]')
     expect(row?.textContent).toContain('CLI')
     expect(row?.textContent).toContain('—')
-    expect(row?.textContent).toContain('✓')
+    expect(row?.textContent).toContain('Planned')
   })
 
   it('copies the install command from the CTA band', async () => {

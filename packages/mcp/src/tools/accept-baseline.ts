@@ -1,7 +1,7 @@
 /**
- * `accept_baseline` — promote a run's current screenshots to the new
- * baseline. Mirrors `POST /v1/baselines/:runId/approve`, which is
- * run-scoped: every diff in the run is promoted together.
+ * `accept_baseline` records whole-run approval through
+ * `POST /v1/baselines/:runId/approve`. The cloud endpoint does not yet
+ * promote screenshots to baseline records.
  *
  * @module tools/accept-baseline
  */
@@ -14,12 +14,12 @@ export const acceptBaselineInputSchema = {
     .string()
     .min(3)
     .describe(
-      'Frontguard run id to approve (e.g. `run_abc123` from `list_regressions` or `recent_runs`). Approval is run-scoped — every screenshot in the run is promoted.',
+      'Frontguard run id to approve (e.g. `run_abc123` from `list_regressions` or `recent_runs`). Approval is run-scoped but does not yet promote screenshots.',
     ),
   confirm_all_regressions_reviewed: z
     .literal(true)
     .describe(
-      'Must be `true`. Set only after you have reviewed every regression returned by `list_regressions` for this run — the cloud-api promotes the entire run, not individual diffs.',
+      'Must be `true`. Set only after you have reviewed every regression returned by `list_regressions` for this run. The cloud API records whole-run approval only.',
     ),
 } as const;
 

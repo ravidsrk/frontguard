@@ -35,7 +35,7 @@ packages/
 │   ├── src/sandbox/              # Local + Daytona fix-verification sandboxes
 │   ├── src/plugins/              # accessibility, perf-budgets, third-party, monitor, figma
 │   ├── src/storage/              # Baseline orphan branch + fix-pattern DB
-│   ├── docker/                   # Pinned cross-OS render image (Dockerfile + compose)
+│   ├── docker/                   # Pinned render environment (Dockerfile + compose)
 │   └── bin/frontguard-render     # Thin render binary used by the Daytona sandbox
 ├── cloud-api/                    # @frontguard/cloud-api — Cloudflare Workers + Hono + D1 + R2
 ├── playwright/                   # @frontguard/playwright — Playwright plugin

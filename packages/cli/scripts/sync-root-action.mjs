@@ -15,6 +15,8 @@ const repoRoot = join(here, '../../..');
 const templatePath = join(repoRoot, 'packages/cli/action.template.yml');
 const canonicalPath = join(repoRoot, 'packages/cli/action.yml');
 const rootPath = join(repoRoot, 'action.yml');
+const actionRunnerPath = join(repoRoot, 'packages/cli/action-run.sh');
+const rootActionRunnerPath = join(repoRoot, 'action-run.sh');
 const dockerfilePath = join(repoRoot, 'packages/cli/Dockerfile');
 
 const version = readFileSync(join(repoRoot, 'VERSION'), 'utf8').trim();
@@ -43,14 +45,13 @@ const header = `# Repo-root composite-action shim.
 # GitHub resolves \`uses: <owner>/<repo>@<ref>\` against an \`action.yml\` at the
 # repository ROOT — it does NOT honour a sub-path \`action.yml\` by default. The
 # canonical manifest lives at \`packages/cli/action.yml\`; this root shim mirrors
-# it byte-for-byte (same inputs, outputs, and steps) so that
-# \`uses: ravidsrk/frontguard@v0\` resolves end-to-end.
+# it byte-for-byte (same inputs, outputs, and steps). The mutable public \`v0\`
+# reference remains pre-release until its external consumer smoke passes.
 #
 # Why the steps are duplicated rather than delegated via \`uses: ./packages/cli\`:
 # a local-path \`uses:\` inside a composite action is resolved against the
 # CONSUMER's checkout, which will not contain \`packages/cli\`. Re-implementing
-# the steps here is the only form that works for an external consumer pinning
-# \`ravidsrk/frontguard@v0\`.
+# the steps here is the form intended for a future validated external consumer.
 #
 # GENERATED BODY — do not edit the steps below. Edit \`packages/cli/action.template.yml\`
 # and run \`node packages/cli/scripts/sync-root-action.mjs\`.
@@ -61,6 +62,7 @@ const header = `# Repo-root composite-action shim.
 `;
 
 writeFileSync(rootPath, `${header}\n${canonicalBody}`);
+writeFileSync(rootActionRunnerPath, readFileSync(actionRunnerPath, 'utf8'));
 
 let dockerfile = readFileSync(dockerfilePath, 'utf8');
 dockerfile = dockerfile.replace(
@@ -69,4 +71,4 @@ dockerfile = dockerfile.replace(
 );
 writeFileSync(dockerfilePath, dockerfile);
 
-console.log(`Synced action manifests and Dockerfile to @frontguard/cli@${version}`);
+console.log(`Synced action manifests, runner, and Dockerfile to @frontguard/cli@${version}`);

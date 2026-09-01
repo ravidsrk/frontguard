@@ -15,6 +15,9 @@ interface DiscoveryManifest {
   package: {
     name: string;
   };
+  api: {
+    baseUrl: string;
+  };
   tools: ManifestTool[];
 }
 
@@ -121,7 +124,8 @@ describe('web MCP discovery manifest', () => {
     expect(manifest.name).toBe(source.serverName);
     expect(manifest.version).toBe(source.serverVersion);
     expect(manifest.package.name).toBe(source.serverName);
-    expect(JSON.stringify(manifest)).toContain('api.frontguard.dev');
+    expect(manifest.api.baseUrl).toBe('https://your-frontguard-api.example.com');
+    expect(JSON.stringify(manifest)).not.toContain('api.frontguard.dev');
 
     const manifestTools = new Map(
       manifest.tools.map((tool) => [tool.name, tool.description] as const),

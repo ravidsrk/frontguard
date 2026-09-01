@@ -16,7 +16,7 @@ import { buildSeoHead } from "../lib/seo";
 
 const SEO_TITLE = "Frontguard — Catch the regression, not the noise";
 const SEO_DESCRIPTION =
-  "AI-powered visual regression testing. AI vision tells a real regression from an intentional change or content, so a red run means something again. Open-source CLI under MIT.";
+  "Open-source visual regression testing with local pixel comparison and optional model-assisted analysis. MIT-licensed CLI.";
 
 const SOFTWARE_JSON_LD = {
   "@context": "https://schema.org",
@@ -26,7 +26,7 @@ const SOFTWARE_JSON_LD = {
   applicationSubCategory: "Testing Tool",
   operatingSystem: "Linux, macOS, Windows",
   description:
-    "AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.",
+    "Open-source frontend visual regression testing with optional model-assisted review.",
   url: "https://frontguard.dev",
   license: "https://opensource.org/licenses/MIT",
   downloadUrl: "https://www.npmjs.com/package/@frontguard/cli",
@@ -43,13 +43,6 @@ const SOFTWARE_JSON_LD = {
       price: "0",
       priceCurrency: "USD",
       description: "MIT-licensed CLI. Bring your own OpenAI or Anthropic key.",
-    },
-    {
-      "@type": "Offer",
-      name: "Pro",
-      price: "29",
-      priceCurrency: "USD",
-      description: "Hosted cloud, team baselines, history, flake-score badges.",
     },
   ],
 };
@@ -81,22 +74,22 @@ const stages = [
   {
     num: "03",
     title: "Render",
-    desc: "Playwright × viewports × browsers. Anti-flake multi-render.",
+    desc: "Playwright × viewports × browsers, with configurable multi-render consensus.",
   },
   {
     num: "04",
     title: "Diff",
-    desc: "pixelmatch fast gate, then DOM + computed-style diff.",
+    desc: "Pixel comparison with an SSIM fallback for perceptual matching.",
   },
   {
     num: "05",
     title: "Analyze",
-    desc: "AI vision classifies, explains, and scores confidence.",
+    desc: "Optional BYOK analysis classifies, explains, and scores confidence.",
   },
   {
     num: "06",
     title: "Report",
-    desc: "Console, JSON, HTML, and a GitHub PR comment with diffs.",
+    desc: "Console, JSON, and an HTML artifact with visual evidence.",
   },
 ];
 
@@ -143,8 +136,8 @@ const features = [
   },
   {
     tag: "REPORT",
-    title: "PR thumbnails",
-    desc: "Baseline / current / diff images embedded right in the PR comment.",
+    title: "Inspectable reports",
+    desc: "Baseline, current, and diff images stay available in the local HTML artifact.",
   },
 ];
 
@@ -168,29 +161,29 @@ const comparison = [
   {
     cap: "AI change classification",
     fg: "✓",
+    percy: "◐",
+    chromatic: "✕",
+    backstop: "✕",
+    lostpixel: "✕",
+  },
+  {
+    cap: "Experimental fix verification",
+    fg: "◐",
     percy: "✕",
     chromatic: "✕",
     backstop: "✕",
     lostpixel: "✕",
   },
   {
-    cap: "AI fix verification",
-    fg: "✓",
-    percy: "✕",
-    chromatic: "✕",
-    backstop: "✕",
-    lostpixel: "✕",
-  },
-  {
-    cap: "Anti-flake rendering",
-    fg: "✓",
+    cap: "Configurable multi-render consensus",
+    fg: "◐",
     percy: "◐",
     chromatic: "◐",
     backstop: "✕",
     lostpixel: "✕",
   },
   {
-    cap: "Self-hostable",
+    cap: "Runs without a hosted service",
     fg: "✓",
     percy: "✕",
     chromatic: "✕",
@@ -200,10 +193,10 @@ const comparison = [
   {
     cap: "Free tier",
     fg: "Forever",
-    percy: "Trial",
-    chromatic: "Hobby",
+    percy: "5k/mo",
+    chromatic: "5k/mo",
     backstop: "Free",
-    lostpixel: "✕",
+    lostpixel: "Sunset",
   },
 ];
 
@@ -228,37 +221,37 @@ const honest = [
   {
     label: "YOU BRING THE KEY",
     color: "#e8862e",
-    body: "AI runs on your own OpenAI or Anthropic key, so you pay per judged diff. The anti-flake gate keeps ~90% of pages away from the model — the bill stays small, and your screenshots never touch a server we run.",
+    body: "AI is optional and uses your selected OpenAI or Anthropic account. Changed screenshots go directly to that provider, not through a Frontguard proxy; leave AI disabled for a fully local run.",
   },
   {
     label: "YOU STAY IN THE LOOP",
     color: "#4fb477",
-    body: "Vision models misjudge edge cases. Frontguard never silently auto-approves — every classification and every fix is yours to accept or reject, and that feedback trains the local fix-pattern database.",
+    body: "High-confidence intentional classifications automatically downgrade regressions to warnings. With fix verification enabled, a verified fix is automatically recorded as an accepted local fix-pattern signal. Neither behavior updates baselines; review model output and patches.",
   },
   {
     label: "NUMBERS, NOT CLAIMS",
     color: "#5b8def",
-    body: "It's young. We validate against real, live repositories and publish real false-positive rates rather than asserting accuracy. Trust is earned — tell us where the classifier gets it wrong.",
+    body: "It's young. We publish the validation harness, including repository boot failures and the fact that the current run did not measure AI accuracy. Trust starts with visible limits.",
   },
 ];
 
 const stats = [
   {
-    v: "~40%",
+    v: "39 / 43",
     c: "#e8862e",
-    d: "of visual-diff runs fail for reasons that aren't real bugs",
+    d: "route rechecks completed in the published local harness",
   },
   {
-    v: "73%",
+    v: "2 / 5",
     c: "#f5f1ea",
-    d: "of teams have lost faith in test automation to flake",
+    d: "fixture repositories booted successfully",
   },
   {
-    v: "<10%",
+    v: "AI OFF",
     c: "#f5f1ea",
-    d: "of frontend teams run visual regression testing at all",
+    d: "classifier accuracy was not measured in that run",
   },
-  { v: "$100M", c: "#f5f1ea", d: "a single mobile CSS bug cost on Prime Day" },
+  { v: "1 HOST", c: "#f5f1ea", d: "macOS only; cross-OS equivalence remains unproven" },
 ];
 
 const pillars = [
@@ -266,19 +259,19 @@ const pillars = [
     n: "01 / DETECT",
     c: "#4fb477",
     h: "Find what changed",
-    p: "Pixel diff plus DOM and computed-style diff across every viewport and browser — catching what humans miss. Multi-render consensus kills the flaky-screenshot noise.",
+    p: "Pixel comparison across configured viewports and browsers, with masks, thresholds, and optional multi-render consensus to control expected variation.",
   },
   {
     n: "02 / UNDERSTAND",
     c: "#e8862e",
     h: "Explain why it broke",
-    p: "AI vision classifies every diff — regression, intentional, or content update — maps it to the exact code change, and explains the root cause in plain language.",
+    p: "When configured, model-assisted analysis classifies changed screenshots and returns a confidence-scored explanation for human review.",
   },
   {
     n: "03 / FIX",
     c: "#5b8def",
     h: "Verified, not guessed",
-    p: "Generate a fix, apply it, re-render, and compare again. Only fixes that provably resolve the regression are suggested — no hallucinated guesses.",
+    p: "Experimental CSS suggestions can be generated and, with a separate verification opt-in, applied in a sandbox and re-rendered. Unverified suggestions remain labeled as such.",
   },
 ];
 
@@ -294,17 +287,18 @@ const TERMINAL_HTML = `<span style="color: #e8862e;">🔍 Discovering routes...<
 <span style="color: #3b3531;">───────────────────────────────────</span>
 <span style="color: #e5484d;">1 regression</span> · <span style="color: #e8862e;">1 warning</span> · <span style="color: #4fb477;">9 passed</span> · <span style="color: #5b8def;">1 new</span><span style="display: inline-block; width: 8px; height: 15px; background: #e8862e; vertical-align: -2px; margin-left: 4px; animation: fg-blink 1.1s step-end infinite;"></span>`;
 
-const CLI_HTML = `<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard run \\
-    --url http://localhost:3000
+const CLI_HTML = `<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard run
 
 <span style="color: #4fb477;">  ✓ 11 passed</span>   <span style="color: #e5484d;">✘ 1 regression</span>
 <span style="color: #564f48;">  AI: "submit button lost its background"</span>`;
 
-const PW_HTML = `<span style="color: #c678dd;">import</span> { expectVisual } <span style="color: #c678dd;">from</span> <span style="color: #98c379;">'@frontguard/playwright'</span>;
+const PW_HTML = `<span style="color: #c678dd;">import</span> { test, expect } <span style="color: #c678dd;">from</span> <span style="color: #98c379;">'@playwright/test'</span>;
+<span style="color: #c678dd;">import</span> { visualTest } <span style="color: #c678dd;">from</span> <span style="color: #98c379;">'@frontguard/playwright'</span>;
 
 test(<span style="color: #98c379;">'home page'</span>, <span style="color: #c678dd;">async</span> ({ page }) => {
   <span style="color: #c678dd;">await</span> page.goto(<span style="color: #98c379;">'/'</span>);
-  <span style="color: #c678dd;">await</span> expectVisual(page);
+  <span style="color: #c678dd;">const</span> result = <span style="color: #c678dd;">await</span> visualTest(page, <span style="color: #98c379;">'home-page'</span>);
+  expect(result.passed).toBe(<span style="color: #56b6c2;">true</span>);
 });`;
 
 const CONFIG_HTML = `<span style="color: #c678dd;">export default</span> {
@@ -351,16 +345,17 @@ const INSTALL_TABS: InstallTab[] = [
   {
     id: "cli",
     label: "CLI",
-    filename: "Terminal",
-    code: "npm install @frontguard/cli\nnpx -p @frontguard/cli frontguard init\nnpx -p @frontguard/cli frontguard run --url http://localhost:3000",
+    filename: "Frontguard terminal",
+    code: "npx -p @frontguard/cli frontguard doctor\nnpx -p @frontguard/cli frontguard update-baselines\ngit push origin frontguard-baselines\nnpx -p @frontguard/cli frontguard run",
     render: (
       <>
-        <span style={s("color: #7c746b;")}>$ </span>npm install @frontguard/cli
-        {"\n"}
         <span style={s("color: #7c746b;")}>$ </span>npx -p @frontguard/cli
-        frontguard init{"\n"}
+        frontguard doctor{"\n"}
         <span style={s("color: #7c746b;")}>$ </span>npx -p @frontguard/cli
-        frontguard run --url http://localhost:3000
+        frontguard update-baselines{"\n"}
+        <span style={s("color: #7c746b;")}>$ </span>git push origin frontguard-baselines{"\n"}
+        <span style={s("color: #7c746b;")}>$ </span>npx -p @frontguard/cli
+        frontguard run
       </>
     ),
   },
@@ -378,34 +373,17 @@ const INSTALL_TABS: InstallTab[] = [
   },
   {
     id: "github",
-    label: "GitHub Action",
-    filename: ".github/workflows/visual.yml",
-    code: [
-      "- name: Frontguard",
-      "  uses: ravidsrk/frontguard@v0",
-      "  with:",
-      "    url: ${{ steps.preview.outputs.url }}",
-      "  env:",
-      "    FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_KEY }}",
-      "    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}",
-    ].join("\n"),
+    label: "Action (pre-release)",
+    filename: "External consumer smoke pending",
+    code: "# External Action smoke is still pending.\n# Use the generated CLI workflow for now.",
     render: (
       <>
-        <span style={s("color: #564f48;")}>- </span>name:{" "}
-        <span style={s("color: #98c379;")}>Frontguard</span>
-        {"\n  "}uses:{" "}
-        <span style={s("color: #98c379;")}>ravidsrk/frontguard@v0</span>
-        {"\n  "}with:
-        {"\n    "}url:{" "}
-        <span style={s("color: #e8862e;")}>
-          {"${{ steps.preview.outputs.url }}"}
+        <span style={s("color: #8c847a;")}>
+          # External Action smoke is still pending.
         </span>
-        {"\n  "}env:
-        {"\n    "}FRONTGUARD_OPENAI_KEY:{" "}
-        <span style={s("color: #e8862e;")}>{"${{ secrets.OPENAI_KEY }}"}</span>
-        {"\n    "}GITHUB_TOKEN:{" "}
-        <span style={s("color: #e8862e;")}>
-          {"${{ secrets.GITHUB_TOKEN }}"}
+        {"\n"}
+        <span style={s("color: #8c847a;")}>
+          # Use the generated CLI workflow for now.
         </span>
       </>
     ),
@@ -477,6 +455,14 @@ function InstallTabs() {
           );
         })}
       </div>
+      <p
+        style={s(
+          `font-family: ${MONO}; font-size: 12px; line-height: 1.6; color: #8c847a; margin: 12px 0 0;`,
+        )}
+      >
+        External Action smoke is still pending. No public copy-ready workflow is
+        available yet.
+      </p>
       <div
         role="tabpanel"
         id={`panel-${tab.id}`}
@@ -484,6 +470,19 @@ function InstallTabs() {
         tabIndex={0}
         style={s("margin-top: 16px;")}
       >
+        {tab.id === "cli" && (
+          <p
+            style={s(
+              `font-family: ${MONO}; font-size: 12.5px; line-height: 1.7; color: #8c847a; margin: 0 0 14px;`,
+            )}
+          >
+            Setup once with <code>npm install @frontguard/cli</code> and{" "}
+            <code>npx -p @frontguard/cli frontguard init</code>. Start your app
+            in another terminal with its dev-server command, such as{" "}
+            <code>npm run dev</code>, leave it running, and wait for the generated
+            config <code>baseUrl</code> before using the Frontguard terminal below.
+          </p>
+        )}
         <div
           style={s(
             "background: #121110; border: 1px solid #2a2622; box-shadow: 0 20px 50px rgba(0,0,0,0.4);",
@@ -761,6 +760,7 @@ function Home() {
         )}
       >
         <div
+          className="fg-responsive-grid"
           style={s(
             "display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center;",
           )}
@@ -776,7 +776,7 @@ function Home() {
                   "display: inline-block; width: 6px; height: 6px; background: #e8862e; animation: fg-pulse 2s ease-in-out infinite;",
                 )}
               />
-              open source · MIT · self-hostable
+              open source · MIT · runs locally
             </div>
             <h1
               style={s(
@@ -792,9 +792,8 @@ function Home() {
                 "font-size: 18px; line-height: 1.55; color: #b8b0a6; margin: 0 0 32px; max-width: 490px;",
               )}
             >
-              Teams add visual regression tests — then mute the channel they
-              post to, because ~40% of failures aren't real bugs. Frontguard
-              uses AI vision to label every diff a{" "}
+              Noisy screenshot checks lose trust quickly. Frontguard starts with
+              deterministic pixel comparison and can use optional AI to label a changed screenshot as a{" "}
               <em style={s("color: #f5f1ea; font-style: normal;")}>
                 regression
               </em>
@@ -804,7 +803,7 @@ function Home() {
               </em>
               , or{" "}
               <em style={s("color: #f5f1ea; font-style: normal;")}>content</em>{" "}
-              — so a red run means something again.
+              , with confidence and an explanation for human review.
             </p>
 
             <div
@@ -924,23 +923,8 @@ function Home() {
                   "margin: 0; font-size: 13.5px; line-height: 1.55; color: #d8d0c5;",
                 )}
               >
-                "The sidebar overlaps main content on mobile. A{" "}
-                <span
-                  style={s(
-                    "color: #e8862e; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;",
-                  )}
-                >
-                  flex-direction
-                </span>{" "}
-                change in{" "}
-                <span
-                  style={s(
-                    "color: #f5f1ea; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;",
-                  )}
-                >
-                  Dashboard.module.css:28
-                </span>{" "}
-                removed column stacking."
+                "The current 375px screenshot shows the sidebar overlapping
+                the main content; the baseline keeps both regions separate."
               </p>
             </div>
           </div>
@@ -954,6 +938,7 @@ function Home() {
         )}
       >
         <div
+          className="fg-responsive-grid"
           style={s(
             "max-width: 1200px; margin: 0 auto; padding: 52px 28px; display: grid; grid-template-columns: 1.1fr 1fr; gap: 56px; align-items: center;",
           )}
@@ -971,9 +956,9 @@ function Home() {
                 "font-size: 24px; line-height: 1.45; color: #f5f1ea; margin: 0; font-weight: 500; letter-spacing: -0.01em;",
               )}
             >
-              Everyone adds visual regression tests. Then everyone{" "}
+              Visual regression checks only help while their output remains{" "}
               <span style={s("color: #e8862e;")}>
-                mutes the channel they post to.
+                specific and inspectable.
               </span>
             </p>
             <p
@@ -981,10 +966,10 @@ function Home() {
                 "font-size: 15px; line-height: 1.6; color: #b8b0a6; margin: 20px 0 0;",
               )}
             >
-              Around 40% of pixel-diff runs go red for things that aren't real
-              bugs — a 2px font shift, a changed date, a lazy image. Once a red
-              run usually means nothing, the tool is dead — worse than no tests.
-              That's the problem Frontguard exists to solve.
+              Frontguard exposes masks, thresholds, configurable multi-render
+              consensus, and optional model-assisted classification. The
+              published harness below reports both successful route checks and
+              repository boot failures; it does not claim measured AI accuracy.
             </p>
           </div>
           <div
@@ -1028,6 +1013,7 @@ function Home() {
           Not just "pixels differ." Detect, understand, fix.
         </h2>
         <div
+          className="fg-responsive-grid"
           style={s(
             "display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;",
           )}
@@ -1088,6 +1074,7 @@ function Home() {
           format, no test files to port.
         </p>
         <div
+          className="fg-responsive-grid"
           style={s("display: grid; grid-template-columns: 1fr 1fr; gap: 20px;")}
         >
           <div
@@ -1187,16 +1174,16 @@ function Home() {
             "font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 14px;",
           )}
         >
-          Six stages, fully self-hostable.
+          Six local stages, no Frontguard account required.
         </h2>
         <p
           style={s(
             "font-size: 16px; color: #b8b0a6; margin: 0 0 44px; max-width: 580px;",
           )}
         >
-          Each stage is independent with error boundaries — one page failing
-          doesn't kill the run. A fast pixel gate means ~90% of pages never hit
-          the AI.
+          One page failing does not stop the remaining comparisons. AI is
+          optional and runs only for changed screenshots when you configure a
+          provider.
         </p>
         <div
           style={s(
@@ -1242,8 +1229,9 @@ function Home() {
           style={s("max-width: 1200px; margin: 0 auto; padding: 84px 28px;")}
         >
           <div
-            style={s(
-              "display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 56px; align-items: center;",
+          className="fg-responsive-grid"
+          style={s(
+            "display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 56px; align-items: center;",
             )}
           >
             <div>
@@ -1253,16 +1241,16 @@ function Home() {
                   "font-size: 36px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;",
                 )}
               >
-                Kills the #1 pain of visual testing: false positives.
+                Optional model-assisted classification for visual diffs.
               </h2>
               <p
                 style={s(
                   "font-size: 15.5px; line-height: 1.6; color: #b8b0a6; margin: 0 0 24px;",
                 )}
               >
-                A diff isn't a bug. Frontguard tells a regression apart from an
-                intentional redesign, so your suite stops crying wolf — and
-                teams stop disabling it.
+                When configured, Frontguard asks your selected model to classify a
+                changed screenshot and explain its output. Published validation has
+                not measured model accuracy, so inspect each result before relying on it.
               </p>
               <ul
                 style={s(
@@ -1320,27 +1308,16 @@ function Home() {
                     "margin: 0; font-size: 13.5px; line-height: 1.55; color: #c8c0b6;",
                   )}
                 >
-                  "The sidebar overlaps the main content on mobile. A
-                  flex-direction change in{" "}
-                  <span
-                    style={s(
-                      `color: #e8862e; font-family: ${MONO}; font-size: 12.5px;`,
-                    )}
-                  >
-                    Dashboard.module.css:28
-                  </span>{" "}
-                  removed the column stacking."
+                  "The current 375px screenshot shows the sidebar overlapping
+                  the main content; the baseline keeps both regions separate."
                 </p>
                 <div
                   style={s(
                     `margin-top: 12px; padding-top: 12px; border-top: 1px solid #2a1818; font-family: ${MONO}; font-size: 12px; color: #8c847a;`,
                   )}
                 >
-                  Suggested fix: restore{" "}
-                  <span style={s("color: #4fb477;")}>
-                    flex-direction: column
-                  </span>{" "}
-                  at the &lt; 768px breakpoint.
+                  Guidance: review responsive stacking at the &lt; 768px
+                  viewport.
                 </div>
               </div>
               <div
@@ -1397,6 +1374,7 @@ function Home() {
           CLI-first. Zero dashboards required.
         </h2>
         <div
+          className="fg-responsive-grid"
           style={s(
             "display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #211e1b; border: 1px solid #211e1b;",
           )}
@@ -1436,6 +1414,7 @@ function Home() {
       {/* ============ CONFIG ============ */}
       <section style={s("border-top: 1px solid #211e1b; background: #100f0e;")}>
         <div
+          className="fg-responsive-grid"
           style={s(
             "max-width: 1200px; margin: 0 auto; padding: 84px 28px; display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 48px; align-items: center;",
           )}
@@ -1543,7 +1522,7 @@ function Home() {
             "font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 40px;",
           )}
         >
-          The only one with AI fix verification.
+          Experimental CSS suggestion verification, clearly labeled.
         </h2>
         <div style={s("border: 1px solid #2a2622; overflow-x: auto;")}>
           <table
@@ -1657,15 +1636,15 @@ function Home() {
                 "font-size: 22px; color: #f5f1ea; margin: 0; font-weight: 600; letter-spacing: -0.01em;",
               )}
             >
-              Extensible by design — 5 built-in plugins, 6 lifecycle hooks
+              Extensible by design — 5 built-in plugins, 9 lifecycle hooks
             </h3>
             <code
               style={s(
                 `font-family: ${MONO}; font-size: 12px; color: #8c847a;`,
               )}
             >
-              beforeDiscover · afterDiscover · afterRender · afterCompare ·
-              afterRun · onError
+              setup · beforeDiscover · afterDiscover · beforeRender · afterRender ·
+              afterCompare · afterRun · onError · teardown
             </code>
           </div>
           <div
@@ -1719,6 +1698,7 @@ function Home() {
           bullets — here's exactly where the edges are.
         </p>
         <div
+          className="fg-responsive-grid"
           style={s(
             "display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;",
           )}
@@ -1774,8 +1754,8 @@ function Home() {
               "font-size: 17px; color: #b8b0a6; margin: 0 auto 34px; max-width: 480px; line-height: 1.55;",
             )}
           >
-            Free forever. No per-screenshot pricing cliff, no dashboard lock-in.
-            Install it and run your first check in two minutes.
+            The local CLI is free under MIT. Start your app, review and accept baselines
+            explicitly, then run comparisons.
           </p>
           <div
             style={s(

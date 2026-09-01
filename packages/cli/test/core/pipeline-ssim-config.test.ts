@@ -4,6 +4,8 @@ import type { DiffResult, FrontguardConfig, Reporter, ScreenshotResult } from '.
 const mocks = vi.hoisted(() => ({
   renderPages: vi.fn(),
   compareScreenshot: vi.fn(),
+  analyzeWithAI: vi.fn(),
+  storageConstructor: vi.fn(),
   init: vi.fn(),
   readBaseline: vi.fn(),
 }));
@@ -13,8 +15,12 @@ vi.mock('../../src/diff/pixel.js', () => ({
   compareScreenshot: mocks.compareScreenshot,
   createNewPageResult: vi.fn(),
 }));
+vi.mock('../../src/diff/ai-vision.js', () => ({ analyzeWithAI: mocks.analyzeWithAI }));
 vi.mock('../../src/storage/git-orphan.js', () => ({
   GitOrphanStorage: class {
+    constructor(...args: unknown[]) {
+      mocks.storageConstructor(...args);
+    }
     init = mocks.init;
     readBaseline = mocks.readBaseline;
   },
@@ -80,9 +86,30 @@ beforeEach(() => {
     status: 'regression',
     diffPercentage: 4,
   } satisfies DiffResult);
+  mocks.analyzeWithAI.mockResolvedValue({
+    classification: 'regression',
+    explanation: 'Visual regression',
+    severity: 'critical',
+    confidence: 0.9,
+  });
 });
 
 describe('pipeline SSIM configuration', () => {
+  it('initializes comparison storage in compare mode', async () => {
+    await runPipeline(config(), reporter());
+
+    expect(mocks.storageConstructor).toHaveBeenCalledWith(process.cwd(), undefined, 'compare');
+  });
+
+  it('propagates baseline initialization failures before reading screenshots', async () => {
+    mocks.init.mockRejectedValue(new Error('origin/frontguard-baselines is unavailable'));
+
+    await expect(runPipeline(config(), reporter())).rejects.toThrow(
+      'origin/frontguard-baselines is unavailable',
+    );
+    expect(mocks.readBaseline).not.toHaveBeenCalled();
+  });
+
   it('forwards the public SSIM controls to the comparison engine', async () => {
     await runPipeline(config(), reporter());
 
@@ -92,6 +119,25 @@ describe('pipeline SSIM configuration', () => {
       Buffer.from('baseline'),
       0.03,
       { enabled: false, ssimThreshold: 0.91 },
+    );
+  });
+
+  it('turns rejected AI analysis into a reported tool error', async () => {
+    mocks.analyzeWithAI.mockRejectedValue(new Error('provider unavailable'));
+    const aiConfig = config();
+    aiConfig.ai = { provider: 'openai', model: 'gpt-4o' };
+    const output = reporter();
+
+    const result = await runPipeline(aiConfig, output);
+
+    expect(result.diffs[0]).toMatchObject({
+      status: 'error',
+      error: 'AI analysis failed: provider unavailable',
+    });
+    expect(result.summary.errors).toBe(1);
+    expect(output.onStageComplete).toHaveBeenCalledWith(
+      'analyze',
+      expect.stringContaining('1 failed'),
     );
   });
 

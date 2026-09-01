@@ -661,6 +661,8 @@ export interface PerfReport {
 }
 
 export interface RunResult {
+  /** True when this result records an explicit baseline-update operation. */
+  baselineUpdate?: boolean;
   /** Aggregate summary counts. */
   summary: {
     /** Total number of route × viewport × browser combinations tested. */
@@ -762,7 +764,7 @@ export interface Reporter {
   /** Called when a pipeline stage completes successfully. */
   onStageComplete(stage: PipelineStage, detail?: string): void;
   /** Called once after the entire pipeline finishes. */
-  onComplete(result: RunResult): void;
+  onComplete(result: RunResult): void | Promise<void>;
   /** Called on a fatal, unrecoverable pipeline error. */
   onError(error: Error): void;
 }

@@ -2,19 +2,18 @@
 # Frontguard render — docker-compose
 # =============================================================================
 #
-# This compose file is the supported way to run the Dockerized renderer
-# against a developer's local repo. It mounts the user's project at
+# This compose file is a repository-source workflow for the Dockerized renderer.
+# It mounts the Frontguard clone at
 # /workspace and forwards the AI provider keys the CLI needs to generate
 # fixes or run judge mode.
 #
 # Usage
 # -----
-#   # From your project root, where frontguard.config.ts lives:
-#   docker compose -f node_modules/@frontguard/cli/docker/docker-compose.yml \
-#     run --rm frontguard run --url http://host.docker.internal:3000
-#
-# Or from the Frontguard monorepo while developing:
-#   (cd packages/cli && npm pack && mv frontguard-cli-*.tgz docker/frontguard-cli.tgz)
+#   # From a clean Frontguard clone:
+#   npm ci
+#   npm run build --workspace=packages/cli
+#   npm pack ./packages/cli --pack-destination packages/cli/docker
+#   mv packages/cli/docker/frontguard-cli-*.tgz packages/cli/docker/frontguard-cli.tgz
 #   docker compose -f packages/cli/docker/docker-compose.yml build
 #   docker compose -f packages/cli/docker/docker-compose.yml run --rm frontguard \
 #     run --url http://host.docker.internal:3000
@@ -37,13 +36,13 @@
 
 services:
   frontguard:
-    # The image is not published to a registry yet — build it locally first:
-    #   docker build --platform linux/amd64 -t frontguard/render:latest ../packages/cli/docker
+    # The image is not published to a registry yet. Prepare frontguard-cli.tgz
+    # with the clean-clone recipe above, then build it locally:
+    #   docker build --platform linux/amd64 -t frontguard/render:0.2.3 packages/cli/docker
     # (or `docker compose ... build`, which uses the build: block below).
     image: frontguard/render:${FRONTGUARD_TAG:-latest}
-    # Pin the architecture so renders are byte-equivalent across an arm64-dev /
-    # amd64-CI fleet. Mirrors the `FROM --platform=linux/amd64` in the Dockerfile
-    # and the `--platform` the CLI injects into `docker run`.
+    # Pin the architecture to remove one source of render variance across an
+    # arm64-dev / amd64-CI fleet. This does not claim cross-host equivalence.
     platform: linux/amd64
     build:
       context: .
@@ -52,8 +51,7 @@ services:
       # comments for how to produce it.
     # The user's repo is mounted read-write so the renderer can write the
     # baseline/report directories. Bind-mounting (not a named volume) is
-    # important: byte-equivalent baselines only matter if they land back in
-    # the user's working tree.
+    # important: generated baselines must land back in the user's working tree.
     volumes:
       - ../../..:/workspace:rw
     working_dir: /workspace

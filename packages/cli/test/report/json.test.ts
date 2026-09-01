@@ -99,6 +99,18 @@ describe('JSONReporter', () => {
     spy.mockRestore();
   });
 
+  it('identifies explicit baseline-update results', () => {
+    const reporter = new JSONReporter();
+    const result = makeRunResult([makeDiff({ status: 'new' })], { baselineUpdate: true });
+
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    reporter.onComplete(result);
+    const parsed = JSON.parse(spy.mock.calls[0][0] as string);
+
+    expect(parsed.baselineUpdate).toBe(true);
+    spy.mockRestore();
+  });
+
   it('contains timing data', () => {
     const reporter = new JSONReporter();
     const result = makeRunResult([makeDiff()]);

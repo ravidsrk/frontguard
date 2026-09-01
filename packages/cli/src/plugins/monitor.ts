@@ -11,7 +11,7 @@
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, unlinkSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FrontguardPlugin, PluginContext } from '../core/plugins.js';
-import type { DiffResult, RunResult, FrontguardConfig, Route } from '../core/types.js';
+import type { DiffResult, RunResult, FrontguardConfig, Route, RouteEntry } from '../core/types.js';
 import { compareDiffToThreshold } from '../diff/threshold.js';
 
 // ---------------------------------------------------------------------------
@@ -48,7 +48,9 @@ export interface AlertEntry {
   diffPercentage: number;
   /** Alert threshold as a ratio (0-1). */
   threshold: number;
-  status: 'regression' | 'warning';
+  status: 'regression' | 'warning' | 'error';
+  /** Capture or tool error when status is `error`. */
+  error?: string;
 }
 
 export interface AlertPayload {
@@ -79,6 +81,17 @@ export function urlToSlug(url: string): string {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .toLowerCase();
+}
+
+/** Resolve config-backed route entries into absolute monitor URLs. */
+export function resolveMonitorUrls(
+  routes: RouteEntry[] | undefined,
+  baseUrl: string,
+): string[] {
+  const entries = routes && routes.length > 0 ? routes : [baseUrl];
+  return entries.map((entry) =>
+    new URL(typeof entry === 'string' ? entry : entry.path, baseUrl).href,
+  );
 }
 
 /**
@@ -223,17 +236,22 @@ export function createMonitorPlugin(config: MonitorConfig): FrontguardPlugin {
 
       for (const diff of diffs) {
         const url = diff.route.path;
-        const isAlert = compareDiffToThreshold(diff.diffPercentage, threshold) > 0;
+        const isError = diff.status === 'error' || Boolean(diff.error);
+        if (isError) diff.status = 'error';
+        const exceedsThreshold = compareDiffToThreshold(diff.diffPercentage, threshold) > 0;
+        const isAlert = isError || exceedsThreshold;
 
         if (isAlert) {
           alerts.push({
             url,
             diffPercentage: diff.diffPercentage,
             threshold,
-            status:
-              compareDiffToThreshold(diff.diffPercentage, threshold * 2) > 0
-                ? 'regression'
-                : 'warning',
+            status: isError
+              ? 'error'
+              : compareDiffToThreshold(diff.diffPercentage, threshold * 2) > 0
+                  ? 'regression'
+                  : 'warning',
+            error: isError ? diff.error : undefined,
           });
         }
 
@@ -243,7 +261,7 @@ export function createMonitorPlugin(config: MonitorConfig): FrontguardPlugin {
             url,
             timestamp: new Date().toISOString(),
             diffPercentage: diff.diffPercentage,
-            status: isAlert ? 'alert' : 'pass',
+            status: isError ? 'error' : isAlert ? 'alert' : 'pass',
           };
           saveHistoryEntry(config.historyDir, url, entry, maxHistory);
 

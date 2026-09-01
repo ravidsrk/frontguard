@@ -136,12 +136,37 @@ describe('runJudgePipeline', () => {
     expect(result.summary.regressions).toBe(0); // errors are not regressions
   });
 
+  it('turns rejected judge calls into errors instead of dropping them', async () => {
+    renderPages.mockResolvedValue([shot('/'), shot('/pricing')]);
+    judgeScreenshot
+      .mockResolvedValueOnce(verdict('/', true))
+      .mockRejectedValueOnce(new Error('provider unavailable'));
+
+    const result = await runJudgePipeline(makeConfig(), makeReporter());
+
+    expect(result.summary).toMatchObject({ total: 2, passed: 1, regressions: 0, errors: 1 });
+    expect(result.judgements).toContainEqual(
+      expect.objectContaining({
+        route: { path: '/pricing' },
+        pass: false,
+        error: 'Judge failed: provider unavailable',
+      }),
+    );
+  });
+
   it('returns an empty result when render captures nothing', async () => {
     renderPages.mockResolvedValue([]);
-    const result = await runJudgePipeline(makeConfig(), makeReporter());
+    const reporter = makeReporter();
+    let completed = false;
+    reporter.onComplete = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      completed = true;
+    };
+    const result = await runJudgePipeline(makeConfig(), reporter);
     expect(result.judgements).toHaveLength(0);
     expect(result.summary.total).toBe(0);
     expect(judgeScreenshot).not.toHaveBeenCalled();
+    expect(completed).toBe(true);
   });
 
   it('handles a render failure gracefully (empty result, no throw)', async () => {

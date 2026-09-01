@@ -1,50 +1,24 @@
 # Frontguard Demo Assets
 
-Reproducible demo recordings for the README and landing page.
+Pre-release launch assets for locations that expect a demo image.
 
-## Files
+`frontguard-demo.gif` is deliberately an illustrated gate card. It says that no
+recorded CLI run has been published; it is not terminal output and must not be
+used as execution evidence. `frontguard-demo.svg` is its editable source.
 
-| File | Description | How to regenerate |
-|------|-------------|-------------------|
-| `frontguard-demo.tape` | VHS tape file (source of truth) | edit this |
-| `frontguard-demo.gif` | Terminal recording for README | `vhs frontguard-demo.tape` |
-| `frontguard-report.mp4` | Screen recording of the HTML report | manual capture |
+The former VHS tape called `demo/scripts/fg-demo`, which printed invented happy
+path output instead of invoking Frontguard. Both files were removed so a
+synthetic transcript cannot be mistaken for a real run.
 
-## Regenerating the terminal recording
+## Promotion gate
 
-[VHS](https://github.com/charmbracelet/vhs) produces deterministic recordings from a tape file — no manual screen capture, no flaky timing.
+Replace the gate card only after all of these are true:
 
-```bash
-# Install VHS
-brew install vhs            # macOS
-go install github.com/charmbracelet/vhs@latest   # any platform
+1. A pinned public CLI runs against `apps/demo`.
+2. Reviewed baselines are present on `origin/frontguard-baselines`.
+3. An unchanged comparison passes.
+4. The opt-in negative control fails with a reported regression.
+5. The recording visibly identifies the CLI version and links to the retained
+   workflow run or report artifact.
 
-# Render the GIF (output path is set inside the tape)
-vhs demo/frontguard-demo.tape
-```
-
-The tape demonstrates the core flow:
-
-1. `frontguard init` — generates a framework-aware config
-2. `cat frontguard.config.ts` — shows the config
-3. `frontguard doctor` — verifies the environment
-4. `frontguard run` — runs visual regression tests
-5. AI classification output — the differentiator
-
-## Output formats
-
-VHS can emit GIF, MP4, or WebM from the same tape. Change the `Output` line in
-`frontguard-demo.tape`:
-
-```
-Output demo/frontguard-demo.gif
-Output demo/frontguard-demo.mp4
-Output demo/frontguard-demo.webm
-```
-
-## Constraints
-
-- Keep the GIF **under 2MB** so it loads fast above the README fold.
-- Keep total runtime **under ~20 seconds** — developers won't watch longer.
-- The HTML report screen recording (`frontguard-report.mp4`) is captured
-  manually since it shows a browser, not a terminal.
+Until then, this directory contains illustrative pre-release fixtures only.

@@ -122,10 +122,12 @@ describe('public SEO assets', () => {
     expect(fs.statSync(path.join(PUBLIC, 'og-image.png')).size).toBeGreaterThan(10_000)
     const llms = readPublic('llms.txt')
     expect(llms).toContain('https://frontguard.dev/docs')
-    expect(llms).toContain('ravidsrk/frontguard@v0')
+    expect(llms).not.toContain('uses: ravidsrk/frontguard@v0')
+    expect(llms).toContain('external consumer smoke')
     expect(llms).not.toContain('ravidsrk/frontguard@v1')
     const llmsFull = readPublic('llms-full.txt')
-    expect(llmsFull).toContain('ravidsrk/frontguard@v0')
+    expect(llmsFull).not.toContain('uses: ravidsrk/frontguard@v0')
+    expect(llmsFull).toContain('external consumer smoke')
     expect(llmsFull).not.toMatch(/ravidsrk\/frontguard@(v1|main)/)
 
     for (const surface of AGENT_SURFACES) {
@@ -135,7 +137,26 @@ describe('public SEO assets', () => {
       expect(fs.existsSync(path.join(PUBLIC, surface.file)), `${surface.file} should exist`).toBe(true)
     }
     expect(llms).toContain('@frontguard/mcp')
-    expect(llms).toContain('FRONTGUARD_API_URL=https://api.frontguard.dev')
+    expect(llms).toContain('no live default hosted endpoint')
+    expect(llms).not.toContain('FRONTGUARD_API_URL=https://api.frontguard.dev')
+
+    const mcp = JSON.parse(readPublic('.well-known/mcp.json')) as {
+      api: { baseUrl: string }
+      tools: Array<{ name: string; description: string }>
+    }
+    expect(mcp.api.baseUrl).toBe('https://your-frontguard-api.example.com')
+    expect(mcp.tools.find((tool) => tool.name === 'accept_baseline')?.description).toContain(
+      'not implemented',
+    )
+
+    const openapi = JSON.parse(readPublic('openapi.json')) as {
+      info: { description: string }
+      servers: Array<{ url: string }>
+    }
+    expect(openapi.info.description).toContain('No default hosted endpoint is live')
+    expect(openapi.servers).toEqual([
+      expect.objectContaining({ url: 'https://your-frontguard-api.example.com' }),
+    ])
   })
 
   it('robots.txt references the sitemap', () => {

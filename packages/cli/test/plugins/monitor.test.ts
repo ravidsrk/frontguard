@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -11,6 +11,7 @@ import {
   formatHistoryTable,
   createPollingController,
   runPollingLoop,
+  resolveMonitorUrls,
   type MonitorConfig,
   type AlertPayload,
   type HistoryEntry,
@@ -88,6 +89,7 @@ describe('createMonitorPlugin', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -227,6 +229,50 @@ describe('createMonitorPlugin', () => {
     expect(JSON.parse(readFileSync(join(historyDir, file), 'utf-8')).status).toBe('pass');
   });
 
+  it('records capture and tool errors as alerting errors even with a zero diff', async () => {
+    const historyDir = join(tempDir, 'history');
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const plugin = createMonitorPlugin({
+      urls: ['https://example.com'],
+      alertThreshold: 0.05,
+      alerts: { webhook: 'https://hooks.example.com/frontguard' },
+      historyDir,
+    });
+    const context = makeContext();
+    plugin.setup!(context);
+    const diffs = [
+      makeDiff({
+        status: 'pass',
+        diffPercentage: 0,
+        error: 'Render error: browser failed to launch',
+      }),
+    ];
+
+    plugin.afterCompare!(diffs, context);
+    await plugin.afterRun!(makeRunResult(diffs), context);
+
+    expect(diffs[0].status).toBe('error');
+    expect(context.metadata.get('monitor:alerts')).toEqual([
+      expect.objectContaining({
+        status: 'error',
+        diffPercentage: 0,
+        error: 'Render error: browser failed to launch',
+      }),
+    ]);
+    const historyFiles = readdirSync(join(historyDir, urlToSlug('https://example.com')));
+    const history = JSON.parse(readFileSync(join(historyDir, urlToSlug('https://example.com'), historyFiles[0]), 'utf-8'));
+    expect(history.status).toBe('error');
+
+    const webhookPayload = JSON.parse(fetchMock.mock.calls[0][1].body as string) as AlertPayload;
+    expect(webhookPayload.alerts[0].status).toBe('error');
+    expect(webhookPayload.summary).toEqual({ total: 1, passed: 0, alerted: 1 });
+
+    const summary = JSON.parse(readFileSync(join(historyDir, 'last-run.json'), 'utf-8'));
+    expect(summary).toMatchObject({ total: 1, passed: 0, alerted: 1 });
+    expect(summary.alerts[0].status).toBe('error');
+  });
+
   it('afterRun saves run summary to historyDir', async () => {
     const historyDir = join(tempDir, 'history');
     const plugin = createMonitorPlugin({
@@ -249,6 +295,27 @@ describe('createMonitorPlugin', () => {
     expect(summary).toHaveProperty('total');
     expect(summary).toHaveProperty('passed');
     expect(summary).toHaveProperty('alerted');
+  });
+});
+
+describe('resolveMonitorUrls', () => {
+  it('resolves config string and object routes against baseUrl', () => {
+    expect(
+      resolveMonitorUrls(
+        ['/pricing', 'account', { path: 'settings', threshold: 0.01 }],
+        'https://example.com/app/',
+      ),
+    ).toEqual([
+      'https://example.com/pricing',
+      'https://example.com/app/account',
+      'https://example.com/app/settings',
+    ]);
+  });
+
+  it('uses baseUrl when config has no routes', () => {
+    expect(resolveMonitorUrls(undefined, 'https://example.com/app')).toEqual([
+      'https://example.com/app',
+    ]);
   });
 });
 

@@ -1,14 +1,17 @@
 # @frontguard/playwright
 
-AI-powered visual regression testing for Playwright. **3 lines to add visual testing to any test.**
+AI-powered visual regression testing for Playwright with an explicit pass/fail assertion.
 
 [![npm](https://img.shields.io/npm/v/@frontguard/playwright)](https://www.npmjs.com/package/@frontguard/playwright)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## Install
 
+The latest registry-verified release is `0.2.2`; the repository's next version
+is still pre-release until it is published.
+
 ```bash
-npm install @frontguard/playwright
+npm install --save-dev @frontguard/playwright@0.2.2 @playwright/test
 ```
 
 ## Usage
@@ -49,38 +52,53 @@ Baselines are plain PNG files in `__visual_baselines__/`. Commit them to git. Re
 ### Basic visual test
 
 ```typescript
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
 test('pricing page', async ({ page }) => {
   await page.goto('https://myapp.com/pricing');
-  await visualTest(page, 'pricing', { threshold: 0.02 });
+  const result = await visualTest(page, 'pricing', { threshold: 0.02 });
+  expect(result.passed).toBe(true);
 });
 ```
 
 ### Mask dynamic content
 
 ```typescript
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
 test('dashboard', async ({ page }) => {
   await page.goto('https://myapp.com/dashboard');
-  await visualTest(page, 'dashboard', {
+  const result = await visualTest(page, 'dashboard', {
     mask: ['.ad-banner', '.timestamp', '.avatar'],
     maskRegions: [{ x: 0, y: 0, width: 200, height: 50 }],
   });
+  expect(result.passed).toBe(true);
 });
 ```
 
 ### Freeze time for deterministic screenshots
 
 ```typescript
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
 test('landing page', async ({ page }) => {
   await page.goto('https://myapp.com');
-  await visualTest(page, 'landing', {
+  const result = await visualTest(page, 'landing', {
     freezeTime: new Date('2024-01-01').getTime(),
   });
+  expect(result.passed).toBe(true);
 });
 ```
 
 ### AI-powered diff analysis
 
 ```typescript
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
 test('checkout flow', async ({ page }) => {
   await page.goto('https://myapp.com/checkout');
   const result = await visualTest(page, 'checkout', {
@@ -92,6 +110,7 @@ test('checkout flow', async ({ page }) => {
     console.log(result.ai?.severity);       // 'critical' | 'high' | 'medium' | 'low'
     console.log(result.ai?.explanation);    // Human-readable explanation
   }
+  expect(result.passed).toBe(true);
 });
 ```
 
@@ -119,8 +138,15 @@ export FRONTGUARD_ANTHROPIC_KEY=sk-ant-...
 ```
 
 ```typescript
-await visualTest(page, 'homepage', {
-  ai: { provider: 'openai' }
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
+test('homepage with AI analysis', async ({ page }) => {
+  await page.goto('https://myapp.com');
+  const result = await visualTest(page, 'homepage', {
+    ai: { provider: 'openai' },
+  });
+  expect(result.passed).toBe(true);
 });
 // result.ai = {
 //   classification: 'regression',
@@ -137,10 +163,20 @@ When you intentionally change your UI:
 
 ```bash
 # Update all baselines
-FRONTGUARD_UPDATE=1 npx playwright test
+FRONTGUARD_UPDATE=1 npm exec -- playwright test
+```
 
-# Or per-test
-await visualTest(page, 'homepage', { update: true });
+Or update a single baseline in a test:
+
+```typescript
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
+test('accept an intentional homepage change', async ({ page }) => {
+  await page.goto('https://myapp.com');
+  const result = await visualTest(page, 'homepage', { update: true });
+  expect(result.passed).toBe(true);
+});
 ```
 
 ## Result Object
@@ -166,7 +202,7 @@ interface VisualTestResult {
 
 Works out of the box in any CI environment. Just commit your baselines:
 
-```bash
+```gitignore
 # .gitignore
 __visual_baselines__/*.current.png
 __visual_baselines__/*.diff.png

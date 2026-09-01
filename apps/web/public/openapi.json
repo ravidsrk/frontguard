@@ -3,7 +3,7 @@
   "info": {
     "title": "Frontguard Cloud API",
     "version": "0.2.2",
-    "description": "OpenAPI contract for the agent and CI-facing Frontguard Cloud API surface. This document is derived from packages/cloud-api/src/index.ts and the mounted route modules under packages/cloud-api/src/routes, and intentionally excludes browser session, OAuth, Stripe billing, and API-key bootstrap routes.",
+    "description": "OpenAPI contract for the agent and CI-facing pre-release Frontguard Cloud API surface. No default hosted endpoint is live. This document is derived from packages/cloud-api/src/index.ts and the mounted route modules under packages/cloud-api/src/routes, and intentionally excludes browser session, OAuth, Stripe billing, and API-key bootstrap routes.",
     "x-generated-from": [
       "packages/cloud-api/src/index.ts",
       "packages/cloud-api/src/routes/screenshots.ts",
@@ -14,7 +14,8 @@
   },
   "servers": [
     {
-      "url": "https://api.frontguard.dev"
+      "url": "https://your-frontguard-api.example.com",
+      "description": "Replace with a verified Frontguard API deployment URL."
     }
   ],
   "tags": [

@@ -8,24 +8,194 @@ on:
       - 'scripts/sync-openapi.mjs'
   workflow_dispatch:
 
+concurrency:
+  group: deploy-web-production
+  cancel-in-progress: false
+
+permissions: {}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://frontguard.dev
     permissions:
       contents: read
       deployments: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: 'npm'
-      - run: npm ci
-      - run: npm run build --workspace=apps/web
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bind web build to commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > apps/web/public/.deploy-version
+          echo "Building deployment for GITHUB_SHA=$GITHUB_SHA"
+
+      - name: Build web
+        run: npm run build --workspace=apps/web
+
       - name: Deploy to Cloudflare Workers
+        id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
           workingDirectory: apps/web
+
+      - name: Probe canonical deployment
+        shell: bash
+        env:
+          CANONICAL_URL: https://frontguard.dev
+          WRANGLER_DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/deploy-web-evidence"
+          mkdir -p "$evidence_dir"
+          probes_file="$evidence_dir/probes.tsv"
+          printf 'sha\tpath\thttp_status\turl\n' > "$probes_file"
+
+          echo "Wrangler deployment URL: ${WRANGLER_DEPLOYMENT_URL:-not reported}"
+          echo "Expected deployed SHA: $GITHUB_SHA"
+
+          deployed_sha=""
+          for attempt in $(seq 1 30); do
+            if candidate="$(curl --fail --silent --show-error --location \
+              --header 'Cache-Control: no-cache' \
+              "$CANONICAL_URL/.deploy-version?deploy_sha=$GITHUB_SHA")"; then
+              deployed_sha="$(printf '%s' "$candidate" | tr -d '[:space:]')"
+            fi
+            if [ "$deployed_sha" = "$GITHUB_SHA" ]; then
+              break
+            fi
+            echo "Canonical deployment is not at $GITHUB_SHA yet (attempt $attempt/30, observed '${deployed_sha:-unavailable}')."
+            sleep 10
+          done
+          [ "$deployed_sha" = "$GITHUB_SHA" ] || {
+            echo "::error::frontguard.dev did not expose the deployed GITHUB_SHA."
+            exit 1
+          }
+          printf '%s\n' "$deployed_sha" > "$evidence_dir/deployed-sha.txt"
+          echo "Canonical deployed SHA: $deployed_sha"
+
+          probe() {
+            local path=$1
+            local name=$2
+            local separator='?'
+            local url
+            local status
+            if [[ "$path" == *\?* ]]; then
+              separator='&'
+            fi
+            url="$CANONICAL_URL$path${separator}deploy_sha=$GITHUB_SHA"
+            status="$(curl --fail --silent --show-error --location \
+              --retry 4 --retry-delay 2 --retry-all-errors \
+              --header 'Cache-Control: no-cache' \
+              --dump-header "$evidence_dir/$name.headers" \
+              --output "$evidence_dir/$name.body" \
+              --write-out '%{http_code}' \
+              "$url")"
+            printf '%s\t%s\t%s\t%s\n' "$GITHUB_SHA" "$path" "$status" "$url" >> "$probes_file"
+            echo "Probe $path -> HTTP $status"
+          }
+
+          probe_paths=(
+            '/'
+            '/docs'
+            '/privacy'
+            '/terms'
+            '/status'
+            '/sitemap.xml'
+            '/agents.md'
+            '/openapi.json'
+            '/.well-known/mcp.json'
+            '/favicon.svg'
+            '/logo-32.png'
+            '/og-image.png'
+          )
+          probe_names=(
+            'home'
+            'docs'
+            'privacy'
+            'terms'
+            'status'
+            'sitemap'
+            'agents'
+            'openapi'
+            'mcp'
+            'favicon'
+            'logo-32'
+            'og-image'
+          )
+          for index in "${!probe_paths[@]}"; do
+            probe "${probe_paths[$index]}" "${probe_names[$index]}"
+          done
+
+          grep -Fq 'The CLI is public. Integrations remain pre-release.' "$evidence_dir/status.body"
+          grep -Fq 'Source version 0.2.3 is a release candidate and has not been published yet.' "$evidence_dir/status.body"
+          node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$evidence_dir/openapi.body"
+          node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$evidence_dir/mcp.body"
+
+          ROOT_BODY="$evidence_dir/home.body" ASSET_LIST="$evidence_dir/runtime-assets.txt" node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+
+          const html = readFileSync(process.env.ROOT_BODY, 'utf8')
+          const assets = [...new Set(
+            [...html.matchAll(/(?:src|href)="(\/assets\/[^"?#]+)[^" ]*"/g)].map((match) => match[1]),
+          )]
+          if (assets.length === 0) throw new Error('No runtime assets were linked from the canonical home page')
+          writeFileSync(process.env.ASSET_LIST, `${assets.join('\n')}\n`)
+          NODE
+
+          runtime_index=0
+          while IFS= read -r asset_path; do
+            [ -n "$asset_path" ] || continue
+            probe "$asset_path" "runtime-asset-$runtime_index"
+            runtime_index=$((runtime_index + 1))
+          done < "$evidence_dir/runtime-assets.txt"
+
+          DEPLOY_SHA="$GITHUB_SHA" \
+          CANONICAL_URL="$CANONICAL_URL" \
+          WRANGLER_DEPLOYMENT_URL="$WRANGLER_DEPLOYMENT_URL" \
+          EVIDENCE_JSON="$evidence_dir/deployment-evidence.json" \
+            node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
+
+          writeFileSync(process.env.EVIDENCE_JSON, `${JSON.stringify({
+            schemaVersion: 1,
+            deployedSha: process.env.DEPLOY_SHA,
+            canonicalUrl: process.env.CANONICAL_URL,
+            wranglerDeploymentUrl: process.env.WRANGLER_DEPLOYMENT_URL || null,
+            probedAt: new Date().toISOString(),
+          }, null, 2)}\n`)
+          NODE
+
+          {
+            echo '## Web deployment verified'
+            echo ''
+            echo "- Canonical URL: $CANONICAL_URL"
+            echo "- Deployed SHA: \`$GITHUB_SHA\`"
+            echo "- Wrangler URL: ${WRANGLER_DEPLOYMENT_URL:-not reported}"
+            echo "- Canonical probes: $(($(wc -l < "$probes_file") - 1))"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-web-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/deploy-web-evidence
+          if-no-files-found: warn
+          retention-days: 14

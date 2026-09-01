@@ -9,8 +9,13 @@ const authSrc = readFileSync(resolve(here, '../src/auth.ts'), 'utf8');
 
 describe('MCP publish surface — no false hosted API default', () => {
   it('README does not list api.frontguard.dev as the FRONTGUARD_API_URL default', () => {
-    expect(readme).not.toMatch(/\|\s*`FRONTGUARD_API_URL`\s*\|\s*`https:\/\/api\.frontguard\.dev`/);
+    expect(readme).not.toContain('api.frontguard.dev');
     expect(readme).toMatch(/no hosted default|FRONTGUARD_API_URL.*required/i);
+  });
+
+  it('describes accept_baseline as approval rather than screenshot promotion', () => {
+    expect(readme).toMatch(/records approval.*screenshot promotion is not implemented/i);
+    expect(readme).not.toMatch(/promotes the.*run.*baseline/i);
   });
 
   it('auth.ts does not define a DEFAULT_API_URL fallback', () => {

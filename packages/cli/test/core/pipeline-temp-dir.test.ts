@@ -1,7 +1,7 @@
 /**
  * REL-5 — compare temp dirs must be unique and cleaned up on pipeline throw.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -13,6 +13,11 @@ const tempDirs = vi.hoisted(() => ({
 
 const { renderPages } = vi.hoisted(() => ({
   renderPages: vi.fn(),
+}));
+
+const storage = vi.hoisted(() => ({
+  init: vi.fn(),
+  readBaseline: vi.fn(),
 }));
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -30,6 +35,12 @@ vi.mock('node:fs', async (importOriginal) => {
 });
 
 vi.mock('../../src/render/playwright.js', () => ({ renderPages }));
+vi.mock('../../src/storage/git-orphan.js', () => ({
+  GitOrphanStorage: class {
+    init = storage.init;
+    readBaseline = storage.readBaseline;
+  },
+}));
 vi.mock('../../src/utils/logger.js', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   setLogLevel: vi.fn(),
@@ -78,12 +89,62 @@ function shot(): ScreenshotResult {
 }
 
 beforeEach(() => {
+  vi.stubEnv('CI', 'false');
   tempDirs.created.length = 0;
   renderPages.mockReset();
   renderPages.mockResolvedValue([shot()]);
+  storage.init.mockReset();
+  storage.init.mockResolvedValue(undefined);
+  storage.readBaseline.mockReset();
+  storage.readBaseline.mockResolvedValue(null);
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe('REL-5: compare temp directory', () => {
+  it('awaits asynchronous reporting when rendering captures nothing', async () => {
+    renderPages.mockResolvedValue([]);
+    let completed = false;
+    const teardown = vi.fn();
+    const reporter = makeReporter();
+    reporter.onComplete = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      completed = true;
+    };
+
+    await runPipeline(makeConfig([{ name: 'cleanup-on-empty', teardown }]), reporter);
+
+    expect(completed).toBe(true);
+    expect(teardown).toHaveBeenCalledTimes(1);
+  });
+
+  it('tears down only setup-attempted plugins once when setup partially fails', async () => {
+    const firstTeardown = vi.fn();
+    const failingTeardown = vi.fn();
+    const unreachedSetup = vi.fn();
+    const unreachedTeardown = vi.fn();
+    const plugins: FrontguardPlugin[] = [
+      { name: 'first', setup: vi.fn(), teardown: firstTeardown },
+      {
+        name: 'failing',
+        setup() {
+          throw new Error('setup failed');
+        },
+        teardown: failingTeardown,
+      },
+      { name: 'unreached', setup: unreachedSetup, teardown: unreachedTeardown },
+    ];
+
+    await expect(runPipeline(makeConfig(plugins), makeReporter())).rejects.toThrow('setup failed');
+
+    expect(firstTeardown).toHaveBeenCalledTimes(1);
+    expect(failingTeardown).toHaveBeenCalledTimes(1);
+    expect(unreachedSetup).not.toHaveBeenCalled();
+    expect(unreachedTeardown).not.toHaveBeenCalled();
+  });
+
   it('reports a failed capture as an error instead of a new page', async () => {
     renderPages.mockResolvedValue([
       {

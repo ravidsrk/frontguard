@@ -1,13 +1,13 @@
 # Frontguard
 
-> AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.
+> Open-source frontend visual regression testing for web teams, with optional model-assisted review.
 
-Frontguard is an open-source CLI + cloud platform. The CLI is MIT-licensed and free forever; the hosted cloud (team baselines, history, flake-score badges) is the paid tier at $29/month per user.
+Frontguard is an open-source CLI with pre-release cloud components. The CLI is MIT-licensed and free forever. Hosted plans are not generally available and have no published purchase price.
 
 ## Key Pages
 
 - [Home](https://frontguard.dev) — Product overview, install paths, comparison vs Percy / Chromatic / Argos
-- [Pricing](https://frontguard.dev/pricing) — Free CLI ($0, MIT), Pro ($29/mo), Team/Enterprise; compare-plans matrix and the 8-question FAQ
+- [Pricing](https://frontguard.dev/pricing) — Free CLI ($0, MIT); hosted and team plans are pre-release design-partner concepts
 - [Comparisons](https://frontguard.dev/comparisons) — Capability-by-capability vs Percy, Chromatic, BackstopJS, Lost Pixel, Argos, with sources
 - [Changelog](https://frontguard.dev/changelog) — Notable releases, newest first (Keep a Changelog)
 - [Brand](https://frontguard.dev/brand) — The amber shield mark, lockups, color tokens, typography, voice
@@ -21,17 +21,17 @@ Frontguard is an open-source CLI + cloud platform. The CLI is MIT-licensed and f
 ## For Agents
 
 - [Agent task routing](https://frontguard.dev/agents.md) — Start here for MCP tools, cloud API routes, auth, limits, and safe task ordering
-- [OpenAPI contract](https://frontguard.dev/openapi.json) — Machine-readable OpenAPI 3.1 contract for the hosted cloud API at `https://api.frontguard.dev`
-- [MCP discovery manifest](https://frontguard.dev/.well-known/mcp.json) — Discovery for `@frontguard/mcp`; configure `FRONTGUARD_API_URL=https://api.frontguard.dev`
+- [OpenAPI contract](https://frontguard.dev/openapi.json) — Machine-readable OpenAPI 3.1 contract for the pre-release cloud API; there is no live default hosted endpoint yet
+- [MCP discovery manifest](https://frontguard.dev/.well-known/mcp.json) — Discovery for `@frontguard/mcp`; point `FRONTGUARD_API_URL` at a verified deployment
 
 ## What Frontguard Does
 
-- Anti-flake consensus — three captures per route, majority wins; SSIM perceptual matching as fallback
-- AI classification — diff goes to GPT-4o or Claude Sonnet with DOM + axe-core findings inline; structured `{category, confidence, cause}` output
-- Sandbox-verified fixes — every AI patch is applied in a local Playwright sandbox (or Daytona snapshot), re-rendered, and only shipped if the diff clears
-- Plugin architecture — six lifecycle hooks; built-ins for accessibility (axe-core), Figma compare, perf budgets, monitor, third-party-script drift
-- CI-native — composite GitHub Action, PR comment with baseline / current / diff thumbnails; GitLab CI, CircleCI, Jenkins via the same CLI
-- Self-hostable — Cloudflare Workers + D1 + R2, or docker-compose on your laptop with miniflare + SQLite + local-disk adapters
+- Configurable consensus — projects can opt into multiple captures per route; pixel comparison uses SSIM as a fallback
+- Optional AI classification — screenshot evidence, basic route metadata, and optional accessibility findings go directly to the configured OpenAI or Anthropic provider
+- Experimental fixes — CSS suggestions and sandbox verification are separate opt-ins; unverified suggestions remain labeled
+- Plugin architecture — nine lifecycle hooks; built-ins for accessibility (axe-core), Figma compare, perf budgets, monitor, third-party-script drift
+- CI-ready — generated workflows preserve JSON and HTML artifacts; source PR reporting remains pending external release validation, and remote thumbnails require a configured `imageUpload` backend
+- Cloud source included — Cloudflare Workers + D1 + R2 implementation is in the repository; hosted and Docker onboarding are pre-release
 
 ## Author
 
@@ -50,7 +50,21 @@ MIT
 ```bash
 npm install @frontguard/cli
 npx -p @frontguard/cli frontguard init
-npx -p @frontguard/cli frontguard run --url http://localhost:3000
+```
+
+App terminal (leave running; use your project's command, such as the example below, and wait for the generated `baseUrl`):
+
+```bash
+npm run dev
+```
+
+Frontguard terminal (uses the generated config):
+
+```bash
+npx -p @frontguard/cli frontguard doctor
+npx -p @frontguard/cli frontguard update-baselines
+git push origin frontguard-baselines # before CI comparisons
+npx -p @frontguard/cli frontguard run
 ```
 
 ### Playwright plugin
@@ -72,15 +86,9 @@ test('checkout @ 375px', async ({ page }) => {
 
 ### GitHub Action
 
-```yaml
-- name: Frontguard
-  uses: ravidsrk/frontguard@v0
-  with:
-    url: ${{ steps.preview.outputs.url }}
-  env:
-    FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
+External consumer smoke is pending, so no public copy-ready Action workflow is
+published yet. Use the CLI flow above until the release procedure in
+`docs/ops-actions.md` passes.
 
 ---
 
@@ -96,9 +104,7 @@ export default defineConfig({
   viewports: [375, 768, 1440],
   browsers: ['chromium', 'firefox', 'webkit'],
   antiFlakeRenders: 3,
-  consensus: 'majority',
-  ai: { provider: 'auto' }, // 'openai' | 'anthropic' | 'auto'
-  baselineDir: '.frontguard/baselines',
+  ai: { provider: 'openai', model: 'gpt-4o' },
   outputDir: '.frontguard/results',
 });
 ```
@@ -106,15 +112,15 @@ export default defineConfig({
 ### Environment variables
 
 - `FRONTGUARD_OPENAI_KEY` / `FRONTGUARD_ANTHROPIC_KEY` — AI provider key. The Playwright plugin also accepts unprefixed `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` when present. `frontguard doctor` reads exactly the same names the runtime reads.
-- `FRONTGUARD_API_URL` / `FRONTGUARD_API_KEY` — hosted or self-hosted cloud endpoint.
+- `FRONTGUARD_API_URL` / `FRONTGUARD_API_KEY` — a verified self-hosted or future hosted cloud endpoint.
 
 ---
 
 ## Pricing
 
-- **Free CLI** — $0 forever, MIT, BYO AI key. Unlimited local screenshots, anti-flake consensus, GitHub Action + PR comment, git-orphan baselines, docker-compose self-host of the cloud.
-- **Pro** — $29 per user / month. Everything in Free CLI plus hosted team baselines, run history, flake-score badges, GitHub App one-click baseline accept, spend-cap alerts at 80% / 95%, Slack and GitHub notifications.
-- **Enterprise** — custom annual. SAML SSO, SCIM, audit log, on-prem deployment, dedicated support + SLA, custom Git / CI integrations.
+- **Free CLI** — $0 forever, MIT, optional BYO AI, local reports, configurable consensus, and git-orphan baselines.
+- **Hosted (planned; not generally available)** — design-partner waitlist only. No purchase price, production onboarding, or hosted baseline promotion is available.
+- **Enterprise (planned)** — no generally available enterprise service or SLA today.
 
 ---
 
@@ -125,11 +131,11 @@ Pulled from each vendor's documented pricing and release notes; full sources in 
 | Feature | Frontguard | Percy | Chromatic | Argos |
 |---|---|---|---|---|
 | Free tier | CLI free forever (MIT, BYO AI key) | 5,000 screenshots/mo | 5,000 snapshots/mo · Chrome-only · no a11y | 5,000 screenshots/mo · unlimited Playwright traces |
-| Paid entry | Pro $29/mo | Desktop ≈ $199/mo | Starter $179/mo | Pro from $100/mo |
-| Snapshot overage | Spend cap | Quote-walled | $0.008 / snapshot | $0.004 extra screenshot |
+| Hosted entry | Waitlist | Desktop ≈ $199/mo | Starter $179/mo | Pro from $100/mo |
+| Snapshot overage | n/a for local CLI | Quote-walled | $0.008 / snapshot | $0.004 extra screenshot |
 | AI diff explanation | Plain-English category + confidence + cause | Visual Review Agent (NL summaries) | No diff-classification AI | Markets "no AI overhead" |
 | Sandbox-verified fixes | Patch + re-render in local Playwright / Daytona | Not advertised | Not advertised | Not advertised |
-| Self-host | docker-compose recipe · MIT cloud | SaaS only | SaaS only | MIT, self-host possible from source |
+| Self-host | Cloud source included; Compose onboarding pre-release | SaaS only | SaaS only | MIT, self-host possible from source |
 | MCP server | @frontguard/mcp | Not shipped | Per-branch /mcp · Storybook 10.3+ · React | Not shipped |
 
 ---
@@ -146,18 +152,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 20 }
       - run: npm ci
       - run: npx playwright install --with-deps
-      - run: npm run build && npm start &
-      - uses: ravidsrk/frontguard@v0
-        with:
-          url: http://localhost:3000
-        env:
-          FRONTGUARD_OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: npm run build
+      - run: npm start & npx wait-on http://localhost:3000 --timeout 60000
+      - run: npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
+
+The composite Action remains pre-release while external consumer smoke is
+pending.
 
 ### GitLab CI
 
@@ -168,11 +173,11 @@ visual:
     - npm ci
     - npm run build
     - npm start &
-    - npx -p @frontguard/cli frontguard run --url http://localhost:3000
+    - npx -p @frontguard/cli frontguard run
   variables:
     FRONTGUARD_OPENAI_KEY: $OPENAI_KEY
   artifacts:
-    when: on_failure
+    when: always
     paths:
       - .frontguard/results/
 ```
@@ -181,7 +186,7 @@ visual:
 
 ## MCP server
 
-`@frontguard/mcp` exposes the following tools to in-IDE agents (Claude Code, Cursor, Cline, Copilot):
+`@frontguard/mcp` exposes the following pre-release tools to in-IDE agents (Claude Code, Cursor, Cline, Copilot). There is no live default hosted endpoint, and `accept_baseline` currently records approval without promoting screenshots:
 
 - `list_regressions(pr_id)`
 - `get_suggested_fix(diff_id)`
@@ -198,13 +203,7 @@ Drop into `mcp.json` per the docs at https://frontguard.dev/docs/integrations/mc
 
 ## Self-host
 
-Cloud stack runs locally:
-
-```bash
-docker compose -f packages/cloud-api/docker-compose.yml up
-```
-
-Maps to miniflare for the Worker runtime, SQLite in place of D1, and a local-disk adapter in place of R2.
+Cloud source is included in `packages/cloud-api`, but its Compose path is not a verified clean-checkout onboarding flow yet. Treat it as development code, not a supported self-host quick start.
 
 ---
 
@@ -212,15 +211,15 @@ Maps to miniflare for the Worker runtime, SQLite in place of D1, and a local-dis
 
 ### How do I install Frontguard?
 
-`npm install @frontguard/cli`, then `npx -p @frontguard/cli frontguard init`, then `npx -p @frontguard/cli frontguard run --url <your URL>`.
+Install `@frontguard/cli`, run `frontguard init`, start the app in a separate terminal, wait for the generated config `baseUrl`, run `frontguard update-baselines`, push `frontguard-baselines`, then run `frontguard run` using that config.
 
 ### How does Frontguard handle cross-OS rendering differences?
 
-Playwright's own docs warn rendering varies by OS and hardware. Frontguard ships a pinned Docker renderer image (Chromium / Firefox / WebKit + system fonts). Enable with `frontguard run --docker`.
+Playwright's own docs warn rendering varies by OS and hardware. The renderer is currently repository-source-only, not a published image; its clean-clone build requires the documented npm build, `npm pack`, tarball rename, and Docker build steps before `frontguard run --docker`.
 
 ### Can I self-host the cloud?
 
-Yes. The cloud is MIT-licensed and runs locally via `docker-compose up`.
+The cloud source is MIT-licensed, but the Compose onboarding path is pre-release and is not currently a verified one-command setup.
 
 ### What env vars does Frontguard read?
 
@@ -236,7 +235,7 @@ Yes. `frontguard init` detects `.storybook/main.ts` and scaffolds a Storybook-aw
 
 ### Data retention?
 
-CLI sends screenshots only to your configured AI provider. On the hosted cloud, default retention is 30 days on Pro; configurable up to 1 year on Enterprise.
+Local CLI artifacts remain on your machine or Git baseline branch; AI inputs go to your configured provider. The pre-release cloud does not yet enforce general run/screenshot retention windows. See `docs/retention.md` for implemented behavior.
 
 ---
 

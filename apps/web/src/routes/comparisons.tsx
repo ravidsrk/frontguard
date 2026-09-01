@@ -98,14 +98,14 @@ function Comparisons() {
             'font-size: 18px; line-height: 1.55; color: #b8b0a6; margin: 0 auto; max-width: 600px;',
           )}
         >
-          Visual testing tools all take a screenshot and diff it. Only Frontguard explains{' '}
-          <em style={s('color: #f5f1ea; font-style: normal;')}>why</em> something changed,
-          verifies a fix, and stays open source and self-hostable.
+          Compare the implemented local CLI against documented vendor capabilities. Frontguard’s
+          model-assisted analysis and fix verification are optional, and its hosted surfaces remain
+          pre-release.
         </p>
       </header>
 
       <section style={s('max-width: 1200px; margin: 0 auto; padding: 0 28px 12px;')}>
-        <div style={s('display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;')}>
+        <div className="fg-responsive-grid" style={s('display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;')}>
           {ALTERNATIVES.map((alt) => (
             <div
               key={alt.name}
@@ -225,7 +225,7 @@ function Comparisons() {
           The honest version — what each tool is genuinely good at, and where Frontguard pulls
           ahead.
         </p>
-        <div style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 18px;')}>
+        <div className="fg-responsive-grid" style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 18px;')}>
           {VERSUS.map((v) => (
             <article
               key={v.name}
@@ -280,6 +280,7 @@ function Comparisons() {
       <section style={s('border-top: 1px solid #211e1b; background: #100f0e;')}>
         <div style={s('max-width: 1200px; margin: 0 auto; padding: 64px 28px;')}>
           <div
+            className="fg-responsive-grid"
             style={s(
               'display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 48px; align-items: center;',
             )}
@@ -294,11 +295,11 @@ function Comparisons() {
               </h2>
               <p style={s('font-size: 15.5px; line-height: 1.6; color: #b8b0a6; margin: 0;')}>
                 Frontguard reads your app by URL — no test files to port, no proprietary snapshot
-                format. Point it at your dev server and you have baselines in one run. Migration
-                guides walk through the rest.
+                format. Point it at your dev server, review the captures, then accept them with one
+                baseline-update command. Migration guides walk through the rest.
               </p>
             </div>
-            <div style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 12px;')}>
+            <div className="fg-responsive-grid" style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 12px;')}>
               {MIGRATIONS.map((m) => (
                 <a
                   key={m.name}
@@ -343,7 +344,7 @@ function Comparisons() {
               'font-size: 17px; color: #b8b0a6; margin: 0 auto 30px; max-width: 440px; line-height: 1.55;',
             )}
           >
-            Install the CLI and run your first AI-explained visual check in two minutes.
+            Install the CLI, capture and review baselines explicitly, then compare changes locally.
           </p>
           <div style={s('display: flex; gap: 14px; justify-content: center;')}>
             <a

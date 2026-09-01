@@ -1,15 +1,15 @@
 # Telemetry & Privacy
 
-Frontguard collects **anonymous, opt-out** usage telemetry to understand which features are used and prioritise development. We take privacy seriously — telemetry is designed to be impossible to trace back to you or your project.
+Frontguard's anonymous usage telemetry is **disabled by default**. You can opt in to help prioritise development. The event payload contains no project URL, path, screenshot, config, secret, or persistent user identifier; as with any HTTP request, the receiving network service can observe connection metadata such as the source IP.
 
 ## What we collect
 
-Each command sends a single small event containing **only** these fields:
+When enabled, each instrumented command sends at most one small event containing **only** these fields:
 
 | Field | Example | Why |
 |-------|---------|-----|
 | `command` | `run` | Which command was used |
-| `version` | `0.2.0` | Frontguard version |
+| `version` | `0.2.2` | Frontguard version |
 | `routes` | `12` | Number of routes tested (count only) |
 | `regressions` | `2` | Number of regressions found (count only) |
 | `aiProvider` | `openai` / `anthropic` / `none` | Which AI backend, if any |
@@ -26,12 +26,28 @@ Each command sends a single small event containing **only** these fields:
 - ❌ Config file contents
 - ❌ Screenshots or image data
 - ❌ API keys or any secrets
-- ❌ Your identity, IP-derived location, or any persistent identifier
+- ❌ Your identity, IP-derived location, or any persistent identifier in the event payload
 - ❌ Error messages (only the error class name)
 
-## How to opt out
+## How to opt in
 
-Any **one** of these disables telemetry completely:
+Set either the environment variable or config field explicitly:
+
+```bash
+export FRONTGUARD_TELEMETRY=1
+```
+
+```ts
+export default {
+  // ...
+  telemetry: true,
+};
+```
+
+## How to disable it
+
+Telemetry is already disabled when no opt-in is present. Any **one** of these
+also disables it explicitly:
 
 ```bash
 # Per-invocation flag
@@ -53,10 +69,10 @@ export default {
 };
 ```
 
-## Guarantees
+## Runtime behavior
 
-- **Non-blocking** — telemetry is fire-and-forget with a 1.5s timeout. It never slows down or fails your run.
-- **Fails silently** — network errors are swallowed; the CLI behaves identically whether or not telemetry succeeds.
+- **Bounded** — when enabled, the CLI waits for the request for at most 1.5 seconds.
+- **Fails silently** — network errors are swallowed and do not change the command result.
 - **No payload on opt-out** — when disabled, nothing is sent and no network call is made.
 
 ## Self-hosting the collector

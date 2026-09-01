@@ -40,9 +40,9 @@ export class HTMLReporter implements Reporter {
     logger.error(`Pipeline error captured for HTML report: ${error.message}`);
   }
 
-  onComplete(result: RunResult): void {
-    this.delegate?.onComplete(result);
+  async onComplete(result: RunResult): Promise<void> {
     this.writeReport(result, result.config.outputDir);
+    await this.delegate?.onComplete(result);
   }
 
   /**
@@ -271,7 +271,7 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
   const routeFragment = safeFilenameFragment(path);
 
   const diffCards = diffs.map((diff, diffIdx) => {
-    const prefix = `${routeFragment}_${diff.viewport}_${diff.browser}_${diffIdx}`;
+    const prefix = `${index}_${routeFragment}_${diff.viewport}_${diff.browser}_${diffIdx}`;
     const baselineSrc = resolveImage(diff.baselineImage, `${prefix}_baseline`);
     const currentSrc = resolveImage(diff.currentImage, `${prefix}_current`);
     const diffSrc = resolveImage(diff.diffImage, `${prefix}_diff`);

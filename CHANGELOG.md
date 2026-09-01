@@ -7,7 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet — open an issue or PR to land the first 0.3 work._
+### Fixed
+
+- Fail closed on empty comparisons, render/storage/AI errors, rejected judge
+  calls, stale CI baselines, and unpublished or diverged baseline state.
+- Make baseline comparison read-only and require explicit update mode for all
+  baseline writes.
+- Repair the composite Action result contract, browser-version pinning, output
+  mapping, artifacts, and update-only Git identity configuration.
+- Reconcile public launch claims with the verified CLI-only product surface.
+
+## [0.2.2] - 2026-06-21
+
+### Fixed
+
+- Keep the CLI config loader's optional dependencies in the published package.
+- Ship workspace-local package READMEs and close remaining release metadata
+  drift across the CLI, Playwright plugin, MCP server, plugin scaffold, and
+  Netlify integration.
+
+### Published packages
+
+- `@frontguard/cli@0.2.2`
+- `@frontguard/playwright@0.2.2`
+- `@frontguard/mcp@0.2.2`
+- `create-frontguard-plugin@0.2.2`
+- `@frontguard/netlify-plugin@0.2.2`
 
 ## [0.2.1] - 2026-06-20
 
@@ -58,14 +83,13 @@ API changes — semver patch.
 
 ## [0.2.0] - 2026-06-17
 
-The "ship it in public" release. Everything around the engine — install path,
-AI loop, cloud, four integrations, MCP server, Storybook support, Docker
-cross-OS rendering, self-host story, validation harness — is now built to full
-depth, tested, and published. Five npm packages went live at 0.2.0
+The "ship it in public" release. Five npm packages went live at 0.2.0
 (`@frontguard/cli`, `@frontguard/playwright`, `@frontguard/mcp`,
 `@frontguard/netlify-plugin`, `create-frontguard-plugin`). Twenty PRs of
 engineering work landed between 2026-06-14 and 2026-06-17 — full punch list
-in [`docs/launch-readiness.md`](./docs/launch-readiness.md).
+in [`docs/launch-readiness.md`](./docs/launch-readiness.md). Later adversarial
+validation found that the Docker and hosted surfaces had not met their release
+acceptance contracts; current status pages supersede those original claims.
 
 ### Added
 
@@ -89,11 +113,11 @@ in [`docs/launch-readiness.md`](./docs/launch-readiness.md).
   `packages/cli/__fixtures__/storybook/` (two component stories, one with a
   `play()` function) and a 500-line integration doc at
   `apps/docs/content/docs/integrations/storybook.mdx`.
-- **Dockerised renderer for cross-OS byte-equivalent baselines** — pinned
-  Chromium / Firefox / WebKit image at `packages/cli/docker/` + a
+- **Dockerised renderer source** — pinned Chromium / Firefox / WebKit
+  environment at `packages/cli/docker/` + a
   `--docker` CLI flag + 274-line `apps/docs/content/docs/cross-os-rendering.mdx`.
-  Solves the #1 reason teams abandon Playwright's built-in visual testing
-  (host-OS rendering drift).
+  It was intended to reduce host-OS rendering drift; image publication and
+  measured cross-host equivalence were not established by this release.
 - **Daytona fix-verification snapshot** — `scripts/build-daytona-snapshot.ts`
   publishes the `frontguard-playwright-v1` Daytona snapshot built on the
   Docker image above, and `frontguard-render` is now a real bin shipped with

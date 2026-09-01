@@ -1,12 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { execFile, execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 /**
  * CLI tests use `tsx` to run the CLI entry point directly.
  * This avoids needing a build step and tests the actual CLI behavior.
  */
 const CLI_PATH = resolve(import.meta.dirname, '../../src/cli/index.ts');
+const TSX_PATH = resolve(import.meta.dirname, '../../node_modules/tsx/dist/cli.mjs');
 
 function runCli(args: string[]): { stdout: string; stderr: string; exitCode: number } {
   try {
@@ -28,6 +32,27 @@ function runCli(args: string[]): { stdout: string; stderr: string; exitCode: num
       exitCode: error.status ?? 1,
     };
   }
+}
+
+function runCliAsync(
+  args: string[],
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return new Promise((resolveRun) => {
+    execFile(
+      process.execPath,
+      [TSX_PATH, CLI_PATH, ...args],
+      { cwd, env, encoding: 'utf8', timeout: 15_000 },
+      (error, stdout, stderr) => {
+        resolveRun({
+          stdout,
+          stderr,
+          exitCode: typeof error?.code === 'number' ? error.code : 0,
+        });
+      },
+    );
+  });
 }
 
 describe('CLI', () => {
@@ -89,4 +114,99 @@ describe('CLI', () => {
     // No history dir → friendly empty message, no pipeline run.
     expect(stdout + stderr).toMatch(/No monitoring history found|Recent monitoring history/i);
   });
+
+  it('does not discard an invalid explicit config when --url is also present', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'frontguard-invalid-config-'));
+    const configPath = join(dir, 'frontguard.config.mjs');
+    writeFileSync(
+      configPath,
+      `export default {
+  version: 1,
+  baseUrl: 'http://127.0.0.1:1',
+  threshold: 'invalid',
+};\n`,
+    );
+
+    try {
+      const result = await runCliAsync(
+        ['run', '--config', configPath, '--url', 'http://127.0.0.1:1'],
+        dir,
+        { ...process.env, FRONTGUARD_TELEMETRY: '0' },
+      );
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout + result.stderr).toContain('Invalid Frontguard config');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('honors telemetry:false when a run fails after loading config', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'frontguard-telemetry-cli-'));
+    const configPath = join(dir, 'frontguard.config.mjs');
+    const requests: string[] = [];
+    const server = createServer((request, response) => {
+      requests.push(request.url ?? '/');
+      response.statusCode = 204;
+      response.end();
+    });
+
+    await new Promise<void>((resolveListen, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolveListen);
+    });
+
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Telemetry server did not bind');
+    const env = {
+      ...process.env,
+      CI: 'false',
+      DO_NOT_TRACK: '0',
+      FRONTGUARD_TELEMETRY: '1',
+      FRONTGUARD_TELEMETRY_ENDPOINT: `http://127.0.0.1:${address.port}/events`,
+    };
+    const writeConfig = (telemetry: boolean): void => {
+      writeFileSync(
+        configPath,
+        `export default {
+  version: 1,
+  baseUrl: 'http://127.0.0.1:1',
+  routes: ['/'],
+  viewports: [1440],
+  browsers: ['chromium'],
+  threshold: 0.1,
+  telemetry: ${telemetry},
+  plugins: [{ name: 'forced-failure', setup() { throw new Error('forced failure'); } }],
+};\n`,
+      );
+    };
+
+    try {
+      // Positive control: the failure path can reach the local collector.
+      writeConfig(true);
+      expect((await runCliAsync(['run', '--config', configPath], dir, env)).exitCode).toBe(2);
+      expect(requests).toHaveLength(1);
+
+      requests.length = 0;
+      writeConfig(false);
+      expect((await runCliAsync(['run', '--config', configPath], dir, env)).exitCode).toBe(2);
+      expect(requests).toHaveLength(0);
+
+      // Invalid config must fail private because its telemetry opt-out cannot be
+      // trusted until validation succeeds.
+      writeFileSync(
+        configPath,
+        `export default {
+  version: 1,
+  baseUrl: 'http://127.0.0.1:1',
+  threshold: 'invalid',
+  telemetry: false,
+};\n`,
+      );
+      expect((await runCliAsync(['run', '--config', configPath], dir, env)).exitCode).toBe(2);
+      expect(requests).toHaveLength(0);
+    } finally {
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
 });

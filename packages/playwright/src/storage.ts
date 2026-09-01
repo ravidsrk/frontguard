@@ -1,5 +1,19 @@
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+
+const MAX_READABLE_KEY_LENGTH = 174;
+
+function safeKeyName(key: string): string {
+  const readable = key
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-_]+|[-_]+$/g, '')
+    .slice(0, MAX_READABLE_KEY_LENGTH) || 'baseline';
+  const digest = createHash('sha256').update(key).digest('hex');
+
+  return `${readable}-${digest}`;
+}
 
 /**
  * File-based baseline storage for visual tests.
@@ -13,14 +27,17 @@ export class BaselineStorage {
   }
 
   /**
-   * Read a baseline image. Returns null if it doesn't exist.
+   * Read a baseline image. Returns null only if it doesn't exist.
    */
   readBaseline(key: string): Buffer | null {
     const filePath = this.getPath(key);
     try {
       return fs.readFileSync(filePath);
-    } catch {
-      return null;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null;
+      }
+      throw error;
     }
   }
 
@@ -44,7 +61,7 @@ export class BaselineStorage {
    * Get the file path for a baseline key and optional suffix.
    */
   getPath(key: string, suffix?: string): string {
-    const safeName = key.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeName = safeKeyName(key);
     const filename = suffix ? `${safeName}.${suffix}.png` : `${safeName}.png`;
     return path.join(this.dir, filename);
   }

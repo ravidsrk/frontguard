@@ -109,6 +109,7 @@ function Changelog() {
             key={r.version}
             data-testid="release"
             aria-label={r.title}
+            className="fg-responsive-grid"
             style={s(
               'display: grid; grid-template-columns: 168px 1fr; gap: 0; border-top: 1px solid #211e1b;',
             )}

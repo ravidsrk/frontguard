@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { HTMLReporter } from '../../src/report/html.js';
-import { createTestPng } from '../fixtures/helpers.js';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { createTempDir, createTestPng } from '../fixtures/helpers.js';
 import type { RunResult, DiffResult, FrontguardConfig } from '../../src/core/types.js';
 
 // ---------------------------------------------------------------------------
@@ -176,13 +178,48 @@ describe('HTMLReporter', () => {
     expect(html).toContain('data:image/png;base64,');
   });
 
-  it('propagates report write failures', () => {
+  it.each([
+    ['routes that sanitize alike', '/products/a', '/products:a'],
+    [
+      'routes with the same long filename prefix',
+      `/${'a'.repeat(70)}-first`,
+      `/${'a'.repeat(70)}-second`,
+    ],
+  ])('writes distinct image files for %s', (_description, firstRoute, secondRoute) => {
+    const firstImage = createTestPng(2, 2, 255, 0, 0);
+    const secondImage = createTestPng(2, 2, 0, 0, 255);
+    const { dir, cleanup } = createTempDir();
+
+    try {
+      const reporter = new HTMLReporter();
+      const result = makeRunResult(
+        [
+          makeDiff({ route: { path: firstRoute }, currentImage: firstImage }),
+          makeDiff({ route: { path: secondRoute }, currentImage: secondImage }),
+        ],
+        { config: makeConfig({ outputDir: dir }) },
+      );
+
+      reporter.writeReport(result, dir);
+
+      const imageFiles = readdirSync(join(dir, 'images')).filter((name) => name.endsWith('.png'));
+      const imageContents = imageFiles.map((name) => readFileSync(join(dir, 'images', name)).toString('base64'));
+      expect(imageFiles).toHaveLength(2);
+      expect(new Set(imageContents)).toEqual(
+        new Set([firstImage.toString('base64'), secondImage.toString('base64')]),
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('propagates report write failures', async () => {
     const reporter = new HTMLReporter();
     vi.spyOn(reporter, 'writeReport').mockImplementation(() => {
       throw new Error('disk full');
     });
 
-    expect(() => reporter.onComplete(makeRunResult([makeDiff()]))).toThrow('disk full');
+    await expect(reporter.onComplete(makeRunResult([makeDiff()]))).rejects.toThrow('disk full');
   });
 
   it('report includes AI analysis when present', () => {

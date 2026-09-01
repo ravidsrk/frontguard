@@ -15,7 +15,7 @@ export const Route = createRootRoute({
       {
         name: 'description',
         content:
-          'AI-powered frontend visual regression testing. Frontguard renders every page, diffs it against your baselines, and uses AI vision to tell a real regression from noise. MIT licensed, self-hostable, free forever.',
+          'Local visual regression testing with reviewed git baselines, inspectable reports, and optional model-assisted analysis. MIT licensed.',
       },
     ],
     links: [

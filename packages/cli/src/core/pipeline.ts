@@ -12,6 +12,7 @@
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { CLI_VERSION } from '../version.js';
 import type {
   FrontguardConfig,
   Route,
@@ -332,13 +333,13 @@ export async function runPipeline(
     for (const plugin of config.plugins) {
       pluginManager.register(plugin);
     }
-    await pluginManager.setup(pluginCtx);
   }
 
   let tempDir: string | undefined;
   const diffs: DiffResult[] = [];
 
   try {
+  await pluginManager.setup(pluginCtx);
 
   // -----------------------------------------------------------------------
   // Stage 0: PREVIEW URL DETECTION
@@ -507,8 +508,7 @@ export async function runPipeline(
   if (screenshots.length === 0) {
     logger.error('No screenshots were captured — cannot proceed with comparison');
     const emptyResult = buildResult([], timing, totalStart, config);
-    reporter.onComplete(emptyResult);
-    await pluginManager.teardown();
+    await reporter.onComplete(emptyResult);
     return emptyResult;
   }
 
@@ -524,19 +524,18 @@ export async function runPipeline(
   const tempPaths = new Map<number, { baseline: string; current: string; diff: string }>();
 
   reporter.onStageStart('compare', 'Comparing against baselines…');
+  const storage = new GitOrphanStorage(process.cwd());
+  try {
+    await storage.init();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error(`Baseline storage init failed: ${msg}`);
+    reporter.onStageComplete('compare', `Failed: ${msg}`);
+    throw err;
+  }
+
   try {
     const [, duration] = await timed(async () => {
-      // Init storage
-      const storage = new GitOrphanStorage(process.cwd());
-      try {
-        await storage.init();
-      } catch (err) {
-        logger.warn(
-          `Baseline storage init failed: ${err instanceof Error ? err.message : String(err)}. ` +
-            'All screenshots will be treated as new.',
-        );
-      }
-
       let completed = 0;
       const batchResults = await processBatched(
         screenshots,
@@ -707,8 +706,8 @@ export async function runPipeline(
       }
 
       try {
-        const [, duration] = await timed(async () => {
-          await processBatched(
+        const [analysisOutcomes, duration] = await timed(async () => {
+          return processBatched(
             changedDiffsWithIndices,
             AI_BATCH_SIZE,
             async ({ diff }) => {
@@ -746,8 +745,40 @@ export async function runPipeline(
           );
         });
 
+        let analysisFailures = 0;
+        for (let i = 0; i < analysisOutcomes.length; i++) {
+          const outcome = analysisOutcomes[i];
+          if (outcome.status === 'fulfilled') continue;
+
+          analysisFailures++;
+          const diff = changedDiffsWithIndices[i]?.diff;
+          const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+          if (diff) {
+            diff.status = 'error';
+            diff.error = `AI analysis failed: ${msg}`;
+            completed++;
+            reporter.onStageProgress(
+              'analyze',
+              completed,
+              changedDiffsWithIndices.length,
+              `${diff.route.path} → error`,
+            );
+          }
+        }
+
         timing.ai = duration;
-        reporter.onStageComplete('analyze', `Analyzed ${changedDiffsWithIndices.length} change(s) in ${duration}ms`);
+        if (analysisFailures > 0) {
+          logger.error(`AI analysis failed for ${analysisFailures} change(s)`);
+          reporter.onStageComplete(
+            'analyze',
+            `Analyzed ${changedDiffsWithIndices.length - analysisFailures} change(s); ${analysisFailures} failed in ${duration}ms`,
+          );
+        } else {
+          reporter.onStageComplete(
+            'analyze',
+            `Analyzed ${changedDiffsWithIndices.length} change(s) in ${duration}ms`,
+          );
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         logger.error(`AI analysis stage failed: ${msg}`);
@@ -908,7 +939,7 @@ export async function runPipeline(
   // Stage 7: REPORT
   // -----------------------------------------------------------------------
   reporter.onStageStart('report', 'Generating report…');
-  reporter.onComplete(result);
+  await reporter.onComplete(result);
   reporter.onStageComplete('report', 'Done');
 
   return result;
@@ -981,6 +1012,10 @@ export async function updateBaselines(
 
   const [screenshots, renderDuration] = await timed(() => renderPages(routes, config));
   timing.render = renderDuration;
+  if (screenshots.length === 0) {
+    reporter.onStageComplete('render', 'Failed: no screenshots were captured');
+    throw new Error('Cannot update baselines: no screenshots were captured');
+  }
   const failedCaptures = screenshots.filter(
     (shot) => !Buffer.isBuffer(shot.buffer) || shot.buffer.length === 0,
   );
@@ -999,7 +1034,7 @@ export async function updateBaselines(
   // Init storage and write all baselines
   reporter.onStageStart('compare', 'Writing baselines…');
   const writeStart = performance.now();
-  const storage = new GitOrphanStorage(process.cwd());
+  const storage = new GitOrphanStorage(process.cwd(), { mode: 'update' });
   await storage.init();
 
   let written = 0;
@@ -1033,7 +1068,7 @@ export async function updateBaselines(
   // Update manifest
   const manifest = (await storage.readManifest()) ?? {
     schemaVersion: 1,
-    createdBy: 'frontguard@0.1.0',
+    createdBy: `frontguard@${CLI_VERSION}`,
     updatedAt: new Date().toISOString(),
     routes: {},
   };
@@ -1066,16 +1101,20 @@ export async function updateBaselines(
 
   reporter.onStageComplete('compare', `Wrote ${written} baseline(s)`);
   logger.info(`✅ Updated ${written} baseline(s) successfully`);
+  logger.info('To share these baselines with CI, run: git push origin frontguard-baselines');
 
   timing.total = Math.round(performance.now() - totalStart);
-  const result = buildResult(
-    screenshots.map((shot) => createNewPageResult(shot)),
-    timing,
-    totalStart,
-    config,
-  );
+  const result = {
+    ...buildResult(
+      screenshots.map((shot) => createNewPageResult(shot)),
+      timing,
+      totalStart,
+      config,
+    ),
+    baselineUpdate: true,
+  };
   reporter.onStageStart('report', 'Generating baseline update report…');
-  reporter.onComplete(result);
+  await reporter.onComplete(result);
   reporter.onStageComplete('report', 'Done');
   return result;
 }
@@ -1148,7 +1187,7 @@ export async function runJudgePipeline(
 
   if (screenshots.length === 0) {
     const empty = buildJudgeResult([], timing, totalStart, config);
-    reporter.onComplete(empty);
+    await reporter.onComplete(empty);
     return empty;
   }
 
@@ -1175,8 +1214,8 @@ export async function runJudgePipeline(
     return referenceCache.get(routePath) ?? undefined;
   }
 
-  const [, judgeDuration] = await timed(async () => {
-    await processBatched(screenshots, AI_BATCH_SIZE, async (shot, index) => {
+  const [judgeOutcomes, judgeDuration] = await timed(async () => {
+    return processBatched(screenshots, AI_BATCH_SIZE, async (shot, index) => {
       const figmaReference = await referenceFor(shot.route.path);
       const verdict = await judgeScreenshot(shot, { ai: config.ai!, figmaReference });
       judgements.push(verdict);
@@ -1188,12 +1227,44 @@ export async function runJudgePipeline(
       );
     });
   });
+  let judgeFailures = 0;
+  for (let i = 0; i < judgeOutcomes.length; i++) {
+    const outcome = judgeOutcomes[i];
+    if (outcome.status === 'fulfilled') continue;
+
+    judgeFailures++;
+    const shot = screenshots[i];
+    if (!shot) continue;
+    const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+    judgements.push({
+      route: shot.route,
+      viewport: shot.viewport,
+      browser: shot.browser,
+      pass: false,
+      confidence: 0,
+      issues: [],
+      withDesignReference: false,
+      error: `Judge failed: ${msg}`,
+    });
+    reporter.onStageProgress(
+      'analyze',
+      i + 1,
+      screenshots.length,
+      `${shot.route.path} @ ${shot.viewport}px → error`,
+    );
+  }
   timing.ai = judgeDuration;
-  reporter.onStageComplete('analyze', `Judged ${judgements.length} screenshot(s) in ${judgeDuration}ms`);
+  if (judgeFailures > 0) {
+    logger.error(`Judge failed for ${judgeFailures} screenshot(s)`);
+  }
+  reporter.onStageComplete(
+    'analyze',
+    `Judged ${judgements.length} screenshot(s) in ${judgeDuration}ms${judgeFailures > 0 ? `; ${judgeFailures} failed` : ''}`,
+  );
 
   timing.total = Math.round(performance.now() - totalStart);
   const result = buildJudgeResult(judgements, timing, totalStart, config);
-  reporter.onComplete(result);
+  await reporter.onComplete(result);
   return result;
 }
 

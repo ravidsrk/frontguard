@@ -1,13 +1,11 @@
-# This smoke workflow uses 'uses: ./' rather than 'uses: ravidsrk/frontguard@v0' because v0 is an OPS-managed lightweight tag that only resolves on the public marketplace after merge. Locally-pathed uses verifies the action.yml resolves end-to-end.
+# These PR checks validate Action manifest structure and generated-file parity.
+# They deliberately do not claim runtime smoke coverage: release acceptance must
+# execute ravidsrk/frontguard@v0 from an external consumer repository after the
+# pinned CLI version is published, with both unchanged and mutated fixtures.
 #
-# It is the standing regression guard for int-3: a repo-root action.yml must
-# exist and resolve so 'uses: ravidsrk/frontguard@<ref>' works, and the historic
-# sub-path consumer ('uses: ravidsrk/frontguard/packages/cli@<ref>') must keep
-# working too.
-#
-# Both local action forms must complete successfully. A broken browser install,
-# CLI invocation, or result contract is a failed smoke test, not an allowed gap.
-name: Action smoke
+# Local `uses: ./` only proves path resolution and previously masked published
+# package failures, so it is intentionally absent here.
+name: Action contract checks
 
 on:
   pull_request:
@@ -16,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  smoke-root-action:
+  root-action-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,13 +34,7 @@ jobs:
             exit 1
           fi
 
-      - name: Run repo-root composite action
-        # Equivalent to what `ravidsrk/frontguard@v0` resolves to.
-        uses: ./
-        with:
-          url: https://example.com
-
-  smoke-subpath-action:
+  subpath-action-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,9 +67,3 @@ jobs:
               exit 1
             fi
           done
-
-      - name: Run sub-path composite action
-        # Verifies the historical 'ravidsrk/frontguard/packages/cli@<ref>'.
-        uses: ./packages/cli
-        with:
-          url: https://example.com

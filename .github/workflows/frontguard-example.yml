@@ -1,20 +1,32 @@
-# Frontguard visual regression testing — EXAMPLE workflow.
+# Repository-only pre-release verification fixture.
 #
-# This is a reference example showing how to run Frontguard in CI. Copy it into
-# your own project (or run `npx frontguard init --ci` to generate it for you).
-# It is named `frontguard-example.yml` so it does NOT run in this repo by
-# default — rename to `frontguard.yml` and adjust the dev command to activate.
-name: Frontguard (example)
+# This workflow runs the published @frontguard/cli@0.2.2 package directly
+# against apps/demo. It does not invoke, validate, or claim acceptance of the
+# Frontguard GitHub Action. Keep it manual until a real run has produced review
+# evidence and the release workflow has published a newer package.
+name: Frontguard CLI demo (pre-release fixture)
 
 on:
-  # Disabled by default in this repo. Uncomment to enable on PRs:
-  # pull_request:
-  #   branches: [main, master]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      update_baselines:
+        description: 'Explicitly accept current demo captures and push frontguard-baselines'
+        required: true
+        type: boolean
+        default: false
+      negative_control:
+        description: 'Inject a known layout regression and require Frontguard to detect it'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
+  # Write access is used only by the guarded baseline-update step below.
   contents: write
-  pull-requests: write
+
+concurrency:
+  group: frontguard-demo-baselines
+  cancel-in-progress: false
 
 jobs:
   visual-regression:
@@ -40,20 +52,119 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ runner.os }}-playwright-frontguard-0.2.2-${{ hashFiles('**/package-lock.json') }}
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        # @frontguard/cli@0.2.2 depends on this exact Playwright release.
+        run: npm exec --yes --package="playwright@1.61.0" -- playwright install --with-deps chromium
+
+      - name: Validate manual controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.update_baselines }}" = "true" ] && [ "${{ inputs.negative_control }}" = "true" ]; then
+            echo "Refusing to accept baselines while the negative control is enabled." >&2
+            exit 2
+          fi
+
+      - name: Load persisted baselines
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin frontguard-baselines >/dev/null 2>&1; then
+            git fetch origin refs/heads/frontguard-baselines:refs/heads/frontguard-baselines
+          elif [ "${{ inputs.update_baselines }}" != "true" ]; then
+            echo "origin/frontguard-baselines does not exist." >&2
+            echo "Dispatch once with update_baselines=true after reviewing the demo." >&2
+            exit 1
+          fi
 
       - name: Start dev server
+        shell: bash
         run: |
-          npm run dev &
-          npx wait-on http://localhost:3000 --timeout 60000
+          set -euo pipefail
+          nohup env FRONTGUARD_DEMO_NEGATIVE_CONTROL="${{ inputs.negative_control && '1' || '0' }}" \
+            npm run dev --workspace=apps/demo -- --hostname 127.0.0.1 \
+            > /tmp/frontguard-demo.log 2>&1 &
 
-      - name: Run Frontguard
-        run: npx frontguard run --url http://localhost:3000 --output json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          if node --input-type=module <<'NODE'
+          const url = 'http://127.0.0.1:3000';
+          const deadline = Date.now() + 60_000;
+          while (Date.now() < deadline) {
+            try {
+              const response = await fetch(url);
+              if (response.ok) process.exit(0);
+            } catch {
+              // The server is still starting.
+            }
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+          console.error(`Timed out waiting for ${url}`);
+          process.exit(1);
+          NODE
+          then
+            exit 0
+          fi
+
+          cat /tmp/frontguard-demo.log >&2
+          exit 1
+
+      - name: Accept and persist baselines
+        if: ${{ inputs.update_baselines }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npm exec --yes --package="@frontguard/cli@0.2.2" -- frontguard run \
+            --config apps/demo/frontguard.config.ts \
+            --update-baselines
+          git push origin frontguard-baselines:frontguard-baselines
+
+      - name: Compare against persisted baselines
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          npm exec --yes --package="@frontguard/cli@0.2.2" -- frontguard run \
+            --config apps/demo/frontguard.config.ts \
+            --output json > frontguard-result.json
+          RUN_EXIT=$?
+          set -e
+          cat frontguard-result.json
+
+          if [ "${{ inputs.negative_control }}" = "true" ]; then
+            if [ "$RUN_EXIT" -ne 1 ]; then
+              echo "Negative control expected exit 1, got $RUN_EXIT." >&2
+              exit 1
+            fi
+            jq -e '.summary.regressions > 0 and .summary.errors == 0 and .summary.newPages == 0' frontguard-result.json >/dev/null
+            echo "Negative control detected the injected regression."
+          else
+            if [ "$RUN_EXIT" -ne 0 ]; then
+              echo "Comparison expected exit 0, got $RUN_EXIT." >&2
+              exit "$RUN_EXIT"
+            fi
+            jq -e '.summary.regressions == 0 and .summary.errors == 0 and .summary.newPages == 0' frontguard-result.json >/dev/null
+          fi
+
+      - name: Upload Frontguard report (GitHub.com)
+        if: always() && github.server_url == 'https://github.com'
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontguard-report
+          path: |
+            frontguard-result.json
+            frontguard-report/
+          if-no-files-found: warn
+
+      - name: Upload Frontguard report (GitHub Enterprise Server)
+        if: always() && github.server_url != 'https://github.com'
+        uses: actions/upload-artifact@v3.2.2-node20
+        with:
+          name: frontguard-report
+          path: |
+            frontguard-result.json
+            frontguard-report/
+          if-no-files-found: warn

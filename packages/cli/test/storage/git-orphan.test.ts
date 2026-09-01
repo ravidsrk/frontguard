@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -73,7 +73,7 @@ describe('GitOrphanStorage', () => {
   });
 
   it('can be instantiated with a custom branch name', () => {
-    const storage = new GitOrphanStorage('/tmp/fake-repo', 'my-baselines');
+    const storage = new GitOrphanStorage('/tmp/fake-repo', { branch: 'my-baselines' });
     expect(storage).toBeDefined();
   });
 
@@ -171,7 +171,7 @@ describe('GitOrphanStorage maxBuffer (install-2)', () => {
   });
 
   it('round-trips a baseline larger than the 1 MiB default buffer without ENOBUFS', async () => {
-    const storage = new GitOrphanStorage(repoDir);
+    const storage = new GitOrphanStorage(repoDir, { mode: 'update' });
     await storage.init();
 
     // 2 MiB payload — reading this back via `git show` would throw ENOBUFS
@@ -184,4 +184,340 @@ describe('GitOrphanStorage maxBuffer (install-2)', () => {
     expect(read!.length).toBeGreaterThan(1024 * 1024);
     expect(read!.equals(big)).toBe(true);
   }, 30_000);
+
+  it('creates the orphan branch without disturbing a dirty working tree', async () => {
+    const uncommitted = join(repoDir, 'frontguard.config.ts');
+    writeFileSync(uncommitted, 'export default { baseUrl: "http://localhost:3000" };\n');
+
+    const storage = new GitOrphanStorage(repoDir, { mode: 'update' });
+    await expect(storage.init()).resolves.toBeUndefined();
+
+    expect(existsSync(uncommitted)).toBe(true);
+    expect(readFileSync(uncommitted, 'utf8')).toContain('baseUrl');
+  });
+
+  it('does not create baseline state during comparison initialization', async () => {
+    const storage = new GitOrphanStorage(repoDir);
+
+    await storage.init();
+
+    expect(execFileSync('git', ['branch', '--list', 'frontguard-baselines'], {
+      cwd: repoDir,
+      encoding: 'utf8',
+    }).trim()).toBe('');
+    await expect(storage.hasBaselines()).resolves.toBe(false);
+    await expect(storage.readBaseline('/missing', 1440, 'chromium')).resolves.toBeNull();
+    await expect(
+      storage.writeBaseline('/missing', 1440, 'chromium', Buffer.from('png')),
+    ).rejects.toThrow('explicit update mode');
+  });
+
+  it('returns null only when the requested baseline path is absent', async () => {
+    const storage = new GitOrphanStorage(repoDir, { mode: 'update' });
+    await storage.init();
+
+    await expect(storage.readBaseline('/missing', 1440, 'chromium')).resolves.toBeNull();
+  });
+
+  it('propagates git failures instead of treating them as missing baselines', async () => {
+    const storage = new GitOrphanStorage(repoDir, { mode: 'update' });
+    await storage.init();
+    git('update-ref', '-d', 'refs/heads/frontguard-baselines');
+
+    await expect(storage.readBaseline('/missing', 1440, 'chromium')).rejects.toThrow(
+      'Could not read baseline',
+    );
+  });
+});
+
+describe('GitOrphanStorage remote branch adoption', () => {
+  let rootDir: string;
+
+  function git(cwd: string, ...args: string[]): string {
+    return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  }
+
+  beforeEach(() => {
+    rootDir = mkdtempSync(join(tmpdir(), 'fg-orphan-remote-'));
+    vi.stubEnv('CI', 'false');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    rmSync(rootDir, { recursive: true, force: true });
+  });
+
+  function createRemoteFixture(expected: Buffer): {
+    sourceDir: string;
+    remoteDir: string;
+  } {
+    const sourceDir = join(rootDir, 'source');
+    const remoteDir = join(rootDir, 'remote.git');
+    mkdirSync(sourceDir);
+
+    git(sourceDir, 'init', '--quiet', '--initial-branch=main');
+    git(sourceDir, 'config', 'user.email', 'test@example.com');
+    git(sourceDir, 'config', 'user.name', 'Test');
+    git(sourceDir, 'config', 'commit.gpgsign', 'false');
+    writeFileSync(join(sourceDir, 'README.md'), '# fixture\n');
+    git(sourceDir, 'add', 'README.md');
+    git(sourceDir, 'commit', '--quiet', '-m', 'initial');
+
+    git(rootDir, 'init', '--quiet', '--bare', remoteDir);
+    git(sourceDir, 'remote', 'add', 'origin', remoteDir);
+    git(sourceDir, 'push', '--quiet', 'origin', 'main');
+
+    git(sourceDir, 'checkout', '--quiet', '--orphan', 'frontguard-baselines');
+    git(sourceDir, 'rm', '--quiet', '-rf', '.');
+    const baselineDir = join(sourceDir, 'baselines', 'home', '1440');
+    mkdirSync(baselineDir, { recursive: true });
+    writeFileSync(join(baselineDir, 'chromium.png'), expected);
+    writeFileSync(
+      join(sourceDir, 'manifest.json'),
+      JSON.stringify({ schemaVersion: 1, createdBy: 'test', updatedAt: '2026-08-29', routes: {} }),
+    );
+    git(sourceDir, 'add', '-A');
+    git(sourceDir, 'commit', '--quiet', '-m', 'baseline');
+    git(sourceDir, 'push', '--quiet', 'origin', 'frontguard-baselines');
+
+    return { sourceDir, remoteDir };
+  }
+
+  it('fetches a remote-only baseline branch in a full clone', async () => {
+    const expected = Buffer.from('accepted-png');
+    const { remoteDir } = createRemoteFixture(expected);
+    const cloneDir = join(rootDir, 'clone');
+
+    git(rootDir, 'clone', '--quiet', '--branch', 'main', remoteDir, cloneDir);
+    git(cloneDir, 'update-ref', '-d', 'refs/remotes/origin/frontguard-baselines');
+    expect(git(cloneDir, 'branch', '--list', 'frontguard-baselines')).toBe('');
+
+    const storage = new GitOrphanStorage(cloneDir);
+    await storage.init();
+
+    expect(await storage.readBaseline('/home', 1440, 'chromium')).toEqual(expected);
+    expect(git(cloneDir, 'branch', '--list', 'frontguard-baselines')).toBe('');
+  });
+
+  it('adopts a remote-only baseline branch in a single-branch shallow clone', async () => {
+    const expected = Buffer.from('shallow-accepted-png');
+    const { remoteDir } = createRemoteFixture(expected);
+    const cloneDir = join(rootDir, 'shallow-clone');
+
+    git(
+      rootDir,
+      'clone',
+      '--quiet',
+      '--depth=1',
+      '--single-branch',
+      '--branch',
+      'main',
+      `file://${remoteDir}`,
+      cloneDir,
+    );
+
+    const storage = new GitOrphanStorage(cloneDir);
+    await storage.init();
+
+    expect(await storage.readBaseline('/home', 1440, 'chromium')).toEqual(expected);
+  });
+
+  it('fast-forwards a stale local baseline branch in CI', async () => {
+    const initial = Buffer.from('initial-png');
+    const latest = Buffer.from('latest-png');
+    const { sourceDir, remoteDir } = createRemoteFixture(initial);
+    const cloneDir = join(rootDir, 'stale-clone');
+    git(rootDir, 'clone', '--quiet', '--branch', 'main', remoteDir, cloneDir);
+
+    await new GitOrphanStorage(cloneDir).init();
+
+    writeFileSync(join(sourceDir, 'baselines', 'home', '1440', 'chromium.png'), latest);
+    git(sourceDir, 'add', '-A');
+    git(sourceDir, 'commit', '--quiet', '-m', 'update baseline');
+    git(sourceDir, 'push', '--quiet', 'origin', 'frontguard-baselines');
+
+    vi.stubEnv('CI', 'true');
+    const refreshed = new GitOrphanStorage(cloneDir);
+    await refreshed.init();
+    expect(await refreshed.readBaseline('/home', 1440, 'chromium')).toEqual(latest);
+  });
+
+  it('reads a newly published remote baseline locally without moving the local branch', async () => {
+    const initial = Buffer.from('initial-png');
+    const latest = Buffer.from('latest-png');
+    const { sourceDir, remoteDir } = createRemoteFixture(initial);
+    const cloneDir = join(rootDir, 'local-refresh-clone');
+    git(rootDir, 'clone', '--quiet', '--branch', 'main', remoteDir, cloneDir);
+
+    const updater = new GitOrphanStorage(cloneDir, { mode: 'update' });
+    await updater.init();
+    const localCommit = git(cloneDir, 'rev-parse', 'frontguard-baselines');
+
+    writeFileSync(join(sourceDir, 'baselines', 'home', '1440', 'chromium.png'), latest);
+    git(sourceDir, 'add', '-A');
+    git(sourceDir, 'commit', '--quiet', '-m', 'publish newer baseline');
+    git(sourceDir, 'push', '--quiet', 'origin', 'frontguard-baselines');
+
+    const comparison = new GitOrphanStorage(cloneDir);
+    await comparison.init();
+
+    expect(await comparison.readBaseline('/home', 1440, 'chromium')).toEqual(latest);
+    expect(git(cloneDir, 'rev-parse', 'frontguard-baselines')).toBe(localCommit);
+  });
+
+  it('preserves unpublished local baseline commits in update mode', async () => {
+    const initial = Buffer.from('initial-png');
+    const local = Buffer.from('local-unpublished-png');
+    const { remoteDir } = createRemoteFixture(initial);
+    const cloneDir = join(rootDir, 'ahead-clone');
+    git(rootDir, 'clone', '--quiet', '--branch', 'main', remoteDir, cloneDir);
+
+    const storage = new GitOrphanStorage(cloneDir, { mode: 'update' });
+    await storage.init();
+    await storage.writeBaseline('/home', 1440, 'chromium', local);
+
+    vi.stubEnv('CI', 'true');
+    const refreshed = new GitOrphanStorage(cloneDir, { mode: 'update' });
+    await refreshed.init();
+    expect(await refreshed.readBaseline('/home', 1440, 'chromium')).toEqual(local);
+  });
+
+  it('rejects unpublished local baseline commits during CI comparison', async () => {
+    const initial = Buffer.from('initial-png');
+    const { remoteDir } = createRemoteFixture(initial);
+    const cloneDir = join(rootDir, 'ahead-comparison-clone');
+    git(rootDir, 'clone', '--quiet', '--branch', 'main', remoteDir, cloneDir);
+
+    const updater = new GitOrphanStorage(cloneDir, { mode: 'update' });
+    await updater.init();
+    await updater.writeBaseline('/home', 1440, 'chromium', Buffer.from('unpublished-png'));
+
+    vi.stubEnv('CI', 'true');
+    const comparison = new GitOrphanStorage(cloneDir);
+    await expect(comparison.init()).rejects.toThrow('refuses unpublished baseline commits');
+    await expect(comparison.readBaseline('/home', 1440, 'chromium')).rejects.toThrow(
+      'not initialized',
+    );
+  });
+
+  it('does not fall back to a stale local branch deleted from origin in CI', async () => {
+    const expected = Buffer.from('published-png');
+    const { sourceDir, remoteDir } = createRemoteFixture(expected);
+    const cloneDir = join(rootDir, 'deleted-remote-clone');
+    git(rootDir, 'clone', '--quiet', '--branch', 'main', remoteDir, cloneDir);
+
+    vi.stubEnv('CI', 'true');
+    const comparison = new GitOrphanStorage(cloneDir);
+    await comparison.init();
+    expect(await comparison.readBaseline('/home', 1440, 'chromium')).toEqual(expected);
+
+    git(sourceDir, 'push', '--quiet', 'origin', '--delete', 'frontguard-baselines');
+
+    await expect(comparison.init()).rejects.toThrow(
+      'Published baseline branch origin/frontguard-baselines does not exist',
+    );
+    await expect(comparison.readBaseline('/home', 1440, 'chromium')).rejects.toThrow(
+      'not initialized',
+    );
+  });
+
+  it('pins CI comparison reads to the fetched remote commit', async () => {
+    const published = Buffer.from('published-png');
+    const { remoteDir } = createRemoteFixture(published);
+    const cloneDir = join(rootDir, 'pinned-comparison-clone');
+    git(rootDir, 'clone', '--quiet', '--branch', 'main', remoteDir, cloneDir);
+
+    vi.stubEnv('CI', 'true');
+    const comparison = new GitOrphanStorage(cloneDir);
+    await comparison.init();
+
+    const updater = new GitOrphanStorage(cloneDir, { mode: 'update' });
+    await updater.init();
+    await updater.writeBaseline('/home', 1440, 'chromium', Buffer.from('unpublished-png'));
+
+    expect(await comparison.readBaseline('/home', 1440, 'chromium')).toEqual(published);
+  });
+
+  it('treats CI=false as local development and keeps an existing baseline offline', async () => {
+    const expected = Buffer.from('offline-png');
+    const { remoteDir } = createRemoteFixture(expected);
+    const cloneDir = join(rootDir, 'offline-clone');
+    git(rootDir, 'clone', '--quiet', '--branch', 'main', remoteDir, cloneDir);
+    await new GitOrphanStorage(cloneDir, { mode: 'update' }).init();
+    git(cloneDir, 'remote', 'set-url', 'origin', join(rootDir, 'missing.git'));
+    vi.stubEnv('CI', 'false');
+
+    const offline = new GitOrphanStorage(cloneDir);
+    await expect(offline.init()).resolves.toBeUndefined();
+    expect(await offline.readBaseline('/home', 1440, 'chromium')).toEqual(expected);
+  });
+
+  it('fails closed when CI cannot refresh the remote baseline branch', async () => {
+    const { remoteDir } = createRemoteFixture(Buffer.from('initial-png'));
+    const cloneDir = join(rootDir, 'network-failure-clone');
+    git(rootDir, 'clone', '--quiet', '--branch', 'main', remoteDir, cloneDir);
+    await new GitOrphanStorage(cloneDir).init();
+    git(cloneDir, 'remote', 'set-url', 'origin', join(rootDir, 'missing.git'));
+    vi.stubEnv('CI', 'true');
+
+    await expect(new GitOrphanStorage(cloneDir).init()).rejects.toThrow(
+      'Could not check origin/frontguard-baselines',
+    );
+  });
+
+  it('rejects divergent local and remote baseline histories in CI', async () => {
+    const initial = Buffer.from('initial-png');
+    const { sourceDir, remoteDir } = createRemoteFixture(initial);
+    const cloneDir = join(rootDir, 'diverged-clone');
+    git(rootDir, 'clone', '--quiet', '--branch', 'main', remoteDir, cloneDir);
+
+    const localStorage = new GitOrphanStorage(cloneDir, { mode: 'update' });
+    await localStorage.init();
+    await localStorage.writeBaseline('/home', 1440, 'chromium', Buffer.from('local-png'));
+
+    writeFileSync(
+      join(sourceDir, 'baselines', 'home', '1440', 'chromium.png'),
+      Buffer.from('remote-png'),
+    );
+    git(sourceDir, 'add', '-A');
+    git(sourceDir, 'commit', '--quiet', '-m', 'remote baseline update');
+    git(sourceDir, 'push', '--quiet', 'origin', 'frontguard-baselines');
+    vi.stubEnv('CI', 'true');
+
+    await expect(new GitOrphanStorage(cloneDir).init()).rejects.toThrow(
+      'has diverged from origin/frontguard-baselines',
+    );
+  });
+});
+
+describe('GitOrphanStorage in a repository without commits', () => {
+  let repoDir: string;
+
+  beforeEach(() => {
+    repoDir = mkdtempSync(join(tmpdir(), 'fg-orphan-unborn-'));
+    execFileSync('git', ['init', '--quiet', '--initial-branch=main'], {
+      cwd: repoDir,
+      stdio: 'pipe',
+    });
+  });
+
+  afterEach(() => {
+    rmSync(repoDir, { recursive: true, force: true });
+  });
+
+  it('creates baselines while preserving uncommitted project files', async () => {
+    const configPath = join(repoDir, 'frontguard.config.ts');
+    writeFileSync(configPath, 'export default { baseUrl: "http://localhost:3000" };\n');
+
+    const storage = new GitOrphanStorage(repoDir, { mode: 'update' });
+    await storage.init();
+
+    expect(existsSync(configPath)).toBe(true);
+    const version = readFileSync(new URL('../../../../VERSION', import.meta.url), 'utf8').trim();
+    expect(await storage.readManifest()).toMatchObject({
+      schemaVersion: 1,
+      createdBy: `frontguard@${version}`,
+      routes: {},
+    });
+  });
 });

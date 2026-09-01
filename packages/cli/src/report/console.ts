@@ -114,13 +114,15 @@ export class ConsoleReporter implements Reporter {
     const hasRegressions = result.summary.regressions > 0;
     const hasWarnings = result.summary.warnings > 0;
     const hasErrors = result.summary.errors > 0;
+    const hasNewPages = result.summary.newPages > 0;
 
-    if (!hasRegressions && !hasWarnings && !hasErrors) {
+    if (!hasRegressions && !hasWarnings && !hasErrors && !hasNewPages) {
       console.log(chalk.green.bold('  ✅ All pages match baselines'));
       console.log('');
     } else {
       this.printRegressions(result);
       this.printWarnings(result);
+      this.printNewPages(result);
     }
 
     this.printAccessibility(result);
@@ -218,6 +220,7 @@ export class ConsoleReporter implements Reporter {
   private printRouteTable(result: RunResult): void {
     const viewports = [...new Set(result.diffs.map((d) => d.viewport))].sort((a, b) => a - b);
     const routes = [...new Set(result.diffs.map((d) => d.route.path))];
+    const browsers = [...new Set(result.diffs.map((d) => d.browser))];
 
     if (routes.length === 0) {
       console.log(chalk.dim('  No routes tested.'));
@@ -227,21 +230,28 @@ export class ConsoleReporter implements Reporter {
     // Header
     const vpHeaders = viewports.map((vp) => chalk.dim(padCenter(`${vp}px`, 8)));
     const routeColWidth = Math.max(30, ...routes.map((r) => r.length + 2));
-    const header = `  ${chalk.bold(padRight('Route', routeColWidth))}${vpHeaders.join(' ')}`;
+    const browserColWidth = Math.max(10, ...browsers.map((browser) => browser.length + 2));
+    const header = `  ${chalk.bold(padRight('Route', routeColWidth))}${chalk.bold(padRight('Browser', browserColWidth))}${vpHeaders.join(' ')}`;
     console.log(header);
-    console.log(chalk.dim(`  ${'─'.repeat(routeColWidth + viewports.length * 9)}`));
+    console.log(chalk.dim(`  ${'─'.repeat(routeColWidth + browserColWidth + viewports.length * 9)}`));
 
     // Rows
     for (const route of routes) {
-      const cells = viewports.map((vp) => {
-        const diff = result.diffs.find((d) => d.route.path === route && d.viewport === vp);
-        if (!diff) return chalk.dim(padCenter('–', 8));
-        const icon = STATUS_ICONS[diff.status] ?? chalk.dim('?');
-        return padCenter(icon, 8);
-      });
+      for (const browser of browsers) {
+        if (!result.diffs.some((d) => d.route.path === route && d.browser === browser)) continue;
+        const cells = viewports.map((vp) => {
+          const diff = result.diffs.find(
+            (d) => d.route.path === route && d.viewport === vp && d.browser === browser,
+          );
+          if (!diff) return chalk.dim(padCenter('–', 8));
+          const icon = STATUS_ICONS[diff.status] ?? chalk.dim('?');
+          return padCenter(icon, 8);
+        });
 
-      const routeLabel = padRight(route, routeColWidth);
-      console.log(`  ${routeLabel}${cells.join(' ')}`);
+        const routeLabel = padRight(route, routeColWidth);
+        const browserLabel = padRight(browser, browserColWidth);
+        console.log(`  ${routeLabel}${browserLabel}${cells.join(' ')}`);
+      }
     }
 
     console.log('');
@@ -325,6 +335,29 @@ export class ConsoleReporter implements Reporter {
 
       console.log('');
     }
+  }
+
+  private printNewPages(result: RunResult): void {
+    if (result.summary.newPages === 0) return;
+
+    if (result.baselineUpdate) {
+      console.log(
+        chalk.blue.bold(
+          `  ★ BASELINES UPDATED (${result.summary.newPages}) — accepted and committed locally`,
+        ),
+      );
+      console.log(chalk.dim('  Share them with CI: git push origin frontguard-baselines'));
+      console.log('');
+      return;
+    }
+
+    console.log(
+      chalk.blue.bold(
+        `  ★ NEW PAGES (${result.summary.newPages}) — current captures were not accepted as baselines`,
+      ),
+    );
+    console.log(chalk.dim('  Review them, then run `frontguard update-baselines` to accept them.'));
+    console.log('');
   }
 
   // -------------------------------------------------------------------------

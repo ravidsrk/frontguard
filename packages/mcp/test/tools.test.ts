@@ -419,6 +419,7 @@ describe('MCP server tools/list + tools/call', () => {
     const tool = res.tools.find((t) => t.name === 'accept_baseline');
     expect(tool?.description).toMatch(/run-scoped/i);
     expect(tool?.description).toMatch(/confirm_all_regressions_reviewed/i);
+    expect(tool?.description).toMatch(/promotion is not implemented/i);
     await client.close();
     await server.close();
   });

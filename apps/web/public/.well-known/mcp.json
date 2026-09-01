@@ -1,14 +1,14 @@
 {
   "name": "@frontguard/mcp",
-  "description": "Frontguard MCP server for querying visual regressions, suggested fixes, recent runs, and baseline approvals.",
-  "version": "0.2.2",
+  "description": "Pre-release Frontguard MCP server for querying a verified cloud API deployment. No default hosted endpoint is live.",
+  "version": "0.2.3",
   "documentation": "https://frontguard.dev/agents.md",
   "package": {
     "registry": "npm",
     "name": "@frontguard/mcp"
   },
   "api": {
-    "baseUrl": "https://api.frontguard.dev"
+    "baseUrl": "https://your-frontguard-api.example.com"
   },
   "transport": {
     "type": "stdio"
@@ -17,7 +17,7 @@
     "command": "npx",
     "args": ["-y", "@frontguard/mcp"],
     "env": {
-      "FRONTGUARD_API_URL": "https://api.frontguard.dev",
+      "FRONTGUARD_API_URL": "https://your-frontguard-api.example.com",
       "FRONTGUARD_API_KEY": "fg_live_xxx"
     }
   },
@@ -25,8 +25,7 @@
     {
       "name": "FRONTGUARD_API_URL",
       "required": true,
-      "description": "Frontguard API base URL.",
-      "default": "https://api.frontguard.dev"
+      "description": "Verified Frontguard API deployment URL. No default hosted endpoint is live."
     },
     {
       "name": "FRONTGUARD_API_KEY",
@@ -46,7 +45,7 @@
     },
     {
       "name": "accept_baseline",
-      "description": "Promote every screenshot in a run to the new baseline (run-scoped \u2014 not per-diff). Requires `run_id` and `confirm_all_regressions_reviewed: true` after you have reviewed every regression from `list_regressions`."
+      "description": "Record run-scoped whole-run approval after `confirm_all_regressions_reviewed: true`. Screenshot promotion is not implemented yet; use the CLI or composite Action to update baselines."
     },
     {
       "name": "recent_runs",

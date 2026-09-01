@@ -16,7 +16,8 @@ import { logger } from '../utils/logger.js';
 
 const COMMENT_MARKER = '<!-- frontguard-report -->';
 const MAX_COMMENT_SIZE = 60_000; // GitHub's comment limit is ~65536, leave margin
-const GITHUB_API = 'https://api.github.com';
+const DEFAULT_GITHUB_API = 'https://api.github.com';
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 
 /** Formats a perf metric value with its unit (ms → s, bytes → KB). */
 function formatPerfValue(value: number, unit: string): string {
@@ -41,13 +42,25 @@ export class GitHubPRReporter implements Reporter {
   private owner: string;
   private repo: string;
   private prNumber: number;
+  private requestTimeoutMs: number;
+  private apiUrl: string;
   /** Perf results keyed by `route@viewport`, populated per `generateComment`. */
   private perfByKey = new Map<string, PerfReport>();
 
-  constructor(options?: { owner?: string; repo?: string; prNumber?: number }) {
+  constructor(options?: {
+    owner?: string;
+    repo?: string;
+    prNumber?: number;
+    requestTimeoutMs?: number;
+    apiUrl?: string;
+  }) {
     this.owner = options?.owner ?? '';
     this.repo = options?.repo ?? '';
     this.prNumber = options?.prNumber ?? 0;
+    this.requestTimeoutMs = options?.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    this.apiUrl = (
+      options?.apiUrl ?? process.env.GITHUB_API_URL ?? DEFAULT_GITHUB_API
+    ).replace(/\/+$/, '');
 
     // Auto-detect from GitHub Actions environment
     if (!this.owner || !this.repo) {
@@ -130,7 +143,7 @@ export class GitHubPRReporter implements Reporter {
     }
 
     // Header with badge
-    sections.push(this.generateHeader(summary));
+    sections.push(this.generateHeader(result));
 
     // Regressions
     const regressions = result.diffs.filter((d) => d.status === 'regression');
@@ -147,7 +160,7 @@ export class GitHubPRReporter implements Reporter {
     // New pages
     const newPages = result.diffs.filter((d) => d.status === 'new');
     if (newPages.length > 0) {
-      sections.push(this.generateNewPagesSection(newPages));
+      sections.push(this.generateNewPagesSection(newPages, result.baselineUpdate === true));
     }
 
     // Accessibility (Task 5.1)
@@ -182,13 +195,23 @@ export class GitHubPRReporter implements Reporter {
     return markdown;
   }
 
-  private generateHeader(summary: RunResult['summary']): string {
+  private generateHeader(result: RunResult): string {
+    const { summary } = result;
     let badge: string;
     let status: string;
 
-    if (summary.regressions > 0) {
+    if (result.baselineUpdate) {
+      badge = '🟢';
+      status = `${summary.total} baseline${summary.total !== 1 ? 's' : ''} explicitly accepted`;
+    } else if (summary.errors > 0) {
+      badge = '🔴';
+      status = `${summary.errors} visual test error${summary.errors !== 1 ? 's' : ''}`;
+    } else if (summary.regressions > 0) {
       badge = '🔴';
       status = `${summary.regressions} visual regression${summary.regressions !== 1 ? 's' : ''} detected`;
+    } else if (summary.newPages > 0) {
+      badge = '🟡';
+      status = `${summary.newPages} new screenshot${summary.newPages !== 1 ? 's' : ''} require baseline acceptance`;
     } else if (summary.warnings > 0) {
       badge = '🟡';
       status = `${summary.warnings} visual change${summary.warnings !== 1 ? 's' : ''} detected`;
@@ -476,13 +499,17 @@ export class GitHubPRReporter implements Reporter {
     ].join('\n');
   }
 
-  private generateNewPagesSection(newPages: DiffResult[]): string {
+  private generateNewPagesSection(newPages: DiffResult[], baselineUpdate: boolean): string {
     const lines: string[] = ['## 🆕 New Pages', ''];
 
     const pageList = newPages.map((d) => `- \`${d.route.path}\` @ ${d.viewport}px`);
     lines.push(...pageList);
     lines.push('');
-    lines.push('> These pages have no baseline yet. Screenshots have been saved as the new baseline.');
+    lines.push(
+      baselineUpdate
+        ? '> These screenshots were explicitly accepted and committed to the local `frontguard-baselines` branch.'
+        : '> These pages have no accepted baseline yet. Review them, then run `frontguard update-baselines` to capture and accept fresh baselines.',
+    );
 
     return lines.join('\n');
   }
@@ -490,6 +517,7 @@ export class GitHubPRReporter implements Reporter {
   private generateSummaryTable(result: RunResult): string {
     const viewports = [...new Set(result.diffs.map((d) => d.viewport))].sort((a, b) => a - b);
     const routes = [...new Set(result.diffs.map((d) => d.route.path))];
+    const browsers = [...new Set(result.diffs.map((d) => d.browser))];
 
     if (routes.length === 0) return '';
 
@@ -497,25 +525,30 @@ export class GitHubPRReporter implements Reporter {
 
     // Table header
     const vpHeaders = viewports.map((vp) => `${vp}px`);
-    lines.push(`| Route | ${vpHeaders.join(' | ')} |`);
-    lines.push(`|:---|${vpHeaders.map(() => ':---:').join('|')}|`);
+    lines.push(`| Route | Browser | ${vpHeaders.join(' | ')} |`);
+    lines.push(`|:---|:---|${vpHeaders.map(() => ':---:').join('|')}|`);
 
     // Table rows
     for (const route of routes) {
-      const cells = viewports.map((vp) => {
-        const diff = result.diffs.find((d) => d.route.path === route && d.viewport === vp);
-        if (!diff) return '–';
-        switch (diff.status) {
-          case 'pass': return '✓';
-          case 'changed': return '⚠';
-          case 'regression': return '✘';
-          case 'new': return '★';
-          case 'error': return '✘';
-          case 'flaky': return '⚠';
-          default: return '–';
-        }
-      });
-      lines.push(`| \`${route}\` | ${cells.join(' | ')} |`);
+      for (const browser of browsers) {
+        if (!result.diffs.some((d) => d.route.path === route && d.browser === browser)) continue;
+        const cells = viewports.map((vp) => {
+          const diff = result.diffs.find(
+            (d) => d.route.path === route && d.viewport === vp && d.browser === browser,
+          );
+          if (!diff) return '–';
+          switch (diff.status) {
+            case 'pass': return '✓';
+            case 'changed': return '⚠';
+            case 'regression': return '✘';
+            case 'new': return '★';
+            case 'error': return '✘';
+            case 'flaky': return '⚠';
+            default: return '–';
+          }
+        });
+        lines.push(`| \`${route}\` | ${browser} | ${cells.join(' | ')} |`);
+      }
     }
 
     return lines.join('\n');
@@ -526,18 +559,18 @@ export class GitHubPRReporter implements Reporter {
     return `---\n` +
       `<sub>🛡️ Frontguard visual regression test · ` +
       `${result.summary.total} comparisons in ${totalSec}s · ` +
-      `📎 See the full HTML report with screenshots in the CI artifacts</sub>`;
+      `📎 Report directory: \`${result.config.outputDir}\`</sub>`;
   }
 
   private truncateComment(markdown: string, result: RunResult): string {
     // Keep header + summary + truncation notice
-    const header = this.generateHeader(result.summary);
+    const header = this.generateHeader(result);
     const footer = this.generateFooter(result);
 
     const truncated = `${COMMENT_MARKER}\n\n` +
       `${header}\n\n` +
       `> ⚠️ **Report truncated** — Full report exceeds GitHub's comment size limit.\n` +
-      `> See the full HTML report for complete details.\n\n` +
+      `> See the workflow artifact when an HTML report was generated.\n\n` +
       `${this.generateSummaryTable(result)}\n\n` +
       `${footer}`;
 
@@ -596,37 +629,41 @@ export class GitHubPRReporter implements Reporter {
   }
 
   private async findExistingComment(headers: Record<string, string>): Promise<number | null> {
-    const url = `${GITHUB_API}/repos/${this.owner}/${this.repo}/issues/${this.prNumber}/comments?per_page=100`;
+    for (let page = 1; ; page += 1) {
+      const url = `${this.apiUrl}/repos/${this.owner}/${this.repo}/issues/${this.prNumber}/comments?per_page=100&page=${page}`;
+      const response = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(this.requestTimeoutMs),
+      });
 
-    const response = await fetch(url, { headers });
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        // PR might not exist or be in a fork
-        logger.warn('PR not found — it may be from a fork with restricted permissions.');
-        return null;
+      if (!response.ok) {
+        if (response.status === 404) {
+          // PR might not exist or be in a fork
+          logger.warn('PR not found — it may be from a fork with restricted permissions.');
+          return null;
+        }
+        throw new Error(`GitHub API error (${response.status}): ${await response.text()}`);
       }
-      throw new Error(`GitHub API error (${response.status}): ${await response.text()}`);
-    }
 
-    const comments = await response.json() as Array<{id: number; body?: string}>;
-
-    for (const comment of comments) {
-      if (comment.body?.includes(COMMENT_MARKER)) {
-        return comment.id;
+      const comments = await response.json() as Array<{id: number; body?: string}>;
+      for (const comment of comments) {
+        if (comment.body?.includes(COMMENT_MARKER)) {
+          return comment.id;
+        }
       }
-    }
 
-    return null;
+      if (comments.length < 100) return null;
+    }
   }
 
   private async createComment(body: string, headers: Record<string, string>): Promise<void> {
-    const url = `${GITHUB_API}/repos/${this.owner}/${this.repo}/issues/${this.prNumber}/comments`;
+    const url = `${this.apiUrl}/repos/${this.owner}/${this.repo}/issues/${this.prNumber}/comments`;
 
     const response = await fetch(url, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ body }),
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
     });
 
     if (!response.ok) {
@@ -635,12 +672,13 @@ export class GitHubPRReporter implements Reporter {
   }
 
   private async updateComment(commentId: number, body: string, headers: Record<string, string>): Promise<void> {
-    const url = `${GITHUB_API}/repos/${this.owner}/${this.repo}/issues/comments/${commentId}`;
+    const url = `${this.apiUrl}/repos/${this.owner}/${this.repo}/issues/comments/${commentId}`;
 
     const response = await fetch(url, {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ body }),
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
     });
 
     if (!response.ok) {
@@ -655,7 +693,8 @@ export class GitHubPRReporter implements Reporter {
       logger.error(
         'GitHub API permission denied (403). ' +
         'Ensure the GITHUB_TOKEN has `write` permission for pull requests. ' +
-        'For fork PRs, use `pull_request_target` instead of `pull_request`.'
+        'Built-in fork PR comments are unsupported because fork tokens are read-only. ' +
+        'Use a separate privileged workflow that only reads trusted artifacts and never executes fork code.'
       );
     } else if (msg.includes('422')) {
       logger.error(

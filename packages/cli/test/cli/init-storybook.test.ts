@@ -196,13 +196,19 @@ describe('runInit — Storybook auto-detection', () => {
   it('emits the GH Actions workflow with storybook port when --ci + storybook detected', () => {
     mkdirSync(join(tempDir, '.storybook'), { recursive: true });
     writeFileSync(join(tempDir, '.storybook', 'main.ts'), 'export default {};');
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({ scripts: { storybook: 'storybook dev -p 6006' } }),
+    );
+    writeFileSync(join(tempDir, 'package-lock.json'), '{}');
 
-    runInit({ cwd: tempDir, format: 'ts', ci: true });
+    const result = runInit({ cwd: tempDir, format: 'ts', ci: true });
+    expect(result.exitCode).toBe(0);
     const wfPath = join(tempDir, '.github', 'workflows', 'frontguard.yml');
     expect(existsSync(wfPath)).toBe(true);
     const wf = readFileSync(wfPath, 'utf-8');
     expect(wf).toContain('6006');
-    expect(wf).toContain('storybook');
+    expect(wf).toContain('npm run storybook');
   });
 
   it('uses the fixture .storybook config when run against packages/cli/__fixtures__/storybook', () => {

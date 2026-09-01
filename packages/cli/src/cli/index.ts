@@ -23,12 +23,13 @@ import {
 import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
 import { maybeRunInDocker } from './run.js';
+import { comparisonExitCode } from './exit-code.js';
 import { parseThresholdRatio } from './threshold.js';
 import { compareDiffToThreshold } from '../diff/threshold.js';
 import { sendTelemetry, isTelemetryEnabled, type TelemetryEvent } from '../utils/telemetry.js';
 import { ConsoleReporter } from '../report/console.js';
-import { JSONReporter } from '../report/json.js';
 import { HTMLReporter } from '../report/html.js';
+import { createReporter } from '../report/factory.js';
 import { logger, setLogLevel } from '../utils/logger.js';
 import { FixPatternDB } from '../storage/fix-patterns.js';
 import {
@@ -37,9 +38,11 @@ import {
   runPollingLoop,
   readRecentHistory,
   formatHistoryTable,
+  resolveMonitorUrls,
 } from '../plugins/monitor.js';
-import type { FrontguardConfig, Reporter, BrowserEngine } from '../core/types.js';
+import type { FrontguardConfig, BrowserEngine } from '../core/types.js';
 import { writeFileSync } from 'node:fs';
+import { CLI_VERSION as VERSION } from '../version.js';
 
 // Global error handlers
 process.on('unhandledRejection', (reason) => {
@@ -53,11 +56,6 @@ process.on('uncaughtException', (error) => {
 });
 
 // ---------------------------------------------------------------------------
-// Version (read from package.json at build time, fallback to hardcoded)
-// ---------------------------------------------------------------------------
-const VERSION = '0.2.2';
-
-// ---------------------------------------------------------------------------
 // Config Builder (merges CLI opts with config file)
 // ---------------------------------------------------------------------------
 
@@ -69,8 +67,13 @@ export async function buildConfig(
   try {
     config = await loadConfig(opts.config as string | undefined);
   } catch (err) {
-    // If no config file found and we have a URL, use sensible defaults
-    if (opts.url) {
+    const noConfigFound =
+      !opts.config &&
+      err instanceof Error &&
+      err.message.startsWith('No Frontguard config found.');
+    // A URL can replace an absent config, but must never mask a config that
+    // exists and failed to load or validate.
+    if (opts.url && noConfigFound) {
       config = {
         version: 1,
         baseUrl: opts.url as string,
@@ -150,20 +153,6 @@ export async function buildConfig(
   }
 
   return config;
-}
-
-// ---------------------------------------------------------------------------
-// Reporter Factory
-// ---------------------------------------------------------------------------
-
-export function createReporter(format: string): Reporter {
-  switch (format) {
-    case 'json':
-      return new JSONReporter();
-    case 'console':
-    default:
-      return new ConsoleReporter();
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -267,9 +256,12 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--experimental', 'Enable experimental features (required for --mode judge)')
     .option(
       '--docker',
-      'Run the renderer inside the pinned frontguard/render Docker image for deterministic cross-OS baselines (build the image locally until the registry-publish release step lands: `docker build --platform linux/amd64 -t frontguard/render:latest packages/cli/docker`)',
+      'Run inside the repository-source renderer image (not published; build recipe: https://frontguard.dev/docs/cross-os-rendering)',
     )
     .action(async (opts) => {
+      // Failure telemetry stays disabled until a config has validated. This
+      // prevents an unreadable `telemetry: false` config from leaking an event.
+      let telemetryConfig: boolean | undefined = false;
       try {
         // Set log level
         if (opts.debug) {
@@ -280,6 +272,7 @@ export async function main(argv?: string[]): Promise<number> {
 
         // Load and merge config
         const config = await buildConfig(opts);
+        telemetryConfig = config.telemetry;
 
         // Create reporter
         const reporter = createReporter(opts.output);
@@ -287,7 +280,7 @@ export async function main(argv?: string[]): Promise<number> {
         // Update baselines mode
         if (opts.updateBaselines) {
           logger.info('Updating baselines…');
-          await updateBaselines(config, reporter);
+          await updateBaselines(config, new HTMLReporter(reporter));
           logger.info('✅ Baselines updated successfully');
           exitCode = 0;
           return;
@@ -321,14 +314,13 @@ export async function main(argv?: string[]): Promise<number> {
               `${js.regressions} failed, ${js.warnings} with warnings, ${js.errors} errors`,
           );
           logger.info('─'.repeat(60));
-          if (js.errors > 0 && js.regressions === 0) {
-            exitCode = 2;
-          } else if (js.regressions > 0) {
+          exitCode = comparisonExitCode(js);
+          if (exitCode === 2) {
+            logger.error('❌ Design evaluation could not complete');
+          } else if (exitCode === 1) {
             logger.error(`❌ ${js.regressions} screenshot(s) failed the design bar`);
-            exitCode = 1;
           } else {
             logger.info('✅ All screenshots passed the design bar');
-            exitCode = 0;
           }
           return;
         }
@@ -353,18 +345,21 @@ export async function main(argv?: string[]): Promise<number> {
         logger.info('─'.repeat(60));
 
         // Exit code
-        if (summary.errors > 0 && summary.regressions === 0) {
-          // Errors in the tool itself, but no regressions found
-          exitCode = 2;
+        exitCode = comparisonExitCode(summary);
+        if (exitCode === 2) {
+          logger.error('❌ Visual comparison could not complete');
         } else if (summary.regressions > 0) {
           logger.error(`❌ ${summary.regressions} regression(s) detected`);
-          exitCode = 1;
+        } else if (summary.newPages > 0) {
+          logger.error(
+            `❌ ${summary.newPages} new screenshot(s) require review; ` +
+              'accept them with `frontguard update-baselines`',
+          );
         } else {
           logger.info('✅ No regressions detected');
-          exitCode = 0;
         }
 
-        // Anonymous telemetry (opt-out).
+        // Anonymous telemetry (opt-in).
         await emitTelemetry(
           {
             command: 'run',
@@ -380,11 +375,14 @@ export async function main(argv?: string[]): Promise<number> {
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;
-        await emitTelemetry({
-          command: 'run',
-          version: VERSION,
-          errorType: err instanceof Error ? err.name : 'UnknownError',
-        });
+        await emitTelemetry(
+          {
+            command: 'run',
+            version: VERSION,
+            errorType: err instanceof Error ? err.name : 'UnknownError',
+          },
+          telemetryConfig,
+        );
       }
     });
 
@@ -524,7 +522,7 @@ export async function main(argv?: string[]): Promise<number> {
 
         const runOnce = async (): Promise<number> => {
           const config = await buildConfig({ ...opts, url: urls?.[0] ?? opts.url });
-          const monitorUrls = urls ?? config.routes ?? [config.baseUrl];
+          const monitorUrls = urls ?? resolveMonitorUrls(config.routes, config.baseUrl);
 
           const monitorPlugin = createMonitorPlugin({
             urls: monitorUrls,
@@ -540,12 +538,19 @@ export async function main(argv?: string[]): Promise<number> {
           const regressions = result.diffs.filter(
             (diff) => compareDiffToThreshold(diff.diffPercentage, alertThreshold) > 0,
           ).length;
-          if (regressions > 0) {
+          const runExitCode = comparisonExitCode(result.summary, regressions);
+          if (runExitCode === 2) {
+            logger.error('❌ Monitoring comparison could not complete');
+          } else if (result.summary.newPages > 0) {
+            logger.error(
+              `❌ ${result.summary.newPages} new screenshot(s) require an accepted baseline`,
+            );
+          } else if (regressions > 0) {
             logger.error(`⚠ ${regressions} URL(s) exceeded the alert threshold`);
-            return 1;
+          } else {
+            logger.info('✅ All monitored URLs within threshold');
           }
-          logger.info('✅ All monitored URLs within threshold');
-          return 0;
+          return runExitCode;
         };
 
         const intervalMin = opts.interval ? parseInt(opts.interval as string, 10) : null;

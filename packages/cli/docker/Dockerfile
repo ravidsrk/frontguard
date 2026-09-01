@@ -2,27 +2,28 @@
 # Frontguard cross-OS rendering image
 # =============================================================================
 #
-# This image freezes the entire visual-regression render stack so a baseline
-# captured on a developer's macOS laptop is byte-equivalent to one captured
-# in CI on Linux. Without this, Playwright's own docs warn that screenshots
+# This image narrows visual-regression variance by using one browser release,
+# architecture, and font set. Cross-host equivalence has not been measured.
+# Playwright's own docs warn that screenshots
 # taken on different operating systems will not match — even with identical
 # browsers — because of font hinting, sub-pixel anti-aliasing, and emoji
 # tables baked into the host OS.
 #
 # Version-pin policy
 # ------------------
-# - Base: pinned to `mcr.microsoft.com/playwright:v1.61.0-jammy`. Microsoft
+# - Base: pinned to `mcr.microsoft.com/playwright:v1.62.1-jammy`. Microsoft
 #   publishes one tag per Playwright release; the browsers (Chromium, Firefox,
 #   WebKit) and their patch level are baked into that tag, so a `latest` tag
 #   would silently change the rendered output across builds.
 # - The base's Playwright minor MUST match the `playwright` version in
-#   packages/cli/package.json (currently `1.61.0`, exact-pinned).
+#   packages/cli/package.json (currently `1.62.1`, exact-pinned).
 #   When bumping `playwright` in package.json, bump this FROM line in the same
 #   commit. The build is intentionally simple to make that pairing obvious.
 # - Fonts: Liberation (Microsoft-metric Arial/Helvetica/Times substitutes),
 #   DejaVu (broad Unicode coverage), and Noto CJK + Color Emoji. These are
-#   installed from Ubuntu Jammy's archive at a fixed apt snapshot when the
-#   image is built; reproducible-fonts is intentionally pinned here.
+#   installed from the image's Ubuntu Jammy package sources at build time.
+#   Package versions are not snapshot-pinned, so rebuilds still require
+#   validation before they can be treated as equivalent.
 # - The CLI itself is installed from a local `npm pack` tarball produced by
 #   the docker-compose / build script, so the image self-contains a known
 #   `@frontguard/cli` build instead of fetching `latest` from npm at runtime.
@@ -32,23 +33,26 @@
 # The image is NOT yet published to a registry (tracked as an OPS action —
 # see docs/ops-actions.md). Until then, build it locally from the repo root.
 # First produce the CLI tarball this build context expects, then build with the
-# architecture pinned so the rendered bytes match across a mixed fleet:
+# architecture pinned so every build uses the same CPU target:
 #
-#   (cd packages/cli && npm pack && mv frontguard-cli-*.tgz docker/frontguard-cli.tgz)
+#   npm ci
+#   npm run build --workspace=packages/cli
+#   npm pack ./packages/cli --pack-destination packages/cli/docker
+#   mv packages/cli/docker/frontguard-cli-*.tgz packages/cli/docker/frontguard-cli.tgz
 #   docker build --platform linux/amd64 \
-#     -t frontguard/render:v0.2.0 -t frontguard/render:latest \
+#     -t frontguard/render:local \
 #     packages/cli/docker
 #
 # `--platform linux/amd64` is required: Chromium's rasterizer emits different
 # sub-pixel anti-aliasing per architecture, so an arm64 build and an amd64
-# build would NOT be byte-equivalent. The `FROM --platform=` directive below
-# enforces the same pin at image-build time even if `docker build` omits it.
+# build can render differently. The `FROM --platform=` directive below holds
+# that variable constant; it does not establish cross-host equivalence.
 # =============================================================================
 
 FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.62.1-jammy
 
 LABEL org.opencontainers.image.title="frontguard-render" \
-      org.opencontainers.image.description="Deterministic cross-OS rendering image for Frontguard visual regression tests" \
+      org.opencontainers.image.description="Pinned Linux rendering image for Frontguard visual regression tests" \
       org.opencontainers.image.source="https://github.com/ravidsrk/frontguard" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.vendor="Frontguard"
@@ -96,7 +100,7 @@ RUN npm install -g /opt/frontguard/frontguard-cli.tgz \
 WORKDIR /workspace
 
 # Render-time env defaults: disable telemetry inside the image (CI/build
-# contexts shouldn't beacon home), and make Playwright deterministic.
+# contexts shouldn't beacon home), and reduce Playwright render variation.
 ENV FRONTGUARD_TELEMETRY=0 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     NODE_ENV=production
