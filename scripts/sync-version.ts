@@ -103,7 +103,9 @@ const FILE_EDITS: Array<{ file: string; edits: RequiredEdit[] }> = [
         find: /@frontguard\/cli@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
         replace: `@frontguard/cli@${version}`,
         label: "generated workflow CLI version",
-        expected: 2,
+        // Four references: the header comment, the Playwright-pin comment, and
+        // the two `npm exec --package=` invocations.
+        expected: 4,
       },
     ],
   },
