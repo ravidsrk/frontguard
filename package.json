@@ -33,7 +33,7 @@
     "prepare": "husky"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.1"
   },
   "overrides": {
     "@opentelemetry/core": "2.9.0",
