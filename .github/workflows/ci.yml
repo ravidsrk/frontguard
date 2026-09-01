@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
       - run: npm ci
       - run: npm run build
@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
       - run: npm ci
       - run: npm run lint
@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
       - name: Check docs internal links + action refs
         run: node apps/web/scripts/check-doc-links.mjs
 
@@ -81,23 +81,41 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
       - run: npm ci
       - run: npm run build
       - name: Check bundle size
-        # Gates the library entry (dist/index.js, built from src/core/pipeline.ts).
-        # Runtime deps are externalized in tsup.config.ts, so this measures only
-        # first-party code — a regression here means our own bundle grew, not a dep.
-        # Budget bumped to 180KB in v0.2 to accommodate the Docker render adapter
-        # (IN-7) and Storybook discovery (IN-9) modules; previous budget was 160KB.
+        # Two budgets, because there are two artifacts that matter and only one
+        # of them used to be measured.
+        #
+        # Runtime deps are all externalized in tsup.config.ts, so both figures
+        # are pure first-party code: a regression here means our own source
+        # grew, never that a dependency leaked in.
+        #
+        # dist/index.js      — library entry, built from src/core/pipeline.ts.
+        #   Budget history: 160KB -> 180KB in v0.2 (Docker render adapter IN-7,
+        #   Storybook discovery IN-9) -> 200KB now. The entry graph is 36
+        #   first-party modules with no vendored code; the previous ceiling was
+        #   stale against deliberate feature growth, not a bloat regression.
+        # dist/cli/index.js  — the actual published bin (bin.frontguard). This
+        #   was previously UNGATED, so the artifact users install could grow
+        #   without limit while CI guarded only the library entry.
         run: |
-          SIZE=$(wc -c < packages/cli/dist/index.js)
-          echo "Bundle size: $SIZE bytes (budget 180000)"
-          if [ "$SIZE" -gt 180000 ]; then
-            echo "⚠️ Bundle exceeds 180KB"
-            exit 1
-          fi
+          check() {
+            local path="$1" budget="$2" label="$3"
+            local size
+            size=$(wc -c < "$path")
+            echo "$label: $size bytes (budget $budget)"
+            if [ "$size" -gt "$budget" ]; then
+              echo "::error::$label exceeds its budget: $size > $budget"
+              return 1
+            fi
+          }
+          status=0
+          check packages/cli/dist/index.js     200000 "library entry" || status=1
+          check packages/cli/dist/cli/index.js 360000 "published bin" || status=1
+          exit $status
 
   audit:
     runs-on: ubuntu-latest
@@ -105,7 +123,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
       - run: npm ci
       - name: npm audit (prod, high+)

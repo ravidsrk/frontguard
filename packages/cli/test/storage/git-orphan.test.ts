@@ -197,6 +197,13 @@ describe('GitOrphanStorage maxBuffer (install-2)', () => {
   });
 
   it('does not create baseline state during comparison initialization', async () => {
+    // Pin the precondition: this asserts LOCAL comparison behaviour. In CI,
+    // compare mode deliberately fails closed when no origin remote exists
+    // (src/storage/git-orphan.ts:242-247), which is a different contract
+    // covered by its own tests. Without this stub the test inherits the
+    // ambient CI variable and passes or fails depending on the shell.
+    vi.stubEnv('CI', 'false');
+
     const storage = new GitOrphanStorage(repoDir);
 
     await storage.init();
@@ -240,6 +247,17 @@ describe('GitOrphanStorage remote branch adoption', () => {
   beforeEach(() => {
     rootDir = mkdtempSync(join(tmpdir(), 'fg-orphan-remote-'));
     vi.stubEnv('CI', 'false');
+    // Isolate from ambient git config. createRemoteFixture configures an
+    // identity on `sourceDir`, but tests that clone from the bare remote get a
+    // fresh repo with none, and production code then commits a baseline into
+    // it. A developer machine has a global user.name/user.email so this passes
+    // locally; a CI runner has neither, so `git commit` fails there. Setting
+    // the identity through the environment covers every repo created, cloned,
+    // or written to in this block at once.
+    vi.stubEnv('GIT_AUTHOR_NAME', 'Test');
+    vi.stubEnv('GIT_AUTHOR_EMAIL', 'test@example.com');
+    vi.stubEnv('GIT_COMMITTER_NAME', 'Test');
+    vi.stubEnv('GIT_COMMITTER_EMAIL', 'test@example.com');
   });
 
   afterEach(() => {

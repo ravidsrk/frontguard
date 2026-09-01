@@ -90,23 +90,14 @@ const FILE_EDITS: Array<{ file: string; edits: RequiredEdit[] }> = [
       },
     ],
   },
-  {
-    file: ".github/workflows/frontguard-example.yml",
-    edits: [
-      {
-        find: /playwright-frontguard-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?-/g,
-        replace: `playwright-frontguard-${version}-`,
-        label: "generated workflow cache version",
-        expected: 1,
-      },
-      {
-        find: /@frontguard\/cli@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
-        replace: `@frontguard/cli@${version}`,
-        label: "generated workflow CLI version",
-        expected: 2,
-      },
-    ],
-  },
+  // NOTE: .github/workflows/frontguard-example.yml is deliberately NOT coupled
+  // to VERSION. It is a pre-release verification fixture that runs the
+  // *published* CLI from npm, so it must pin a version that actually exists on
+  // the registry -- VERSION leads the published line during development. Its
+  // own header says to keep it manual until the release workflow has published
+  // a newer package, and scripts/test/launch-examples.test.ts enforces the pin
+  // against `verifiedCliVersion`. Coupling it here made those two guards
+  // contradict each other and was what broke the lint job.
   {
     file: "packages/mcp/src/index.ts",
     edits: [

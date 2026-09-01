@@ -33,7 +33,7 @@
     "prepare": "husky"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "overrides": {
     "@opentelemetry/core": "2.9.0",
@@ -69,12 +69,14 @@
   "devDependencies": {
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "playwright": "1.62.1",
-    "react-router-dom": "^6.30.4"
+    "playwright": "1.62.1"
   },
   "lint-staged": {
     "packages/cli/src/**/*.ts": [
       "eslint --fix --config packages/cli/eslint.config.js"
+    ],
+    "packages/cloud-api/src/**/*.ts": [
+      "eslint --fix --config packages/cloud-api/eslint.config.js"
     ],
     "apps/web/src/**/*.{ts,tsx}": [
       "eslint --fix --config apps/web/eslint.config.js"
