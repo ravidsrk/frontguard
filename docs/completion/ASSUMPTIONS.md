@@ -79,3 +79,17 @@ honesty gap is the smaller, correct, and fully sufficient fix; measuring accurac
 filed post-launch. AI is optional and disabled without a provider key, and pixel-diff remains the
 authoritative pass/fail signal (verified by T-17), so an unmeasured classifier cannot silently
 break the core flow.
+
+## A-08 — P1 landed as one integration branch, not ten single-task PRs
+
+**Phase:** 5
+**Decision:** Land all ten P1 tasks on `ravidsrk/p1-green-baseline` as one PR, each task a separate
+commit.
+**Rejected:** One branch and one PR per task, as R10 prescribes.
+**Reason:** R10 requires merging only when CI is green, but `main` had six independent red causes
+(lint, build, two test matrix legs, e2e, plus a path-filtered deploy). No single-task PR could
+reach green, so R10 and R9's green-state invariant were in direct conflict; following R10 literally
+would have meant either never merging or merging red. One integration branch with per-task commits
+preserves the reviewable unit of work, satisfies R9, and matches R10's own allowance for related
+commits sharing a PR. Later phases return to one task per PR now that `main` is green and a single
+fix can be verified in isolation.

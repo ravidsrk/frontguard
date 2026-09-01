@@ -124,3 +124,72 @@ firewall respected: all external queries were category-only; per-track query log
 ---
 
 **RESUME POINTER: `P1/T-01`**
+
+### PHASE 5 — EXECUTION · P1 GREEN BASELINE · COMPLETE
+
+**`main` is green.** CI success on `e5295de` (PR #209, merged with a merge commit, branch deleted).
+All 10 tasks done. Completion 35% -> 40%.
+
+Structural deviation, logged as **A-08**: R10 wants one task per branch merged when CI is green, but
+`main` had six independent red causes, so no single-task PR could ever be green — R10 and R9's
+green-state invariant were in direct conflict. P1 landed as one integration branch with each task
+as its own commit, which is the only ordering that satisfies R9. Later phases return to
+one-task-per-PR now that `main` is green.
+
+Per-task outcomes, and three places the audit's own verdicts were wrong:
+
+- **T-01 (G-02) — the CLI was never broken.** The two "CLI exits 1, contract says 2" failures were
+  a test harness pointing at `packages/cli/node_modules/tsx/dist/cli.mjs`, which npm workspaces
+  hoists to the root. `node` given a missing file exits 1 with MODULE_NOT_FOUND and the harness
+  recorded that as the CLI's exit code. Verified directly: source *and* built bundle both exit 2.
+  The Phase 1 verdict of "CODE bug" was wrong; it was the harness.
+- **T-02 (G-03)** — stale `storageConstructor` assertions corrected against the real signature
+  (`git-orphan.ts:127`) and call sites (`pipeline.ts:527,1037`). The compare assertion stays an
+  exact single-argument match, so it still fails if update-mode options are threaded through.
+- **T-03 (G-06)** — the e2e image-name expectation used the pipeline's *temp-file* naming; report
+  images are named by the HTML reporter (`html.ts:274`), which has carried a route-index prefix
+  since 5b9ff3e. The assertion was added in 89616a3 against the wrong scheme and never passed.
+- **T-04 (G-05) — two guards were contradicting each other.** `sync-version` coupled
+  `frontguard-example.yml` to `VERSION` (0.2.3) while `launch-examples.test.ts` requires copy-ready
+  examples to pin the *published* release (0.2.2). Unsatisfiable. The fixture runs the published
+  CLI from npm so it must pin a version that exists on the registry; decoupled from `VERSION`.
+- **T-05 (G-04) — the bundle gate measured the wrong artifact.** It gated the 188KB library entry
+  while the 330KB bin users install was unmeasured. Both now gated; library ceiling 180KB -> 200KB
+  (all deps already external, so those bytes are 36 first-party modules — the same budget was
+  already raised 160 -> 180 in v0.2).
+- **T-06 (G-09)** — EOL Node 20 dropped; matrix `[22, 24]`, `engines >=22`. Greptile raised a
+  P1 that this rejects Node 20 consumers under `engine-strict` with no Node-22-only runtime need.
+  Correct. Not reverted (advertising untested support is worse) but declared as a deliberate minor
+  changeset for the three published packages.
+- **T-07 (G-13) — parity closed, with a negative control.** Four "remote branch adoption" tests
+  committed into freshly cloned repos that inherit no git identity; a dev machine has a global one,
+  a runner does not. Identity is now set via the environment. Proof: revert the fix and point
+  `GIT_CONFIG_GLOBAL/SYSTEM` at `/dev/null` and exactly those four fail locally; with it, 36/36.
+  CI's environment is now reproducible on a laptop. Also raised the `launch-examples` tsc timeout
+  from vitest's 5s default to 60s (it takes ~10s on a runner).
+- **T-08 (G-24)** — lint-staged extended to `cloud-api`; typecheck added to `packages/playwright`.
+  The `apps/demo` typecheck was added and then **reverted**: its `tsconfig.json` is Next-generated
+  and gitignored (`.gitignore:52`), so it cannot exist in a fresh clone. My own regression, caught
+  by CI, fixed in the same branch.
+- **T-09 (G-23)** — removed unused `react-router-dom`. Full tree: 2 moderate -> **0 vulnerabilities**.
+- **T-10 (G-26)** — deleted both fully-merged remote branches (0 unique commits each). Worktree
+  deregistered; its 490MB directory of stale build artifacts left on disk for the owner (verified
+  to hold nothing unique: clean `git status`, no commits absent from main).
+
+**Exit criteria: 3 of 4 met.** CI green on main ✓, cold start passes ✓, branch list clean ✓.
+**Not met: `Deploy Web` still has not run.** Its trigger is path-filtered to `apps/web/**` and
+`scripts/sync-openapi.mjs`; the P1 merge touched neither. Production remains stale, so `/privacy`,
+`/terms` and `/status` still 404 (G-07). This needs an `apps/web` change to merge (T-14 or T-27),
+which deploys via the repo's own automation — or an explicit owner decision to dispatch it.
+Deliberately not dispatched: R15 forbids the agent performing a production deploy.
+
+**Second look:** the branch initially shipped an `apps/demo` typecheck that passed locally and
+broke CI — the exact class of defect this phase existed to eliminate, introduced by the fix for it.
+Caught, reverted, and the reason recorded. It is also why T-07's fix carries a negative control
+rather than just a green run: "it passes now" was precisely the evidence that failed here.
+
+- Evidence added: 1 file (`P1-exit-green-main.txt`).
+
+---
+
+**RESUME POINTER: `P2/T-11`**
