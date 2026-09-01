@@ -169,7 +169,11 @@ describe('copy-ready launch examples', () => {
         `${block.file}:${block.line} must compile`,
       ).toBe('');
     });
-  });
+    // Invokes the TypeScript compiler once per example block, so runtime scales
+    // with the number of examples and the host's speed. It lands around 10s on
+    // a CI runner, well past vitest's 5s default -- the timeout was the reason
+    // this failed in CI while passing locally.
+  }, 60_000);
 
   it('syntax-checks every copy-ready shell example', () => {
     const blocks = codeBlocks(['bash', 'sh', 'shell']);
