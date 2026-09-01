@@ -254,3 +254,55 @@ repo had no timeout headroom anywhere to absorb it.
 ---
 
 **RESUME POINTER: `P3/T-15` — T-14/T-25/T-27 blocked on H-06; T-21/T-22/T-23 blocked on H-01/H-02/H-03**
+
+### PHASE 7 — T-28 DEPENDABOT TRIAGE · 5 of 11 RESOLVED, 6 HELD
+
+All 11 open dependabot PRs reviewed on evidence rather than titles. Completion 44% -> 45%.
+Full detail: `evidence/T-28-dependabot-triage.md`.
+
+**Merged (3):** #208 `@axe-core/playwright` 4.13.0, #207 `@modelcontextprotocol/sdk` 1.30.0, and
+#200 `lint-staged` 17.4.1 — the last required tightening root `engines.node` to `>=22.22.1` (v17's
+declared floor) and a direct smoke test of the husky hook, since CI never runs lint-staged.
+
+**Closed (2), both unmergeable as written:**
+- #198 `setup-node` v4→v7. `action.yml` is generated; bumping only the generated file makes the
+  generator revert it and `root-action-contract` fail. Proven by checking out the branch and
+  running the contract. Superseded by **#215 (merged)**, which fixes the template — and which also
+  caught a regression from this run's own P1 work: the template pinned `node-version: '20'` (EOL)
+  while P1 raised the published CLI to `>=22`, so the shipped action would have provisioned Node 20
+  for a package requiring 22.
+- #204 `react-dom` 19.2.8. Root `overrides` exact-pin react/react-dom to 19.2.7, so `npm ci` fails
+  outright; even reconciled the override wins and the bump is a no-op, and react/react-dom would be
+  misaligned across two SSR apps.
+
+**Held (6):** #199, #201, #202, #203, #205, #206. All verified **as a group** on a scratch branch —
+`npm ci`/build/1926 tests green, 0 vulnerabilities, peer constraints satisfied. Blocked only on
+**H-06**: each touches `apps/web` (or peer-couples to one that does), so merging fires the
+path-filtered `Deploy Web` and publishes production.
+
+**Research correction — the vitest bump is NOT a security fix.** Phase 2 (B1 R-04) claimed 4.1.11
+was a GHSA Critical+Moderate security bump and that claim reached a status report. Both advisories
+were checked against their affected ranges: GHSA-5xrq-8626-4rwp affects `>=4.0.0, <4.1.0` and
+GHSA-9crc-q9x8-hgqq affects only `<3.0.5`. Installed 4.1.9 is patched for both, and `npm audit`
+reports nothing. It is a routine patch, which removes the urgency argument for rushing a deploy.
+A second earlier claim — that #198 was "obsolete" — was also wrong; it came from grepping only
+`.github/workflows/`, which is already on v7, while the shipped action was not.
+
+### R9 BREAKER (second) — docker e2e budget
+
+`main` went red on `bb7ec1b`: `spawnSync docker ETIMEDOUT` in `docker-build.test.ts` at ~15 minutes.
+Independent of the PRs and of the `testTimeout` fix — that timeout is `execFileSync`'s own. CI has
+no Docker layer cache, so every e2e run cold-pulls the Playwright base and runs apt install, which
+is legitimately 10-25 minutes; the original 15-minute budget was the binding constraint. Raised to
+25 minutes and bounded the job at 45 in **#216 (merged)**. The test was **not** skipped or
+weakened. The fix run took **15m11s**, which confirms the diagnosis exactly. `main` green at
+`f5b0b6c`.
+
+**Second look:** I twice propagated a research claim without checking it — "vitest 4.1.11 is a
+security bump" and "#198 is obsolete" — and both were wrong in ways that would have changed
+decisions (one manufacturing urgency for a production deploy, the other closing a PR that was
+actually needed). Verifying a cited claim costs one command; repeating it costs a wrong call.
+
+---
+
+**RESUME POINTER: `P3/T-15` — 6 dependabot PRs and T-14/T-25/T-27 all blocked on H-06**
