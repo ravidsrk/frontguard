@@ -5,6 +5,10 @@ dist
 auth.json
 .env
 .env.*
+# ...but the checked-in template must be committable. The broad `.env.*` above
+# also swallowed `.env.example`, which is why the repo had no environment
+# reference at all: every attempt to add one was silently ignored.
+!.env.example
 .dev.vars
 .dev.vars.*
 *.log
