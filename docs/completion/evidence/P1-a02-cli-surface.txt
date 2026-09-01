@@ -1,0 +1,33 @@
+# angle 2 dynamic: CLI surface
+2026-09-01T11:36:11Z
+# NOTE: bin.frontguard = dist/cli/index.js; dist/index.js is the LIBRARY entry (what CI's bundle gate measures)
+=== --version ===
+0.2.3
+exit:0
+=== --help ===
+Usage: frontguard [options] [command]
+
+AI-powered frontend visual regression testing
+
+Options:
+  -V, --version               output the version number
+  --no-telemetry              Disable anonymous usage telemetry
+  -h, --help                  display help for command
+
+Commands:
+  run [options]               Run visual regression tests
+  init [options]              Generate a starter Frontguard config file
+  update-baselines [options]  Accept current screenshots as new baselines
+  doctor                      Diagnose environment readiness (Node, Playwright,
+                              browsers, config, git)
+  monitor [options]           Monitor live production URLs for visual
+                              regressions
+  accept-fix <id>             Mark a suggested fix as accepted (improves future
+                              suggestions)
+  reject-fix <id>             Mark a suggested fix as rejected (negative
+                              training signal)
+  export-patterns [options]   Export the local fix-pattern database as JSON
+                              (shareable)
+  plugin                      Manage Frontguard plugins from the npm registry
+  help [command]              display help for command
+exit:0

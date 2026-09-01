@@ -1,5 +1,5 @@
 {
-  "product": "Frontguard — AI-powered frontend visual regression testing",
+  "product": "Frontguard \u2014 AI-powered frontend visual regression testing",
   "repo_path": "/Users/ravindra/projects/frontguard",
   "run_id": "20260901-1658",
   "mode": "drive",
@@ -10,15 +10,269 @@
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
   "current_commit": "5f0e141a65651fa34823866c2ee715c913dc2c45",
-  "resume_pointer": "PHASE_1",
+  "resume_pointer": "PHASE_2",
   "definition_frozen_at": null,
-  "completion_pct": 0,
+  "completion_pct": 35,
   "gate": {
     "status": "NOT_EVALUATED",
-    "reason": "Phase 0 complete; 360 audit not yet run"
+    "reason": "Definition of Complete not yet frozen (Phase 3)"
   },
-  "angles": [],
-  "critical_flows": [],
+  "angles": [
+    {
+      "id": 1,
+      "name": "product",
+      "score": 2,
+      "rag": "A",
+      "na_reason": null,
+      "weight": 8,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A01-A02-product-functional.md"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "functional",
+      "score": 2,
+      "rag": "A",
+      "na_reason": null,
+      "weight": 14,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A01-A02-product-functional.md"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "code_quality",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 4,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A03-A04-quality-testing.md"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "testing",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 8,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A03-A04-quality-testing.md"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "security",
+      "score": 2,
+      "rag": "A",
+      "na_reason": null,
+      "weight": 14,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A05-security.md"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "data",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 8,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A06-A07-data-infra.md"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "infra_deploy",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 6,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A06-A07-data-infra.md"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "reliability",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 5,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A08-A09-A10-ops.md"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "observability",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 4,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A08-A09-A10-ops.md"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "performance_cost",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 5,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A08-A09-A10-ops.md"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "integrations",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 5,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A11-A12-integrations-ai.md"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "ai_llm",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 5,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A11-A12-integrations-ai.md"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "ux_frontend",
+      "score": 2,
+      "rag": "A",
+      "na_reason": null,
+      "weight": 5,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A13-A14-ux-docs.md"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "documentation",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 3,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A13-A14-ux-docs.md"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "legal_compliance",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 5,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A15-A16-A17-legal-gtm-ownership.md"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "gtm",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 4,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A15-A16-A17-legal-gtm-ownership.md"
+      ]
+    },
+    {
+      "id": 17,
+      "name": "ownership_ops",
+      "score": 1,
+      "rag": "R",
+      "na_reason": null,
+      "weight": 2,
+      "findings": [],
+      "evidence": [
+        "docs/completion/angles/A15-A16-A17-legal-gtm-ownership.md"
+      ]
+    }
+  ],
+  "critical_flows": [
+    {
+      "id": "CF-01",
+      "name": "Local visual regression loop (init -> update-baselines -> run)",
+      "money": false,
+      "status": "verified",
+      "happy_evidence": "docs/completion/evidence/CF-01-local-regression-loop.txt",
+      "failure_evidence": "docs/completion/evidence/CF-01-local-regression-loop.txt"
+    },
+    {
+      "id": "CF-02",
+      "name": "Environment onboarding (doctor)",
+      "money": false,
+      "status": "verified",
+      "happy_evidence": "docs/completion/evidence/P1-a02-cli-doctor.txt",
+      "failure_evidence": null
+    },
+    {
+      "id": "CF-03",
+      "name": "CI comparison against pushed baselines",
+      "money": false,
+      "status": "partial",
+      "happy_evidence": null,
+      "failure_evidence": null
+    },
+    {
+      "id": "CF-04",
+      "name": "AI classification of a regression",
+      "money": false,
+      "status": "partial",
+      "happy_evidence": null,
+      "failure_evidence": null
+    },
+    {
+      "id": "CF-05",
+      "name": "Hosted run via cloud-api",
+      "money": false,
+      "status": "absent",
+      "happy_evidence": null,
+      "failure_evidence": null
+    },
+    {
+      "id": "CF-06",
+      "name": "One-click integration install",
+      "money": false,
+      "status": "absent",
+      "happy_evidence": null,
+      "failure_evidence": null
+    }
+  ],
   "gaps": [],
   "phases": [
     {
@@ -26,22 +280,99 @@
       "name": "Baseline freeze",
       "status": "complete",
       "exit_criteria": [
-        { "text": "Baseline git/toolchain/inventory recorded", "met": true, "evidence": "docs/completion/STATUS.md" },
-        { "text": "Cold-start result captured (pass or fail)", "met": true, "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt" }
+        {
+          "text": "Baseline git/toolchain/inventory recorded",
+          "met": true,
+          "evidence": "docs/completion/STATUS.md"
+        },
+        {
+          "text": "Cold-start result captured (pass or fail)",
+          "met": true,
+          "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
+        }
+      ]
+    },
+    {
+      "id": "P1_AUDIT",
+      "name": "360 audit",
+      "status": "complete",
+      "exit_criteria": [
+        {
+          "text": "No angle unscored",
+          "met": true,
+          "evidence": "docs/completion/STATUS.md"
+        },
+        {
+          "text": "Every score >=2 backed by executed evidence",
+          "met": true,
+          "evidence": "docs/completion/evidence/"
+        },
+        {
+          "text": "Second look logged",
+          "met": true,
+          "evidence": "docs/completion/STATUS.md"
+        }
       ]
     }
   ],
   "tasks": [],
   "human_actions": [],
   "assumptions": [
-    { "id": "A-01", "phase": "P0", "decision": "Use npm against the committed package-lock.json", "rejected": ["pnpm per fleet-global rule"], "reason": "pnpm refuses the workspaces field; CI uses npm; operator confirmed" },
-    { "id": "A-02", "phase": "P0", "decision": "Task branches in the primary checkout", "rejected": ["one git worktree per task"], "reason": "single-agent run; no collision possible; keeps R5 evidence paths stable" },
-    { "id": "A-03", "phase": "P0", "decision": "Single product identity across all 11 workspaces", "rejected": ["treat cloud-api/integrations as separate products"], "reason": "one scope, one VERSION, one changeset line" },
-    { "id": "A-04", "phase": "P0", "decision": "DOMAIN_HINTS = devtool-oss", "rejected": ["full fintech/VDA compliance sweep"], "reason": "MIT devtool, no money path observed in Phase 0; pending angle 15 + Phase 2 confirmation" }
+    {
+      "id": "A-01",
+      "phase": "P0",
+      "decision": "Use npm against the committed package-lock.json",
+      "rejected": [
+        "pnpm per fleet-global rule"
+      ],
+      "reason": "pnpm refuses the workspaces field; CI uses npm; operator confirmed"
+    },
+    {
+      "id": "A-02",
+      "phase": "P0",
+      "decision": "Task branches in the primary checkout",
+      "rejected": [
+        "one git worktree per task"
+      ],
+      "reason": "single-agent run; no collision possible; keeps R5 evidence paths stable"
+    },
+    {
+      "id": "A-03",
+      "phase": "P0",
+      "decision": "Single product identity across all 11 workspaces",
+      "rejected": [
+        "treat cloud-api/integrations as separate products"
+      ],
+      "reason": "one scope, one VERSION, one changeset line"
+    },
+    {
+      "id": "A-04",
+      "phase": "P0",
+      "decision": "DOMAIN_HINTS = devtool-oss",
+      "rejected": [
+        "full fintech/VDA compliance sweep"
+      ],
+      "reason": "MIT devtool, no money path observed in Phase 0; pending angle 15 + Phase 2 confirmation"
+    },
+    {
+      "id": "A-05",
+      "phase": "P1",
+      "decision": "Normalise completion_pct against the actual weight total of 105",
+      "rejected": [
+        "rescale weights to force a 100 total",
+        "report against a 100 denominator anyway"
+      ],
+      "reason": "Appendix B declares 'Weights (sum 100)' but the published values sum to 105 (71+34). Rescaling would silently alter the framework's relative priorities; using a 100 denominator would overstate completion. Normalising against 105 keeps every weight as published and the number reproducible."
+    }
   ],
   "research": [],
   "breakers_tripped": [],
   "history": [
-    { "run_id": "20260901-1658", "commit": "5f0e141a65651fa34823866c2ee715c913dc2c45", "completion_pct": 0, "gate": "NOT_EVALUATED" }
+    {
+      "run_id": "20260901-1658",
+      "commit": "5f0e141a65651fa34823866c2ee715c913dc2c45",
+      "completion_pct": 35,
+      "gate": "NOT_EVALUATED"
+    }
   ]
 }

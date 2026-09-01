@@ -1,0 +1,32 @@
+# CF-01 dynamic proof: local visual regression loop (happy + failure path)
+2026-09-01T11:40:51Z
+fixture: /tmp/fg-smoke (git repo, static site on :8477, chromium)
+cli: packages/cli/dist/cli/index.js v0.2.3
+
+## step 1 — frontguard init -y            => exit 0, wrote frontguard.config.ts + .gitignore
+## step 2 — frontguard update-baselines    => exit 0, 1 baseline, orphan branch 'frontguard-baselines'
+## step 3 — frontguard run (UNCHANGED)     => exit 0, 'All pages match baselines', 1 passed
+## step 4 — mutate CSS (#3b82f6->#ef4444, 28px->40px)
+## step 5 — frontguard run (MUTATED)       => exit 1, 'REGRESSIONS (1)', Diff 4.97% pixels changed
+
+VERDICT: the core critical flow works, with correct exit-code semantics
+(0 = match, 1 = regression, 2 = error). Both happy and failure paths demonstrated.
+
+## caveat discovered — CI mode requires an origin remote
+Step 3 initially FAILED with exit 2:
+  'CI comparison requires origin/frontguard-baselines; no "origin" remote is configured.'
+Cause: the agent shell exports CI=true, enabling strictCIComparison
+(packages/cli/src/storage/git-orphan.ts:243-247). Adding an origin remote fixed it.
+This is CORRECT product behaviour for CI, not a defect. Recorded because it also
+explains the git-orphan.test.ts failure in this audit's earlier runs.
+
+## artifacts
+total 16
+drwxr-xr-x 4 ravindra wheel   128 Sep  1 17:09 .
+drwxr-xr-x 8 ravindra wheel   256 Sep  1 17:09 ..
+drwxr-xr-x 5 ravindra wheel   160 Sep  1 17:10 images
+-rw-r--r-- 1 ravindra wheel 15535 Sep  1 17:10 report.html
+baseline branch:
+d075fb6 Update baseline manifest
+c0828a0 Update baseline: _root @ 1440px [chromium]
+1f78c50 Initialize frontguard baselines

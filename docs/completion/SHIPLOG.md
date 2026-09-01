@@ -37,3 +37,30 @@ Note: a *different* prior audit exists in-repo (`docs/` launch audit, commit 5e1
 ---
 
 **RESUME POINTER: `PHASE_1`**
+
+### PHASE 1 — 360° AUDIT · COMPLETE
+
+Method: 8 parallel investigators (7 general + 1 security specialist) covering all 17 angles, each
+hard-capped at score 1 because static reading cannot demonstrate behaviour (R13). The parent then
+ran every dynamic proof and raised scores only where evidence justified it.
+
+- **Completion score: 36.5/105 = 35%.** Angles ≥2: 1, 2, 5, 13. All others 1. None N/A.
+- **CF-01 proven end-to-end** (happy + failure): init → update-baselines → run(match, exit 0) →
+  mutate CSS → run(regression, exit 1, 4.97% pixels). The core product works.
+- **Method error caught and corrected:** the agent shell exports `CI=true`, so every Phase 0
+  "local" measurement was actually CI behaviour. True local is 4 failures, not 5; parity gap is
+  4-vs-10, wider than recorded. Re-measured before scoring.
+- **Security's two unknowns resolved by parent proof:** git-history secret scan CLEAN across all
+  refs (the only matches are the product's own redaction regexes); netlify tarball concern REFUTED
+  (`lib/core.js` is tracked). Production dep tree: 0 vulnerabilities.
+- **Causal chain identified:** main red → Deploy Web cancelled → production stale → `/privacy` and
+  `/terms` 404 while `/pricing` serves 200. One root cause, and it orders the plan.
+- Red-suite verdicts fixed: 2 CODE bugs (exit 1 vs contract 2), 2 STALE tests (storageConstructor
+  signature), 1 TEST-isolation issue (fail-closed is intended).
+- Assumption added: A-05 (Appendix B weights sum to 105, not the declared 100; normalising to 105).
+- **Exit criteria met:** no angle unscored; every score ≥2 has executed evidence; second look logged.
+- Evidence added: 9 files.
+
+---
+
+**RESUME POINTER: `PHASE_2`**
