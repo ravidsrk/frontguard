@@ -1,0 +1,350 @@
+# P0 cold start step 3: npm test
+# date: 2026-09-01T11:28:45Z
+---
+
+> test
+> npm run test --workspaces --if-present
+
+
+> @frontguard/cli@0.2.3 test
+> vitest run --pool=forks --exclude='test/e2e/**'
+
+
+ RUN  v4.1.9 /Users/ravindra/projects/frontguard/packages/cli
+
+- 🖥  Rendering — Chromium 1440px
+✔ 🖥  Rendering — done
+- 🖥  Rendering
+✔ 🖥  Rendering
+Preparing worktree (detached HEAD 06d9b64)
+Switched to a new branch 'frontguard-baselines'
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (detached HEAD 5a764b4)
+Switched to a new branch 'frontguard-baselines'
+ ❯ test/core/pipeline-ssim-config.test.ts (5 tests | 1 failed) 12ms
+     × initializes comparison storage in compare mode 5ms
+ ❯ test/core/pipeline-baseline-update.test.ts (3 tests | 1 failed) 9ms
+     × returns and reports a machine-readable result for updated baselines 5ms
+Preparing worktree (detached HEAD 5a764b4)
+Switched to a new branch 'frontguard-baselines'
+fatal: path 'baselines/missing/1440/chromium.png' does not exist in 'frontguard-baselines'
+Preparing worktree (detached HEAD 5a764b4)
+Switched to a new branch 'frontguard-baselines'
+fatal: invalid object name 'frontguard-baselines'.
+From /var/folders/65/nfjkpf196n5_xrwbkyrrgqrc0000gn/T/fg-orphan-remote-aIEU4k/remote
+ * [new branch]      frontguard-baselines -> origin/frontguard-baselines
+From file:///var/folders/65/nfjkpf196n5_xrwbkyrrgqrc0000gn/T/fg-orphan-remote-WpZPVT/remote
+ * [new branch]      frontguard-baselines -> origin/frontguard-baselines
+From /var/folders/65/nfjkpf196n5_xrwbkyrrgqrc0000gn/T/fg-orphan-remote-F5x0Ms/remote
+   d595771..2f339e5  frontguard-baselines -> origin/frontguard-baselines
+From /var/folders/65/nfjkpf196n5_xrwbkyrrgqrc0000gn/T/fg-orphan-remote-hajYgb/remote
+   b37efdb..c6fb9f3  frontguard-baselines -> origin/frontguard-baselines
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+From /var/folders/65/nfjkpf196n5_xrwbkyrrgqrc0000gn/T/fg-orphan-remote-15Qk5e/remote
+   11f5a37..e72208f  frontguard-baselines -> origin/frontguard-baselines
+error: unknown option '--invalid-option'
+From /var/folders/65/nfjkpf196n5_xrwbkyrrgqrc0000gn/T/frontguard-seed-U58M1V
+ * [new branch]      frontguard-baselines -> frontguard-baselines
+ ❯ test/storage/git-orphan.test.ts (36 tests | 1 failed) 6523ms
+     × does not create baseline state during comparison initialization 129ms
+  ℹ 🔍 Monitoring 1 URL(s)…
+  ✘ 
+╔══════════════════════════════════════════════════════════╗
+║                   FRONTGUARD ERROR                      ║
+╚══════════════════════════════════════════════════════════╝
+
+  [frontguard-monitor] Invalid URL: not-a-valid-url
+
+  Set FRONTGUARD_DEBUG=1 for full stack trace.
+  ℹ 📜 Recent monitoring history (.frontguard/does-not-exist-history):
+ ❯ test/cli/index.test.ts (9 tests | 2 failed) 9820ms
+     × does not discard an invalid explicit config when --url is also present 23ms
+     × honors telemetry:false when a run fails after loading config 25ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/cli/index.test.ts > CLI > does not discard an invalid explicit config when --url is also present
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/cli/index.test.ts:136:31
+    134|         { ...process.env, FRONTGUARD_TELEMETRY: '0' },
+    135|       );
+    136|       expect(result.exitCode).toBe(2);
+       |                               ^
+    137|       expect(result.stdout + result.stderr).toContain('Invalid Frontgu…
+    138|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/cli/index.test.ts > CLI > honors telemetry:false when a run fails after loading config
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/cli/index.test.ts:186:87
+    184|       // Positive control: the failure path can reach the local collec…
+    185|       writeConfig(true);
+    186|       expect((await runCliAsync(['run', '--config', configPath], dir, …
+       |                                                                                       ^
+    187|       expect(requests).toHaveLength(1);
+    188|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/core/pipeline-baseline-update.test.ts > updateBaselines > returns and reports a machine-readable result for updated baselines
+AssertionError: expected "vi.fn()" to be called with arguments: [ …(3) ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+    "/Users/ravindra/projects/frontguard/packages/cli",
+-   undefined,
+-   "update",
++   {
++     "mode": "update",
++   },
+  ]
+
+
+Number of calls: 1
+
+ ❯ test/core/pipeline-baseline-update.test.ts:129:38
+    127|     expect(output.completed).toHaveBeenCalledOnce();
+    128|     expect(output.completed).toHaveBeenCalledWith(result);
+    129|     expect(mocks.storageConstructor).toHaveBeenCalledWith(process.cwd(…
+       |                                      ^
+    130|     const version = readFileSync(new URL('../../../../VERSION', import…
+    131|     expect(mocks.writeManifest).toHaveBeenCalledWith(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/core/pipeline-ssim-config.test.ts > pipeline SSIM configuration > initializes comparison storage in compare mode
+AssertionError: expected "vi.fn()" to be called with arguments: [ …(3) ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+    "/Users/ravindra/projects/frontguard/packages/cli",
+-   undefined,
+-   "compare",
+  ]
+
+
+Number of calls: 1
+
+ ❯ test/core/pipeline-ssim-config.test.ts:101:38
+     99|     await runPipeline(config(), reporter());
+    100|
+    101|     expect(mocks.storageConstructor).toHaveBeenCalledWith(process.cwd(…
+       |                                      ^
+    102|   });
+    103|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/storage/git-orphan.test.ts > GitOrphanStorage maxBuffer (install-2) > does not create baseline state during comparison initialization
+Error: CI comparison requires origin/frontguard-baselines; no "origin" remote is configured.
+ ❯ GitOrphanStorage.init src/storage/git-orphan.ts:245:13
+    243|     const hasOrigin = this.gitCheck('remote', 'get-url', 'origin');
+    244|     if (strictCIComparison && !hasOrigin) {
+    245|       throw new Error(
+       |             ^
+    246|         `CI comparison requires origin/${this.branch}; no "origin" rem…
+    247|       );
+ ❯ test/storage/git-orphan.test.ts:202:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  4 failed | 65 passed (69)
+      Tests  5 failed | 970 passed (975)
+   Start at  16:58:46
+   Duration  21.50s (transform 2.93s, setup 0ms, import 7.33s, tests 45.93s, environment 3ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/ravindra/projects/frontguard/packages/cli
+npm error workspace @frontguard/cli@0.2.3
+npm error location /Users/ravindra/projects/frontguard/packages/cli
+npm error command failed
+npm error command sh -c vitest run --pool=forks --exclude='test/e2e/**'
+
+
+> @frontguard/cloud-api@0.2.1 test
+> vitest run
+
+
+ RUN  v4.1.9 /Users/ravindra/projects/frontguard/packages/cloud-api
+
+
+ Test Files  45 passed (45)
+      Tests  478 passed (478)
+   Start at  16:59:07
+   Duration  795ms (transform 2.70s, setup 0ms, import 4.95s, tests 2.49s, environment 2ms)
+
+
+> create-frontguard-plugin@0.2.3 pretest
+> npm run build
+
+
+> create-frontguard-plugin@0.2.3 build
+> tsc
+
+
+> create-frontguard-plugin@0.2.3 test
+> vitest run
+
+
+ RUN  v4.1.9 /Users/ravindra/projects/frontguard/packages/create-frontguard-plugin
+
+
+ Test Files  2 passed (2)
+      Tests  26 passed (26)
+   Start at  16:59:09
+   Duration  105ms (transform 33ms, setup 0ms, import 46ms, tests 41ms, environment 0ms)
+
+
+> @frontguard/mcp@0.2.3 pretest
+> npm run build
+
+
+> @frontguard/mcp@0.2.3 build
+> tsup
+
+CLI Building entry: {"index":"src/index.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"tools/index":"src/tools/index.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/ravindra/projects/frontguard/packages/mcp/tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/ravindra/projects/frontguard/packages/mcp/tsup.config.ts
+CLI Target: node18
+CLI Target: node18
+ESM Build start
+CLI Cleaning output folder
+ESM Build start
+ESM dist/tools/index.js     10.10 KB
+ESM dist/tools/index.js.map 28.12 KB
+ESM ⚡️ Build success in 7ms
+ESM dist/index.js     16.79 KB
+ESM dist/index.js.map 40.59 KB
+ESM ⚡️ Build success in 7ms
+DTS Build start
+DTS Build start
+DTS ⚡️ Build success in 371ms
+DTS dist/tools/index.d.ts 9.45 KB
+DTS ⚡️ Build success in 447ms
+DTS dist/index.d.ts 1.11 KB
+
+> @frontguard/mcp@0.2.3 test
+> vitest run
+
+
+ RUN  v4.1.9 /Users/ravindra/projects/frontguard/packages/mcp
+
+
+ Test Files  8 passed (8)
+      Tests  57 passed (57)
+   Start at  16:59:10
+   Duration  882ms (transform 414ms, setup 0ms, import 714ms, tests 812ms, environment 0ms)
+
+
+> @frontguard/playwright@0.2.3 test
+> vitest run
+
+
+ RUN  v4.1.9 /Users/ravindra/projects/frontguard/packages/playwright
+
+
+ Test Files  5 passed (5)
+      Tests  38 passed (38)
+   Start at  16:59:11
+   Duration  575ms (transform 106ms, setup 0ms, import 397ms, tests 419ms, environment 0ms)
+
+
+> test
+> vitest run
+
+
+ RUN  v4.1.9 /Users/ravindra/projects/frontguard/apps/web
+
+
+ Test Files  12 passed (12)
+      Tests  85 passed (85)
+   Start at  16:59:12
+   Duration  1.56s (transform 2.26s, setup 653ms, import 2.77s, tests 3.21s, environment 5.41s)
+
+
+> @frontguard/github-app@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.9 /Users/ravindra/projects/frontguard/integrations/github-app
+
+
+ Test Files  5 passed (5)
+      Tests  88 passed (88)
+   Start at  16:59:14
+   Duration  496ms (transform 320ms, setup 0ms, import 518ms, tests 342ms, environment 0ms)
+
+
+> @frontguard/netlify-plugin@0.2.3 test
+> vitest run
+
+
+ RUN  v4.1.9 /Users/ravindra/projects/frontguard/integrations/netlify
+
+
+ Test Files  3 passed (3)
+      Tests  43 passed (43)
+   Start at  16:59:14
+   Duration  90ms (transform 42ms, setup 0ms, import 60ms, tests 15ms, environment 0ms)
+
+
+> @frontguard/slack-app@0.2.1 test
+> vitest run
+
+
+ RUN  v4.1.9 /Users/ravindra/projects/frontguard/integrations/slack-app
+
+
+ Test Files  8 passed (8)
+      Tests  76 passed (76)
+   Start at  16:59:15
+   Duration  141ms (transform 235ms, setup 0ms, import 310ms, tests 70ms, environment 0ms)
+
+
+> @frontguard/vercel-integration@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.9 /Users/ravindra/projects/frontguard/integrations/vercel
+
+
+ Test Files  3 passed (3)
+      Tests  60 passed (60)
+   Start at  16:59:15
+   Duration  120ms (transform 80ms, setup 0ms, import 111ms, tests 34ms, environment 0ms)
+
+real 29.85
+user 58.89
+sys 15.67
+---EXIT:1

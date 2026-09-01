@@ -1,0 +1,44 @@
+# P1 exit evidence: main restored to green
+2026-09-01T12:40:21Z
+
+## Before (baseline 5f0e141)
+  lint FAIL | build FAIL | test(22) FAIL (10 tests) | test(20) cancelled | e2e FAIL | Deploy Web cancelled
+
+## After (merge e5295de, PR #209)
+  Greptile Review            pass
+  audit                      pass
+  build                      pass
+  docs-links                 pass
+  e2e                        pass
+  lint                       pass
+  root-action-contract       pass
+  subpath-action-contract    pass
+  test (22)                  pass
+  test (24)                  pass
+
+## main CI
+  CI completed/success on e5295de7238647ff94b6170b13df738a56bd6fee
+
+## Local full verification
+  npm test (11 workspaces): exit 0, 1926 tests passing
+  npm run build: exit 0 | npm run lint: exit 0 | npm run typecheck: clean
+  npm audit: 0 vulnerabilities (was 2 moderate)
+  CLI suite parity: 975/975 with CI=true AND with CI unset
+
+## Negative control (proves the parity fix is load-bearing)
+  With the git-identity stub reverted and GIT_CONFIG_GLOBAL/SYSTEM=/dev/null,
+  exactly the 4 CI-only 'remote branch adoption' failures reproduce locally.
+  With the fix: 36/36 pass. CI's environment is now reproducible locally.
+
+## Branch cleanup
+  Deleted (both fully merged, 0 unique commits): origin/audit/launch-finish-2026-08,
+  origin/cursor/complete-identified-items-124b. Non-dependabot remote branches: main only.
+  Worktree ../frontguard-launch-review deregistered from git; the 490MB directory of
+  stale build artifacts remains on disk for the owner to delete (nothing unique in it:
+  git status was clean and the branch had 0 commits not in main).
+
+## NOT closed by P1
+  Deploy Web only triggers on pushes touching apps/web/** or scripts/sync-openapi.mjs.
+  The P1 merge touched neither, so production is STILL stale and /privacy, /terms and
+  /status still 404. G-07 needs an apps/web change to merge (T-14 or T-27), which will
+  deploy as the repo's normal automated consequence -- or an explicit owner decision.

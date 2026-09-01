@@ -1,0 +1,47 @@
+# angles 15/16 dynamic: live surface probe
+2026-09-01T11:44:32Z
+https://frontguard.dev/                    200
+https://frontguard.dev/privacy             404
+https://frontguard.dev/terms               404
+https://frontguard.dev/pricing             200
+https://frontguard.dev/status              404
+https://frontguard.dev/changelog           200
+https://api.frontguard.dev/health          ERR:6
+https://app.frontguard.dev/                ERR:6
+
+## Interpretation
+Repo HAS these routes — Phase 0 build emitted them:
+  pricing-BcpTlWJw.js
+  pricing-Du5LVhK6.js
+  privacy-BDuHK6mn.js
+  privacy-Zmm9cujg.js
+  status-CtdbkUdg.js
+  status-MgifdwI5.js
+  terms-Cmn1cL3Y.js
+  terms-DzYUE2kd.js
+
+Source routes on disk:
+  __root.tsx
+  brand.tsx
+  changelog
+  changelog.tsx
+  comparisons
+  comparisons.tsx
+  docs
+  docs.tsx
+  index.tsx
+  pricing.tsx
+  privacy.tsx
+  status.tsx
+  terms.tsx
+
+CAUSAL CHAIN (the load-bearing finding):
+  main is RED in CI  ->  'Deploy Web' job cancelled  ->  production frontguard.dev is STALE
+  -> /privacy, /terms, /status 404 in production while /pricing serves 200.
+
+A site that advertises paid plans while its privacy policy and terms return 404 is a
+legal exposure, not just a broken link. It is ALSO not an independent problem: fixing the
+red baseline (P1) unblocks the deploy that publishes the legal pages. One root cause.
+
+api.frontguard.dev and app.frontguard.dev do not resolve (curl exit 6, DNS).
+Confirms BizScout: no live money path; cloud-api is undeployed source.

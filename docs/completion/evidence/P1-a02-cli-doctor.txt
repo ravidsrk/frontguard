@@ -1,0 +1,27 @@
+# angle 2/13 dynamic: frontguard doctor
+2026-09-01T11:36:20Z
+=== dist sizes ===
+  562729 total
+  330439 packages/cli/dist/cli/index.js
+  188160 packages/cli/dist/index.js
+   39100 packages/cli/dist/plugins/index.js
+    5030 packages/cli/dist/cli/render.js
+=== budget check (CI gate target) ===
+dist/index.js=188160 budget=180000 over=8160
+=== doctor ===
+
+Frontguard Doctor
+────────────────────────────────────────────────────────────
+✅ Node.js version: v24.20.0 (>= 20 required)
+✅ Playwright installed: playwright package is resolvable
+✅ Browser binaries: all required browsers available: chromium
+🟡 Configuration: no config file found
+   → Run `frontguard init` to create one, or pass --url at runtime.
+🟡 AI provider keys: no AI keys found (AI classification disabled)
+   → Set FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY to enable AI analysis.
+✅ Git repository: inside a git work tree
+✅ Baseline branch: 'frontguard-baselines' exists (local)
+────────────────────────────────────────────────────────────
+✅ All critical checks passed (2 advisory warning(s)).
+
+exit:0

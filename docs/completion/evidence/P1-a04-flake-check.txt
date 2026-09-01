@@ -1,0 +1,14 @@
+# angle 4 dynamic: flake detection (R13 — suite run twice)
+2026-09-01T11:37:43Z
+cmd: npx vitest run --pool=forks --exclude='test/e2e/**' (packages/cli, x2)
+run1 exit=1, run2 exit=1, wall 42.1s
+
+Failure sets are IDENTICAL across both runs -> DETERMINISTIC, not flaky:
+  - CLI does not discard an invalid explicit config when --url is also present
+  - CLI honors telemetry:false when a run fails after loading config
+  - GitOrphanStorage maxBuffer (install-2) does not create baseline state during comparison initialization
+  - pipeline SSIM configuration initializes comparison storage in compare mode
+  - updateBaselines returns and reports a machine-readable result for updated baselines
+
+Verdict: the 5 local failures are real regressions, not flakes.
+Routes to fix-with-failing-test, not to flake quarantine.
