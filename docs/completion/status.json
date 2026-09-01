@@ -1,0 +1,47 @@
+{
+  "product": "Frontguard — AI-powered frontend visual regression testing",
+  "repo_path": "/Users/ravindra/projects/frontguard",
+  "run_id": "20260901-1658",
+  "mode": "drive",
+  "baseline": {
+    "commit": "5f0e141a65651fa34823866c2ee715c913dc2c45",
+    "date": "2026-09-01T16:58:00Z",
+    "cold_start": "fail",
+    "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
+  },
+  "current_commit": "5f0e141a65651fa34823866c2ee715c913dc2c45",
+  "resume_pointer": "PHASE_1",
+  "definition_frozen_at": null,
+  "completion_pct": 0,
+  "gate": {
+    "status": "NOT_EVALUATED",
+    "reason": "Phase 0 complete; 360 audit not yet run"
+  },
+  "angles": [],
+  "critical_flows": [],
+  "gaps": [],
+  "phases": [
+    {
+      "id": "P0",
+      "name": "Baseline freeze",
+      "status": "complete",
+      "exit_criteria": [
+        { "text": "Baseline git/toolchain/inventory recorded", "met": true, "evidence": "docs/completion/STATUS.md" },
+        { "text": "Cold-start result captured (pass or fail)", "met": true, "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt" }
+      ]
+    }
+  ],
+  "tasks": [],
+  "human_actions": [],
+  "assumptions": [
+    { "id": "A-01", "phase": "P0", "decision": "Use npm against the committed package-lock.json", "rejected": ["pnpm per fleet-global rule"], "reason": "pnpm refuses the workspaces field; CI uses npm; operator confirmed" },
+    { "id": "A-02", "phase": "P0", "decision": "Task branches in the primary checkout", "rejected": ["one git worktree per task"], "reason": "single-agent run; no collision possible; keeps R5 evidence paths stable" },
+    { "id": "A-03", "phase": "P0", "decision": "Single product identity across all 11 workspaces", "rejected": ["treat cloud-api/integrations as separate products"], "reason": "one scope, one VERSION, one changeset line" },
+    { "id": "A-04", "phase": "P0", "decision": "DOMAIN_HINTS = devtool-oss", "rejected": ["full fintech/VDA compliance sweep"], "reason": "MIT devtool, no money path observed in Phase 0; pending angle 15 + Phase 2 confirmation" }
+  ],
+  "research": [],
+  "breakers_tripped": [],
+  "history": [
+    { "run_id": "20260901-1658", "commit": "5f0e141a65651fa34823866c2ee715c913dc2c45", "completion_pct": 0, "gate": "NOT_EVALUATED" }
+  ]
+}
