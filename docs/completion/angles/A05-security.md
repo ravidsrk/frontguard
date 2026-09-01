@@ -1,0 +1,93 @@
+## Angle 5 — Security
+
+**Score: 1/4 · RAG: R**
+**Score justification:** The security *controls* are unusually dense for a repo this age — every inbound webhook fails closed on a missing secret and uses a constant-time compare, all D1 access is parameterised, every ID-bearing cloud-api route re-checks ownership, and there is a real SSRF guard. But this was pure static reading: I executed nothing, so per the audit's scoring rule I cannot award 2+. The residual gaps are real and completion-blocking: there is no `.env.example` anywhere in the tree, the git-history secret scan could not be run from my toolset, and three route groups sit in front of the rate-limit middleware.
+**Dynamic proof needed to justify a higher score:**
+1. `npm test -w @frontguard/cloud-api -- auth.test.ts sec-2.test.ts sec-4.test.ts sec-6.test.ts session.test.ts keys-routes.test.ts list-runs-team-scope.test.ts render-target.test.ts billing.test.ts`
+2. `npm test -w @frontguard/github-app -w @frontguard/slack-app -w @frontguard/vercel -- webhook verify oauth`
+3. Secret history scan (I could not run these — no shell in my toolset):
+   `git log --all -p -S 'BEGIN PRIVATE KEY' -- . | head -50`;
+   `git log --all -p -S 'whsec_' | head -50`;
+   `git log --all --diff-filter=A --name-only --pretty=format: | sort -u | grep -E '(^|/)\.env'`;
+   `npx gitleaks detect --no-git=false --redact`
+4. `git check-ignore -v integrations/netlify/lib/core.js integrations/netlify/test/core.test.js; git ls-files integrations/netlify`
+5. `npm audit --omit=dev --json | jq '.metadata.vulnerabilities'` and `npm ls --all 2>/dev/null | grep -c .` for the 10 install-script packages: `npm ci --foreground-scripts --dry-run 2>&1 | grep -A20 install-scripts`
+
+### Explicit verdicts on the four required questions
+
+- **Webhook signature verification — PRESENT on all three inbound webhooks, all constant-time, all fail-closed.** GitHub (`integrations/github-app/src/webhook.ts:50-77`, HMAC-SHA256 + `timingSafeEqual`), Slack (`integrations/slack-app/src/verify.ts:14-18,36-64`, HMAC-SHA256 over `v0:<ts>:<body>` plus a 300 s replay window), Vercel (`integrations/vercel/src/webhook.ts:71-96`, HMAC-SHA1 per Vercel's spec), Stripe (`packages/cloud-api/src/billing/stripe.ts`, `verifyStripeSignature` with a 300 s tolerance). Missing-secret paths return 500 rather than skipping the check: `integrations/github-app/src/handler.ts:138-144`, `integrations/slack-app/src/handler.ts:93,124`, `integrations/vercel/src/handler.ts:207-212`. **Netlify is N/A — it is a build plugin (`onSuccess` lifecycle hook), not an HTTP webhook receiver; `integrations/netlify/index.js:38` exports only `onSuccess`, there is no Hono app and no inbound request surface.**
+- **cloud-api object-level authorisation — PRESENT on every ID-bearing route I read; no BOLA found.** `GET /v1/runs/:id` (`packages/cloud-api/src/index.ts:573-597`), `GET /v1/reports/:id` (`:634-659`), `POST /v1/baselines/:runId/approve` (`:665-686`), `DELETE /v1/runs/:id` (`:692`, delegating to `deleteRun(id, userId)` which is `DELETE ... WHERE id = ? AND user_id = ?` at `db/d1-store.ts:287`), all screenshot routes (`routes/screenshots.ts:23-25,31,53`), and all 18 session-dashboard routes (`routes/dashboard.ts:146-523`, every one re-verifies the cookie and then compares `m.userId === userId` or `getRunOwner(runId) === userId`). Team-scoped reads go through `store.getMember(project.teamId, userId)` and writes additionally through `can(member.role, 'run_tests')`.
+- **Command injection via git — no exploitable path found; one latent hazard.** `packages/cli/src/storage/git-orphan.ts:11` uses `execFileSync` with an argv array (no shell) throughout; `packages/cli/src/cli/doctor.ts:256-258` likewise. The one shell-interpolating call site is `gitDiff()` at `packages/cli/src/graph/resolver.ts:334-341` (`execSync(\`git ${args}\`)`), but all four callers (`:380,386,392,398`) pass hardcoded string literals, so no attacker-controlled data reaches it today. See F-5-09.
+- **Prompt injection — a real, unmitigated surface, though the blast radius is verdict manipulation rather than tool-call hijack.** There are no tool-calls/function-calls in any provider request (`ai-vision.ts:236-280,347-390`, `model-judge.ts:182-235` send only text + base64 images), so page content cannot cause the model to *act*. But attacker-controlled page data does reach the prompt — see F-5-08 — and the model's `classification` decides whether a run passes or fails, and its `patch` output is injected into a live browser page. No delimiting, escaping, or instruction-hierarchy defence exists anywhere in the prompt builders.
+
+### Findings
+
+- **F-5-01** — There is no `.env.example` (or equivalent) anywhere in the repository; `glob '**/.env*'` with gitignore disabled returns zero files. The ~14 cloud-api secrets exist only as a comment block in `packages/cloud-api/wrangler.toml:41-59`, and the integrations' env contracts exist only as TypeScript interfaces (`integrations/slack-app/src/handler.ts:46-63`, `integrations/vercel/src/handler.ts:59-72`, `GitHubAppEnv` in `integrations/github-app/src/handler.ts`). Location: `packages/cloud-api/wrangler.toml:41`. Impact: directly blocks the rubric's level-4 "a stranger could run and operate it from the docs alone", and makes it impossible to statically diff "env vars the code reads" against "env vars documented" — the two lists have no single source.
+- **F-5-02** — **The git-history secret scan was NOT performed.** My toolset has no shell (`read`/`grep`/`glob` only), so `git log -p -S` and `gitleaks` could not run. Working-tree scanning *was* done and is clean: a regex sweep for `sk-`, `ghp_`, `github_pat_`, `xoxb-`, `AKIA`, `BEGIN * PRIVATE KEY`, `whsec_`, `sk_live_` across all tracked files returned only test fixtures (`packages/cli/test/utils/redact.test.ts:6`, `packages/cli/test/core/config.test.ts:135`), a PEM parser (`integrations/github-app/src/github-api.ts:29`), and prose in `docs/DECISIONS.md:94`. Location: `docs/DECISIONS.md:93`. Impact: an unscanned history is an unbounded risk on a repo that has already published 0.2.x to npm; treat this angle as unproven until the commands in "Dynamic proof" run.
+- **F-5-03** — `/auth/*`, `/v1/keys/*`, and `/v1/billing/*` are mounted at `packages/cloud-api/src/index.ts:169-171`, *before* the rate-limit middleware registered at `:246`. Hono dispatches in registration order, so those three routers are never rate-limited. They include `POST /v1/keys` (mints API keys, capped only by `MAX_KEYS_PER_USER=10`), `POST /v1/billing/checkout` (creates real Stripe Checkout Sessions), and `GET /auth/github/callback` (performs an outbound token exchange per request). Location: `packages/cloud-api/src/index.ts:169`. Impact: unmetered Stripe API calls and unmetered outbound GitHub calls from a single caller; also unlimited API-key guessing attempts against the `keyRoutes` guard at `routes/keys.ts:27-46` (infeasible against 192-bit keys, but the control is simply absent).
+- **F-5-04** — The rate limiter is a per-isolate in-process `Map`, self-documented as not shared across Cloudflare isolates. Location: `packages/cloud-api/src/rate-limit.ts:1-12`. Impact: on Workers the advertised "100 req/min per key" is per-isolate, so effective throughput is unbounded in practice. The `X-RateLimit-*` headers returned at `index.ts:252-254` therefore state a limit the service does not enforce.
+- **F-5-05** — The dashboard session is a stateless HMAC cookie (`userId.expiry.signature`) with a 7-day `SESSION_MAX_AGE`, and there is no logout route and no server-side revocation: grepping `packages/cloud-api/src` for `logout|deleteCookie(c, SESSION_COOKIE)` returns zero hits. Location: `packages/cloud-api/src/auth/session.ts:15,118-127`; issued at `packages/cloud-api/src/routes/auth.ts:137-144`. Impact: a stolen or leaked `fg_session` cookie is valid for up to 7 days with no way for the user or operator to invalidate it short of rotating `DASHBOARD_SESSION_SECRET`, which logs out every user. Also: 18 state-changing `POST /dashboard/*` routes carry no CSRF token and rely solely on `sameSite: 'Lax'`.
+- **F-5-06** — CORS reflects *any* `http://localhost:<port>` origin while `credentials: true`. Location: `packages/cloud-api/src/index.ts:113-124`. Impact: any page served from any port on the victim's loopback interface (a dev server, a locally installed app, a compromised npm package's local server) can issue credentialed cross-origin requests to `api.frontguard.dev` and read the responses, including `GET /v1/runs` and `GET /v1/reports/:id`. The allowlist should not be a `startsWith` prefix match combined with credential passing in a production config.
+- **F-5-07** — `apps/web` ships no Content-Security-Policy, no HSTS, no `X-Frame-Options`, and no `_headers` file. The only header-ish control is two `<meta>` tags (`referrer` and an `httpEquiv` `X-Content-Type-Options`) in `apps/web/src/routes/__root.tsx:25-26`; `httpEquiv` nosniff is ignored by browsers — only the real HTTP header counts. `apps/web/wrangler.jsonc` sets no header rules and `apps/web/public/` contains no `_headers`. Location: `apps/web/src/routes/__root.tsx:25`. Impact: frontguard.dev is clickjackable and has no XSS containment; contrast with cloud-api, which sets all five headers correctly at `packages/cloud-api/src/index.ts:129-136`.
+- **F-5-08** — Attacker-controlled page data reaches the AI prompt. The crawler derives `route.path` from `<a href>` links harvested off the live page (`packages/cli/src/discovery/crawler.ts:288-300`) and stores `new URL(currentUrl).pathname` as the route (`:267-276`); that value is then interpolated verbatim into the analysis prompt (`packages/cli/src/diff/ai-vision.ts:176-181` → `:258-259` / `:369-370`) and the fix prompt (`packages/cli/src/diff/ai-fix.ts:186-195`). `ai-fix.ts:192-194` additionally splices up to 4 000 chars of raw `git diff` text into the prompt. The model's `classification` verdict decides pass/fail, and its `patch` string is fed straight into a sandbox page render via `applyPatch` (`packages/cli/src/sandbox/verify-fix.ts:107` → `sandbox/local.ts:33-35`). Location: `packages/cli/src/diff/ai-vision.ts:258`. Impact: a malicious or compromised page under test can attempt to steer its own regression verdict to `intentional`, suppressing a real failure. Mitigating factors, stated honestly: URL pathnames are percent-encoded so newline-based prompt breaks are hard, `model-judge.ts:117-119` deliberately sends only the *count* of console errors (not their text), and `domSnapshot` is never sent to any provider. Nothing in the prompt builders delimits or neutralises the untrusted segment.
+- **F-5-09** — `gitDiff()` builds a shell command by string interpolation: `execSync(\`git ${args}\`)`. Location: `packages/cli/src/graph/resolver.ts:334-341`. Impact: not exploitable today (all four call sites at `:380,386,392,398` pass literals), but it is one commit away from injection the moment anyone threads a branch name, base ref, or config value through `args`. `git-orphan.ts` next door does the same job correctly with `execFileSync` + argv.
+- **F-5-10** — `integrations/netlify/index.js:24-32` imports `./lib/core.js`; that file exists on disk but does not appear in a gitignore-respecting listing of `integrations/netlify/**` (neither does `test/core.test.js`), while `package.json:10-15` ships `lib/` in the npm tarball and `publishConfig.provenance` is `true`. No `build` script exists in that workspace. Location: `integrations/netlify/package.json:10`. Impact: if `lib/core.js` is genuinely untracked, the published tarball contains executable code that is not in the repository the provenance attestation points at — the attestation would be technically valid and semantically misleading. Needs `git check-ignore -v` / `git ls-files` to confirm (see Dynamic proof #4).
+- **F-5-11** — `previewUrlCache` is an unbounded module-level `Map` keyed by `owner/repo@sha`, populated on every verified `status` and `deployment_status` webhook, never evicted. Location: `integrations/github-app/src/handler.ts:81`, written at `:207,236`. Impact: memory growth per isolate proportional to commit volume across all installations; a busy installation can degrade the worker. Compare `packages/cloud-api/src/rate-limit.ts`, which does bound and evict.
+- **F-5-12** — `GET /v1/usage` returns hardcoded `limits: { runs: 500, screenshots: 5000 }` regardless of the caller's actual plan, while enforcement uses `getPlan(planId).limits`. Location: `packages/cloud-api/src/index.ts:744-748`. Impact: a free-plan user is told their limit is 500 runs and then gets a 402 at the real free-tier ceiling — a correctness/trust bug on a billing-adjacent endpoint, not a vulnerability.
+- **F-5-13** — `DELETE /v1/runs/:id` is owner-only and has no team-membership path, unlike `GET /v1/runs/:id`, `GET /v1/reports/:id`, and the approve route, which all accept team members. Location: `packages/cloud-api/src/index.ts:692`. Impact: fail-closed, so not a vulnerability — but it is an undocumented authorisation inconsistency a team admin will hit and report as a bug.
+- **F-5-14** — The `npm warn install-scripts` count of 10 comes entirely from transitive dependencies: no workspace declares `postinstall`/`preinstall`/`install`; the only lifecycle script in the tree is the root `"prepare": "husky"` (`package.json:33`). The root `overrides` block (30 entries, mostly OpenTelemetry) pins transitives without any recorded rationale. Location: `package.json:33`. Impact: install-script risk is inherited, not self-inflicted; the actionable gap is that no allowlist, `--ignore-scripts` policy, or documented review of those 10 exists.
+
+### Notes
+
+**Controls that are genuinely well-built** (recorded so the parent can score them up after dynamic proof, not as praise): the release pipeline at `.github/workflows/release.yml` is the strongest thing in this repo — `permissions: {}` at the top, tag ref must equal `v$VERSION` from the `VERSION` file (`:52-55`), the remote tag SHA must equal the checked-out SHA (`:59`), the commit must be an ancestor of the default branch (`:60`), a successful `ci.yml` *push* run on that exact SHA must exist (`:73-100`), the GitHub Release must report `immutable == true` before npm publish is even reachable (`:213-220`), publish runs with `id-token: write` and `--provenance` when `publishConfig.provenance` is set (`scripts/release.sh:346-349`), and `NPM_TOKEN` is written to a temp `.npmrc` under a `trap`-based cleanup (`scripts/release.sh:332-335`). A compromised PR cannot publish: publication requires a tag push whose commit already merged to the default branch *and* already passed CI there.
+
+**On the untrusted-content rule:** I checked `apps/web/public/agents.md` and `apps/web/public/.well-known/`. `agents.md` is legitimate product documentation in the llms.txt tradition — it describes MCP tools and REST routes and is notably *honest* (it states `api.frontguard.dev` is not live and that `accept_baseline` records approval without promoting screenshots). It contains no attempt to steer a reading agent's behaviour. No prompt-injection or agent-steering file was found anywhere in the tree.
+
+**SSRF:** `packages/cloud-api/src/security/render-target.ts` is a serious implementation — it defeats integer-form IPv4 (`parseIntegerIpv4`), mixed-radix octets (`parseDottedIpv4`), IPv4-mapped IPv6, and covers `fe80::/10` and `fc00::/7`, then resolves A/AAAA via DNS-over-HTTPS and re-checks the resolved addresses. It is enforced on `POST /v1/run` (`index.ts:294-302`) and on the Slack slash command (`integrations/slack-app/src/handler.ts:150`). Residual: a TOCTOU DNS-rebinding window between `assertSafeRenderTarget` and the actual fetch, which no code closes; low severity because the render happens in a Daytona sandbox, not the worker.
+
+**Coverage:** I read all 7 cloud-api route modules, both auth modules, the billing/Stripe module, the SSRF guard, the rate limiter, the D1 store (all ~90 `prepare()` sites — every one is `?`-bound; the two dynamically-built `WHERE` clauses at `d1-store.ts:249-251` and `:765` build placeholders, never values), all 4 integrations' webhook/handler/verify modules, the CLI's git/exec surface, the three AI prompt builders, the sandbox patch path, the crawler, telemetry, `apps/web` headers, all 6 workflows plus `scripts/release.sh`, and all workspace manifests.
+
+---
+
+## Parent dynamic proof (run by Main, not the scout)
+
+SecScout is read-only and has no shell, so it correctly flagged two findings it could not test.
+Both were executed here. **One closes clean, one is refuted.**
+
+### F-5-02 - git-history secret scan: **CLEAN, finding closed**
+
+Evidence: `evidence/P1-a05-secret-history-scan.txt`. Scanned ALL refs, full history, via
+`git log --all -S<pattern>` for `BEGIN RSA PRIVATE KEY`, `BEGIN PRIVATE KEY`, `whsec_`,
+`sk_live_`, `xoxb-`, `ghp_`, `github_pat_`, `AKIA`, plus every `.env*` ever added.
+
+Every hit is benign, and the reason is faintly pleasing: the `sk_live_`, `AKIA`, and
+`github_pat_` matches are **the product's own redaction regexes** in the secret-scrubbing
+module, added in `6396cbb`. `whsec_` hits are test fixtures (`whsec_test`, `whsec_cost2`).
+`BEGIN PRIVATE KEY` is documentation prose plus a `.replace()` in the GitHub App PEM parser.
+
+**`.env` files ever added to history: NONE.**
+
+No real credential has been committed. Angle 5's largest unknown resolves in the repo's favour.
+
+### F-5-10 - netlify `lib/core.js` untracked-but-published: **REFUTED**
+
+Evidence: `evidence/P1-a05-netlify-tarball.txt`.
+`git ls-files integrations/netlify` lists `lib/core.js` and `test/core.test.js`.
+`git check-ignore -v` reports neither is ignored. The on-disk file set and the git-tracked
+file set are **identical** (10 files each).
+
+The published tarball therefore contains only committed code, and the
+`publishConfig.provenance: true` attestation is honest. The scout's glob tooling was
+respecting a gitignore rule that hid the path from its listing. No action required.
+
+### F-5-14 / dependency posture
+
+`npm audit --omit=dev` reports **0 vulnerabilities in the production tree**
+(`evidence/P1-a05-npm-audit.txt`). The only 2 advisories in the whole tree are moderate and
+both come from `react-router`/`react-router-dom`, which is **imported nowhere**: zero hits for
+`from 'react-router*'` across `packages/`, `apps/`, `integrations/`, `scripts/`. It is an
+unused root devDependency.
+
+Remediation is therefore `npm uninstall react-router-dom` at the root, **not** the
+semver-major bump to 7.18.3 that `npm audit fix` proposes. Cheap, and it takes the full-tree
+advisory count to zero.

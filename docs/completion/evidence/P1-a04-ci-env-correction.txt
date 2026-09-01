@@ -1,0 +1,23 @@
+# angle 4 dynamic: CORRECTED local baseline (CI env isolation)
+2026-09-01T11:40:23Z
+
+METHOD ERROR FOUND AND CORRECTED:
+The agent shell exports CI=true. Every earlier 'local' run in this audit therefore
+executed in CI mode, and is NOT a real developer's local environment.
+
+With CI=true   (Phase 0 cold start): 5 failures / 970 passed
+With CI unset  (true dev local)    : 4 failures / 971 passed
+GitHub Actions CI                  : 10 failures
+
+Delta: test/storage/git-orphan.test.ts 'does not create baseline state during
+comparison initialization' PASSES when CI is unset. It is environment-dependent,
+gated on strictCIComparison (src/storage/git-orphan.ts:243-247), not a code defect.
+
+True developer-local failures (4), all deterministic across runs:
+  - CLI does not discard an invalid explicit config when --url is also present
+  - CLI honors telemetry:false when a run fails after loading config
+  - pipeline SSIM configuration initializes comparison storage in compare mode
+  - updateBaselines returns and reports a machine-readable result for updated baselines
+
+=> Parity gap is WIDER than Phase 0 recorded: 4 local vs 10 CI, not 5 vs 10.
+=> Any contributor running 'npm test' sees a different suite than CI enforces.

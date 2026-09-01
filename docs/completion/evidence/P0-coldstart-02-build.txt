@@ -1,0 +1,220 @@
+# P0 cold start step 2: npm run build
+# date: 2026-09-01T11:28:25Z
+---
+
+> build
+> node scripts/sync-openapi.mjs && npm run build --workspaces --if-present
+
+
+> @frontguard/cli@0.2.3 build
+> tsup
+
+CLI Building entry: {"cli/index":"src/cli/index.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"cli/render":"src/cli/render.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"index":"src/core/pipeline.ts","plugins/index":"src/plugins/index.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/ravindra/projects/frontguard/packages/cli/tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/ravindra/projects/frontguard/packages/cli/tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/ravindra/projects/frontguard/packages/cli/tsup.config.ts
+CLI Target: node18
+CLI Target: node18
+ESM Build start
+CLI Target: node18
+ESM Build start
+CLI Cleaning output folder
+ESM Build start
+ESM dist/cli/render.js     4.91 KB
+ESM dist/cli/render.js.map 11.83 KB
+ESM ⚡️ Build success in 8ms
+ESM dist/plugins/index.js     38.15 KB
+ESM dist/index.js             183.72 KB
+ESM dist/plugins/index.js.map 99.81 KB
+ESM dist/index.js.map         441.54 KB
+ESM ⚡️ Build success in 26ms
+ESM dist/cli/index.js     322.65 KB
+ESM dist/cli/index.js.map 719.99 KB
+ESM ⚡️ Build success in 31ms
+DTS Build start
+DTS Build start
+DTS Build start
+DTS ⚡️ Build success in 544ms
+DTS dist/cli/render.d.ts 2.51 KB
+DTS ⚡️ Build success in 1140ms
+DTS dist/cli/index.d.ts 27.54 KB
+DTS ⚡️ Build success in 1360ms
+DTS dist/index.d.ts          9.69 KB
+DTS dist/plugins/index.d.ts  14.00 KB
+DTS dist/types-DDsQuKXX.d.ts 33.58 KB
+
+> @frontguard/cloud-api@0.2.1 build
+> node ../../scripts/sync-openapi.mjs && tsup src/index.ts --format esm --dts
+
+CLI Building entry: src/index.ts
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Target: es2022
+ESM Build start
+ESM dist/chunk-ZV6UFIWK.js          2.85 KB
+ESM dist/daytona-runner-5FESQKEV.js 5.48 KB
+ESM dist/index.js                   327.79 KB
+ESM ⚡️ Build success in 22ms
+DTS Build start
+DTS ⚡️ Build success in 778ms
+DTS dist/index.d.ts 24.96 KB
+
+> create-frontguard-plugin@0.2.3 build
+> tsc
+
+
+> @frontguard/mcp@0.2.3 build
+> tsup
+
+CLI Building entry: {"index":"src/index.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"tools/index":"src/tools/index.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/ravindra/projects/frontguard/packages/mcp/tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/ravindra/projects/frontguard/packages/mcp/tsup.config.ts
+CLI Target: node18
+CLI Target: node18
+ESM Build start
+CLI Cleaning output folder
+ESM Build start
+ESM dist/tools/index.js     10.10 KB
+ESM dist/tools/index.js.map 28.12 KB
+ESM ⚡️ Build success in 8ms
+ESM dist/index.js     16.79 KB
+ESM dist/index.js.map 40.59 KB
+ESM ⚡️ Build success in 8ms
+DTS Build start
+DTS Build start
+DTS ⚡️ Build success in 419ms
+DTS dist/tools/index.d.ts 9.45 KB
+DTS ⚡️ Build success in 483ms
+DTS dist/index.d.ts 1.11 KB
+
+> @frontguard/playwright@0.2.3 build
+> tsup
+
+CLI Building entry: src/index.ts
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/ravindra/projects/frontguard/packages/playwright/tsup.config.ts
+CLI Target: node18
+CLI Cleaning output folder
+ESM Build start
+ESM dist/index.js     12.84 KB
+ESM dist/index.js.map 25.45 KB
+ESM ⚡️ Build success in 6ms
+DTS Build start
+DTS ⚡️ Build success in 423ms
+DTS dist/index.d.ts 1.32 KB
+
+> frontguard-demo@1.0.0 build
+> next build
+
+▲ Next.js 16.3.3 (Turbopack)
+✓ Running next.config.js took 7ms
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 869ms
+  Running TypeScript ...
+
+  We detected TypeScript in your project and created a tsconfig.json file for you.
+  Finished TypeScript in 495ms ...
+  Collecting page data using 6 workers ...
+  Generating static pages using 6 workers (0/5) ...
+  Generating static pages using 6 workers (1/5) 
+  Generating static pages using 6 workers (2/5) 
+  Generating static pages using 6 workers (3/5) 
+✓ Generating static pages using 6 workers (5/5) in 164ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /about
+└ ○ /pricing
+
+
+○  (Static)  prerendered as static content
+
+
+> build
+> vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 158 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/client/.assetsignore                     0.02 kB
+dist/client/assets/styles-DWICHovv.css        3.15 kB │ gzip:   1.17 kB
+dist/client/assets/InfoPage-oKAR8mWv.js       0.93 kB │ gzip:   0.50 kB
+dist/client/assets/status-CtdbkUdg.js         1.19 kB │ gzip:   0.64 kB
+dist/client/assets/privacy-BDuHK6mn.js        1.29 kB │ gzip:   0.69 kB
+dist/client/assets/terms-Cmn1cL3Y.js          1.34 kB │ gzip:   0.70 kB
+dist/client/assets/Nav-DMI7DZle.js            1.58 kB │ gzip:   0.76 kB
+dist/client/assets/Footer-CArcqJRh.js         2.69 kB │ gzip:   1.10 kB
+dist/client/assets/_-3JybQQTC.js              2.83 kB │ gzip:   0.94 kB
+dist/client/assets/changelog-JcvMoLDP.js      4.12 kB │ gzip:   1.43 kB
+dist/client/assets/docs-D3-UNN14.js           4.25 kB │ gzip:   1.41 kB
+dist/client/assets/comparisons-D60lTO3J.js    9.20 kB │ gzip:   2.63 kB
+dist/client/assets/pricing-BcpTlWJw.js       11.38 kB │ gzip:   3.43 kB
+dist/client/assets/brand-COgWyeXz.js         16.32 kB │ gzip:   3.59 kB
+dist/client/assets/style-CxCmuEtF.js         30.22 kB │ gzip:  11.25 kB
+dist/client/assets/routes-D33ZyCkV.js        43.63 kB │ gzip:  10.39 kB
+dist/client/assets/index-D6rWiy1y.js        331.50 kB │ gzip: 106.73 kB
+
+✓ built in 223ms
+vite v8.2.2 building ssr environment for production...
+transforming...
+✓ 207 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/server/wrangler.json                                    1.35 kB │ gzip:   0.67 kB
+dist/server/.vite/manifest.json                              7.33 kB │ gzip:   1.09 kB
+dist/server/assets/styles-DWICHovv.css                       3.15 kB │ gzip:   1.17 kB
+dist/server/assets/start-5Z2QO8AU.js                         0.14 kB │ gzip:   0.13 kB
+dist/server/assets/empty-plugin-adapters-D9UWiqvJ.js         0.22 kB │ gzip:   0.16 kB
+dist/server/assets/matchContext-Ei2qVPEH.js                  0.58 kB │ gzip:   0.31 kB
+dist/server/assets/InfoPage-DrcyhUaL.js                      1.59 kB │ gzip:   0.66 kB
+dist/server/assets/status-MgifdwI5.js                        1.76 kB │ gzip:   0.76 kB
+dist/server/assets/privacy-Zmm9cujg.js                       1.94 kB │ gzip:   0.83 kB
+dist/server/assets/redirect-Dr4N3STz.js                      1.95 kB │ gzip:   0.86 kB
+dist/server/assets/terms-DzYUE2kd.js                         1.99 kB │ gzip:   0.84 kB
+dist/server/assets/Nav-BDxwo20y.js                           2.38 kB │ gzip:   1.00 kB
+dist/server/assets/_tanstack-start-manifest_v-8ByEeY21.js    2.59 kB │ gzip:   0.66 kB
+dist/server/assets/Footer-ZesVYmfx.js                        4.04 kB │ gzip:   1.34 kB
+dist/server/assets/_-DvcG9D8i.js                             4.51 kB │ gzip:   1.24 kB
+dist/server/assets/changelog-DqFKaw3Z.js                     6.62 kB │ gzip:   1.86 kB
+dist/server/assets/docs-B_OSwwp5.js                          6.84 kB │ gzip:   1.88 kB
+dist/server/assets/style-CTJdTqvV.js                         9.04 kB │ gzip:   3.07 kB
+dist/server/assets/Match-B9xE_9KI.js                        11.47 kB │ gzip:   3.08 kB
+dist/server/assets/comparisons-CAfAFXur.js                  14.43 kB │ gzip:   3.28 kB
+dist/server/assets/pricing-Du5LVhK6.js                      16.48 kB │ gzip:   4.04 kB
+dist/server/assets/brand-D5qba58d.js                        25.02 kB │ gzip:   4.28 kB
+dist/server/assets/routes-B86kuS8O.js                       62.64 kB │ gzip:  12.46 kB
+dist/server/assets/useStore-DrGdK02W.js                     66.85 kB │ gzip:  18.43 kB
+dist/server/assets/router-CNIQmPRN.js                       91.69 kB │ gzip:  26.07 kB
+dist/server/assets/manifest-B9IfuaQw.js                     93.03 kB │ gzip:  22.18 kB
+dist/server/index.js                                       662.06 kB │ gzip: 135.91 kB
+
+✓ built in 226ms
+real 12.53
+user 22.43
+sys 2.91
+---EXIT:0
