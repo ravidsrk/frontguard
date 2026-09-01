@@ -63,11 +63,16 @@ describe.skipIf(!HAVE_DOCKER)('docker image e2e', () => {
         stdio: 'inherit',
         env: { ...process.env, DOCKER_BUILDKIT: '1' },
         // Pulling the Playwright base + apt install is genuinely slow on a
-        // cold cache. Give it 15 minutes — vitest defaults are too tight.
-        timeout: 15 * 60 * 1000,
+        // cold cache, and CI has no Docker layer cache, so every run is cold.
+        // 15 minutes was the original budget; it blew on main (run
+        // 33519144250, `spawnSync docker ETIMEDOUT` at ~15m) while the same
+        // build had passed at 10m23s on a less-loaded runner. The operation is
+        // genuinely this slow and variable, so the budget is raised to 25
+        // minutes rather than the test being skipped.
+        timeout: 25 * 60 * 1000,
       },
     );
-  }, 15 * 60 * 1000);
+  }, 26 * 60 * 1000);
 
   it('runs frontguard --version inside the image', () => {
     const result = spawnSync('docker', ['run', '--rm', TAG, '--version'], {

@@ -31,6 +31,11 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    # The docker-build e2e does a cold, uncached Playwright base pull plus apt
+    # install on every run, which is legitimately 10-25 minutes. Bound the job
+    # so a genuinely hung build fails in 45 minutes instead of consuming the
+    # 360-minute default.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
