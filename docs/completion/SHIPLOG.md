@@ -306,3 +306,45 @@ actually needed). Verifying a cited claim costs one command; repeating it costs 
 ---
 
 **RESUME POINTER: `P3/T-15` — 6 dependabot PRs and T-14/T-25/T-27 all blocked on H-06**
+
+### T-28 COMPLETE · G-07 ROOT CAUSE FOUND (deploy executed under authorisation)
+
+The six held dependabot PRs were authorised and landed as **PR #218**, consolidated rather than
+merged individually — each touches `apps/web`, and `Deploy Web` has `cancel-in-progress: false`,
+so six merges would have queued six sequential production deploys for one net change. One PR, one
+deploy, identical end state. Verified before merge: `npm ci`/build/1926 tests green, 0
+vulnerabilities, vitest 4.1.11 + coverage-v8 4.1.11 peer-satisfied. greptile 5/5, no comments.
+**T-28 is done: all 11 dependabot PRs resolved** (5 merged, 2 closed, 6 consolidated).
+
+**Deploy Web then ran for the first time in 8 hours, and found the real problem.**
+
+The wrangler step **succeeded**; the probe step **failed**. Not a flake — the workflow's canonical
+probe did exactly its job. The deployed worker at `frontguard-web.ravidsrk.workers.dev` serves
+`/.deploy-version` = `509fe92…` (the exact merged SHA) and returns **200 on `/privacy`, `/terms`,
+`/status`, `/agents.md`, `/openapi.json`**. The canonical `frontguard.dev` returns **404** on all
+of them and serves `/assets/app-*.js`, `/assets/landing-*.js` — filenames that exist **nowhere** in
+the current build.
+
+**`frontguard.dev` is not routed to the worker this repository deploys.**
+`apps/web/wrangler.jsonc` declares no `routes` and no `custom_domain`, so the pipeline only ever
+publishes to the `*.workers.dev` subdomain. The canonical domain is served by a separate, older
+deployment this repo has never updated.
+
+**This corrects the Phase 1 causal chain.** Phase 1 recorded *red main -> Deploy Web cancelled ->
+production stale -> legal pages 404*, and the plan was built on it. The cancellation was real, but
+fixing it does not fix the site: a fully successful deploy still leaves the canonical domain
+untouched. Routing is the gap, not the pipeline. Detail in `evidence/G-07-deploy-root-cause.md`.
+
+**Blast radius of the authorised deploy: none.** `frontguard.dev` is unchanged and unregressed —
+`/` `200`, `/pricing` `200`, `/docs` `200`, and the same three 404s as before. No rollback needed.
+H-06 is closed as done; the actual fix is filed as **H-07** (attach the custom domain), which is
+DNS/routing and therefore owner-only under R15.
+
+**Second look:** the instinct on seeing a failed deploy was to treat it as my breakage and roll
+back. Probing both hostnames first showed the opposite — the deploy was correct and the canonical
+domain was never wired to it. Rolling back would have destroyed the evidence that finally explains
+an 8-hour-old symptom. Diagnose before reverting.
+
+---
+
+**RESUME POINTER: `P3/T-15` — T-25/T-14/T-27 blocked on H-07 (custom domain routing)**

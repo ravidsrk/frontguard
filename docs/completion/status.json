@@ -9,8 +9,8 @@
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "f5b0b6cfb79ffe6cca44c1a5436c30bcd51607ae",
-  "resume_pointer": "P3/T-15 (T-28 partially done; 6 PRs blocked on H-06)",
+  "current_commit": "509fe92d3a5ae5e88b019d94780da538504e3a0e",
+  "resume_pointer": "P3/T-15 (T-25 blocked on H-07)",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 45,
   "gate": {
@@ -838,14 +838,14 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
+      "status": "blocked",
       "branch": null,
       "pr": null,
       "commit": null,
       "evidence": [],
       "review": null,
       "attempts": 0,
-      "block_signature": null
+      "block_signature": "frontguard.dev is not routed to the frontguard-web worker; a successful deploy does not change the canonical domain. See H-07."
     },
     {
       "id": "T-26",
@@ -892,16 +892,16 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "active",
+      "status": "done",
       "branch": "various",
-      "pr": "https://github.com/ravidsrk/frontguard/pull/216",
-      "commit": null,
+      "pr": "https://github.com/ravidsrk/frontguard/pull/218",
+      "commit": "509fe92d3a5ae5e88b019d94780da538504e3a0e",
       "evidence": [
         "docs/completion/evidence/T-28-dependabot-triage.md"
       ],
       "review": "greptile",
       "attempts": 0,
-      "block_signature": "6 of 11 remain: all touch apps/web (or peer-couple to one that does), so merging them fires Deploy Web. Blocked on H-06."
+      "block_signature": null
     },
     {
       "id": "T-29",
@@ -994,7 +994,19 @@
         "T-27"
       ],
       "gates_launch": true,
-      "verification": "agent re-probes the live routes for 200 and truthful content",
+      "verification": "Authorised and executed: PR #218 merged, Deploy Web ran. Deploy succeeded to the worker; probe correctly failed because the canonical domain is not routed to it. Superseded by H-07.",
+      "status": "done"
+    },
+    {
+      "id": "H-07",
+      "instruction": "Point frontguard.dev (and www) at the frontguard-web Cloudflare Worker \u2014 either by adding a routes/custom_domain block to apps/web/wrangler.jsonc, or by attaching the custom domain to the worker in the Cloudflare dashboard. This replaces the older deployment currently serving the domain.",
+      "unblocks": [
+        "T-25",
+        "T-14",
+        "T-27"
+      ],
+      "gates_launch": true,
+      "verification": "agent re-probes frontguard.dev for /.deploy-version == deployed SHA and 200 on /privacy, /terms, /status",
       "status": "open"
     }
   ],
@@ -1079,6 +1091,11 @@
       "rule": "R9",
       "at": "post-P2",
       "note": "main went red on 299b1c1 (docs-only merge) via a load-dependent storybook timeout. Root cause: all three vitest configs used `timeout` instead of `testTimeout`, so every test ran on the 5000ms default rather than the intended 30s/60s/15s. Fixed in PR #213; main green at 7c69ba2."
+    },
+    {
+      "rule": "R15",
+      "at": "T-25",
+      "note": "Deploy Web executed under owner authorisation. wrangler deploy succeeded to frontguard-web.ravidsrk.workers.dev (SHA 509fe92, all probed paths 200). Canonical frontguard.dev unchanged and unregressed -- it is served by a separate older deployment with no route to this worker. Root cause recorded in evidence/G-07-deploy-root-cause.md; fix filed as H-07."
     }
   ],
   "history": [
