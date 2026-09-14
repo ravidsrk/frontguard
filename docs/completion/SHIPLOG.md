@@ -425,3 +425,26 @@ directory exits 1 and names the missing git repository.
 `docs/completion/evidence/T-19-doctor-failure.txt`.
 
 **RESUME POINTER: `P3/T-20`**
+
+### P3 / T-20 — CF-03 CI COMPARISON GREEN + RED · IN FLIGHT
+
+Branch: `ravidsrk/p3-cf03-ci-evidence`. A-12: use the existing
+`.github/workflows/frontguard-example.yml` fixture.
+
+Sequence:
+1. `update_baselines=true` — seed `origin/frontguard-baselines`
+2. both inputs false — unchanged comparison, expect exit 0
+3. `negative_control=true` — 160px layout shift, expect exit 1 with regressions
+
+Seed dispatch 34840303128 failed at setup: GitHub.com rejects `upload-artifact@v3.2.2-node20`
+even when the step is skipped. Dropped that pin (A-13). greptile P1 (GHES v3 fallback) is
+not applicable: keeping the reference makes GitHub.com unable to run CF-03.
+Follow-up greptile P1: skip the v7 upload when `github.server_url != 'https://github.com'`
+so GHES jobs are not failed by an unsupported artifact backend. Still no v3 reference.
+
+Seed 34840763158 success; pushed `origin/frontguard-baselines` `15a027b`.
+Green 34840956249: 6 passed, 0 regressions (byte-identical).
+Red 34842050810: 6 regressions, compare step exit 1, **GitHub job failure**.
+(First red dispatch 34840985253 detected the same 6 but the fixture swallowed
+the CLI exit; greptile P1; `f7e1467` propagates `exit "$RUN_EXIT"`.)
+Evidence: `docs/completion/evidence/T-20-cf03-ci.txt`.

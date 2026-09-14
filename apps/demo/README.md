@@ -62,8 +62,8 @@ They are never enabled implicitly by the example workflow.
 `workflow_dispatch` and runs the CLI directly. It is not an Action acceptance
 test. Dispatch it with `update_baselines=true` once to seed the persisted branch,
 then with both inputs false for a comparison. Set only
-`negative_control=true` to inject a known 160px layout shift; that run succeeds
-only when Frontguard reports a regression.
+`negative_control=true` to inject a known 160px layout shift. That job is red
+when Frontguard reports a regression, and also red if it does not.
 
 ---
 

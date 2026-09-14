@@ -84,7 +84,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          nohup env FRONTGUARD_DEMO_NEGATIVE_CONTROL="${{ inputs.negative_control && '1' || '0' }}" \
+          nohup env FRONTGUARD_DEMO_NEGATIVE_CONTROL="${{ inputs.negative_control == true && '1' || '0' }}" \
             npm run dev --workspace=apps/demo -- --hostname 127.0.0.1 \
             > /tmp/frontguard-demo.log 2>&1 &
 
@@ -141,6 +141,7 @@ jobs:
             fi
             jq -e '.summary.regressions > 0 and .summary.errors == 0 and .summary.newPages == 0' frontguard-result.json >/dev/null
             echo "Negative control detected the injected regression."
+            exit "$RUN_EXIT"
           else
             if [ "$RUN_EXIT" -ne 0 ]; then
               echo "Comparison expected exit 0, got $RUN_EXIT." >&2
@@ -149,19 +150,10 @@ jobs:
             jq -e '.summary.regressions == 0 and .summary.errors == 0 and .summary.newPages == 0' frontguard-result.json >/dev/null
           fi
 
-      - name: Upload Frontguard report (GitHub.com)
+      - name: Upload Frontguard report
+        # GitHub.com rejects any v3 reference (A-13). Skip upload on GHES (no v4+ backend).
         if: always() && github.server_url == 'https://github.com'
         uses: actions/upload-artifact@v7
-        with:
-          name: frontguard-report
-          path: |
-            frontguard-result.json
-            frontguard-report/
-          if-no-files-found: warn
-
-      - name: Upload Frontguard report (GitHub Enterprise Server)
-        if: always() && github.server_url != 'https://github.com'
-        uses: actions/upload-artifact@v3.2.2-node20
         with:
           name: frontguard-report
           path: |

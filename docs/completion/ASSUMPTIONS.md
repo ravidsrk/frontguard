@@ -127,3 +127,27 @@ which R15 forbids. The Stranger Test in the gate is clone → README. Live-site 
 **Reason:** Those files sit under `apps/web/**` and would trigger Deploy Web (R15). The live
 canonical domain is also not routed to this worker (H-07). T-18 records the stale copy as a
 public-claim gap until H-07.
+
+## A-12 — CF-03 evidence uses the CLI demo fixture, not the unpublished Action
+
+**Phase:** P3 / T-20
+**Decision:** Capture CF-03 with `.github/workflows/frontguard-example.yml` (the documented
+demo CI path: checkout, explicit `frontguard-baselines` fetch, published `@frontguard/cli@0.2.2`).
+**Rejected:** Invoking the composite GitHub Action (`uses: ravidsrk/frontguard@v0`) as the
+evidence run; adding a new always-on PR workflow.
+**Reason:** CF-06 (Action marketplace path) is out of scope. The fixture already encodes the
+documented checkout+fetch contract from T-15 and the green/red controls CF-03 requires.
+Pushing `origin/frontguard-baselines` is git, not a production deploy (R15).
+
+## A-13 — Documented CI uploads use upload-artifact v7 only
+
+**Phase:** P3 / T-20
+**Decision:** Remove `actions/upload-artifact@v3.2.2-node20` from the example fixture,
+generated `init --ci` workflow, and composite Action. Use v7 unconditionally.
+**Rejected:** Keep a GHES-only v3 step behind `github.server_url != 'https://github.com'`.
+**Reason:** GitHub.com now fails the job at *setup* if the workflow even *references* the
+deprecated v3 action, including skipped steps. That made the CF-03 fixture unable to start
+(run 34840303128). GHES report upload is deferred; the report still lands on disk. Logged
+from greptile P1 on this branch.
+**Amendment:** Skip the v7 upload when `github.server_url != 'https://github.com'` so a GHES
+job is not marked failed by an unsupported artifact backend. Still no v3 reference.
