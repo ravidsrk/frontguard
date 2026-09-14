@@ -214,7 +214,7 @@ export async function main(argv?: string[]): Promise<number> {
 
   program
     .name('frontguard')
-    .description('AI-powered frontend visual regression testing')
+    .description('Local visual regression testing with reviewed git baselines and optional model-assisted analysis')
     .version(VERSION)
     .option('--no-telemetry', 'Disable anonymous usage telemetry');
 

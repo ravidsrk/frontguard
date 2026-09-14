@@ -406,26 +406,18 @@ Branch deleted local + remote. G-08 closed.
 
 ---
 
-**RESUME POINTER: `P3/T-16`**
-
 **T-16 DONE.** PR #233 merged (`8757f24`). G-14 closed for the clone-from-README path.
+
+**T-17 DONE.** PR #234 merged (`2c709cd`). G-20 closed in the CLI.
 
 ---
 
-**RESUME POINTER: `P3/T-17`**
+### P3 / T-18 — CF-04 HONESTY · IN FLIGHT
 
-### P3 / T-17 — PIXEL DIFF IS AUTHORITATIVE · IN FLIGHT
+Branch: `ravidsrk/p3-ai-honesty`. Closes G-22 on clone/npm surfaces.
 
-Branch: `ravidsrk/p3-pixel-authoritative`. Closes G-20.
+README, CLI `--help`, npm descriptions, and the published CLI README no longer lead with
+unmeasured "AI-powered" positioning. Pixel comparison is stated as the pass/fail signal.
+Live `apps/web` copy remains until H-07 (A-10/A-11).
 
-AI classification no longer rewrites `diff.status`. Route path and crawled-page a11y findings
-are fenced in `FRONTGUARD_UNTRUSTED` blocks. A-11: live-site 0.8-downgrade copy waits on H-07.
-
-### P3 / T-16 — README QUICK START REACHES A FIRST COMPARISON · IN FLIGHT
-
-Branch: `ravidsrk/p3-readme-quickstart`. Closes G-14.
-
-The Quick Start no longer starts with `init --ci` (which writes nothing without package.json /
-a start script / one lockfile), no longer claims Node 20, and names Playwright browsers plus
-git/`origin` before the first `run`. `doctor` floor matches `engines.node` (>=22).
-A-10: live `apps/web` docs are not in this PR because merging them deploys production.
+**RESUME POINTER: `P3/T-18`**
