@@ -1,7 +1,11 @@
 # T-19 CF-02 failure path — doctor against a broken environment
 # date: 2026-09-14T11:01:02Z
-# cwd: /var/folders/65/nfjkpf196n5_xrwbkyrrgqrc0000gn/T/tmp.B4PSv3QqII
-# command: npx tsx packages/cli/src/cli/index.ts doctor
+# inspected directory (not a git repo, no config): /var/folders/65/nfjkpf196n5_xrwbkyrrgqrc0000gn/T/tmp.B4PSv3QqII
+# command (run with that directory as cwd; CLI path is absolute so it does not
+# depend on files inside the inspected directory):
+#   npx --yes tsx /Users/ravindra/projects/frontguard/packages/cli/src/cli/index.ts doctor
+# Reproducible automated proof: packages/cli/test/cli/doctor.test.ts
+#   "exits 1 and names git when the directory is not a repository"
 
 
 Frontguard Doctor
