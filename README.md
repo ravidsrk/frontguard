@@ -64,8 +64,9 @@ npx -p @frontguard/cli playwright install --with-deps chromium
 npx -p @frontguard/cli frontguard init --yes
 npx -p @frontguard/cli frontguard doctor
 
-# The published CLI requires a clean working tree to create the baseline branch.
-git add -A && git commit -m "Add Frontguard"
+# Commit only the files init wrote. The published CLI needs a clean tree
+# to create the baseline branch.
+git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"
 ```
 
 **App terminal (leave this running):** start your app and wait until the `baseUrl` in `frontguard.config.ts` responds. Example:
@@ -78,8 +79,13 @@ npm run dev
 
 ```bash
 npx -p @frontguard/cli frontguard update-baselines
-git push origin frontguard-baselines
 npx -p @frontguard/cli frontguard run
+```
+
+Local `run` does not need `origin`. For CI comparisons, publish the orphan branch:
+
+```bash
+git push origin frontguard-baselines
 ```
 
 `run` exits 0 when pages match, 1 on a regression or unaccepted new page, and 2 on a tool error.

@@ -375,11 +375,16 @@ export function runInit(opts: InitOptions = {}): InitResult {
   }
 
   // --- Next steps -----------------------------------------------------------
+  const commitPaths = [fileName, '.gitignore'];
+  if (opts.ci && existsSync(workflowPath)) {
+    commitPaths.push('.github/workflows/frontguard.yml');
+  }
+  const commitCommand = `git add ${commitPaths.join(' ')} && git commit -m "Add Frontguard"`;
   logger.info('');
   logger.info('Next steps:');
   if (useStorybook) {
     logger.info('  1. Commit generated files (clean working tree required to create the baseline branch):');
-    logger.info('     git add -A && git commit -m "Add Frontguard"');
+    logger.info(`     ${commitCommand}`);
     logger.info('  2. Start your Storybook (e.g. npm run storybook)');
     logger.info(`     Frontguard expects it at ${storybookUrl}`);
     logger.info('  3. Accept the initial state:');
@@ -390,7 +395,7 @@ export function runInit(opts: InitOptions = {}): InitResult {
   } else {
     logger.info(`  1. Edit ${fileName} to set your baseUrl and routes`);
     logger.info('  2. Commit generated files (clean working tree required to create the baseline branch):');
-    logger.info('     git add -A && git commit -m "Add Frontguard"');
+    logger.info(`     ${commitCommand}`);
     logger.info('  3. Start your dev server (e.g. npm run dev)');
     logger.info('  4. Accept the initial state:');
     logger.info('     npx -p @frontguard/cli frontguard update-baselines');

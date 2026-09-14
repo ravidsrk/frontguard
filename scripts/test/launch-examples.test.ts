@@ -284,7 +284,10 @@ describe('README Quick Start stranger path', () => {
   it.each(['README.md', 'packages/cli/README.md'])(
     '%s tells the user to commit before capturing baselines',
     (file) => {
-      expect(read(file)).toContain('git add -A && git commit -m "Add Frontguard"');
+      expect(read(file)).toContain(
+        'git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"',
+      );
+      expect(read(file)).not.toContain('git add -A');
     },
   );
 });

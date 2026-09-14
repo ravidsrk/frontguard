@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runInit } from '../../src/cli/init.js';
@@ -70,8 +70,30 @@ describe('init .gitignore entries (install-2)', () => {
       const output = infoSpy.mock.calls.flat().join('\n');
       expect(output).toContain('frontguard update-baselines');
       expect(output).toContain('git push origin frontguard-baselines');
-      expect(output).toContain('git add -A && git commit -m "Add Frontguard"');
+      expect(output).toContain(
+        'git add frontguard.config.json .gitignore && git commit -m "Add Frontguard"',
+      );
+      expect(output).not.toContain('git add -A');
       expect(output).not.toContain('On first run, Frontguard captures baselines');
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+
+  it('storybook next-steps stage the generated config, not the whole tree', () => {
+    const storybookDir = join(dir, '.storybook');
+    mkdirSync(storybookDir, { recursive: true });
+    writeFileSync(join(storybookDir, 'main.ts'), 'export default {};\n');
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    try {
+      const { exitCode } = runInit({ cwd: dir, format: 'ts', yes: true, storybook: true });
+      expect(exitCode).toBe(0);
+      const output = infoSpy.mock.calls.flat().join('\n');
+      expect(output).toContain(
+        'git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"',
+      );
+      expect(output).toContain('npm run storybook');
+      expect(output).not.toContain('git add -A');
     } finally {
       infoSpy.mockRestore();
     }
