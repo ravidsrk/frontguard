@@ -458,3 +458,8 @@ Evidence: `docs/completion/evidence/T-20-cf03-ci.txt`.
 
 Branch: `ravidsrk/p3-telemetry-disclosure`. A-14: README + `docs/telemetry.md` only;
 do not edit `apps/web` (Deploy Web). Delete unused `showFirstRunNotice`.
+greptile P1: `monitor` ignored `telemetry: false`; fixed in `ce4adcd`.
+
+**T-26 DONE.** PR #240 merged (`3355011`). G-11 closed on CLI surfaces.
+
+**RESUME POINTER: `P7/T-29`**
