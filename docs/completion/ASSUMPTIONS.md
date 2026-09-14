@@ -138,3 +138,14 @@ evidence run; adding a new always-on PR workflow.
 **Reason:** CF-06 (Action marketplace path) is out of scope. The fixture already encodes the
 documented checkout+fetch contract from T-15 and the green/red controls CF-03 requires.
 Pushing `origin/frontguard-baselines` is git, not a production deploy (R15).
+
+## A-13 — Documented CI uploads use upload-artifact v7 only
+
+**Phase:** P3 / T-20
+**Decision:** Remove `actions/upload-artifact@v3.2.2-node20` from the example fixture,
+generated `init --ci` workflow, and composite Action. Use v7 unconditionally.
+**Rejected:** Keep a GHES-only v3 step behind `github.server_url != 'https://github.com'`.
+**Reason:** GitHub.com now fails the job at *setup* if the workflow even *references* the
+deprecated v3 action, including skipped steps. That made the CF-03 fixture unable to start
+(run 34840303128). GHES report upload is deferred; the report still lands on disk. Logged
+from greptile P1 on this branch.

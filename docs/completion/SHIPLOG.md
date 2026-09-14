@@ -435,3 +435,7 @@ Sequence:
 1. `update_baselines=true` — seed `origin/frontguard-baselines`
 2. both inputs false — unchanged comparison, expect exit 0
 3. `negative_control=true` — 160px layout shift, expect exit 1 with regressions
+
+Seed dispatch 34840303128 failed at setup: GitHub.com rejects `upload-artifact@v3.2.2-node20`
+even when the step is skipped. Dropped that pin (A-13). greptile P1 (GHES v3 fallback) is
+not applicable: keeping the reference makes GitHub.com unable to run CF-03.
