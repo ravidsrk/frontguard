@@ -73,7 +73,7 @@
     "pixelmatch": "^7.2.0",
     "playwright": "1.62.1",
     "pngjs": "^7.0.0",
-    "tsx": "^4.22.4",
+    "tsx": "^4.23.13",
     "zod": "^4.4.3"
   },
   "optionalDependencies": {
