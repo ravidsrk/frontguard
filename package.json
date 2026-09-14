@@ -1,7 +1,7 @@
 {
   "name": "frontguard-monorepo",
   "private": true,
-  "description": "AI-powered frontend visual regression testing",
+  "description": "Local visual regression testing with reviewed git baselines and optional model-assisted analysis",
   "license": "MIT",
   "repository": {
     "type": "git",

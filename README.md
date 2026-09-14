@@ -5,7 +5,7 @@
 [![npm: @frontguard/playwright](https://img.shields.io/npm/v/@frontguard/playwright?label=%40frontguard%2Fplaywright)](https://www.npmjs.com/package/@frontguard/playwright)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-**AI-powered frontend visual regression testing for web teams — detect, understand, and fix visual bugs before they ship to production.**
+**Local visual regression testing with reviewed git baselines, inspectable reports, and optional model-assisted analysis.** Pixel comparison is the pass/fail signal. Model classification is advisory and unmeasured.
 
 Frontguard gives frontend teams a local, inspectable screenshot comparison loop without requiring a hosted account.
 
@@ -87,7 +87,7 @@ npx -p @frontguard/cli frontguard run
 
 - **Zero-config route discovery** — Auto-crawls your app to find all pages
 - **Multi-browser** — Chromium, Firefox, WebKit via Playwright
-- **AI-powered analysis** — BYOK (OpenAI/Anthropic) classifies regressions vs intentional changes
+- **Optional AI analysis** — BYOK (OpenAI/Anthropic) can classify a pixel change; it does not change pass/fail and has no published accuracy benchmark
 - **Smart rendering** — Dependency graph renders only pages affected by your changes
 - **Preview deployments** — Auto-detects Vercel/Netlify preview URLs
 - **Git-native baselines** — Stored in orphan branch, zero main branch bloat

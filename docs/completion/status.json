@@ -11,7 +11,7 @@
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
   "current_commit": "5f447df",
-  "resume_pointer": "P3/T-17",
+  "resume_pointer": "P3/T-18",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 45,
   "gate": {

@@ -414,6 +414,20 @@ Branch deleted local + remote. G-08 closed.
 
 **RESUME POINTER: `P3/T-17`**
 
+**T-17 DONE.** PR #234 merged (`2c709cd`). G-20 closed in the CLI.
+
+---
+
+**RESUME POINTER: `P3/T-18`**
+
+### P3 / T-18 — CF-04 HONESTY · IN FLIGHT
+
+Branch: `ravidsrk/p3-ai-honesty`. Closes G-22 on clone/npm surfaces.
+
+README, CLI `--help`, and package descriptions no longer lead with unmeasured
+"AI-powered" positioning. Pixel comparison is stated as the pass/fail signal.
+Live `apps/web` copy remains until H-07 (A-10/A-11).
+
 ### P3 / T-17 — PIXEL DIFF IS AUTHORITATIVE · IN FLIGHT
 
 Branch: `ravidsrk/p3-pixel-authoritative`. Closes G-20.

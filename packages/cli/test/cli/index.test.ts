@@ -73,7 +73,7 @@ describe('CLI', () => {
     const { stdout, exitCode } = runCli(['--help']);
     expect(exitCode).toBe(0);
     expect(stdout).toContain('frontguard');
-    expect(stdout).toContain('AI-powered');
+    expect(stdout).toMatch(/optional\s+model-assisted analysis/);
     expect(stdout).toContain('run');
     expect(stdout).toContain('init');
   });
