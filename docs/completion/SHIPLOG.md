@@ -448,3 +448,8 @@ Red 34842050810: 6 regressions, compare step exit 1, **GitHub job failure**.
 (First red dispatch 34840985253 detected the same 6 but the fixture swallowed
 the CLI exit; greptile P1; `f7e1467` propagates `exit "$RUN_EXIT"`.)
 Evidence: `docs/completion/evidence/T-20-cf03-ci.txt`.
+
+**T-20 DONE.** PR #238 merged (`712fdae`). CF-03 evidenced:
+`docs/completion/evidence/T-20-cf03-ci.txt` (green 34840956249, red 34842050810).
+
+**RESUME POINTER: `P3/T-26`**
