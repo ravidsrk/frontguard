@@ -10,8 +10,8 @@
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "444698a",
-  "resume_pointer": "P3/T-20",
+  "current_commit": "712fdae",
+  "resume_pointer": "P3/T-26",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 45,
   "gate": {
@@ -241,7 +241,7 @@
       "money": false,
       "status": "verified",
       "happy_evidence": "docs/completion/evidence/P1-a02-cli-doctor.txt",
-      "failure_evidence": null
+      "failure_evidence": "docs/completion/evidence/T-19-doctor-failure.txt"
     },
     {
       "id": "CF-03",
@@ -760,10 +760,10 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "in_progress",
+      "status": "done",
       "branch": "ravidsrk/p3-cf03-ci-evidence",
       "pr": "https://github.com/ravidsrk/frontguard/pull/238",
-      "commit": null,
+      "commit": "712fdae",
       "evidence": [
         "docs/completion/evidence/T-20-cf03-ci.txt",
         "docs/completion/evidence/T-20-cf03-green.json",
