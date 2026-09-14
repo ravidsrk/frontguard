@@ -90,7 +90,7 @@
     "tsup": "^8.3.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.0",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   },
   "author": "Ravindra Kumar <ravidsrk@gmail.com>"
 }
