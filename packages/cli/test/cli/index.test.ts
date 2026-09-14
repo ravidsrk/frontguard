@@ -216,4 +216,75 @@ describe('CLI', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   }, 30_000);
+
+  it('honors telemetry:false on monitor --history', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'frontguard-telemetry-monitor-'));
+    const configPath = join(dir, 'frontguard.config.mjs');
+    const historyDir = join(dir, 'history');
+    const requests: string[] = [];
+    const server = createServer((request, response) => {
+      requests.push(request.url ?? '/');
+      response.statusCode = 204;
+      response.end();
+    });
+
+    await new Promise<void>((resolveListen, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolveListen);
+    });
+
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Telemetry server did not bind');
+    const env = {
+      ...process.env,
+      CI: 'false',
+      DO_NOT_TRACK: '0',
+      FRONTGUARD_TELEMETRY: '1',
+      FRONTGUARD_TELEMETRY_ENDPOINT: `http://127.0.0.1:${address.port}/events`,
+    };
+    const writeConfig = (telemetry: boolean): void => {
+      writeFileSync(
+        configPath,
+        `export default {
+  version: 1,
+  baseUrl: 'http://127.0.0.1:1',
+  routes: ['/'],
+  viewports: [1440],
+  browsers: ['chromium'],
+  threshold: 0.1,
+  telemetry: ${telemetry},
+};\n`,
+      );
+    };
+
+    try {
+      writeConfig(true);
+      expect(
+        (
+          await runCliAsync(
+            ['monitor', '--history', '--config', configPath, '--history-dir', historyDir],
+            dir,
+            env,
+          )
+        ).exitCode,
+      ).toBe(0);
+      expect(requests).toHaveLength(1);
+
+      requests.length = 0;
+      writeConfig(false);
+      expect(
+        (
+          await runCliAsync(
+            ['monitor', '--history', '--config', configPath, '--history-dir', historyDir],
+            dir,
+            env,
+          )
+        ).exitCode,
+      ).toBe(0);
+      expect(requests).toHaveLength(0);
+    } finally {
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
 });

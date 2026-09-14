@@ -495,6 +495,8 @@ export async function main(argv?: string[]): Promise<number> {
         if (opts.debug) setLogLevel('debug');
         else if (opts.verbose) setLogLevel('info');
 
+        let telemetryConfig: boolean | undefined;
+
         // ----- --history: print stored history and exit (no checks) -----
         if (opts.history) {
           const historyDir = opts.historyDir as string;
@@ -503,7 +505,12 @@ export async function main(argv?: string[]): Promise<number> {
           logger.info(`📜 Recent monitoring history (${historyDir}):`);
           // Print the table to stdout so it can be piped/captured cleanly.
           console.log(formatHistoryTable(records));
-          await emitTelemetry({ command: 'monitor', version: VERSION });
+          try {
+            telemetryConfig = (await loadConfig(opts.config as string | undefined)).telemetry;
+          } catch {
+            telemetryConfig = undefined;
+          }
+          await emitTelemetry({ command: 'monitor', version: VERSION }, telemetryConfig);
           exitCode = 0;
           return;
         }
@@ -522,6 +529,7 @@ export async function main(argv?: string[]): Promise<number> {
 
         const runOnce = async (): Promise<number> => {
           const config = await buildConfig({ ...opts, url: urls?.[0] ?? opts.url });
+          telemetryConfig = config.telemetry;
           const monitorUrls = urls ?? resolveMonitorUrls(config.routes, config.baseUrl);
 
           const monitorPlugin = createMonitorPlugin({
@@ -601,7 +609,7 @@ export async function main(argv?: string[]): Promise<number> {
           exitCode = await runOnce();
         }
 
-        await emitTelemetry({ command: 'monitor', version: VERSION });
+        await emitTelemetry({ command: 'monitor', version: VERSION }, telemetryConfig);
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;
