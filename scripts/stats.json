@@ -1,20 +1,20 @@
 {
   "version": "0.2.3",
-  "testFiles": 66,
+  "testFiles": 67,
   "sourceFiles": 60,
   "plugins": 5,
   "bundleSize": {
-    "tarballBytes": 509077,
-    "tarballKB": 497,
-    "unpackedBytes": 1997114,
-    "unpackedKB": 1950
+    "tarballBytes": 509971,
+    "tarballKB": 498,
+    "unpackedBytes": 1999877,
+    "unpackedKB": 1953
   },
   "display": {
-    "testFiles": "66 test files",
+    "testFiles": "67 test files",
     "sourceFiles": "60 source files",
     "plugins": "5 built-in plugins",
     "version": "v0.2.3",
-    "bundle": "497KB"
+    "bundle": "498KB"
   },
   "source": "derived-from-source"
 }
