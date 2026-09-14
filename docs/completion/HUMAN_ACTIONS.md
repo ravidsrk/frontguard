@@ -88,6 +88,34 @@ the publish path.
 
 ---
 
+## H-06 — Authorise an `apps/web` production deploy · **DONE** (superseded by H-07)
+
+**Instruction.** Authorise merging changes under `apps/web/**`, which triggers Deploy Web.
+
+**Status:** done via PR #218. The worker published; `frontguard.dev` is not routed to it.
+
+**Unblocks:** none remaining — T-14 / T-25 / T-27 now wait on H-07.
+
+---
+
+## H-07 — Attach `frontguard.dev` to the `frontguard-web` Worker · **GATES LAUNCH**
+
+**Instruction.** Point `frontguard.dev` (and `www`) at the `frontguard-web` Cloudflare Worker —
+either add a `routes` / `custom_domain` block to `apps/web/wrangler.jsonc`, or attach the custom
+domain to the worker in the Cloudflare dashboard. This replaces the older deployment currently
+serving the domain.
+
+**Why required.** A successful Deploy Web still leaves the canonical domain on an older, unrelated
+deployment. `/privacy`, `/terms`, and `/status` 404 on `frontguard.dev` while the worker serves
+them. DNS/routing is owner-only under R15.
+
+**Unblocks:** T-14, T-25, T-27. **Gates launch:** yes.
+
+**Verification once confirmed:** re-probe `frontguard.dev` for `/.deploy-version` equal to the
+deployed SHA and HTTP 200 on `/privacy`, `/terms`, `/status`.
+
+---
+
 ## Summary
 
 | id | gates launch | unblocks | status |
@@ -97,7 +125,8 @@ the publish path.
 | H-03 red-`main` alert channel | **yes** | T-21 | open |
 | H-04 pricing story decision | no | T-27 | open |
 | H-05 npm trusted publishing | no | — | open |
+| H-06 authorise apps/web deploy | no (done) | — | **done** |
+| H-07 attach frontguard.dev to worker | **yes** | T-14, T-25, T-27 | open |
 
-**Three Human Actions gate launch.** All three are P4 operability proofs, none block P1, P2, P3,
-P5, or P6. The agent can therefore drive the plan to the edge of the gate without waiting, and the
-expected terminal verdict if the agent-side work completes is **CONDITIONAL GO** pending H-01…H-03.
+**Four Human Actions gate launch** (H-01, H-02, H-03, H-07). None block P3 agent-side work.
+Expected terminal verdict if the agent-side work completes: **CONDITIONAL GO**.

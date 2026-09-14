@@ -1,0 +1,24 @@
+# T-15 local proof — documented fetch after depth-1 single-branch clone
+# date: 2026-09-14T08:57:15Z
+# cwd: /Users/ravindra/projects/frontguard
+# HEAD: c5836461411acb11dd60faec517e394017156dcd
+# branch: ravidsrk/p3-ci-baseline-fetch
+
+## command
+vitest: packages/cli/test/templates/templates.test.ts (documented fetch retrieves sibling orphan ref)
+
+
+> @frontguard/cli@0.2.3 test
+> vitest run --pool=forks --exclude='test/e2e/**' test/templates/templates.test.ts -t documented fetch
+
+
+ RUN  v4.1.11 /Users/ravindra/projects/frontguard/packages/cli
+
+ ✓ test/templates/templates.test.ts (17 tests | 16 skipped) 253ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 16 skipped (17)
+   Start at  14:27:15
+   Duration  361ms (transform 26ms, setup 0ms, import 54ms, tests 253ms, environment 0ms)
+
+EXIT:0

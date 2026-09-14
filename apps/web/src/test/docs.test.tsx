@@ -133,6 +133,8 @@ describe("docs content store", () => {
     expect(generated).toContain("comparison-only");
     expect(generated).toContain("contents: read");
     expect(generated).toContain("separate explicit workflow");
+    expect(generated).toContain("frontguard-baselines");
+    expect(generated).toContain("fetch-depth: 1");
 
     const action = article("ci-cd/github-actions").html;
     expect(action).toContain("PRE-RELEASE ACTION");

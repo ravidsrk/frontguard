@@ -34,6 +34,16 @@ jobs:
             exit 1
           fi
 
+      - name: Assert documented baseline-ref fetch is present (G-08)
+        run: |
+          set -euo pipefail
+          FETCH='git fetch --no-tags origin +refs/heads/frontguard-baselines:refs/remotes/origin/frontguard-baselines'
+          for f in action.yml packages/cli/action.yml packages/cli/action.template.yml \
+            packages/cli/src/templates/github-actions.ts \
+            integrations/github-app/src/github-api.ts; do
+            grep -q "$FETCH" "$f" || { echo "missing documented fetch in $f" >&2; exit 1; }
+          done
+
   subpath-action-contract:
     runs-on: ubuntu-latest
     steps:
@@ -67,3 +77,45 @@ jobs:
               exit 1
             fi
           done
+
+  documented-baseline-ref-fetch:
+    name: Documented CI path fetches the baseline ref
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Prove default checkout misses a sibling ref and the documented fetch retrieves it
+        run: |
+          set -euo pipefail
+          FIX=$(mktemp -d)
+          git init --bare "$FIX/remote.git"
+          git init -b main "$FIX/main"
+          git -C "$FIX/main" config user.email "t15@example.com"
+          git -C "$FIX/main" config user.name "T15"
+          git -C "$FIX/main" config commit.gpgsign false
+          echo hi > "$FIX/main/README"
+          git -C "$FIX/main" add README
+          git -C "$FIX/main" commit -m init
+          git -C "$FIX/main" remote add origin "$FIX/remote.git"
+          git -C "$FIX/main" push origin main
+
+          git -C "$FIX/main" checkout --orphan frontguard-baselines
+          git -C "$FIX/main" rm -rf .
+          printf '{"ok":true}\n' > "$FIX/main/manifest.json"
+          git -C "$FIX/main" add manifest.json
+          git -C "$FIX/main" commit -m baseline
+          git -C "$FIX/main" push origin frontguard-baselines
+
+          git clone --depth=1 --single-branch --branch main "file://$FIX/remote.git" "$FIX/shallow"
+          if git -C "$FIX/shallow" rev-parse --verify refs/remotes/origin/frontguard-baselines >/dev/null 2>&1; then
+            echo "FAIL: depth-1 single-branch clone must not already have the baseline ref" >&2
+            exit 1
+          fi
+
+          # Same command the generated workflow, composite Action, and GitHub App bootstrap emit.
+          git -C "$FIX/shallow" fetch --no-tags origin +refs/heads/frontguard-baselines:refs/remotes/origin/frontguard-baselines
+          CONTENT=$(git -C "$FIX/shallow" show origin/frontguard-baselines:manifest.json)
+          echo "$CONTENT" | grep -q '"ok":true'
+          echo "PASS: documented fetch retrieved the orphan baseline ref after fetch-depth: 1"

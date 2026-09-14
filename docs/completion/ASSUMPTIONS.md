@@ -93,3 +93,18 @@ would have meant either never merging or merging red. One integration branch wit
 preserves the reviewable unit of work, satisfies R9, and matches R10's own allowance for related
 commits sharing a PR. Later phases return to one task per PR now that `main` is green and a single
 fix can be verified in isolation.
+
+## A-09 — Explicit baseline-ref fetch, not fetch-depth: 0 alone
+
+**Phase:** P3 / T-15
+**Decision:** The documented CI path fetches `refs/heads/frontguard-baselines` into
+`refs/remotes/origin/frontguard-baselines`. Keep `fetch-depth: 0` on the generated `init --ci`
+workflow (already present) and add the explicit fetch. GitHub App bootstrap uses `fetch-depth: 1`
+plus the same fetch.
+**Rejected:** Treating `actions/checkout` `fetch-depth: 0` as sufficient by itself; dropping
+`fetch-depth: 0` from the generated workflow.
+**Reason:** Checkout's `fetch-depth: 0` fetches history of the *triggering* ref. It does not
+reliably retrieve a sibling orphan branch. The repo's own `frontguard-example.yml` already learned
+this (it has both). The CLI also fetches in `GitOrphanStorage.init`; the documented checkout is
+the user-facing contract and must not depend on that internal call. Node 22 is the generated
+workflow default because T-06 already raised `engines.node` to `>=22`.

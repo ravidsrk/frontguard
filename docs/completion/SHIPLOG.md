@@ -348,3 +348,50 @@ an 8-hour-old symptom. Diagnose before reverting.
 ---
 
 **RESUME POINTER: `P3/T-15` — T-25/T-14/T-27 blocked on H-07 (custom domain routing)**
+
+---
+
+### RUN 20260914 — RESUME (R4)
+
+**Mode:** drive · agentic with write access.
+**R1 toolchain:** `git` 2.55.0 · `node` v24.20.0 · `npm` 11.19.0 · `just` 1.58.0 · `mise` 2026.9.6 ·
+`gh` 2.100.0 · `greptile` 3.5.2 · `rg` 15.2.0. `pnpm` present (12.4.1) but unused (A-01).
+
+**Baseline ancestor check:** `5f0e141` is an ancestor of `HEAD` (`c583646`). Last recorded run
+commit `509fe92` is also an ancestor. Commits since last SHIPLOG pointer: 2
+(`a975c13` docs + `c583646` merge of PR #219). Files changed vs last run: **3 / 680 = 0.4%** —
+under the 20% restart threshold. No re-audit.
+
+**HEAD freeze:** `c583646` on `main`, clean, `origin/main` in sync. CI on HEAD: success
+(https://github.com/ravidsrk/frontguard/actions/runs/33527814667). Open PRs: 12 dependabot
+(#220–#231). Open issues: not re-filed (R17). Local `frontguard-baselines` exists; **not on origin**.
+
+**Restart not justified.** Continue from resume pointer `P3/T-15`.
+
+**Second look:** HUMAN_ACTIONS.md was missing H-06/H-07 that SHIPLOG and `status.json` already
+recorded. Restored in this resume so a stranger reading only HUMAN_ACTIONS.md would not miss the
+launch-gating routing gap.
+
+---
+
+### P3 / T-15 — DOCUMENTED CI PATH FETCHES THE BASELINE REF · IN FLIGHT
+
+Branch: `ravidsrk/p3-ci-baseline-fetch`. Closes G-08.
+
+`actions/checkout` `fetch-depth: 0` fetches history of the triggering ref; it does not retrieve
+the sibling `frontguard-baselines` orphan branch. The documented path now does:
+
+- `frontguard init --ci` generated workflow: explicit fetch after checkout (kept `fetch-depth: 0`).
+- Composite Action (`action.template.yml` → `action.yml` / root shim): fetch step before run.
+- GitHub App bootstrap workflow: `fetch-depth: 1` + the same fetch.
+- Docs (`guides/github-actions`, `ci-cd/github-actions`) name the default-checkout hole.
+- Generated Node default `20` → `22` (T-06 leftover on this path). A-09.
+
+Proofs:
+- Local: `test/templates/templates.test.ts` clones `--depth=1 --single-branch` and runs the
+  documented `git fetch` command; blob is readable afterwards.
+- CI: `action-smoke.yml` job `documented-baseline-ref-fetch` repeats that on GitHub-hosted
+  runners (the T-15 "real workflow run"). URL filled after the PR's Action contract checks pass.
+
+`ls-remote` is fail-closed: exit 2 (missing branch) is a warning; any other exit fails the step
+instead of pretending the branch is unpublished (second look).
