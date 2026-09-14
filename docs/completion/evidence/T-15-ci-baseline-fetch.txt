@@ -22,3 +22,17 @@ vitest: packages/cli/test/templates/templates.test.ts (documented fetch retrieve
    Duration  361ms (transform 26ms, setup 0ms, import 54ms, tests 253ms, environment 0ms)
 
 EXIT:0
+
+## real workflow run (GitHub Actions)
+
+Job: Documented CI path fetches the baseline ref
+Workflow: Action contract checks
+PR: https://github.com/ravidsrk/frontguard/pull/232
+Run: https://github.com/ravidsrk/frontguard/actions/runs/34825623503
+Job: https://github.com/ravidsrk/frontguard/actions/runs/34825623503/job/103916975811
+Result: pass (5s) on SHA 39013e31c26fc4e33e3dcdfe6fc29c1920eaa0e7
+
+The job checks out this repo with fetch-depth: 1, creates a local origin that
+has an orphan frontguard-baselines ref, clones it --depth=1 --single-branch,
+asserts the sibling ref is missing, then runs the documented git fetch and
+reads origin/frontguard-baselines:manifest.json.
