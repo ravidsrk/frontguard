@@ -149,3 +149,5 @@ generated `init --ci` workflow, and composite Action. Use v7 unconditionally.
 deprecated v3 action, including skipped steps. That made the CF-03 fixture unable to start
 (run 34840303128). GHES report upload is deferred; the report still lands on disk. Logged
 from greptile P1 on this branch.
+**Amendment:** Skip the v7 upload when `github.server_url != 'https://github.com'` so a GHES
+job is not marked failed by an unsupported artifact backend. Still no v3 reference.

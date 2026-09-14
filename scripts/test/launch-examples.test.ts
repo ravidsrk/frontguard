@@ -245,6 +245,7 @@ describe('repository-only example workflow', () => {
     expect(workflow).toContain("inputs.negative_control == true");
     expect(workflow).not.toContain('v3.2.2-node20');
     expect(workflow).toContain('actions/upload-artifact@v7');
+    expect(workflow).toContain("github.server_url == 'https://github.com'");
     expect(workflow).toContain('Negative control expected exit 1');
     expect(workflow).toContain('.summary.regressions > 0');
   });

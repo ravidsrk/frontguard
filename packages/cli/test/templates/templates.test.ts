@@ -111,6 +111,7 @@ describe('generateGitHubActionsWorkflow', () => {
     expect(yaml).toContain('actions/upload-artifact@v7');
     expect(yaml).not.toContain('actions/upload-artifact@v3');
     expect(yaml).not.toContain('v3.2.2-node20');
+    expect(yaml).toContain("github.server_url == 'https://github.com'");
     expect(yaml).not.toContain('continue-on-error: true');
     expect(yaml).toContain('id: frontguard');
     expect(yaml).toContain('path: ${{ steps.frontguard.outputs.report-path }}');

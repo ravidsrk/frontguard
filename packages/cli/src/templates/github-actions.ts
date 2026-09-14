@@ -190,7 +190,8 @@ ${packageManagerSetup}
           # FRONTGUARD_ANTHROPIC_KEY: \${{ secrets.FRONTGUARD_ANTHROPIC_KEY }}
 
       - name: Upload Frontguard report
-        if: always() && steps.frontguard.outputs.report-path != ''
+        # GitHub.com rejects any v3 reference (A-13). Skip upload on GHES (no v4+ backend).
+        if: always() && steps.frontguard.outputs.report-path != '' && github.server_url == 'https://github.com'
         uses: actions/upload-artifact@v7
         with:
           name: frontguard-report

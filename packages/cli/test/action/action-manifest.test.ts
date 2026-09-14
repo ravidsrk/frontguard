@@ -75,6 +75,7 @@ describe('COU-1: root shim stays synced with canonical action manifest', () => {
     expect(yml).toContain('actions/upload-artifact@v7');
     expect(yml).not.toContain('actions/upload-artifact@v3');
     expect(yml).not.toContain('v3.2.2-node20');
+    expect(yml).toContain("github.server_url == 'https://github.com'");
   });
 });
 
