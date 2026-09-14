@@ -444,5 +444,7 @@ so GHES jobs are not failed by an unsupported artifact backend. Still no v3 refe
 
 Seed 34840763158 success; pushed `origin/frontguard-baselines` `15a027b`.
 Green 34840956249: 6 passed, 0 regressions (byte-identical).
-Red 34840985253: 6 regressions, CLI red, fixture job green after asserting detection.
+Red 34842050810: 6 regressions, compare step exit 1, **GitHub job failure**.
+(First red dispatch 34840985253 detected the same 6 but the fixture swallowed
+the CLI exit; greptile P1; `f7e1467` propagates `exit "$RUN_EXIT"`.)
 Evidence: `docs/completion/evidence/T-20-cf03-ci.txt`.

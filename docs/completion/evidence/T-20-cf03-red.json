@@ -8,11 +8,11 @@
     "errors": 0
   },
   "timing": {
-    "discovery": 0,
-    "render": 4221,
-    "compare": 1252,
+    "discovery": 1,
+    "render": 5638,
+    "compare": 1326,
     "ai": 0,
-    "total": 5491
+    "total": 6979
   },
   "diffs": [
     {
