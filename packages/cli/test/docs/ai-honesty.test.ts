@@ -27,6 +27,6 @@ describe('CF-04 honesty — public CLI claims stay within demonstrated behaviour
     expect(root).toMatch(/--mode judge --experimental/);
     expect(published).toMatch(/does not change pass\/fail/);
     expect(published).toMatch(/no published accuracy benchmark/);
-    expect(published).toMatch(/--mode judge/);
+    expect(published).toMatch(/--mode judge --experimental/);
   });
 });
