@@ -718,19 +718,8 @@ export async function runPipeline(
                 accessibility ? { accessibility } : undefined,
               );
               diff.aiAnalysis = analysis;
-
-              // If AI says intentional with high confidence, downgrade regression → warning status
-              if (
-                analysis.classification === 'intentional' &&
-                analysis.confidence >= 0.8
-              ) {
-                logger.info(
-                  `AI classified ${diff.route.path} as intentional (confidence: ${analysis.confidence}) — downgrading to pass`,
-                );
-                // We don't change status to a literal "warning" since DiffStatus has no 'warning',
-                // but we keep it as 'changed' (below regression threshold) to signal it's not critical
-                diff.status = 'changed';
-              }
+              // Pixel comparison is the pass/fail signal. Classification is
+              // advisory so a crawled page cannot prompt-inject a clean CI run.
 
               completed++;
               reporter.onStageProgress(

@@ -117,3 +117,13 @@ workflow default because T-06 already raised `engines.node` to `>=22`.
 **Rejected:** Updating the live Getting Started / Installation / Quick Start articles in the same PR.
 **Reason:** `Deploy Web` is path-filtered to `apps/web/**`. Merging those files publishes production,
 which R15 forbids. The Stranger Test in the gate is clone → README. Live-site docs wait on H-07.
+
+## A-11 — T-17 does not edit live-site AI copy
+
+**Phase:** P3 / T-17
+**Decision:** Stop the CLI from letting AI classification change pass/fail. Leave
+`apps/web` sentences about the 0.8 auto-downgrade unchanged.
+**Rejected:** Updating homepage and docs-content in the same PR so marketing matches the code.
+**Reason:** Those files sit under `apps/web/**` and would trigger Deploy Web (R15). The live
+canonical domain is also not routed to this worker (H-07). T-18 records the stale copy as a
+public-claim gap until H-07.
