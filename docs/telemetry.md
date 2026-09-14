@@ -2,6 +2,8 @@
 
 Frontguard's anonymous usage telemetry is **disabled by default**. You can opt in to help prioritise development. The event payload contains no project URL, path, screenshot, config, secret, or persistent user identifier; as with any HTTP request, the receiving network service can observe connection metadata such as the source IP.
 
+Default collector: `https://telemetry.frontguard.dev/v1/events` (`telemetry.ts` `DEFAULT_ENDPOINT`). Override with `FRONTGUARD_TELEMETRY_ENDPOINT`.
+
 ## What we collect
 
 When enabled, each instrumented command sends at most one small event containing **only** these fields:
@@ -84,3 +86,7 @@ export FRONTGUARD_TELEMETRY_ENDPOINT=https://my-collector.example.com/events
 ```
 
 The payload is a JSON POST with the fields listed above.
+
+## Retention
+
+There is **no published retention period** for events received by the default collector. Opt in only if you accept that the HTTP peer may store the JSON fields above and connection metadata for an unspecified duration. Point `FRONTGUARD_TELEMETRY_ENDPOINT` at a collector you control if you need a documented TTL.

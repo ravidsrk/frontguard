@@ -281,6 +281,16 @@ The release flow is documented and reproducible — no hidden steps.
 
 Idempotent: already-published versions are skipped automatically. Scoped packages are forced `public` after publish so org defaults can't silently restrict them.
 
+## Telemetry
+
+Anonymous usage telemetry is **off by default**. Nothing is sent unless you opt in with `FRONTGUARD_TELEMETRY=1` or `telemetry: true` in config.
+
+Opt out with any of `--no-telemetry`, `FRONTGUARD_TELEMETRY=0`, `DO_NOT_TRACK=1`, or `telemetry: false`.
+
+When enabled, the CLI POSTs one JSON event to `https://telemetry.frontguard.dev/v1/events` (override with `FRONTGUARD_TELEMETRY_ENDPOINT`). Fields: `command`, `version`, `routes`, `regressions`, `aiProvider`, `antiFlake`, `ci`, `durationMs`, `errorType`, `ts`. No URLs, paths, screenshots, or keys. The HTTP peer can see the source IP. There is no published retention period for the default collector.
+
+Full schema: [docs/telemetry.md](./docs/telemetry.md).
+
 ## Environment Variables
 
 ```bash
@@ -288,9 +298,13 @@ Idempotent: already-published versions are skipped automatically. Scoped package
 FRONTGUARD_OPENAI_KEY=sk-...
 FRONTGUARD_ANTHROPIC_KEY=...
 
+# Opt-in anonymous usage telemetry (off unless set)
+FRONTGUARD_TELEMETRY=1
+FRONTGUARD_TELEMETRY_ENDPOINT=https://telemetry.frontguard.dev/v1/events
+DO_NOT_TRACK=1
 ```
 
-> **Note:** AI keys are optional. Frontguard works without them using local pixel comparison. AI analysis activates only when you configure a provider and sends screenshot evidence directly to that provider.
+> **Note:** AI keys are optional. Frontguard works without them using local pixel comparison. AI analysis activates only when you configure a provider and sends screenshot evidence directly to that provider. Telemetry is also optional and off by default.
 
 ## Contributing
 

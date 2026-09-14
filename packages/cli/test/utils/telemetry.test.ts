@@ -1,10 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
+import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   isTelemetryEnabled,
   detectCI,
   sendTelemetry,
   type TelemetryEvent,
 } from '../../src/utils/telemetry.js';
+
+const repoRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 
 const evt: TelemetryEvent = { command: 'run', version: '0.2.0' };
 
@@ -134,5 +139,34 @@ describe('sendTelemetry', () => {
         'antiFlake', 'ci', 'durationMs', 'errorType', 'ts',
       ]).toContain(k);
     }
+  });
+});
+
+describe('G-11 telemetry disclosure', () => {
+  const required = [
+    'FRONTGUARD_TELEMETRY',
+    '--no-telemetry',
+    'DO_NOT_TRACK',
+    'https://telemetry.frontguard.dev/v1/events',
+  ];
+
+  it.each(['README.md', 'packages/cli/README.md', 'docs/telemetry.md'])(
+    '%s names opt-in, opt-out, and the default endpoint',
+    (relative) => {
+      const text = readFileSync(join(repoRoot, relative), 'utf8');
+      for (const token of required) {
+        expect(text, `${relative} missing ${token}`).toContain(token);
+      }
+    },
+  );
+
+  it('docs/telemetry.md states there is no published retention period', () => {
+    const text = readFileSync(join(repoRoot, 'docs/telemetry.md'), 'utf8');
+    expect(text).toMatch(/no published retention period/i);
+  });
+
+  it('does not leave an unused first-run notice in the CLI', () => {
+    const source = readFileSync(join(repoRoot, 'packages/cli/src/utils/telemetry.ts'), 'utf8');
+    expect(source).not.toContain('showFirstRunNotice');
   });
 });

@@ -151,3 +151,11 @@ deprecated v3 action, including skipped steps. That made the CF-03 fixture unabl
 from greptile P1 on this branch.
 **Amendment:** Skip the v7 upload when `github.server_url != 'https://github.com'` so a GHES
 job is not marked failed by an unsupported artifact backend. Still no v3 reference.
+
+## A-14 — T-26 does not edit apps/web
+
+**Phase:** P3 / T-26
+**Decision:** Publish telemetry disclosure in root README, `packages/cli/README.md`, and
+`docs/telemetry.md`. Delete unused `showFirstRunNotice`. Do not edit `apps/web` privacy copy.
+**Rejected:** Updating `apps/web/src/routes/privacy.tsx` in this task.
+**Reason:** `apps/web/**` path-filters Deploy Web (R15). Live `/privacy` remains T-25 / H-07.

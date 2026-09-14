@@ -453,3 +453,8 @@ Evidence: `docs/completion/evidence/T-20-cf03-ci.txt`.
 `docs/completion/evidence/T-20-cf03-ci.txt` (green 34840956249, red 34842050810).
 
 **RESUME POINTER: `P3/T-26`**
+
+### P3 / T-26 — TELEMETRY DISCLOSURE · IN FLIGHT
+
+Branch: `ravidsrk/p3-telemetry-disclosure`. A-14: README + `docs/telemetry.md` only;
+do not edit `apps/web` (Deploy Web). Delete unused `showFirstRunNotice`.

@@ -222,6 +222,16 @@ Pipeline: `discover → filter → render → diff → analyze → report`
 
 Each stage is independent with error boundaries — one page failing doesn't kill the run.
 
+## Telemetry
+
+Anonymous usage telemetry is **off by default**. Nothing is sent unless you opt in with `FRONTGUARD_TELEMETRY=1` or `telemetry: true` in config.
+
+Opt out with any of `--no-telemetry`, `FRONTGUARD_TELEMETRY=0`, `DO_NOT_TRACK=1`, or `telemetry: false`.
+
+When enabled, the CLI POSTs one JSON event to `https://telemetry.frontguard.dev/v1/events` (override with `FRONTGUARD_TELEMETRY_ENDPOINT`). Fields: `command`, `version`, `routes`, `regressions`, `aiProvider`, `antiFlake`, `ci`, `durationMs`, `errorType`, `ts`. No URLs, paths, screenshots, or keys. The HTTP peer can see the source IP. There is no published retention period for the default collector.
+
+Full schema: [telemetry.md](https://github.com/ravidsrk/frontguard/blob/main/docs/telemetry.md).
+
 ## Environment Variables
 
 ```bash
@@ -229,9 +239,13 @@ Each stage is independent with error boundaries — one page failing doesn't kil
 FRONTGUARD_OPENAI_KEY=sk-...
 FRONTGUARD_ANTHROPIC_KEY=...
 
+# Opt-in anonymous usage telemetry (off unless set)
+FRONTGUARD_TELEMETRY=1
+FRONTGUARD_TELEMETRY_ENDPOINT=https://telemetry.frontguard.dev/v1/events
+DO_NOT_TRACK=1
 ```
 
-> AI keys are optional. Frontguard works without them using local pixel comparison. AI analysis activates only when configured and sends screenshot evidence directly to the selected provider.
+> AI keys are optional. Frontguard works without them using local pixel comparison. AI analysis activates only when configured and sends screenshot evidence directly to the selected provider. Telemetry is also optional and off by default.
 
 ## Documentation
 
