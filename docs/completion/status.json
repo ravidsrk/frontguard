@@ -10,8 +10,8 @@
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "712fdae",
-  "resume_pointer": "P3/T-26",
+  "current_commit": "3355011",
+  "resume_pointer": "P7/T-29",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 45,
   "gate": {
@@ -872,13 +872,18 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
-      "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "status": "done",
+      "branch": "ravidsrk/p3-telemetry-disclosure",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/240",
+      "commit": "3355011",
+      "evidence": [
+        "README.md",
+        "packages/cli/README.md",
+        "docs/telemetry.md",
+        "packages/cli/test/utils/telemetry.test.ts"
+      ],
+      "review": "greptile",
+      "attempts": 1,
       "block_signature": null
     },
     {
