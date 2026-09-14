@@ -408,6 +408,19 @@ Branch deleted local + remote. G-08 closed.
 
 **RESUME POINTER: `P3/T-16`**
 
+**T-16 DONE.** PR #233 merged (`8757f24`). G-14 closed for the clone-from-README path.
+
+---
+
+**RESUME POINTER: `P3/T-17`**
+
+### P3 / T-17 — PIXEL DIFF IS AUTHORITATIVE · IN FLIGHT
+
+Branch: `ravidsrk/p3-pixel-authoritative`. Closes G-20.
+
+AI classification no longer rewrites `diff.status`. Route path and crawled-page a11y findings
+are fenced in `FRONTGUARD_UNTRUSTED` blocks. A-11: live-site 0.8-downgrade copy waits on H-07.
+
 ### P3 / T-16 — README QUICK START REACHES A FIRST COMPARISON · IN FLIGHT
 
 Branch: `ravidsrk/p3-readme-quickstart`. Closes G-14.
