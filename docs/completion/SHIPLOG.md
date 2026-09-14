@@ -463,4 +463,4 @@ greptile P1: `monitor` ignored `telemetry: false`; fixed in `ce4adcd`.
 **T-26 DONE.** PR #240 merged (`3355011`). G-11 closed on CLI surfaces.
 
 **RESUME POINTER: `P7/T-29`** — T-21–T-24 blocked on H-01/H-02/H-03; T-14/T-25/T-27
-blocked on H-07 (`apps/web` deploy) and T-27 also on H-04; T-28 (dependabot) is unblocked.
+blocked on H-07 (`apps/web` deploy) and T-27 also on H-04; T-28 (dependabot) is done.
