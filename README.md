@@ -5,7 +5,7 @@
 [![npm: @frontguard/playwright](https://img.shields.io/npm/v/@frontguard/playwright?label=%40frontguard%2Fplaywright)](https://www.npmjs.com/package/@frontguard/playwright)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-**Local visual regression testing with reviewed git baselines, inspectable reports, and optional model-assisted analysis.** Pixel comparison is the pass/fail signal. Model classification is advisory and unmeasured.
+**Local visual regression testing with reviewed git baselines, inspectable reports, and optional model-assisted analysis.** On the default compare path, pixel comparison is the pass/fail signal. Model classification is advisory and unmeasured. Experimental `frontguard run --mode judge --experimental` is a separate opt-in and is not that path.
 
 Frontguard gives frontend teams a local, inspectable screenshot comparison loop without requiring a hosted account.
 
