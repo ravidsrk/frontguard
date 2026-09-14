@@ -280,6 +280,18 @@ describe('repository-only example workflow', () => {
   });
 });
 
+describe('README Quick Start stranger path', () => {
+  it.each(['README.md', 'packages/cli/README.md'])(
+    '%s tells the user to commit before capturing baselines',
+    (file) => {
+      expect(read(file)).toContain(
+        'git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"',
+      );
+      expect(read(file)).not.toContain('git add -A');
+    },
+  );
+});
+
 describe('pre-release demo evidence gate', () => {
   it('contains no fake terminal runner or placeholder screenshot', () => {
     expect(existsSync(resolve(repoRoot, 'demo/frontguard-demo.tape'))).toBe(false);

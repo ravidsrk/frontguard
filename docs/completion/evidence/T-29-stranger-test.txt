@@ -1,0 +1,184 @@
+# T-29 Stranger Test — README Quick Start to first comparison
+# date: 2026-09-14
+# CLI: published @frontguard/cli@0.2.2 via `npx -p @frontguard/cli` (README path)
+# Node: v24.20.0  npm: 11.19.0  git: 2.55.0
+# App: throwaway git repo; app files committed before the clock (stranger already
+#      has a project). Clock: first README command → `frontguard run` exit 0.
+# Isolated PLAYWRIGHT_BROWSERS_PATH (Chromium already downloaded from attempt 1).
+# Cold download on attempt 1: 45s. This passing run: 9s. Combined << 900s.
+#
+# README now stages only frontguard.config.ts and .gitignore, and does not
+# require `git push origin` for a local first comparison.
+#
+# Verdict: PASS. 9/9 routes×viewports match. run exit 0.
+
+# T-29 stranger test transcript
+# date: 2026-09-14T14:34:47Z
+# workdir: /tmp/fg-stranger-t29
+# node: v24.20.0
+# npm: 11.19.0
+# git: git version 2.55.0
+# README source: https://github.com/ravidsrk/frontguard/blob/main/README.md Quick Start
+# Pre-existing app: 3-route static server on 127.0.0.1:3000 (generic init routes /, /about, /contact)
+# PLAYWRIGHT_BROWSERS_PATH=/tmp/fg-stranger-t29-browsers (isolated; no reuse of this machine's cache)
+# Clock starts at the first README command.
+
+## CLOCK START 2026-09-14T14:34:47Z epoch=1789396487
+
+## README: install Chromium
+# command: npx --yes -p @frontguard/cli playwright install --with-deps chromium
+# start: 2026-09-14T14:34:47Z
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ WARNING: It looks like you are running 'npx playwright install' without first ║
+║ installing your project's dependencies.                                       ║
+║                                                                               ║
+║ To avoid unexpected behavior, please install your dependencies first, and     ║
+║ then run Playwright's install command:                                        ║
+║                                                                               ║
+║     npm install                                                               ║
+║     npx playwright install                                                    ║
+║                                                                               ║
+║ If your project does not yet depend on Playwright, first install the          ║
+║ applicable npm package (most commonly @playwright/test), and                  ║
+║ then run Playwright's install command to download the browsers:               ║
+║                                                                               ║
+║     npm install @playwright/test                                              ║
+║     npx playwright install                                                    ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+EXIT:0
+STEP_SECONDS:1
+
+## README: init --yes
+# command: npx --yes -p @frontguard/cli frontguard init --yes
+# start: 2026-09-14T14:34:49Z
+  ℹ Detecting framework…
+  ℹ No specific framework detected — using defaults
+  ℹ ✅ Created frontguard.config.ts
+  ℹ Updated .gitignore with: node_modules/, auth.json, .env, .env.*, .frontguard/, .frontguard-debug/, frontguard-report/
+  ℹ 
+  ℹ Next steps:
+  ℹ   1. Edit frontguard.config.ts to set your baseUrl and routes
+  ℹ   2. Start your dev server (e.g. npm run dev)
+  ℹ   3. Run: npx -p @frontguard/cli frontguard run
+  ℹ 
+  ℹ On first run, Frontguard captures baselines.
+  ℹ Subsequent runs compare against them and report changes.
+EXIT:0
+STEP_SECONDS:0
+
+## README: doctor
+# command: npx --yes -p @frontguard/cli frontguard doctor
+# start: 2026-09-14T14:34:49Z
+
+Frontguard Doctor
+────────────────────────────────────────────────────────────
+✅ Node.js version: v24.20.0 (>= 18 required)
+✅ Playwright installed: playwright package is resolvable
+✅ Browser binaries: available: chromium
+✅ Configuration: loaded config (baseUrl: http://localhost:3000)
+🟡 AI provider keys: no AI keys found (AI classification disabled)
+   → Set FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY to enable AI analysis.
+✅ Git repository: inside a git work tree
+🟡 Baseline branch: 'frontguard-baselines' not found
+   → It will be created automatically on your first `frontguard run`.
+────────────────────────────────────────────────────────────
+✅ All critical checks passed (2 advisory warning(s)).
+
+EXIT:0
+STEP_SECONDS:1
+
+## README: git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"
+# command: git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"
+# start: 2026-09-14T14:34:50Z
+[main 6a8cf22] Add Frontguard
+ 2 files changed, 23 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 frontguard.config.ts
+EXIT:0
+STEP_SECONDS:0
+
+## README: npm run dev (background)
+# command: npm run dev
+# start: 2026-09-14T14:34:50Z
+DEV_PID:85151
+DEV_SERVER: ready at http://127.0.0.1:3000/
+
+## README: update-baselines
+# command: npx --yes -p @frontguard/cli frontguard update-baselines
+# start: 2026-09-14T14:34:50Z
+  ℹ Updating baselines…
+- ⚙  Loading config — Updating baselines…
+  ℹ Using 3 configured route(s)
+  ℹ Rendering 3 route(s) for baseline update…
+- 🖥  Rendering — Capturing screenshots for 3 route(s)…
+  ℹ Rendering 9 screenshots (3 routes × 3 viewports × 1 browsers)
+  ℹ Rendering complete — 9/9 succeeded
+✔ 🖥  Rendering — Captured 9 screenshot(s)
+- 🔍 Comparing — Writing baselines…
+  ℹ Creating orphan branch "frontguard-baselines" for baseline storage
+Preparing worktree (detached HEAD 6a8cf22)
+Switched to a new branch 'frontguard-baselines'
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+✔ 🔍 Comparing — Wrote 9 baseline(s)
+  ℹ ✅ Updated 9 baseline(s) successfully
+  ℹ ✅ Baselines updated successfully
+EXIT:0
+STEP_SECONDS:4
+
+## README: run
+# command: npx --yes -p @frontguard/cli frontguard run
+# start: 2026-09-14T14:34:54Z
+  ℹ Running Frontguard against http://localhost:3000
+- 🔍 Discovering routes — Determining routes to test…
+  ℹ Using 3 configured route(s)
+✔ 🔍 Discovering routes — Found 3 route(s)
+- 📊 Filtering — Analyzing dependency graph…
+  ℹ No route entry files found — rendering all routes
+  ℹ Smart filter: no route entry files found on disk (15ms)
+✔ 📊 Filtering — 3/3 route(s) to render — no route entry files found on disk
+  ℹ Testing 3 route(s) × 3 viewport(s) × 1 browser(s) = 9 combination(s)
+- 🖥  Rendering — Capturing 9 screenshot(s)…
+  ℹ Rendering 9 screenshots (3 routes × 3 viewports × 1 browsers)
+  ℹ Rendering complete — 9/9 succeeded
+✔ 🖥  Rendering — Captured 9 screenshot(s) in 1889ms
+- 🔍 Comparing — Comparing against baselines…
+✔ 🔍 Comparing — Compared 9 screenshot(s) in 58ms
+- 📄 Reporting — Generating report…
+
+  Route                          375px    768px    1440px 
+  ─────────────────────────────────────────────────────────
+  /                                ✓        ✓        ✓    
+  /about                           ✓        ✓        ✓    
+  /contact                         ✓        ✓        ✓    
+
+  ✅ All pages match baselines
+
+  9 passed
+  Report: ./frontguard-report/report.html
+  Done in 2.0s (render 1.9s, compare 0.1s)
+
+  ℹ HTML report written to frontguard-report/report.html
+  ℹ 
+  ℹ ────────────────────────────────────────────────────────────
+  ℹ Results: 9 tested, 9 passed, 0 regressions, 0 warnings, 0 new, 0 errors
+  ℹ Timing: 1964ms total
+  ℹ ────────────────────────────────────────────────────────────
+  ℹ ✅ No regressions detected
+EXIT:0
+STEP_SECONDS:2
+
+## CLOCK END 2026-09-14T14:34:56Z epoch=1789396496
+TOTAL_SECONDS:9
+TOTAL_HUMAN:9s (0m 9s)
+EXITS: playwright=0 init=0 doctor=0 commit=0 update=0 run=0
+VERDICT: PASS — first comparison in 9s (<=900s)

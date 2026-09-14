@@ -375,22 +375,31 @@ export function runInit(opts: InitOptions = {}): InitResult {
   }
 
   // --- Next steps -----------------------------------------------------------
+  const commitPaths = [fileName, '.gitignore'];
+  if (opts.ci && existsSync(workflowPath)) {
+    commitPaths.push('.github/workflows/frontguard.yml');
+  }
+  const commitCommand = `git add ${commitPaths.join(' ')} && git commit -m "Add Frontguard"`;
   logger.info('');
   logger.info('Next steps:');
   if (useStorybook) {
-    logger.info('  1. Start your Storybook (e.g. npm run storybook)');
+    logger.info('  1. Commit generated files (clean working tree required to create the baseline branch):');
+    logger.info(`     ${commitCommand}`);
+    logger.info('  2. Start your Storybook (e.g. npm run storybook)');
     logger.info(`     Frontguard expects it at ${storybookUrl}`);
-    logger.info('  2. Accept the initial state:');
-    logger.info('     npx -p @frontguard/cli frontguard update-baselines');
-    logger.info('  3. Run comparisons: npx -p @frontguard/cli frontguard run');
-    logger.info('  4. (Optional) Add `parameters.frontguard` to individual stories');
-    logger.info('     to set per-story viewports, threshold, or ignore rules.');
-  } else {
-    logger.info(`  1. Edit ${fileName} to set your baseUrl and routes`);
-    logger.info('  2. Start your dev server (e.g. npm run dev)');
     logger.info('  3. Accept the initial state:');
     logger.info('     npx -p @frontguard/cli frontguard update-baselines');
     logger.info('  4. Run comparisons: npx -p @frontguard/cli frontguard run');
+    logger.info('  5. (Optional) Add `parameters.frontguard` to individual stories');
+    logger.info('     to set per-story viewports, threshold, or ignore rules.');
+  } else {
+    logger.info(`  1. Edit ${fileName} to set your baseUrl and routes`);
+    logger.info('  2. Commit generated files (clean working tree required to create the baseline branch):');
+    logger.info(`     ${commitCommand}`);
+    logger.info('  3. Start your dev server (e.g. npm run dev)');
+    logger.info('  4. Accept the initial state:');
+    logger.info('     npx -p @frontguard/cli frontguard update-baselines');
+    logger.info('  5. Run comparisons: npx -p @frontguard/cli frontguard run');
   }
   logger.info('');
   logger.info('Baseline updates commit locally to the frontguard-baselines branch.');

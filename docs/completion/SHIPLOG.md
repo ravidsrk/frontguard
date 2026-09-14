@@ -464,3 +464,13 @@ greptile P1: `monitor` ignored `telemetry: false`; fixed in `ce4adcd`.
 
 **RESUME POINTER: `P7/T-29`** — T-21–T-24 blocked on H-01/H-02/H-03; T-14/T-25/T-27
 blocked on H-07 (`apps/web` deploy) and T-27 also on H-04; T-28 (dependabot) is done.
+
+### P7 / T-29 — STRANGER TEST · IN FLIGHT
+
+Branch: `ravidsrk/p7-stranger-test`. Throwaway git repo + pre-existing 3-route
+static app (generic `init --yes` scaffold). Clock starts at the first README
+Quick Start command. Local first comparison; no `origin` (README lists origin
+only for CI). Isolated `PLAYWRIGHT_BROWSERS_PATH`. A-14 still applies: no
+`apps/web`. A-15: published `@frontguard/cli@0.2.2`. Attempt 1 failed on 0.2.2's
+dirty-tree check after `init --yes`; README and `init` next-steps now include
+`git commit`. Cold-browser rerun: 31s, `run` exit 0, 9/9 match.
