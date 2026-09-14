@@ -10,13 +10,13 @@
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "bf6e86e",
+  "current_commit": "cd5eed7",
   "resume_pointer": "P7/T-30",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 45,
   "gate": {
-    "status": "NOT_EVALUATED",
-    "reason": "Definition of Complete not yet frozen (Phase 3)"
+    "status": "CONDITIONAL_GO",
+    "reason": "Agent-side plan work that is not blocked on a Human Action is done. Launch-gating Human Actions remain: H-01, H-02, H-03, H-04, H-07. Evidence: docs/completion/evidence/T-30-launch-gate.md"
   },
   "angles": [
     {
@@ -255,9 +255,9 @@
       "id": "CF-04",
       "name": "AI classification of a regression",
       "money": false,
-      "status": "partial",
-      "happy_evidence": null,
-      "failure_evidence": null
+      "status": "verified",
+      "happy_evidence": "docs/completion/evidence/T-18-cf04-honesty.txt",
+      "failure_evidence": "packages/cli/test/diff/ai-vision.test.ts"
     },
     {
       "id": "CF-05",
@@ -949,13 +949,16 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
+      "status": "in_progress",
+      "branch": "ravidsrk/p7-launch-gate",
       "pr": null,
       "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "evidence": [
+        "docs/completion/evidence/T-30-launch-gate.md",
+        "docs/completion/evidence/T-18-cf04-honesty.txt"
+      ],
+      "review": "greptile",
+      "attempts": 1,
       "block_signature": null
     }
   ],
@@ -996,7 +999,7 @@
       "unblocks": [
         "T-27"
       ],
-      "gates_launch": false,
+      "gates_launch": true,
       "verification": "agent implements the copy and re-probes for a truthful 200",
       "status": "open"
     },

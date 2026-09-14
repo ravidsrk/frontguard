@@ -1,0 +1,22 @@
+# CF-04 honesty clause (G-22 / T-18)
+
+CF-04 allows either a measured AI classification run, or public claims reduced to
+what is demonstrable. Accuracy was never measured. T-18 took the second path.
+
+PR: https://github.com/ravidsrk/frontguard/pull/235
+Merge: b7174d3
+Guard: packages/cli/test/docs/ai-honesty.test.ts
+
+CLI surfaces (README.md, packages/cli/README.md, package.json description):
+- pixel comparison is the pass/fail signal
+- model classification is advisory and unmeasured
+- experimental `frontguard run --mode judge --experimental` is a separate opt-in
+
+No captured `run` with a live provider key exists.
+
+Failure path (classification cannot clear a pixel fail):
+packages/cli/test/diff/ai-vision.test.ts
+  "pixel comparison decides pass/fail"
+
+Live frontguard.dev still markets AI vision as the product (T-30 item 8).
+That is a live-site honesty failure, not a CLI-claim failure.

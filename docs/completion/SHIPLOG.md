@@ -480,3 +480,10 @@ a scoped `git add` of generated files. Passing run: 9s, `run` exit 0, 9/9 match.
 
 **RESUME POINTER: `P7/T-30`** — T-21–T-24 blocked on H-01/H-02/H-03; T-14/T-25/T-27
 blocked on H-07 (`apps/web` deploy) and T-27 also on H-04; T-28 done.
+
+### P7 / T-30 — LAUNCH GATE EVALUATION · IN FLIGHT
+
+Branch: `ravidsrk/p7-launch-gate`. Mechanical read of `DEFINITION.md` §2 against
+`main` `cd5eed7`. Does not reopen frozen scope. Does not edit `apps/web`.
+Verdict: **CONDITIONAL GO**. Evidence: `docs/completion/evidence/T-30-launch-gate.md`.
+H-04 promoted to launch-gating because §2 item 8 cannot pass while `/pricing` sells \$29.
