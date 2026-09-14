@@ -416,6 +416,11 @@ Branch deleted local + remote. G-08 closed.
 
 ---
 
+### P3 / T-19 — CF-02 DOCTOR FAILURE PATH · IN FLIGHT
+
+Branch: `ravidsrk/p3-doctor-failure-evidence`. Evidence: doctor against a non-git
+directory exits 1 and names the missing git repository.
+
 **T-19 DONE.** PR #236 merged (`444698a`). CF-02 failure path evidenced:
 `docs/completion/evidence/T-19-doctor-failure.txt`.
 
