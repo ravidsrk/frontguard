@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   checkNodeVersion,
   checkAiKeys,
@@ -8,6 +8,7 @@ import {
   checkConfig,
   formatReport,
   getRequiredBrowsers,
+  runDoctor,
   type CheckResult,
 } from '../../src/cli/doctor.js';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -283,5 +284,22 @@ describe('doctor: formatReport', () => {
     ]);
     expect(out).not.toContain('should-not-show');
     expect(out).toContain('should-show');
+  });
+});
+
+describe('doctor: runDoctor failure path (CF-02)', () => {
+  it('exits 1 and names git when the directory is not a repository', async () => {
+    const dir = makeTempDir();
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    try {
+      const code = await runDoctor(dir);
+      const report = write.mock.calls.map((call) => String(call[0])).join('');
+      expect(code).toBe(1);
+      expect(report).toContain('not a git repository');
+      expect(report).toContain('critical check(s) failed');
+    } finally {
+      write.mockRestore();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

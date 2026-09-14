@@ -412,12 +412,13 @@ Branch deleted local + remote. G-08 closed.
 
 ---
 
-### P3 / T-18 — CF-04 HONESTY · IN FLIGHT
+**T-18 DONE.** PR #235 merged (`b7174d3`). G-22 closed on clone/npm surfaces.
 
-Branch: `ravidsrk/p3-ai-honesty`. Closes G-22 on clone/npm surfaces.
+---
 
-README, CLI `--help`, npm descriptions, and the published CLI README no longer lead with
-unmeasured "AI-powered" positioning. Pixel comparison is stated as the pass/fail signal.
-Live `apps/web` copy remains until H-07 (A-10/A-11).
+### P3 / T-19 — CF-02 DOCTOR FAILURE PATH · IN FLIGHT
 
-**RESUME POINTER: `P3/T-18`**
+Branch: `ravidsrk/p3-doctor-failure-evidence`. Evidence: doctor against a non-git
+directory exits 1 and names the missing git repository.
+
+**RESUME POINTER: `P3/T-19`**
