@@ -13,8 +13,6 @@
  * @module utils/telemetry
  */
 
-import { logger } from './logger.js';
-
 /** Default ingestion endpoint (a simple collector). Override with env. */
 const DEFAULT_ENDPOINT = 'https://telemetry.frontguard.dev/v1/events';
 
@@ -91,20 +89,6 @@ export function detectCI(env: NodeJS.ProcessEnv = process.env): string {
   if (env.TRAVIS) return 'travis';
   if (env.CI) return 'generic-ci';
   return 'local';
-}
-
-let firstRunNoticeShown = false;
-
-/**
- * Shows a one-time disclosure on first run. Idempotent within a process.
- */
-export function showFirstRunNotice(): void {
-  if (firstRunNoticeShown) return;
-  firstRunNoticeShown = true;
-  logger.debug(
-    'Frontguard can send anonymous usage telemetry (no URLs, paths, or config). ' +
-      'Enable with FRONTGUARD_TELEMETRY=1 or telemetry: true in config.',
-  );
 }
 
 /**
