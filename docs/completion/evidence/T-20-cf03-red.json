@@ -1,0 +1,109 @@
+{
+  "summary": {
+    "total": 6,
+    "passed": 0,
+    "regressions": 6,
+    "warnings": 0,
+    "newPages": 0,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 4221,
+    "compare": 1252,
+    "ai": 0,
+    "total": 5491
+  },
+  "diffs": [
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "regression",
+      "diffPercentage": 36.02710609065311,
+      "hasBaselineImage": true,
+      "hasCurrentImage": true,
+      "hasDiffImage": true,
+      "comparisonMethod": "pixelmatch",
+      "error": "Dimension mismatch: current=535×1706, baseline=375×1706. Images were padded to the larger dimensions for comparison."
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "regression",
+      "diffPercentage": 14.442234848484848,
+      "hasBaselineImage": true,
+      "hasCurrentImage": true,
+      "hasDiffImage": true,
+      "comparisonMethod": "pixelmatch",
+      "error": "Dimension mismatch: current=1600×990, baseline=1440×990. Images were padded to the larger dimensions for comparison."
+    },
+    {
+      "route": "/pricing",
+      "label": "/pricing",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "regression",
+      "diffPercentage": 33.97511209820783,
+      "hasBaselineImage": true,
+      "hasCurrentImage": true,
+      "hasDiffImage": true,
+      "comparisonMethod": "pixelmatch",
+      "error": "Dimension mismatch: current=535×2003, baseline=375×2003. Images were padded to the larger dimensions for comparison."
+    },
+    {
+      "route": "/pricing",
+      "label": "/pricing",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "regression",
+      "diffPercentage": 13.861032440782697,
+      "hasBaselineImage": true,
+      "hasCurrentImage": true,
+      "hasDiffImage": true,
+      "comparisonMethod": "pixelmatch",
+      "error": "Dimension mismatch: current=1600×971, baseline=1440×971. Images were padded to the larger dimensions for comparison."
+    },
+    {
+      "route": "/about",
+      "label": "/about",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "regression",
+      "diffPercentage": 33.39859298709315,
+      "hasBaselineImage": true,
+      "hasCurrentImage": true,
+      "hasDiffImage": true,
+      "comparisonMethod": "pixelmatch",
+      "error": "Dimension mismatch: current=535×2362, baseline=375×2362. Images were padded to the larger dimensions for comparison."
+    },
+    {
+      "route": "/about",
+      "label": "/about",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "regression",
+      "diffPercentage": 13.541822429906542,
+      "hasBaselineImage": true,
+      "hasCurrentImage": true,
+      "hasDiffImage": true,
+      "comparisonMethod": "pixelmatch",
+      "error": "Dimension mismatch: current=1600×1070, baseline=1440×1070. Images were padded to the larger dimensions for comparison."
+    }
+  ],
+  "config": {
+    "baseUrl": "http://127.0.0.1:3000",
+    "viewports": [
+      375,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.01,
+    "outputDir": "./frontguard-report"
+  }
+}

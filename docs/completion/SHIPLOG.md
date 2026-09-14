@@ -439,3 +439,10 @@ Sequence:
 Seed dispatch 34840303128 failed at setup: GitHub.com rejects `upload-artifact@v3.2.2-node20`
 even when the step is skipped. Dropped that pin (A-13). greptile P1 (GHES v3 fallback) is
 not applicable: keeping the reference makes GitHub.com unable to run CF-03.
+Follow-up greptile P1: skip the v7 upload when `github.server_url != 'https://github.com'`
+so GHES jobs are not failed by an unsupported artifact backend. Still no v3 reference.
+
+Seed 34840763158 success; pushed `origin/frontguard-baselines` `15a027b`.
+Green 34840956249: 6 passed, 0 regressions (byte-identical).
+Red 34840985253: 6 regressions, CLI red, fixture job green after asserting detection.
+Evidence: `docs/completion/evidence/T-20-cf03-ci.txt`.

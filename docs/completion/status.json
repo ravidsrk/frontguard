@@ -247,9 +247,9 @@
       "id": "CF-03",
       "name": "CI comparison against pushed baselines",
       "money": false,
-      "status": "partial",
-      "happy_evidence": null,
-      "failure_evidence": null
+      "status": "verified",
+      "happy_evidence": "docs/completion/evidence/T-20-cf03-green.json",
+      "failure_evidence": "docs/completion/evidence/T-20-cf03-red.json"
     },
     {
       "id": "CF-04",
@@ -760,13 +760,17 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
+      "status": "in_progress",
+      "branch": "ravidsrk/p3-cf03-ci-evidence",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/238",
       "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "evidence": [
+        "docs/completion/evidence/T-20-cf03-ci.txt",
+        "docs/completion/evidence/T-20-cf03-green.json",
+        "docs/completion/evidence/T-20-cf03-red.json"
+      ],
+      "review": "greptile",
+      "attempts": 1,
       "block_signature": null
     },
     {

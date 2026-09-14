@@ -1,0 +1,103 @@
+{
+  "summary": {
+    "total": 6,
+    "passed": 6,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 0,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 1,
+    "render": 4210,
+    "compare": 55,
+    "ai": 0,
+    "total": 4280
+  },
+  "diffs": [
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "byte-identical"
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "byte-identical"
+    },
+    {
+      "route": "/pricing",
+      "label": "/pricing",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "byte-identical"
+    },
+    {
+      "route": "/pricing",
+      "label": "/pricing",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "byte-identical"
+    },
+    {
+      "route": "/about",
+      "label": "/about",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "byte-identical"
+    },
+    {
+      "route": "/about",
+      "label": "/about",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "byte-identical"
+    }
+  ],
+  "config": {
+    "baseUrl": "http://127.0.0.1:3000",
+    "viewports": [
+      375,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.01,
+    "outputDir": "./frontguard-report"
+  }
+}

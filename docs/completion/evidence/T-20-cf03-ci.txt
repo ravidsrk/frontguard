@@ -1,0 +1,65 @@
+# T-20 CF-03 — documented CI comparison green on unchanged, red on regression
+# date: 2026-09-14
+# workflow: .github/workflows/frontguard-example.yml
+# ref: ravidsrk/p3-cf03-ci-evidence @ e75f8e4ff4b9196cbb69f59b096ae844abd5046f
+# package: @frontguard/cli@0.2.2 against apps/demo
+# A-12: CLI demo fixture, not the unpublished composite Action
+#
+# Sequence (all workflow_dispatch; concurrency group frontguard-demo-baselines):
+#   gh workflow run frontguard-example.yml --ref ravidsrk/p3-cf03-ci-evidence \
+#     -f update_baselines=true -f negative_control=false
+#   gh workflow run frontguard-example.yml --ref ravidsrk/p3-cf03-ci-evidence \
+#     -f update_baselines=false -f negative_control=false
+#   gh workflow run frontguard-example.yml --ref ravidsrk/p3-cf03-ci-evidence \
+#     -f update_baselines=false -f negative_control=true
+#
+# Checkout: actions/checkout@v4 fetch-depth: 0, then
+#   git ls-remote --exit-code --heads origin frontguard-baselines
+#   git fetch origin refs/heads/frontguard-baselines:refs/heads/frontguard-baselines
+# Negative control: FRONTGUARD_DEMO_NEGATIVE_CONTROL=1 → translateX(160px) in
+#   apps/demo/app/layout.tsx. Fixture job stays green after asserting CLI exit 1
+#   and .summary.regressions > 0 (the compare itself is red).
+
+## 1. Seed origin/frontguard-baselines
+
+Run:  https://github.com/ravidsrk/frontguard/actions/runs/34840763158
+Job:  https://github.com/ravidsrk/frontguard/actions/runs/34840763158/job/103964952627
+Inputs: update_baselines=true, negative_control=false
+Conclusion: success
+Pushed: 15a027b7f386973eb1212bf8e0ef1e19340fbfa7 (github-actions[bot], "Update baseline manifest")
+        tree: baselines/ manifest.json
+Post-update compare: 6 tested, 6 passed, 0 regressions
+
+## 2. Green — unchanged comparison
+
+Run:  https://github.com/ravidsrk/frontguard/actions/runs/34840956249
+Job:  https://github.com/ravidsrk/frontguard/actions/runs/34840956249/job/103965586574
+Inputs: update_baselines=false, negative_control=false
+Conclusion: success
+Load persisted baselines log:
+  From https://github.com/ravidsrk/frontguard
+   * [new branch]      frontguard-baselines -> frontguard-baselines
+Compare log:
+  Results: 6 tested, 6 passed, 0 regressions, 0 warnings, 0 new, 0 errors
+  ✅ No regressions detected
+JSON: docs/completion/evidence/T-20-cf03-green.json
+      summary.regressions == 0, comparisonMethod byte-identical on all 6 diffs
+
+## 3. Red — deliberately regressed (160px translateX)
+
+Run:  https://github.com/ravidsrk/frontguard/actions/runs/34840985253
+Job:  https://github.com/ravidsrk/frontguard/actions/runs/34840985253/job/103965834608
+Inputs: update_baselines=false, negative_control=true
+Dev server: FRONTGUARD_DEMO_NEGATIVE_CONTROL="1"
+Compare log:
+  Results: 6 tested, 0 passed, 6 regressions, 0 warnings, 0 new, 0 errors
+  ❌ 6 regression(s) detected
+  Negative control detected the injected regression.
+JSON: docs/completion/evidence/T-20-cf03-red.json
+      summary.regressions == 6, comparisonMethod pixelmatch
+      Home 375: 36.03% (current 535×1706 vs baseline 375×1706)
+      Home 1440: 14.44% (current 1600×990 vs baseline 1440×990)
+Fixture job conclusion: success (asserts CLI red; does not fail the Actions job)
+
+Failed setup that forced A-13 (v3 pin, main, not evidence):
+  https://github.com/ravidsrk/frontguard/actions/runs/34840303128
