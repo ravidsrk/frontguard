@@ -141,6 +141,7 @@ jobs:
             fi
             jq -e '.summary.regressions > 0 and .summary.errors == 0 and .summary.newPages == 0' frontguard-result.json >/dev/null
             echo "Negative control detected the injected regression."
+            exit "$RUN_EXIT"
           else
             if [ "$RUN_EXIT" -ne 0 ]; then
               echo "Comparison expected exit 0, got $RUN_EXIT." >&2
