@@ -159,3 +159,13 @@ job is not marked failed by an unsupported artifact backend. Still no v3 referen
 `docs/telemetry.md`. Delete unused `showFirstRunNotice`. Do not edit `apps/web` privacy copy.
 **Rejected:** Updating `apps/web/src/routes/privacy.tsx` in this task.
 **Reason:** `apps/web/**` path-filters Deploy Web (R15). Live `/privacy` remains T-25 / H-07.
+
+## A-15 — Stranger Test uses the published CLI the README invokes
+
+**Phase:** P7 / T-29
+**Decision:** Time the README Quick Start with `npx -p @frontguard/cli` (registry 0.2.2), not
+the unpublished workspace CLI.
+**Rejected:** Running the in-repo 0.2.3 source as the stranger path.
+**Reason:** Gate item 7 is "using the README alone." 0.2.2 still requires a clean working tree
+to create `frontguard-baselines`; source already narrowed that check to the checkout fallback.
+The README now includes the commit step 0.2.2 needs.

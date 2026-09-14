@@ -70,6 +70,7 @@ describe('init .gitignore entries (install-2)', () => {
       const output = infoSpy.mock.calls.flat().join('\n');
       expect(output).toContain('frontguard update-baselines');
       expect(output).toContain('git push origin frontguard-baselines');
+      expect(output).toContain('git add -A && git commit -m "Add Frontguard"');
       expect(output).not.toContain('On first run, Frontguard captures baselines');
     } finally {
       infoSpy.mockRestore();

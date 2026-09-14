@@ -1,0 +1,235 @@
+# T-29 Stranger Test — README Quick Start to first comparison
+# date: 2026-09-14
+# CLI: published @frontguard/cli@0.2.2 via `npx -p @frontguard/cli` (README path)
+# Node: v24.20.0  npm: 11.19.0  git: 2.55.0
+# App: throwaway git repo with a 3-route static server (generic init routes)
+# Clock: first README command → `frontguard run` exit 0
+# Isolated PLAYWRIGHT_BROWSERS_PATH (cold Chromium download included)
+#
+# Attempt 1 failed: 0.2.2 refuses a dirty tree after `init --yes`. README now
+# includes `git add -A && git commit -m "Add Frontguard"` before capturing
+# baselines. `git push origin frontguard-baselines` exits 128 without origin
+# (README lists origin only for CI). Local first comparison does not need it.
+#
+# Verdict: PASS in 31s (limit 900s). 9/9 routes×viewports match.
+
+# T-29 stranger test transcript
+# date: 2026-09-14T14:27:07Z
+# workdir: /tmp/fg-stranger-t29
+# node: v24.20.0
+# npm: 11.19.0
+# git: git version 2.55.0
+# README source: https://github.com/ravidsrk/frontguard/blob/main/README.md Quick Start
+# Pre-existing app: 3-route static server on 127.0.0.1:3000 (generic init routes /, /about, /contact)
+# PLAYWRIGHT_BROWSERS_PATH=/tmp/fg-stranger-t29-browsers (isolated; no reuse of this machine's cache)
+# Clock starts at the first README command.
+
+## CLOCK START 2026-09-14T14:27:07Z epoch=1789396027
+
+## README: install Chromium
+# command: npx --yes -p @frontguard/cli playwright install --with-deps chromium
+# start: 2026-09-14T14:27:07Z
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ WARNING: It looks like you are running 'npx playwright install' without first ║
+║ installing your project's dependencies.                                       ║
+║                                                                               ║
+║ To avoid unexpected behavior, please install your dependencies first, and     ║
+║ then run Playwright's install command:                                        ║
+║                                                                               ║
+║     npm install                                                               ║
+║     npx playwright install                                                    ║
+║                                                                               ║
+║ If your project does not yet depend on Playwright, first install the          ║
+║ applicable npm package (most commonly @playwright/test), and                  ║
+║ then run Playwright's install command to download the browsers:               ║
+║                                                                               ║
+║     npm install @playwright/test                                              ║
+║     npx playwright install                                                    ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+Downloading Chrome for Testing 149.0.7827.55 (playwright chromium v1228) from https://cdn.playwright.dev/builds/cft/149.0.7827.55/mac-arm64/chrome-mac-arm64.zip
+|                                                                                |   0% of 171 MiB
+|■■■■■■■■                                                                        |  10% of 171 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 171 MiB
+Chrome for Testing 149.0.7827.55 (playwright chromium v1228) downloaded to /tmp/fg-stranger-t29-browsers/chromium-1228
+Downloading FFmpeg (playwright ffmpeg v1011) from https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1011/ffmpeg-mac-arm64.zip
+|                                                                                |   0% of 1 MiB
+|■■■■■■■■                                                                        |  10% of 1 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  31% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  61% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 1 MiB
+FFmpeg (playwright ffmpeg v1011) downloaded to /tmp/fg-stranger-t29-browsers/ffmpeg-1011
+Downloading Chrome Headless Shell 149.0.7827.55 (playwright chromium-headless-shell v1228) from https://cdn.playwright.dev/builds/cft/149.0.7827.55/mac-arm64/chrome-headless-shell-mac-arm64.zip
+|                                                                                |   0% of 93.5 MiB
+|■■■■■■■■                                                                        |  10% of 93.5 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 93.5 MiB
+Chrome Headless Shell 149.0.7827.55 (playwright chromium-headless-shell v1228) downloaded to /tmp/fg-stranger-t29-browsers/chromium_headless_shell-1228
+EXIT:0
+STEP_SECONDS:22
+
+## README: init --yes
+# command: npx --yes -p @frontguard/cli frontguard init --yes
+# start: 2026-09-14T14:27:29Z
+  ℹ Detecting framework…
+  ℹ No specific framework detected — using defaults
+  ℹ ✅ Created frontguard.config.ts
+  ℹ Updated .gitignore with: node_modules/, auth.json, .env, .env.*, .frontguard/, .frontguard-debug/, frontguard-report/
+  ℹ 
+  ℹ Next steps:
+  ℹ   1. Edit frontguard.config.ts to set your baseUrl and routes
+  ℹ   2. Start your dev server (e.g. npm run dev)
+  ℹ   3. Run: npx -p @frontguard/cli frontguard run
+  ℹ 
+  ℹ On first run, Frontguard captures baselines.
+  ℹ Subsequent runs compare against them and report changes.
+EXIT:0
+STEP_SECONDS:1
+
+## README: doctor
+# command: npx --yes -p @frontguard/cli frontguard doctor
+# start: 2026-09-14T14:27:30Z
+
+Frontguard Doctor
+────────────────────────────────────────────────────────────
+✅ Node.js version: v24.20.0 (>= 18 required)
+✅ Playwright installed: playwright package is resolvable
+✅ Browser binaries: available: chromium
+✅ Configuration: loaded config (baseUrl: http://localhost:3000)
+🟡 AI provider keys: no AI keys found (AI classification disabled)
+   → Set FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY to enable AI analysis.
+✅ Git repository: inside a git work tree
+🟡 Baseline branch: 'frontguard-baselines' not found
+   → It will be created automatically on your first `frontguard run`.
+────────────────────────────────────────────────────────────
+✅ All critical checks passed (2 advisory warning(s)).
+
+EXIT:0
+STEP_SECONDS:0
+
+## README: git add -A && git commit -m "Add Frontguard"
+# command: git add -A && git commit -m "Add Frontguard"
+# start: 2026-09-14T14:27:30Z
+[main (root-commit) 0af03dc] Add Frontguard
+ 4 files changed, 42 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 frontguard.config.ts
+ create mode 100644 package.json
+ create mode 100644 server.mjs
+EXIT:0
+STEP_SECONDS:1
+
+## README: npm run dev (background)
+# command: npm run dev
+# start: 2026-09-14T14:27:31Z
+DEV_PID:37794
+DEV_SERVER: ready at http://127.0.0.1:3000/
+
+## README: update-baselines
+# command: npx --yes -p @frontguard/cli frontguard update-baselines
+# start: 2026-09-14T14:27:31Z
+  ℹ Updating baselines…
+- ⚙  Loading config — Updating baselines…
+  ℹ Using 3 configured route(s)
+  ℹ Rendering 3 route(s) for baseline update…
+- 🖥  Rendering — Capturing screenshots for 3 route(s)…
+  ℹ Rendering 9 screenshots (3 routes × 3 viewports × 1 browsers)
+  ℹ Rendering complete — 9/9 succeeded
+✔ 🖥  Rendering — Captured 9 screenshot(s)
+- 🔍 Comparing — Writing baselines…
+  ℹ Creating orphan branch "frontguard-baselines" for baseline storage
+Preparing worktree (detached HEAD 0af03dc)
+Switched to a new branch 'frontguard-baselines'
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+✔ 🔍 Comparing — Wrote 9 baseline(s)
+  ℹ ✅ Updated 9 baseline(s) successfully
+  ℹ ✅ Baselines updated successfully
+EXIT:0
+STEP_SECONDS:4
+
+## README: git push origin frontguard-baselines (expected to fail: no origin; README lists origin only for CI)
+# command: git push origin frontguard-baselines
+# start: 2026-09-14T14:27:35Z
+fatal: 'origin' does not appear to be a git repository
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+EXIT:128
+
+## README: run
+# command: npx --yes -p @frontguard/cli frontguard run
+# start: 2026-09-14T14:27:35Z
+  ℹ Running Frontguard against http://localhost:3000
+- 🔍 Discovering routes — Determining routes to test…
+  ℹ Using 3 configured route(s)
+✔ 🔍 Discovering routes — Found 3 route(s)
+- 📊 Filtering — Analyzing dependency graph…
+  ℹ Smart filter: no changes detected (29ms)
+✔ 📊 Filtering — 3/3 route(s) to render — no changes detected
+  ℹ Testing 3 route(s) × 3 viewport(s) × 1 browser(s) = 9 combination(s)
+- 🖥  Rendering — Capturing 9 screenshot(s)…
+  ℹ Rendering 9 screenshots (3 routes × 3 viewports × 1 browsers)
+  ℹ Rendering complete — 9/9 succeeded
+✔ 🖥  Rendering — Captured 9 screenshot(s) in 1905ms
+- 🔍 Comparing — Comparing against baselines…
+✔ 🔍 Comparing — Compared 9 screenshot(s) in 63ms
+- 📄 Reporting — Generating report…
+
+  Route                          375px    768px    1440px 
+  ─────────────────────────────────────────────────────────
+  /                                ✓        ✓        ✓    
+  /about                           ✓        ✓        ✓    
+  /contact                         ✓        ✓        ✓    
+
+  ✅ All pages match baselines
+
+  9 passed
+  Report: ./frontguard-report/report.html
+  Done in 2.0s (render 1.9s, compare 0.1s)
+
+  ℹ HTML report written to frontguard-report/report.html
+  ℹ 
+  ℹ ────────────────────────────────────────────────────────────
+  ℹ Results: 9 tested, 9 passed, 0 regressions, 0 warnings, 0 new, 0 errors
+  ℹ Timing: 1997ms total
+  ℹ ────────────────────────────────────────────────────────────
+  ℹ ✅ No regressions detected
+EXIT:0
+STEP_SECONDS:3
+
+## CLOCK END 2026-09-14T14:27:38Z epoch=1789396058
+TOTAL_SECONDS:31
+TOTAL_HUMAN:31s (0m 31s)
+EXITS: playwright=0 init=0 doctor=0 commit=0 update=0 push=128 run=0
+VERDICT: PASS — first comparison in 31s (<=900s)

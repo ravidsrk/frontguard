@@ -64,6 +64,9 @@ npx -p @frontguard/cli playwright install --with-deps chromium
 # one lockfile exists) — otherwise `init --ci` writes nothing.
 npx -p @frontguard/cli frontguard init --yes
 npx -p @frontguard/cli frontguard doctor
+
+# The published CLI requires a clean working tree to create the baseline branch.
+git add -A && git commit -m "Add Frontguard"
 ```
 
 **App terminal (leave this running):** start your app and wait until the `baseUrl` in `frontguard.config.ts` responds. Example:
