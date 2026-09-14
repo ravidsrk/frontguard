@@ -683,13 +683,15 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
-      "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "status": "done",
+      "branch": "ravidsrk/p3-readme-quickstart",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/233",
+      "commit": "8757f24",
+      "evidence": [
+        "packages/cli/test/docs/quick-start.test.ts"
+      ],
+      "review": "greptile",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -701,13 +703,16 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
-      "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "status": "done",
+      "branch": "ravidsrk/p3-pixel-authoritative",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/234",
+      "commit": "2c709cd",
+      "evidence": [
+        "packages/cli/test/core/pipeline-ssim-config.test.ts",
+        "packages/cli/test/diff/ai-vision.test.ts"
+      ],
+      "review": "greptile",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -719,13 +724,15 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
-      "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "status": "done",
+      "branch": "ravidsrk/p3-ai-honesty",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/235",
+      "commit": "b7174d3",
+      "evidence": [
+        "packages/cli/test/docs/ai-honesty.test.ts"
+      ],
+      "review": "greptile",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -735,13 +742,15 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
-      "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "status": "done",
+      "branch": "ravidsrk/p3-doctor-failure-evidence",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/236",
+      "commit": "444698a",
+      "evidence": [
+        "docs/completion/evidence/T-19-doctor-failure.txt"
+      ],
+      "review": "greptile",
+      "attempts": 1,
       "block_signature": null
     },
     {
