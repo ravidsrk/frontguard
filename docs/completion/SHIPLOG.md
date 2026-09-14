@@ -473,4 +473,10 @@ Quick Start command. Local first comparison; no `origin` (README lists origin
 only for CI). Isolated `PLAYWRIGHT_BROWSERS_PATH`. A-14 still applies: no
 `apps/web`. A-15: published `@frontguard/cli@0.2.2`. Attempt 1 failed on 0.2.2's
 dirty-tree check after `init --yes`; README and `init` next-steps now include
-`git commit`. Cold-browser rerun: 31s, `run` exit 0, 9/9 match.
+a scoped `git add` of generated files. Passing run: 9s, `run` exit 0, 9/9 match.
+
+**T-29 DONE.** PR #243 merged (`bf6e86e`). Evidence:
+`docs/completion/evidence/T-29-stranger-test.txt`.
+
+**RESUME POINTER: `P7/T-30`** — T-21–T-24 blocked on H-01/H-02/H-03; T-14/T-25/T-27
+blocked on H-07 (`apps/web` deploy) and T-27 also on H-04; T-28 done.

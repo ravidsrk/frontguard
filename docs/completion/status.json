@@ -10,8 +10,8 @@
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "3355011",
-  "resume_pointer": "P7/T-29",
+  "current_commit": "bf6e86e",
+  "resume_pointer": "P7/T-30",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 45,
   "gate": {
@@ -931,13 +931,15 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
-      "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "status": "done",
+      "branch": "ravidsrk/p7-stranger-test",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/243",
+      "commit": "bf6e86e",
+      "evidence": [
+        "docs/completion/evidence/T-29-stranger-test.txt"
+      ],
+      "review": "greptile",
+      "attempts": 1,
       "block_signature": null
     },
     {
