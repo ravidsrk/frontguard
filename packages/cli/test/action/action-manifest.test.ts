@@ -70,12 +70,11 @@ describe('COU-1: root shim stays synced with canonical action manifest', () => {
     expect(readAction(templateAction)).toContain("@@FRONTGUARD_VERSION@@");
   });
 
-  it('selects a supported artifact action for GitHub.com and GHES', () => {
+  it('uploads reports with a current artifact action (v3 is rejected by GitHub.com)', () => {
     const yml = readAction(templateAction);
     expect(yml).toContain('actions/upload-artifact@v7');
-    expect(yml).toContain('actions/upload-artifact@v3.2.2-node20');
-    expect(yml).toContain("github.server_url == 'https://github.com'");
-    expect(yml).toContain("github.server_url != 'https://github.com'");
+    expect(yml).not.toContain('actions/upload-artifact@v3');
+    expect(yml).not.toContain('v3.2.2-node20');
   });
 });
 

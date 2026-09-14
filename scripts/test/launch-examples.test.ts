@@ -242,6 +242,9 @@ describe('repository-only example workflow', () => {
     expect(workflow).toContain('--update-baselines');
     expect(workflow).toContain('git push origin frontguard-baselines:frontguard-baselines');
     expect(workflow).toContain('FRONTGUARD_DEMO_NEGATIVE_CONTROL=');
+    expect(workflow).toContain("inputs.negative_control == true");
+    expect(workflow).not.toContain('v3.2.2-node20');
+    expect(workflow).toContain('actions/upload-artifact@v7');
     expect(workflow).toContain('Negative control expected exit 1');
     expect(workflow).toContain('.summary.regressions > 0');
   });

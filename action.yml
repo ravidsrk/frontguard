@@ -191,17 +191,9 @@ runs:
         IN_UPDATE_BASELINES: ${{ inputs.update-baselines }}
       run: bash "$GITHUB_ACTION_PATH/action-run.sh"
 
-    - name: Upload Report (GitHub.com)
-      if: always() && github.server_url == 'https://github.com' && steps.frontguard.outputs.report-path != ''
+    - name: Upload Report
+      if: always() && steps.frontguard.outputs.report-path != ''
       uses: actions/upload-artifact@v7
-      with:
-        name: frontguard-report
-        path: ${{ steps.frontguard.outputs.report-path }}
-        if-no-files-found: error
-
-    - name: Upload Report (GitHub Enterprise Server)
-      if: always() && github.server_url != 'https://github.com' && steps.frontguard.outputs.report-path != ''
-      uses: actions/upload-artifact@v3.2.2-node20
       with:
         name: frontguard-report
         path: ${{ steps.frontguard.outputs.report-path }}

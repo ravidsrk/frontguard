@@ -189,17 +189,9 @@ ${packageManagerSetup}
           # FRONTGUARD_OPENAI_KEY: \${{ secrets.FRONTGUARD_OPENAI_KEY }}
           # FRONTGUARD_ANTHROPIC_KEY: \${{ secrets.FRONTGUARD_ANTHROPIC_KEY }}
 
-      - name: Upload Frontguard report (GitHub.com)
-        if: always() && github.server_url == 'https://github.com' && steps.frontguard.outputs.report-path != ''
+      - name: Upload Frontguard report
+        if: always() && steps.frontguard.outputs.report-path != ''
         uses: actions/upload-artifact@v7
-        with:
-          name: frontguard-report
-          path: \${{ steps.frontguard.outputs.report-path }}
-          if-no-files-found: error
-
-      - name: Upload Frontguard report (GitHub Enterprise Server)
-        if: always() && github.server_url != 'https://github.com' && steps.frontguard.outputs.report-path != ''
-        uses: actions/upload-artifact@v3.2.2-node20
         with:
           name: frontguard-report
           path: \${{ steps.frontguard.outputs.report-path }}

@@ -425,3 +425,13 @@ directory exits 1 and names the missing git repository.
 `docs/completion/evidence/T-19-doctor-failure.txt`.
 
 **RESUME POINTER: `P3/T-20`**
+
+### P3 / T-20 — CF-03 CI COMPARISON GREEN + RED · IN FLIGHT
+
+Branch: `ravidsrk/p3-cf03-ci-evidence`. A-12: use the existing
+`.github/workflows/frontguard-example.yml` fixture.
+
+Sequence:
+1. `update_baselines=true` — seed `origin/frontguard-baselines`
+2. both inputs false — unchanged comparison, expect exit 0
+3. `negative_control=true` — 160px layout shift, expect exit 1 with regressions
