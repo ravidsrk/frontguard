@@ -395,3 +395,24 @@ Proofs:
 
 `ls-remote` is fail-closed: exit 2 (missing branch) is a warning; any other exit fails the step
 instead of pretending the branch is unpublished (second look).
+
+**T-15 DONE.** PR #232 merged with a merge commit (`5f447df`). CI green including
+`documented-baseline-ref-fetch` (https://github.com/ravidsrk/frontguard/actions/runs/34826304309/job/103919164034).
+Greptile GitHub P2 on ls-remote branches fixed in `68bc17f` and replied in-thread.
+R9: `133a24d` bumped browserslist/qs so `npm audit --omit=dev --audit-level=high` is green.
+Branch deleted local + remote. G-08 closed.
+
+**Second look:** none further after the P2.
+
+---
+
+**RESUME POINTER: `P3/T-16`**
+
+### P3 / T-16 — README QUICK START REACHES A FIRST COMPARISON · IN FLIGHT
+
+Branch: `ravidsrk/p3-readme-quickstart`. Closes G-14.
+
+The Quick Start no longer starts with `init --ci` (which writes nothing without package.json /
+a start script / one lockfile), no longer claims Node 20, and names Playwright browsers plus
+git/`origin` before the first `run`. `doctor` floor matches `engines.node` (>=22).
+A-10: live `apps/web` docs are not in this PR because merging them deploys production.

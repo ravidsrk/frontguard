@@ -51,28 +51,34 @@ Console, JSON, and HTML evidence are written → Optional AI assists with change
 
 ## Quick Start
 
-**Prerequisites:** [Node.js](https://nodejs.org/) 20+ and npm 9+
+**Prerequisites:** [Node.js](https://nodejs.org/) 22+, a git repository, and an `origin` remote if CI should compare against published baselines. Frontguard stores screenshots on the `frontguard-baselines` orphan branch.
 
 ```bash
-# Frontguard terminal: install, initialize, and check the environment
-npm install @frontguard/cli
-npx -p @frontguard/cli frontguard init --ci
+# One-time per machine: install the Chromium browser Frontguard uses to render pages
+npx -p @frontguard/cli playwright install --with-deps chromium
+
+# Generate frontguard.config.ts (--yes skips prompts).
+# Add --ci only if this repo already has package.json, a start script,
+# and exactly one lockfile — otherwise `init --ci` writes nothing.
+npx -p @frontguard/cli frontguard init --yes
 npx -p @frontguard/cli frontguard doctor
 ```
 
-**App terminal (leave this running):** use your project's dev-server command (for example, the command below) and wait for the `baseUrl` generated in `frontguard.config.ts` to respond.
+**App terminal (leave this running):** start your app and wait until the `baseUrl` in `frontguard.config.ts` responds. Example:
 
 ```bash
 npm run dev
 ```
 
-**Frontguard terminal:** review the running app, then capture baselines and compare using the generated config.
+**Frontguard terminal:** review the running app, accept baselines, publish the orphan branch, then compare.
 
 ```bash
 npx -p @frontguard/cli frontguard update-baselines
 git push origin frontguard-baselines
 npx -p @frontguard/cli frontguard run
 ```
+
+`run` exits 0 when pages match, 1 on a regression or unaccepted new page, and 2 on a tool error.
 
 > **Full documentation:** [frontguard.dev/docs](https://frontguard.dev/docs) · internal notes in [`docs/`](./docs/)
 

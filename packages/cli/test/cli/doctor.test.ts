@@ -21,13 +21,19 @@ function makeTempDir(): string {
 
 describe('doctor: checkNodeVersion', () => {
   it('passes for a supported version', () => {
-    const r = checkNodeVersion('v20.10.0');
+    const r = checkNodeVersion('v22.10.0');
     expect(r.status).toBe('pass');
     expect(r.critical).toBe(true);
   });
 
   it('passes for exactly the minimum version', () => {
-    expect(checkNodeVersion('v20.0.0').status).toBe('pass');
+    expect(checkNodeVersion('v22.0.0').status).toBe('pass');
+  });
+
+  it('fails for EOL Node 20', () => {
+    const r = checkNodeVersion('v20.10.0');
+    expect(r.status).toBe('fail');
+    expect(r.fix).toBeTruthy();
   });
 
   it('fails for a version below the minimum', () => {

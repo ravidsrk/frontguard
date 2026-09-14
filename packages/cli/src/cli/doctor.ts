@@ -7,7 +7,7 @@
  * AI keys) only warn.
  *
  * Checks performed:
- *   1. Node.js version >= 20
+ *   1. Node.js version >= 22
  *   2. Playwright installed (resolvable)
  *   3. Every configured Playwright browser available (executable present)
  *   4. Config file found and parseable
@@ -44,7 +44,7 @@ export interface CheckResult {
 }
 
 /** Minimum supported Node.js major version. */
-const MIN_NODE_MAJOR = 20;
+const MIN_NODE_MAJOR = 22;
 
 /** Browser used when no config can be loaded. Mirrors the config schema default. */
 const DEFAULT_BROWSERS: BrowserEngine[] = ['chromium'];

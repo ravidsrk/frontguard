@@ -108,3 +108,12 @@ reliably retrieve a sibling orphan branch. The repo's own `frontguard-example.ym
 this (it has both). The CLI also fetches in `GitOrphanStorage.init`; the documented checkout is
 the user-facing contract and must not depend on that internal call. Node 22 is the generated
 workflow default because T-06 already raised `engines.node` to `>=22`.
+
+## A-10 — T-16 does not edit `apps/web` (Deploy Web is production)
+
+**Phase:** P3 / T-16
+**Decision:** Close G-14 in README.md, packages/cli/README.md, and `doctor`'s Node floor. Leave
+`apps/web/src/lib/docs-content.ts` unchanged.
+**Rejected:** Updating the live Getting Started / Installation / Quick Start articles in the same PR.
+**Reason:** `Deploy Web` is path-filtered to `apps/web/**`. Merging those files publishes production,
+which R15 forbids. The Stranger Test in the gate is clone → README. Live-site docs wait on H-07.
