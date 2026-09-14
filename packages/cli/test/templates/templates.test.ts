@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { describe, it, expect } from 'vitest';
 import { getFrameworkInfo, FRAMEWORK_TEMPLATES } from '../../src/templates/index.js';
 import { generateGitHubActionsWorkflow } from '../../src/templates/github-actions.js';
@@ -94,6 +97,12 @@ describe('generateGitHubActionsWorkflow', () => {
     );
     expect(yaml).toContain('actions/checkout@v4');
     expect(yaml).toContain('fetch-depth: 0');
+    expect(yaml).toContain(
+      'git fetch --no-tags origin +refs/heads/frontguard-baselines:refs/remotes/origin/frontguard-baselines',
+    );
+    expect(yaml).toContain('elif [ "$status" -eq 2 ]');
+    expect(yaml).toContain("node-version: '22'");
+    expect(yaml).not.toContain("node-version: '20'");
     expect(yaml).toContain('contents: read');
     expect(yaml).not.toContain('contents: write');
     expect(yaml).toContain('pull-requests: write');
@@ -131,4 +140,112 @@ describe('generateGitHubActionsWorkflow', () => {
     expect(yaml).toContain('playwright install --with-deps chromium firefox webkit');
     expect(yaml).not.toContain('npx playwright install');
   });
+
+  it('the documented fetch retrieves a sibling orphan ref after a depth-1 clone', () => {
+    const root = mkdtempSync(join(tmpdir(), 'frontguard-t15-'));
+    try {
+      const clone = createShallowClone(root, { withBaselines: true });
+      expect(() => git(clone, 'rev-parse', '--verify', 'refs/remotes/origin/frontguard-baselines')).toThrow();
+
+      const result = runDocumentedFetchStep(clone);
+      expect(result.status, result.stderr).toBe(0);
+      expect(git(clone, 'show', 'origin/frontguard-baselines:manifest.json')).toContain('"ok":true');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('the documented fetch step warns and exits 0 when the baseline branch is unpublished', () => {
+    const root = mkdtempSync(join(tmpdir(), 'frontguard-t15-missing-'));
+    try {
+      const clone = createShallowClone(root, { withBaselines: false });
+      const result = runDocumentedFetchStep(clone);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('origin/frontguard-baselines is not published');
+      expect(() => git(clone, 'rev-parse', '--verify', 'refs/remotes/origin/frontguard-baselines')).toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('the documented fetch step fails closed when ls-remote cannot talk to origin', () => {
+    const root = mkdtempSync(join(tmpdir(), 'frontguard-t15-auth-'));
+    try {
+      const clone = createShallowClone(root, { withBaselines: false });
+      git(clone, 'remote', 'set-url', 'origin', join(root, 'not-a-git-remote'));
+      const result = runDocumentedFetchStep(clone);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('Could not check origin/frontguard-baselines');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
+
+function git(cwd: string, ...args: string[]): string {
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+}
+
+function documentedFetchStepScript(): string {
+  const yaml = generateGitHubActionsWorkflow();
+  const marker = '      - name: Fetch Frontguard baselines\n        run: |\n';
+  const start = yaml.indexOf(marker);
+  expect(start).toBeGreaterThan(-1);
+  const bodyStart = start + marker.length;
+  const next = yaml.indexOf('\n      - name:', bodyStart);
+  expect(next).toBeGreaterThan(bodyStart);
+  return yaml.slice(bodyStart, next).replace(/^          /gm, '');
+}
+
+function runDocumentedFetchStep(cwd: string): { status: number | null; stdout: string; stderr: string } {
+  const result = spawnSync('bash', ['-s'], {
+    cwd,
+    encoding: 'utf8',
+    input: documentedFetchStepScript(),
+  });
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
+}
+
+function createShallowClone(root: string, options: { withBaselines: boolean }): string {
+  const remote = join(root, 'remote.git');
+  mkdirSync(remote);
+  git(root, 'init', '--quiet', '--bare', remote);
+  const source = join(root, 'source');
+  mkdirSync(source);
+  git(source, 'init', '--quiet', '--initial-branch=main');
+  git(source, 'config', 'user.email', 't15@example.com');
+  git(source, 'config', 'user.name', 'T15');
+  git(source, 'config', 'commit.gpgsign', 'false');
+  writeFileSync(join(source, 'README.md'), '# fixture\n');
+  git(source, 'add', 'README.md');
+  git(source, 'commit', '--quiet', '-m', 'initial');
+  git(source, 'remote', 'add', 'origin', remote);
+  git(source, 'push', '--quiet', 'origin', 'main');
+
+  if (options.withBaselines) {
+    git(source, 'checkout', '--quiet', '--orphan', 'frontguard-baselines');
+    git(source, 'rm', '--quiet', '-rf', '.');
+    writeFileSync(join(source, 'manifest.json'), '{"ok":true}\n');
+    git(source, 'add', '-A');
+    git(source, 'commit', '--quiet', '-m', 'baseline');
+    git(source, 'push', '--quiet', 'origin', 'frontguard-baselines');
+  }
+
+  const clone = join(root, 'shallow');
+  git(
+    root,
+    'clone',
+    '--quiet',
+    '--depth=1',
+    '--single-branch',
+    '--branch',
+    'main',
+    `file://${remote}`,
+    clone,
+  );
+  return clone;
+}

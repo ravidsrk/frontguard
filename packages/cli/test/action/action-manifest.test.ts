@@ -172,6 +172,22 @@ describe('Action launch contract', () => {
     }
   });
 
+  it('fetches the orphan baseline ref before comparing', () => {
+    const template = readAction(templateAction);
+    const fetchStep = template.match(
+      /    - name: Fetch Frontguard baselines[\s\S]*?(?=\n    - name:)/,
+    )?.[0];
+    expect(fetchStep).toBeTruthy();
+    expect(fetchStep).toContain(
+      'git fetch --no-tags origin +refs/heads/frontguard-baselines:refs/remotes/origin/frontguard-baselines',
+    );
+    expect(fetchStep).toContain('elif [ "$status" -eq 2 ]');
+    expect(fetchStep).toContain('Could not check origin/frontguard-baselines');
+    expect(template.indexOf('- name: Fetch Frontguard baselines')).toBeLessThan(
+      template.indexOf('- name: Run Frontguard'),
+    );
+  });
+
   it('configures a scoped Git author and pushes only explicit baseline updates', () => {
     const template = readAction(templateAction);
     const identityStep = template.match(

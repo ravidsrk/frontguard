@@ -59,7 +59,7 @@ export function generateGitHubActionsWorkflow(options: GitHubActionsOptions = {}
   const managerConfig = packageManagerConfig[packageManager];
   const {
     port = 3000,
-    nodeVersion = '20',
+    nodeVersion = '22',
   } = options;
   const devCommand =
     options.devCommand ?? `${packageManager} run ${options.devScript ?? 'dev'}`;
@@ -99,8 +99,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Full history so the baseline orphan branch can be fetched.
+          # fetch-depth: 0 is the triggering ref's history, not sibling branches.
+          # The next step fetches the orphan baseline branch explicitly.
           fetch-depth: 0
+
+      - name: Fetch Frontguard baselines
+        run: |
+          set -euo pipefail
+          set +e
+          git ls-remote --exit-code --heads origin frontguard-baselines >/dev/null 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            git fetch --no-tags origin +refs/heads/frontguard-baselines:refs/remotes/origin/frontguard-baselines
+          elif [ "$status" -eq 2 ]; then
+            echo "origin/frontguard-baselines is not published. CI comparison will fail closed until you push it."
+          else
+            echo "Could not check origin/frontguard-baselines (git ls-remote exited $status)." >&2
+            exit "$status"
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v7

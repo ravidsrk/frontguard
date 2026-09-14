@@ -1,16 +1,17 @@
 {
   "product": "Frontguard \u2014 AI-powered frontend visual regression testing",
   "repo_path": "/Users/ravindra/projects/frontguard",
-  "run_id": "20260901-1658",
+  "run_id": "20260914-resume",
   "mode": "drive",
+  "stage": "S3",
   "baseline": {
     "commit": "5f0e141a65651fa34823866c2ee715c913dc2c45",
     "date": "2026-09-01T16:58:00Z",
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "509fe92d3a5ae5e88b019d94780da538504e3a0e",
-  "resume_pointer": "P3/T-15 (T-25 blocked on H-07)",
+  "current_commit": "c5836461411acb11dd60faec517e394017156dcd",
+  "resume_pointer": "P3/T-15",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 45,
   "gate": {
@@ -662,13 +663,13 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
+      "status": "active",
+      "branch": "ravidsrk/p3-ci-baseline-fetch",
       "pr": null,
       "commit": null,
       "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "review": "greptile",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -1083,6 +1084,16 @@
         "one PR per task per R10"
       ],
       "reason": "main had six independent red causes; no single-task PR could be green, putting R10 in conflict with R9's green-state invariant"
+    },
+    {
+      "id": "A-09",
+      "phase": "P3",
+      "decision": "Explicit fetch of origin/frontguard-baselines; keep generated fetch-depth: 0",
+      "rejected": [
+        "treat fetch-depth: 0 as sufficient",
+        "drop fetch-depth: 0 from the generated workflow"
+      ],
+      "reason": "checkout fetch-depth: 0 is the triggering ref's history, not a sibling orphan branch"
     }
   ],
   "research": [],
@@ -1126,6 +1137,12 @@
     {
       "run_id": "20260901-1658",
       "commit": "f5b0b6cfb79ffe6cca44c1a5436c30bcd51607ae",
+      "completion_pct": 45,
+      "gate": "NOT_EVALUATED"
+    },
+    {
+      "run_id": "20260914-resume",
+      "commit": "c5836461411acb11dd60faec517e394017156dcd",
       "completion_pct": 45,
       "gate": "NOT_EVALUATED"
     }

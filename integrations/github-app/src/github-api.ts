@@ -384,6 +384,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Fetch Frontguard baselines
+        run: |
+          set -euo pipefail
+          set +e
+          git ls-remote --exit-code --heads origin frontguard-baselines >/dev/null 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            git fetch --no-tags origin +refs/heads/frontguard-baselines:refs/remotes/origin/frontguard-baselines
+          elif [ "$status" -eq 2 ]; then
+            echo "origin/frontguard-baselines is not published. Comparison will fail closed until it is."
+          else
+            echo "Could not check origin/frontguard-baselines (git ls-remote exited $status)." >&2
+            exit "$status"
+          fi
       - name: Frontguard
         uses: ${ACTION_REF}
         with:

@@ -179,4 +179,18 @@ describe('DEFAULT_WORKFLOW_YML', () => {
   it('checks out the repo before running the action', () => {
     expect(DEFAULT_WORKFLOW_YML).toContain('actions/checkout@v4');
   });
+
+  it('fetches the orphan baseline ref that default checkout omits', () => {
+    expect(DEFAULT_WORKFLOW_YML).toContain('fetch-depth: 1');
+    expect(DEFAULT_WORKFLOW_YML).toContain(
+      'git fetch --no-tags origin +refs/heads/frontguard-baselines:refs/remotes/origin/frontguard-baselines',
+    );
+    expect(DEFAULT_WORKFLOW_YML).toContain('elif [ "$status" -eq 2 ]');
+    expect(DEFAULT_WORKFLOW_YML.indexOf('actions/checkout@v4')).toBeLessThan(
+      DEFAULT_WORKFLOW_YML.indexOf('Fetch Frontguard baselines'),
+    );
+    expect(DEFAULT_WORKFLOW_YML.indexOf('Fetch Frontguard baselines')).toBeLessThan(
+      DEFAULT_WORKFLOW_YML.indexOf(`uses: ${ACTION_REF}`),
+    );
+  });
 });

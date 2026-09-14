@@ -169,7 +169,7 @@ test('home', async ({ page }) =&gt; {
     'GitHub Actions',
     'CI/CD',
     ['Release status', 'Permissions', 'Baseline updates'],
-    `${note('PRE-RELEASE ACTION.', 'The external consumer smoke is pending, so there is no public copy-ready Action workflow yet. Use the generated CLI workflow until publication, tag advancement, and both smoke controls pass.')}${p('The repo-root action.yml is the future marketplace consumer shim. It requires contents: write only when update-baselines is true; PR reporting requires pull-requests: write.')}${p('Updated baselines still require the workflow to push frontguard-baselines in explicit update mode. Do not infer that the public v0 ref has passed this journey until the external smoke test is recorded.')}`,
+    `${note('PRE-RELEASE ACTION.', 'The external consumer smoke is pending, so there is no public copy-ready Action workflow yet. Use the generated CLI workflow until publication, tag advancement, and both smoke controls pass.')}${p('The repo-root action.yml is the future marketplace consumer shim. It requires contents: write only when update-baselines is true; PR reporting requires pull-requests: write. Default actions/checkout fetch-depth: 1 does not retrieve the frontguard-baselines orphan branch; the Action fetches that ref before comparing.')}${p('Updated baselines still require the workflow to push frontguard-baselines in explicit update mode. Do not infer that the public v0 ref has passed this journey until the external smoke test is recorded.')}`,
   ),
   makeArticle(
     'guides/ai-analysis',
@@ -244,7 +244,7 @@ $ frontguard monitor --history`)}${p('CLI monitor records run history under .fro
     'GitHub Actions',
     'Guides',
     ['Generated workflow', 'Baseline workflow', 'Composite Action'],
-    `${p('frontguard init --ci generates a comparison-only workflow that invokes the CLI directly, uses contents: read, and uploads the HTML artifact. Configure FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY only if optional analysis is enabled.')}${p('Baseline acceptance belongs in a separate explicit workflow: run frontguard update-baselines, review the result, then push frontguard-baselines.')}${p('The generated workflow and the repository composite Action are separate surfaces. The public Action remains pre-release pending an external consumer smoke test.')}`,
+    `${p('frontguard init --ci generates a comparison-only workflow that invokes the CLI directly, uses contents: read, and uploads the HTML artifact. Configure FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY only if optional analysis is enabled.')}${p('The generated workflow fetches origin/frontguard-baselines explicitly. Default actions/checkout fetch-depth: 1 only retrieves the triggering commit, so a CI user who omits that fetch gets an empty expected set.')}${p('Baseline acceptance belongs in a separate explicit workflow: run frontguard update-baselines, review the result, then push frontguard-baselines.')}${p('The generated workflow and the repository composite Action are separate surfaces. The public Action remains pre-release pending an external consumer smoke test.')}`,
   ),
   makeArticle(
     'guides/migrate-from-backstopjs',
