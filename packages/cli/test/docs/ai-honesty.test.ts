@@ -20,8 +20,11 @@ describe('CF-04 honesty — public CLI claims stay within demonstrated behaviour
   });
 
   it('states that pixel comparison is the pass/fail signal', () => {
-    const readme = readFileSync(join(repoRoot, 'README.md'), 'utf8');
-    expect(readme).toMatch(/Pixel comparison is the pass\/fail signal/);
-    expect(readme).toMatch(/advisory and unmeasured/);
+    const root = readFileSync(join(repoRoot, 'README.md'), 'utf8');
+    const published = readFileSync(join(repoRoot, 'packages/cli/README.md'), 'utf8');
+    expect(root).toMatch(/Pixel comparison is the pass\/fail signal/);
+    expect(root).toMatch(/advisory and unmeasured/);
+    expect(published).toMatch(/does not change pass\/fail/);
+    expect(published).toMatch(/no published accuracy benchmark/);
   });
 });

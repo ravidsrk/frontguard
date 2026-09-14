@@ -102,7 +102,7 @@ Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on 
 
 - **Zero-config route discovery** — Auto-crawls your app to find all pages
 - **Multi-browser** — Chromium, Firefox, WebKit via Playwright
-- **AI-powered analysis** — BYOK (OpenAI/Anthropic) classifies regressions vs intentional changes
+- **Optional AI analysis** — BYOK (OpenAI/Anthropic) can classify a pixel change; it does not change pass/fail and has no published accuracy benchmark
 - **Experimental AI fix verification** — Suggested CSS patches are re-rendered only when `verifyFixes` is enabled; reports label the result verified or unverified
 - **Smart rendering** — Dependency graph renders only pages affected by your changes
 - **Preview deployments** — Auto-detects Vercel/Netlify preview URLs
