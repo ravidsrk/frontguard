@@ -421,4 +421,7 @@ Branch deleted local + remote. G-08 closed.
 Branch: `ravidsrk/p3-doctor-failure-evidence`. Evidence: doctor against a non-git
 directory exits 1 and names the missing git repository.
 
-**RESUME POINTER: `P3/T-19`**
+**T-19 DONE.** PR #236 merged (`444698a`). CF-02 failure path evidenced:
+`docs/completion/evidence/T-19-doctor-failure.txt`.
+
+**RESUME POINTER: `P3/T-20`**
