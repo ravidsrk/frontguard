@@ -60,7 +60,8 @@ npx -p @frontguard/cli playwright install --with-deps chromium
 
 # Generate frontguard.config.ts (--yes skips prompts).
 # Add --ci only if this repo already has package.json, a start script,
-# and exactly one lockfile — otherwise `init --ci` writes nothing.
+# and a supported lockfile (set package.json "packageManager" if more than
+# one lockfile exists) — otherwise `init --ci` writes nothing.
 npx -p @frontguard/cli frontguard init --yes
 npx -p @frontguard/cli frontguard doctor
 ```

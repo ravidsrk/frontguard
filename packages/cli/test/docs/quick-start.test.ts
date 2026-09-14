@@ -39,6 +39,7 @@ describe('README Quick Start reaches a first comparison (G-14)', () => {
   it.each(sections)('$path generates a config without requiring --ci', ({ body }) => {
     expect(body).toContain('frontguard init --yes');
     expect(body).toMatch(/--ci only if|--ci.*optional|Add --ci/i);
+    expect(body).toContain('packageManager');
   });
 
   it.each(sections)('$path keeps the scoped npx form so a cold machine does not 404', ({ body }) => {
