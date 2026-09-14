@@ -62,9 +62,11 @@ export const UNTRUSTED_CLOSE = 'FRONTGUARD_UNTRUSTED>>>';
  * Strips delimiter lookalikes so the model cannot close the fence early.
  */
 export function wrapUntrusted(label: string, value: string): string {
-  const sanitized = value
-    .replaceAll(UNTRUSTED_OPEN, '')
-    .replaceAll(UNTRUSTED_CLOSE, '');
+  let sanitized = value;
+  // Keep stripping: deleting one marker can reconstruct another from leftovers.
+  while (sanitized.includes(UNTRUSTED_OPEN) || sanitized.includes(UNTRUSTED_CLOSE)) {
+    sanitized = sanitized.replaceAll(UNTRUSTED_OPEN, '').replaceAll(UNTRUSTED_CLOSE, '');
+  }
   return `${label}:\n${UNTRUSTED_OPEN}\n${sanitized}\n${UNTRUSTED_CLOSE}`;
 }
 
