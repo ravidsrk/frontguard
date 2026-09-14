@@ -16,7 +16,7 @@
   "completion_pct": 45,
   "gate": {
     "status": "CONDITIONAL_GO",
-    "reason": "Agent-side plan work that is not blocked on a Human Action is done. Launch-gating Human Actions remain: H-01, H-02, H-03, H-07. Evidence: docs/completion/evidence/T-30-launch-gate.md"
+    "reason": "Agent-side plan work that is not blocked on a Human Action is done. Launch-gating Human Actions remain: H-01, H-02, H-03, H-04, H-07. Evidence: docs/completion/evidence/T-30-launch-gate.md"
   },
   "angles": [
     {
@@ -257,7 +257,7 @@
       "money": false,
       "status": "verified",
       "happy_evidence": "docs/completion/evidence/T-18-cf04-honesty.txt",
-      "failure_evidence": "docs/completion/evidence/P1-a02-cli-doctor.txt"
+      "failure_evidence": "packages/cli/test/diff/ai-vision.test.ts"
     },
     {
       "id": "CF-05",
@@ -999,7 +999,7 @@
       "unblocks": [
         "T-27"
       ],
-      "gates_launch": false,
+      "gates_launch": true,
       "verification": "agent implements the copy and re-probes for a truthful 200",
       "status": "open"
     },

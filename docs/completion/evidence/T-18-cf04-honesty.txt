@@ -12,8 +12,11 @@ CLI surfaces (README.md, packages/cli/README.md, package.json description):
 - model classification is advisory and unmeasured
 - experimental `frontguard run --mode judge --experimental` is a separate opt-in
 
-No captured `run` with a live provider key exists. Doctor without keys reports
-AI classification disabled (evidence/P1-a02-cli-doctor.txt).
+No captured `run` with a live provider key exists.
+
+Failure path (classification cannot clear a pixel fail):
+packages/cli/test/diff/ai-vision.test.ts
+  "pixel comparison decides pass/fail"
 
 Live frontguard.dev still markets AI vision as the product (T-30 item 8).
 That is a live-site honesty failure, not a CLI-claim failure.

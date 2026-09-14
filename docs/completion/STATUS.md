@@ -87,7 +87,7 @@ Independently reproduced by the testing investigator.
 | CF-01 | Local visual regression loop | `frontguard init` → `update-baselines` → `run` | **verified** | `evidence/CF-01-local-regression-loop.txt` |
 | CF-02 | Environment onboarding | `frontguard doctor` | **verified** | `evidence/P1-a02-cli-doctor.txt` |
 | CF-03 | CI comparison against pushed baselines | GH Action / `run` with `origin` | **verified** | `evidence/T-20-cf03-ci.txt` |
-| CF-04 | AI classification of a regression | `run` + provider key | partial | never accuracy-tested; validation ran AI **disabled** |
+| CF-04 | AI classification of a regression | `run` + provider key | **verified** (honesty clause) | `evidence/T-18-cf04-honesty.txt`; pixel-diff remains fail-closed |
 | CF-05 | Hosted run via cloud-api | `POST /v1/run` | **unreachable** | `api.frontguard.dev` does not resolve |
 | CF-06 | One-click integration install | GitHub/Slack/Vercel/Netlify | **unreachable** | all four listings "in review" |
 

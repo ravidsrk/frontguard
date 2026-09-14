@@ -486,3 +486,4 @@ blocked on H-07 (`apps/web` deploy) and T-27 also on H-04; T-28 done.
 Branch: `ravidsrk/p7-launch-gate`. Mechanical read of `DEFINITION.md` §2 against
 `main` `cd5eed7`. Does not reopen frozen scope. Does not edit `apps/web`.
 Verdict: **CONDITIONAL GO**. Evidence: `docs/completion/evidence/T-30-launch-gate.md`.
+H-04 promoted to launch-gating because §2 item 8 cannot pass while `/pricing` sells \$29.

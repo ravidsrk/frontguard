@@ -57,7 +57,7 @@ confirms the alert fires, and captures the proof.
 
 ---
 
-## H-04 — Confirm the intended pricing story · does not gate launch, but blocks T-27
+## H-04 — Confirm the intended pricing story · **GATES LAUNCH** (T-30)
 
 **Instruction.** Decide what `frontguard.dev/pricing` should say now that there is no hosted plan
 and `app.frontguard.dev` does not resolve. Options: remove the paid tier entirely and present the
@@ -67,7 +67,10 @@ hosted plan (out of scope for this run per `DEFINITION.md` §4).
 **Why required.** The page currently advertises a $29 trial linking to a host that does not exist.
 Which way to correct it is a product decision, not an engineering one.
 
-**Unblocks:** T-27. **Verification:** the agent implements the chosen copy and re-probes the live
+**Unblocks:** T-27. **Gates launch:** yes — `DEFINITION.md` §2 item 8 (live site truthful)
+cannot pass while `/pricing` sells a \$29 trial. T-30 promoted this from non-gating.
+
+**Verification:** the agent implements the chosen copy and re-probes the live
 route for a 200 with truthful content.
 
 ---
@@ -123,10 +126,10 @@ deployed SHA and HTTP 200 on `/privacy`, `/terms`, `/status`.
 | H-01 D1 Time Travel retention | **yes** | T-22 | open |
 | H-02 Workers rollback rehearsal | **yes** | T-23 | open |
 | H-03 red-`main` alert channel | **yes** | T-21 | open |
-| H-04 pricing story decision | no | T-27 | open |
+| H-04 pricing story decision | **yes** | T-27 | open |
 | H-05 npm trusted publishing | no | — | open |
 | H-06 authorise apps/web deploy | no (done) | — | **done** |
 | H-07 attach frontguard.dev to worker | **yes** | T-14, T-25, T-27 | open |
 
-**Four Human Actions gate launch** (H-01, H-02, H-03, H-07). None block P3 agent-side work.
-Expected terminal verdict if the agent-side work completes: **CONDITIONAL GO**.
+**Five Human Actions gate launch** (H-01, H-02, H-03, H-04, H-07). None block remaining
+agent-side plan work. Expected terminal verdict: **CONDITIONAL GO**.
