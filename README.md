@@ -42,8 +42,10 @@ AI is optional; without it, the CLI performs local pixel comparison and writes l
 
 ```
 Developer runs Frontguard → Pages render → Pixels compare to reviewed baselines →
-Console, JSON, and HTML evidence are written → Optional AI assists with changed screenshots
+Console and HTML evidence are written → Optional AI assists with changed screenshots
 ```
+
+(`run --output json` emits the same result as JSON instead of the console report.)
 
 - **Detect** — Pixel comparison finds changes above the configured threshold
 - **Understand** — Optional AI returns a confidence-scored explanation for human review
@@ -55,6 +57,8 @@ Console, JSON, and HTML evidence are written → Optional AI assists with change
 
 ```bash
 # One-time per machine: install the Chromium browser Frontguard uses to render pages
+# (--with-deps installs Linux system packages; on macOS the dependency
+# warning is safe to ignore.)
 npx -p @frontguard/cli playwright install --with-deps chromium
 
 # Generate frontguard.config.ts (--yes skips prompts).
@@ -69,26 +73,34 @@ npx -p @frontguard/cli frontguard doctor
 git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"
 ```
 
-**App terminal (leave this running):** start your app and wait until the `baseUrl` in `frontguard.config.ts` responds. Example:
+Check the `routes` in `frontguard.config.ts` before capturing: for
+non-framework apps `init` guesses (`/`, `/about`, `/contact`), and a route
+that does not exist baselines its 404 page without warning.
+
+**App terminal (leave this running):** start your app and wait until the `baseUrl` in `frontguard.config.ts` responds. A static folder works too (`npx serve`):
 
 ```bash
 npm run dev
 ```
 
-**Frontguard terminal:** review the running app, accept baselines, publish the orphan branch, then compare.
+**Frontguard terminal:** review the running app in your browser, capture
+baselines with `update-baselines`, then compare with `run`. Local comparison
+needs no `origin` remote:
 
 ```bash
 npx -p @frontguard/cli frontguard update-baselines
 npx -p @frontguard/cli frontguard run
 ```
 
-Local `run` does not need `origin`. For CI comparisons, publish the orphan branch:
+Only CI comparisons need the published orphan branch:
 
 ```bash
 git push origin frontguard-baselines
 ```
 
 `run` exits 0 when pages match, 1 on a regression or unaccepted new page, and 2 on a tool error.
+The default `threshold` is 0.1 (10% changed pixels), so a small visible change
+still passes — lower it for stricter pages.
 
 > **Full documentation:** [frontguard.dev/docs](https://frontguard.dev/docs) · internal notes in [`docs/`](./docs/)
 
