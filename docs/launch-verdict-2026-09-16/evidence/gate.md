@@ -1,9 +1,20 @@
 # Mechanical gate evaluation — run 20260916-complete-it
 
 Evaluated 2026-09-16 against `docs/launch-verdict-2026-09-16/DEFINITION.md`
-on `main` `b430890`. Does not reinterpret the frozen product definition
-(R13). Frozen baseline preserved: prior run 45% / CONDITIONAL GO at
-`cd5eed7` (`docs/completion/status.json`, `T-30-launch-gate.md`).
+on `main` `b430890` (last behavior-affecting head). Does not reinterpret the
+frozen product definition (R13). Frozen baseline preserved: prior run 45% /
+CONDITIONAL GO at `cd5eed7` (`docs/completion/status.json`,
+`T-30-launch-gate.md`).
+
+**Termination rule (greptile P1 on #258, accepted):** a run record cannot cite
+CI on its own merge commit before merging. The record therefore evaluates
+the last behavior-affecting head (`b430890`, CI run 35104071248, 7/7 green);
+this docs-only record PR (#258) is verified 11/11 green pre-merge; its merge
+SHA and CI run are recorded post-merge in the closing LOG entry, whose own
+docs-only merge CI is verified green by the driver before the verdict is
+reported. Any red at any step reopens the run. This matches the prior run's
+T-30 → #245 → #246 pattern and terminates because the closing entry is
+record-only.
 
 **Verdict: CONDITIONAL GO.** All agent-side work is done; the only opens rest
 on the five named owner actions (H-01, H-02, H-03, H-04, H-07).

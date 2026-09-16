@@ -9,11 +9,12 @@ triaged-and-closed. No silent skips.
 |---|---|---|
 | #252 | zod 4.4.3→4.6.2 | Merge commit `623b51c`, branch deleted, zero review threads, CI green pre- and post-merge (run 35101634515). No `apps/web/**` touch → no Deploy Web. |
 
-## PRs merged in this run — run's own (1)
+## PRs merged in this run — run's own (2)
 
 | PR | Change | Receipt |
 |---|---|---|
 | #257 | Stranger-friction README fixes + durable transcript | Merge commit `b430890`, branches deleted, 1 greptile P2 fixed in `b738357` + replied in-thread (reply 4026687748), 11/11 checks green. No `apps/web/**` touch → no Deploy Web. |
+| #258 | This run-record PR (self-entry) | Docs-only. Pre-merge: 11/11 checks green, greptile P1 answered in-thread (see termination rule in `gate.md`). Post-merge: merge SHA + CI run recorded in the closing LOG entry; branches deleted. No `apps/web/**` touch → no Deploy Web. |
 
 ## PRs held on H-07 — batch after canonical routing (7)
 
