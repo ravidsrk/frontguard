@@ -49,3 +49,11 @@
   /privacy /terms /status 404); worker 200s; api/app unresolving; npm 0.2.2.
 - Gate: C-2/C-3/C-7/C-9/C-10/C-11/C-12 MET; C-1/C-4/C-5/C-6/C-8 OPEN on
   H-01/H-02/H-03/H-04/H-07. Verdict CONDITIONAL GO (`evidence/gate.md`).
+
+## 2026-09-16 — close (termination-rule entry for #258)
+- #258 merged as `b699001`; CI run 35106211232 on the merge commit: 7/7
+  success (e2e, build, docs-links, lint, test 22/24, audit). Deploy Web
+  path-filtered skip (docs-only). Branch deleted local + remote.
+- Pre-existing local branches g199/g201/g202/g203/g205/g206 untouched.
+- Worktree clean; no run processes started. Run terminal state:
+  CONDITIONAL GO on H-01/H-02/H-03/H-04/H-07.
