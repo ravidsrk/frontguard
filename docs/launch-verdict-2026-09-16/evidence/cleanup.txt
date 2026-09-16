@@ -1,0 +1,19 @@
+# C-12 evidence — cleanup (2026-09-16)
+
+Run branches: none remain.
+- ravidsrk/completeit-stranger-friction (PR #257): merged `b430890`,
+  local + remote deleted. Verified: `git branch -a | grep completeit` → 0.
+- No other run branch was created (#252 was merged directly, branch
+  auto-deleted by GitHub).
+
+Pre-existing local branches untouched (not this run's, present at run open):
+g205, g199, g202, g206, g203, g201 (stale dependabot checkouts from the T-28
+era, e.g. g205 @ ce44dbb "bump vitest 4.1.9 to 4.1.11"). Left for the owner.
+
+Scratch: stranger-test artifacts under /tmp/stranger-20260916 only
+(durable transcript copy committed as evidence/stranger-transcript.txt).
+Subagent isolated worktree auto-cleaned by the runtime. No stray processes
+started by this run (all probes were bounded curl/gh commands).
+
+Worktree: clean after final run-record PR merge (this file's claim is
+verified post-merge; see LOG).

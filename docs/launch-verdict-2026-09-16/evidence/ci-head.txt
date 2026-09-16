@@ -1,0 +1,17 @@
+# C-2 evidence — CI on head `b430890` (2026-09-16)
+
+Run: https://github.com/ravidsrk/frontguard/actions/runs/35104071248
+SHA: b43089019cc4e41877fd972425f64cb595e6ae43 (merge of PR #257)
+Conclusion: success
+
+Jobs (all success):
+- lint, e2e, audit, docs-links, build, test (22), test (24)
+
+Prior head in this run: CI run 35101634515 success on `623b51c` (merge of
+PR #252) — same 7 jobs green. Both merges verified green on main.
+
+Deploy Web: did not run on either SHA — path filter (`apps/web/**`,
+`scripts/sync-openapi.mjs`) unmatched by both merges. Last Deploy Web run
+34827322407 failed at the probe step (canonical routing, H-07); unchanged.
+
+Command: `gh run view 35104071248 --json headSha,conclusion,jobs`

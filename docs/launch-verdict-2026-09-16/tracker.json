@@ -1,0 +1,238 @@
+{
+  "baseline_commit": "947f619",
+  "criteria": {
+    "C-1": {
+      "evidence": [
+        "evidence/gate.md",
+        "evidence/prod-probe.txt"
+      ],
+      "status": "OPEN-OWNER(H-07)"
+    },
+    "C-10": {
+      "evidence": [
+        "evidence/conditions.md"
+      ],
+      "status": "MET"
+    },
+    "C-11": {
+      "evidence": [
+        "evidence/reconciliation.md"
+      ],
+      "status": "MET"
+    },
+    "C-12": {
+      "evidence": [
+        "evidence/cleanup.txt"
+      ],
+      "status": "MET"
+    },
+    "C-2": {
+      "evidence": [
+        "evidence/ci-head.txt"
+      ],
+      "status": "MET"
+    },
+    "C-3": {
+      "evidence": [
+        "evidence/gate.md"
+      ],
+      "status": "MET"
+    },
+    "C-4": {
+      "evidence": [
+        "evidence/conditions.md"
+      ],
+      "status": "OPEN-OWNER(H-01)"
+    },
+    "C-5": {
+      "evidence": [
+        "evidence/conditions.md"
+      ],
+      "status": "OPEN-OWNER(H-02)"
+    },
+    "C-6": {
+      "evidence": [
+        "evidence/conditions.md"
+      ],
+      "status": "OPEN-OWNER(H-03)"
+    },
+    "C-7": {
+      "evidence": [
+        "evidence/stranger-test.md",
+        "evidence/stranger-transcript.txt"
+      ],
+      "status": "MET"
+    },
+    "C-8": {
+      "evidence": [
+        "evidence/prod-probe.txt"
+      ],
+      "status": "OPEN-OWNER(H-07,H-04)"
+    },
+    "C-9": {
+      "evidence": [
+        "evidence/gate.md"
+      ],
+      "status": "MET"
+    }
+  },
+  "frozen_at": "2026-09-16",
+  "gaps": [
+    {
+      "id": "X-G1",
+      "severity": "S1",
+      "source": "stranger F1-product",
+      "status": "FILED-post-launch",
+      "text": "Non-2xx route (404) baselined with zero warning; report shows pass. Acceptance: render records HTTP status; non-2xx capture warns naming route+status, or fails closed with actionable message. Docs mitigation shipped in PR #257."
+    },
+    {
+      "id": "X-G2",
+      "severity": "S3",
+      "source": "stranger F6",
+      "status": "FILED-post-launch",
+      "text": "10x 'Preparing worktree...' log lines on successful update-baselines. Acceptance: single summary line on success."
+    },
+    {
+      "id": "X-G3",
+      "severity": "S3",
+      "source": "stranger F7",
+      "status": "FILED-post-launch",
+      "text": "init creates unexplained empty node_modules/.cache/storybook dirs on non-Storybook apps. Acceptance: no stray dirs, or a log line explaining them."
+    },
+    {
+      "id": "X-G4",
+      "severity": "S2",
+      "source": "stranger F9-images",
+      "status": "FILED-post-launch",
+      "text": "Verify baseline/current/diff images are retained in HTML reports on REGRESSION runs (pass-run images/ empty may be by design; html.ts:111-142 has file+base64 paths). Acceptance: red-run report contains viewable images for each regression, file or inline."
+    }
+  ],
+  "open_items": [
+    {
+      "disposition": "HELD-migration(pin+types)",
+      "id": "PR-247",
+      "kind": "dependabot",
+      "note": "playwright group; CI test(22) FAILURE",
+      "title": "bump the playwright group with 2 updates"
+    },
+    {
+      "disposition": "HELD-H-07-batch",
+      "id": "PR-248",
+      "kind": "dependabot",
+      "note": "@types/node group; CI green; touches apps/web",
+      "title": "bump @types/node 26.4.0 to 26.5.1"
+    },
+    {
+      "disposition": "HELD-H-07-batch",
+      "id": "PR-249",
+      "kind": "dependabot",
+      "note": "openapi-parser 8->9 major; CI green; touches apps/web",
+      "title": "bump @readme/openapi-parser 8.0.1 to 9.0.0"
+    },
+    {
+      "disposition": "HELD-H-07-batch",
+      "id": "PR-250",
+      "kind": "dependabot",
+      "note": "CI green; touches apps/web",
+      "title": "bump @tanstack/react-start 1.168.49 to 1.168.52"
+    },
+    {
+      "disposition": "HELD-H-07-batch",
+      "id": "PR-251",
+      "kind": "dependabot",
+      "note": "CI green; touches apps/web",
+      "title": "bump vite 8.2.2 to 8.3.0"
+    },
+    {
+      "disposition": "MERGED 623b51c, receipt in LOG",
+      "id": "PR-252",
+      "kind": "dependabot",
+      "note": "CI green; no apps/web",
+      "title": "bump zod 4.4.3 to 4.6.2"
+    },
+    {
+      "disposition": "HELD-H-07-batch",
+      "id": "PR-253",
+      "kind": "dependabot",
+      "note": "CI green; touches apps/web",
+      "title": "bump globals 17.11.0 to 17.12.0"
+    },
+    {
+      "disposition": "HELD-H-07-batch",
+      "id": "PR-254",
+      "kind": "dependabot",
+      "note": "jsdom 29->30 major; CI green; touches apps/web",
+      "title": "bump jsdom 29.1.1 to 30.0.1"
+    },
+    {
+      "disposition": "HELD-H-07-batch-FIRST(security)",
+      "id": "PR-255",
+      "kind": "dependabot",
+      "note": "CI green; touches apps/web; fixes 4 high dev-tree advisories (wrangler>4.130)",
+      "title": "bump wrangler 4.127.1 to 4.131.1"
+    },
+    {
+      "disposition": "HELD-migration(vitest5)",
+      "id": "PR-256",
+      "kind": "dependabot",
+      "note": "vitest 4->5 major; CI lint FAILURE",
+      "title": "bump vitest 4.1.11 to 5.0.0"
+    },
+    {
+      "disposition": "ACCEPT-standing-tracker",
+      "id": "ISSUE-157",
+      "kind": "standing-tracker",
+      "note": "weekly npm audit; owner triaged 2026-08 as keep-open",
+      "title": "Weekly npm audit (production tree)"
+    }
+  ],
+  "run_id": "20260916-complete-it",
+  "tasks": [
+    {
+      "evidence": [],
+      "id": "X-1",
+      "status": "done",
+      "text": "Freeze definition + tracker on disk"
+    },
+    {
+      "evidence": [
+        "merge 623b51c (PR #252)",
+        "evidence/reconciliation.md"
+      ],
+      "id": "X-2",
+      "status": "done",
+      "text": "Triage + drain dependabot queue (#247-256)"
+    },
+    {
+      "evidence": [
+        "evidence/stranger-test.md",
+        "PR #257"
+      ],
+      "id": "X-3",
+      "status": "done",
+      "text": "Stranger test (isolated agent, timed, corroborated)"
+    },
+    {
+      "evidence": [
+        "evidence/gate.md",
+        "evidence/prod-probe.txt",
+        "evidence/ci-head.txt"
+      ],
+      "id": "X-4",
+      "status": "done",
+      "text": "Mechanical gate evaluation + live probes"
+    },
+    {
+      "evidence": [
+        "evidence/reconciliation.md",
+        "evidence/conditions.md",
+        "evidence/cleanup.txt"
+      ],
+      "id": "X-5",
+      "status": "done",
+      "text": "Reconcile, cleanup, verdict report"
+    }
+  ],
+  "verdict": "CONDITIONAL GO",
+  "current_head": "b430890"
+}
