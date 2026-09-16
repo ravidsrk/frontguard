@@ -22,7 +22,8 @@ Clock: 13:24:03 UTC (epoch 1789565043) → STEP7 end 13:26:40 UTC (1789565200).
 | S8 run after SMALL css change | — | 3s | 0 (missed, expected 1) | 172s |
 | S8b run after LARGE css change | — | 3s | 1, 6 regressions | 201s |
 
-743s spare. Transcript: /tmp/stranger-20260916/transcript.txt (574 lines).
+743s spare. Transcript (durable copy): `stranger-transcript.txt` in this
+directory (574 lines; original at /tmp/stranger-20260916/transcript.txt).
 
 ## Independent corroboration (second route, by driver)
 

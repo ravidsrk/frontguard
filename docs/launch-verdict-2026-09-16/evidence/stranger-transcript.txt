@@ -1,0 +1,574 @@
+STRANGER TEST transcript — Frontguard C-7
+Date (UTC): 
+Wed Sep 16 13:23:52 UTC 2026
+Workspace: /tmp/stranger-20260916
+frontguard-readonly clone: /tmp/stranger-20260916/frontguard-readonly (depth 1, no checkout switching)
+demo-app: /tmp/stranger-20260916/demo-app (throwaway git repo, 3 routes: /, /about, /pricing)
+PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers (isolated, empty at start)
+CLI source: published npm only via `npx -p @frontguard/cli` (NOT repo source)
+README: frontguard-readonly/README.md lines 52-91 (Quick Start)
+
+Pre-clock setup (NOT timed): mkdir, git clone --depth 1, demo-app file creation, git init + commit.
+Clock starts at first README Quick Start command below.
+Budget: 15 min to first successful `run` (exit 0, all pages matching baselines).
+
+CLOCK_START_UTC: Wed Sep 16 13:24:03 UTC 2026 (epoch 1789565043)
+
+=== STEP 1: browser install (README L58) ===
+$ PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli playwright install --with-deps chromium
+STEP1_START_UTC: Wed Sep 16 13:24:03 UTC 2026 (epoch 1789565043)
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ WARNING: It looks like you are running 'npx playwright install' without first ║
+║ installing your project's dependencies.                                       ║
+║                                                                               ║
+║ To avoid unexpected behavior, please install your dependencies first, and     ║
+║ then run Playwright's install command:                                        ║
+║                                                                               ║
+║     npm install                                                               ║
+║     npx playwright install                                                    ║
+║                                                                               ║
+║ If your project does not yet depend on Playwright, first install the          ║
+║ applicable npm package (most commonly @playwright/test), and                  ║
+║ then run Playwright's install command to download the browsers:               ║
+║                                                                               ║
+║     npm install @playwright/test                                              ║
+║     npx playwright install                                                    ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+Downloading Chrome for Testing 149.0.7827.55 (playwright chromium v1228)[2m from https://cdn.playwright.dev/builds/cft/149.0.7827.55/mac-arm64/chrome-mac-arm64.zip[22m
+|                                                                                |   0% of 171 MiB
+|■■■■■■■■                                                                        |  10% of 171 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 171 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 171 MiB
+Chrome for Testing 149.0.7827.55 (playwright chromium v1228) downloaded to /tmp/stranger-20260916/pw-browsers/chromium-1228
+Downloading FFmpeg (playwright ffmpeg v1011)[2m from https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1011/ffmpeg-mac-arm64.zip[22m
+|                                                                                |   1% of 1 MiB
+|■■■■■■■■                                                                        |  10% of 1 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  71% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 1 MiB
+FFmpeg (playwright ffmpeg v1011) downloaded to /tmp/stranger-20260916/pw-browsers/ffmpeg-1011
+Downloading Chrome Headless Shell 149.0.7827.55 (playwright chromium-headless-shell v1228)[2m from https://cdn.playwright.dev/builds/cft/149.0.7827.55/mac-arm64/chrome-headless-shell-mac-arm64.zip[22m
+|                                                                                |   0% of 93.5 MiB
+|■■■■■■■■                                                                        |  10% of 93.5 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 93.5 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 93.5 MiB
+Chrome Headless Shell 149.0.7827.55 (playwright chromium-headless-shell v1228) downloaded to /tmp/stranger-20260916/pw-browsers/chromium_headless_shell-1228
+STEP1_EXIT: 0
+STEP1_END_UTC: Wed Sep 16 13:24:25 UTC 2026 (epoch 1789565065) DURATION: 22s ELAPSED_SINCE_CLOCK: 22s
+
+total 0
+drwxr-xr-x@ 6 ravindra  wheel  192 Sep 16 18:54 .
+drwxr-xr-x@ 7 ravindra  wheel  224 Sep 16 18:54 ..
+drwxr-xr-x@ 3 ravindra  wheel   96 Sep 16 18:54 .links
+drwxr-xr-x@ 5 ravindra  wheel  160 Sep 16 18:54 chromium_headless_shell-1228
+drwxr-xr-x@ 5 ravindra  wheel  160 Sep 16 18:54 chromium-1228
+drwxr-xr-x@ 6 ravindra  wheel  192 Sep 16 18:54 ffmpeg-1011
+=== STEP 2: init (README L64) ===
+$ PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli frontguard init --yes
+STEP2_START_UTC: Wed Sep 16 13:24:33 UTC 2026 (epoch 1789565073)
+  ℹ Detecting framework…
+  ℹ No specific framework detected — using defaults
+  ℹ ✅ Created frontguard.config.ts
+  ℹ Updated .gitignore with: node_modules/, auth.json, .env, .env.*, .frontguard/, .frontguard-debug/, frontguard-report/
+  ℹ 
+  ℹ Next steps:
+  ℹ   1. Edit frontguard.config.ts to set your baseUrl and routes
+  ℹ   2. Start your dev server (e.g. npm run dev)
+  ℹ   3. Run: npx -p @frontguard/cli frontguard run
+  ℹ 
+  ℹ On first run, Frontguard captures baselines.
+  ℹ Subsequent runs compare against them and report changes.
+STEP2_EXIT: 0
+STEP2_END_UTC: Wed Sep 16 13:24:33 UTC 2026 (epoch 1789565073) DURATION: 0s ELAPSED_SINCE_CLOCK: 30s
+--- files after init ---
+total 64
+drwxr-xr-x@ 12 ravindra  wheel   384 Sep 16 18:54 .
+drwxr-xr-x@  7 ravindra  wheel   224 Sep 16 18:54 ..
+drwxr-xr-x@ 14 ravindra  wheel   448 Sep 16 18:53 .git
+-rw-r--r--@  1 ravindra  wheel   101 Sep 16 18:54 .gitignore
+-rw-r--r--@  1 ravindra  wheel   315 Sep 16 18:53 about.html
+-rw-r--r--@  1 ravindra  wheel   310 Sep 16 18:54 frontguard.config.ts
+-rw-r--r--@  1 ravindra  wheel   319 Sep 16 18:53 index.html
+drwxr-xr-x@  3 ravindra  wheel    96 Sep 16 18:54 node_modules
+-rw-r--r--@  1 ravindra  wheel   144 Sep 16 18:53 package.json
+-rw-r--r--@  1 ravindra  wheel   307 Sep 16 18:53 pricing.html
+-rw-r--r--@  1 ravindra  wheel  1054 Sep 16 18:53 server.mjs
+-rw-r--r--@  1 ravindra  wheel   157 Sep 16 18:53 styles.css
+?? .gitignore
+?? frontguard.config.ts
+
+=== INSPECT: generated config (between init and doctor) ===
+export default {
+  version: 1,
+  baseUrl: 'http://localhost:3000',
+  routes: ['/', '/about', '/contact'],
+  viewports: [375, 768, 1440],
+  browsers: ['chromium'],
+  threshold: 0.1,
+  ignore: [],
+  smartRender: true,
+  workers: 4,
+  pageTimeout: 30000,
+  maxHeight: 5000,
+  outputDir: './frontguard-report',
+};
+--- .gitignore ---
+
+# Frontguard
+node_modules/
+auth.json
+.env
+.env.*
+.frontguard/
+.frontguard-debug/
+frontguard-report/
+--- node_modules (unexpected?) ---
+total 0
+drwxr-xr-x@  3 ravindra  wheel   96 Sep 16 18:54 .
+drwxr-xr-x@ 12 ravindra  wheel  384 Sep 16 18:54 ..
+drwxr-xr-x@  3 ravindra  wheel   96 Sep 16 18:54 .cache
+node_modules
+node_modules/.cache
+node_modules/.cache/storybook
+
+=== STEP 3: doctor (README L65) ===
+$ PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli frontguard doctor
+STEP3_START_UTC: Wed Sep 16 13:24:54 UTC 2026 (epoch 1789565094)
+
+Frontguard Doctor
+────────────────────────────────────────────────────────────
+✅ Node.js version: v24.20.0 (>= 18 required)
+✅ Playwright installed: playwright package is resolvable
+✅ Browser binaries: available: chromium
+✅ Configuration: loaded config (baseUrl: http://localhost:3000)
+🟡 AI provider keys: no AI keys found (AI classification disabled)
+   → Set FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY to enable AI analysis.
+✅ Git repository: inside a git work tree
+🟡 Baseline branch: 'frontguard-baselines' not found
+   → It will be created automatically on your first `frontguard run`.
+────────────────────────────────────────────────────────────
+✅ All critical checks passed (2 advisory warning(s)).
+
+STEP3_EXIT: 0
+STEP3_END_UTC: Wed Sep 16 13:24:55 UTC 2026 (epoch 1789565095) DURATION: 1s ELAPSED_SINCE_CLOCK: 52s
+
+=== STEP 4: commit init files (README L69) ===
+$ git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"
+STEP4_START_UTC: Wed Sep 16 13:25:04 UTC 2026 (epoch 1789565104)
+[main bb6f1ad] Add Frontguard
+ 2 files changed, 23 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 frontguard.config.ts
+STEP4_EXIT: 0
+STEP4_END_UTC: Wed Sep 16 13:25:04 UTC 2026 (epoch 1789565104) DURATION: 0s ELAPSED_SINCE_CLOCK: 61s
+bb6f1ad Add Frontguard
+25df602 initial demo app
+
+=== STEP 5: start app (README L72-76: npm run dev) ===
+$ npm run dev (background, leave running)
+STEP5_START_UTC: Wed Sep 16 13:25:16 UTC 2026 (epoch 1789565116)
+app start issued; waiting for baseUrl http://localhost:3000 ...
+TIMEOUT waiting for baseUrl
+GET / -> 000
+GET /about -> 000
+GET /contact -> 000 (init guessed this route; our app has /pricing not /contact)
+GET /pricing -> 000
+--- app.log ---
+/bin/sh: line 6: setsid: command not found
+STEP5_END_UTC: Wed Sep 16 13:25:46 UTC 2026 (epoch 1789565146) DURATION: 30s ELAPSED_SINCE_CLOCK: 103s
+
+=== STEP 5 RETRY: app via managed background session (setsid missing on macOS; harness issue, not README) ===
+STEP5b_START_UTC: Wed Sep 16 13:26:16 UTC 2026 (epoch 1789565176)
+GET / -> 200
+GET /about -> 200
+GET /contact -> 404 (init guessed; app lacks this route)
+GET /pricing -> 200
+STEP5b_END_UTC: Wed Sep 16 13:26:17 UTC 2026 (epoch 1789565177) ELAPSED_SINCE_CLOCK: 134s
+NOTE: first STEP 5 attempt (setsid) cost 30s timeout; retry via managed session succeeded immediately.
+
+=== STEP 6: update-baselines (README L81) ===
+$ PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli frontguard update-baselines
+STEP6_START_UTC: Wed Sep 16 13:26:25 UTC 2026 (epoch 1789565185)
+  ℹ Updating baselines…
+- ⚙  Loading config — Updating baselines…
+  ℹ Using 3 configured route(s)
+  ℹ Rendering 3 route(s) for baseline update…
+- 🖥  Rendering — Capturing screenshots for 3 route(s)…
+  ℹ Rendering 9 screenshots (3 routes × 3 viewports × 1 browsers)
+  ℹ Rendering complete — 9/9 succeeded
+[32m✔[39m 🖥  Rendering — Captured 9 screenshot(s)
+- 🔍 Comparing — Writing baselines…
+  ℹ Creating orphan branch "frontguard-baselines" for baseline storage
+Preparing worktree (detached HEAD bb6f1ad)
+Switched to a new branch 'frontguard-baselines'
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+Preparing worktree (checking out 'frontguard-baselines')
+[32m✔[39m 🔍 Comparing — Wrote 9 baseline(s)
+  ℹ ✅ Updated 9 baseline(s) successfully
+  ℹ ✅ Baselines updated successfully
+STEP6_EXIT: 0
+STEP6_END_UTC: Wed Sep 16 13:26:29 UTC 2026 (epoch 1789565189) DURATION: 4s ELAPSED_SINCE_CLOCK: 146s
+--- git branches after update-baselines ---
+  frontguard-baselines
+* main
+
+=== STEP 7: run — FIRST comparison (README L82) — budget clock stops here on exit 0 ===
+$ PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli frontguard run
+STEP7_START_UTC: Wed Sep 16 13:26:38 UTC 2026 (epoch 1789565198)
+  ℹ Running Frontguard against http://localhost:3000
+- 🔍 Discovering routes — Determining routes to test…
+  ℹ Using 3 configured route(s)
+[32m✔[39m 🔍 Discovering routes — Found 3 route(s)
+- 📊 Filtering — Analyzing dependency graph…
+  ℹ No route entry files found — rendering all routes
+  ℹ Smart filter: no route entry files found on disk (15ms)
+[32m✔[39m 📊 Filtering — 3/3 route(s) to render — no route entry files found on disk
+  ℹ Testing 3 route(s) × 3 viewport(s) × 1 browser(s) = 9 combination(s)
+- 🖥  Rendering — Capturing 9 screenshot(s)…
+  ℹ Rendering 9 screenshots (3 routes × 3 viewports × 1 browsers)
+  ℹ Rendering complete — 9/9 succeeded
+[32m✔[39m 🖥  Rendering — Captured 9 screenshot(s) in 1846ms
+- 🔍 Comparing — Comparing against baselines…
+[32m✔[39m 🔍 Comparing — Compared 9 screenshot(s) in 66ms
+- 📄 Reporting — Generating report…
+
+  Route                          375px    768px    1440px 
+  ─────────────────────────────────────────────────────────
+  /                                ✓        ✓        ✓    
+  /about                           ✓        ✓        ✓    
+  /contact                         ✓        ✓        ✓    
+
+  ✅ All pages match baselines
+
+  9 passed
+  Report: ./frontguard-report/report.html
+  Done in 1.9s (render 1.8s, compare 0.1s)
+
+  ℹ HTML report written to frontguard-report/report.html
+  ℹ 
+  ℹ ────────────────────────────────────────────────────────────
+  ℹ Results: 9 tested, 9 passed, 0 regressions, 0 warnings, 0 new, 0 errors
+  ℹ Timing: 1928ms total
+  ℹ ────────────────────────────────────────────────────────────
+  ℹ ✅ No regressions detected
+STEP7_EXIT: 0
+STEP7_END_UTC: Wed Sep 16 13:26:40 UTC 2026 (epoch 1789565200) DURATION: 2s ELAPSED_SINCE_CLOCK: 157s
+BUDGET RESULT: PASS — first successful comparison at 1789565200s epoch, elapsed 157s of 900s budget
+
+=== STEP 8: CSS mutation + second run (expect exit 1 regression) ===
+STEP8_START_UTC: Wed Sep 16 13:26:52 UTC 2026 (epoch 1789565212)
+--- styles.css BEFORE ---
+body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; }
+nav { margin-bottom: 1rem; }
+.hero { color: #1a56db; font-size: 1.25rem; }
+--- styles.css AFTER (hero blue -> red) ---
+body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; }
+nav { margin-bottom: 1rem; }
+.hero { color: #db1a1a; font-size: 1.25rem; }
+$ PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli frontguard run
+  ℹ Running Frontguard against http://localhost:3000
+- 🔍 Discovering routes — Determining routes to test…
+  ℹ Using 3 configured route(s)
+[32m✔[39m 🔍 Discovering routes — Found 3 route(s)
+- 📊 Filtering — Analyzing dependency graph…
+  ℹ No route entry files found — rendering all routes
+  ℹ Smart filter: no route entry files found on disk (24ms)
+[32m✔[39m 📊 Filtering — 3/3 route(s) to render — no route entry files found on disk
+  ℹ Testing 3 route(s) × 3 viewport(s) × 1 browser(s) = 9 combination(s)
+- 🖥  Rendering — Capturing 9 screenshot(s)…
+  ℹ Rendering 9 screenshots (3 routes × 3 viewports × 1 browsers)
+  ℹ Rendering complete — 9/9 succeeded
+[32m✔[39m 🖥  Rendering — Captured 9 screenshot(s) in 1909ms
+- 🔍 Comparing — Comparing against baselines…
+[32m✔[39m 🔍 Comparing — Compared 9 screenshot(s) in 306ms
+- 📄 Reporting — Generating report…
+
+  Route                          375px    768px    1440px 
+  ─────────────────────────────────────────────────────────
+  /                                ✓        ✓        ✓    
+  /about                           ✓        ✓        ✓    
+  /contact                         ✓        ✓        ✓    
+
+  ✅ All pages match baselines
+
+  9 passed
+  Report: ./frontguard-report/report.html
+  Done in 2.2s (render 1.9s, compare 0.3s)
+
+  ℹ HTML report written to frontguard-report/report.html
+  ℹ 
+  ℹ ────────────────────────────────────────────────────────────
+  ℹ Results: 9 tested, 9 passed, 0 regressions, 0 warnings, 0 new, 0 errors
+  ℹ Timing: 2239ms total
+  ℹ ────────────────────────────────────────────────────────────
+  ℹ ✅ No regressions detected
+STEP8_EXIT: 0 (expected 1)
+STEP8_END_UTC: Wed Sep 16 13:26:55 UTC 2026 (epoch 1789565215) DURATION_RUN: 3s ELAPSED_SINCE_CLOCK: 172s
+REGRESSION CHECK: FAIL — second run exit 0, expected 1
+
+=== STEP 8 INVESTIGATION: why did small mutation not trigger? ===
+--- curl served styles.css (verify mutation is live) ---
+body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; }
+nav { margin-bottom: 1rem; }
+.hero { color: #db1a1a; font-size: 1.25rem; }
+
+--- frontguard-report contents ---
+total 40
+drwxr-xr-x@  4 ravindra  wheel    128 Sep 16 18:56 .
+drwxr-xr-x@ 13 ravindra  wheel    416 Sep 16 18:56 ..
+drwxr-xr-x@  2 ravindra  wheel     64 Sep 16 18:56 images
+-rw-r--r--@  1 ravindra  wheel  18733 Sep 16 18:56 report.html
+--- report JSON if present ---
+ls: frontguard-report/*.json: No such file or directory
+
+--- config threshold ---
+7:  threshold: 0.1,
+=== STEP 8b: LARGER mutation (body background) + third run (expect exit 1) ===
+Rationale: small .hero color change affects <10% pixels; default threshold 0.1 needs larger change.
+--- styles.css AFTER large mutation ---
+body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; background: #db1a1a; color: white; }
+nav { margin-bottom: 1rem; }
+.hero { color: white; font-size: 3rem; }
+body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; background: #db1a1a; color: white; }
+nav { margin-bottom: 1rem; }
+.hero { color: white; font-size: 3rem; }
+$ PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli frontguard run
+  ℹ Running Frontguard against http://localhost:3000
+- 🔍 Discovering routes — Determining routes to test…
+  ℹ Using 3 configured route(s)
+[32m✔[39m 🔍 Discovering routes — Found 3 route(s)
+- 📊 Filtering — Analyzing dependency graph…
+  ℹ No route entry files found — rendering all routes
+  ℹ Smart filter: no route entry files found on disk (16ms)
+[32m✔[39m 📊 Filtering — 3/3 route(s) to render — no route entry files found on disk
+  ℹ Testing 3 route(s) × 3 viewport(s) × 1 browser(s) = 9 combination(s)
+- 🖥  Rendering — Capturing 9 screenshot(s)…
+  ℹ Rendering 9 screenshots (3 routes × 3 viewports × 1 browsers)
+  ℹ Rendering complete — 9/9 succeeded
+[32m✔[39m 🖥  Rendering — Captured 9 screenshot(s) in 1867ms
+- 🔍 Comparing — Comparing against baselines…
+[32m✔[39m 🔍 Comparing — Compared 9 screenshot(s) in 340ms
+- 📄 Reporting — Generating report…
+
+  Route                          375px    768px    1440px 
+  ─────────────────────────────────────────────────────────
+  /                                ✘        ✘        ✘    
+  /about                           ✘        ✘        ✘    
+  /contact                         ✓        ✓        ✓    
+
+  ✘ REGRESSIONS (6)
+
+    / @ 375px
+    Diff: 95.24% pixels changed
+
+    / @ 768px
+    Diff: 97.69% pixels changed
+
+    / @ 1440px
+    Diff: 98.77% pixels changed
+
+    /about @ 375px
+    Diff: 99.11% pixels changed
+
+    /about @ 768px
+    Diff: 99.56% pixels changed
+
+    /about @ 1440px
+    Diff: 99.77% pixels changed
+
+  6 regressions · 3 passed
+  Report: ./frontguard-report/report.html
+  Done in 2.2s (render 1.9s, compare 0.3s)
+
+  ℹ HTML report written to frontguard-report/report.html
+  ℹ 
+  ℹ ────────────────────────────────────────────────────────────
+  ℹ Results: 9 tested, 3 passed, 6 regressions, 0 warnings, 0 new, 0 errors
+  ℹ Timing: 2224ms total
+  ℹ ────────────────────────────────────────────────────────────
+  ✘ ❌ 6 regression(s) detected
+STEP8b_EXIT: 1 (expected 1)
+STEP8b_END_UTC: Wed Sep 16 13:27:24 UTC 2026 (epoch 1789565244) DURATION_RUN: 3s ELAPSED_SINCE_CLOCK: 201s
+REGRESSION CHECK (large mutation): PASS — run reported regression (exit 1)
+
+=== POST-TEST EVIDENCE (clock stopped; budget already decided) ===
+$ npx -p @frontguard/cli frontguard --version
+0.2.2
+--- git branches + log ---
+  frontguard-baselines
+* main
+70b5615 Update baseline manifest
+eacff6a Update baseline: contact @ 1440px [chromium]
+de3b4ca Update baseline: contact @ 768px [chromium]
+da855b6 Update baseline: contact @ 375px [chromium]
+d426a5f Update baseline: about @ 1440px [chromium]
+601ed7a Update baseline: about @ 768px [chromium]
+5dc24d6 Update baseline: about @ 375px [chromium]
+9e53ced Update baseline: _root @ 1440px [chromium]
+db2bd9a Update baseline: _root @ 768px [chromium]
+4d45da3 Update baseline: _root @ 375px [chromium]
+13017a5 Initialize frontguard baselines
+bb6f1ad Add Frontguard
+25df602 initial demo app
+--- baseline branch file sample ---
+baselines/_root/1440/chromium.png
+baselines/_root/375/chromium.png
+baselines/_root/768/chromium.png
+baselines/about/1440/chromium.png
+baselines/about/375/chromium.png
+baselines/about/768/chromium.png
+baselines/contact/1440/chromium.png
+baselines/contact/375/chromium.png
+baselines/contact/768/chromium.png
+manifest.json
+--- report images ---
+total 0
+drwxr-xr-x@ 2 ravindra  wheel   64 Sep 16 18:56 .
+drwxr-xr-x@ 4 ravindra  wheel  128 Sep 16 18:56 ..
+--- confirm /Users/ravindra/projects/frontguard untouched ---
+?? docs/launch-verdict-2026-09-16/
+(above: pre-existing worktree state; this test wrote only under /tmp/stranger-20260916)
+
+================================================================
+FINAL SUMMARY
+================================================================
+VERDICT: PASS (with findings)
+- Budget: 15 min (900s) to first successful `run` (exit 0, all matching).
+- Clock start: first README Quick Start command (browser install).
+- First `run` exit 0 at elapsed 157s (2m37s). Budget PASS with 743s spare.
+- Regression check: SMALL CSS mutation (.hero blue->red text) did NOT trigger
+  (exit 0, 9 passed) — default threshold 0.1 misses small visible changes.
+  LARGE mutation (body background red + hero 3rem) DID trigger (exit 1,
+  6 regressions, 95-99% diff). Regression detection itself works; sensitivity
+  default + docs are the finding.
+
+PER-STEP TIMINGS (wall clock, UTC 2026-09-16)
+  CLOCK_START                       13:24:03  epoch 1789565043
+  STEP 1 browser install (L58)      22s       exit 0  elapsed 22s
+  STEP 2 init --yes (L64)            0s       exit 0  elapsed 30s
+  STEP 3 doctor (L65)                1s       exit 0  elapsed 52s
+  STEP 4 git add+commit (L69)        0s       exit 0  elapsed 61s
+  STEP 5 app start (L72-76)         30s FAIL (setsid missing, macOS harness issue)
+  STEP 5b app retry (managed bg)    ~1s       ok      elapsed 134s
+  STEP 6 update-baselines (L81)      4s       exit 0  elapsed 146s
+  STEP 7 run, 1st comparison (L82)   2s       exit 0  elapsed 157s <- BUDGET STOP
+  STEP 8 run after SMALL css change  3s       exit 0  elapsed 172s (expected 1; NOT detected)
+  STEP 8b run after LARGE css change 3s       exit 1  elapsed 201s (regression confirmed)
+  Total incl. harness detour: ~201s (3m21s). Excl. 30s setsid timeout: ~171s.
+
+EXACT COMMANDS RUN (in /tmp/stranger-20260916/demo-app unless noted)
+  [pre-clock] mkdir -p /tmp/stranger-20260916/demo-app /tmp/stranger-20260916/pw-browsers
+  [pre-clock] git clone --depth 1 https://github.com/ravidsrk/frontguard.git /tmp/stranger-20260916/frontguard-readonly
+  [pre-clock] created package.json, server.mjs, index.html, about.html, pricing.html, styles.css; git init; git commit "initial demo app"
+  [CLOCK STARTS]
+  1. PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli playwright install --with-deps chromium
+  2. PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli frontguard init --yes
+     (inspect: cat frontguard.config.ts .gitignore; ls node_modules)
+  3. PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli frontguard doctor
+  4. git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"
+  5. setsid -f npm run dev (FAILED: setsid missing on macOS; harness-only) then managed-session `npm run dev` + curl checks on :3000
+  6. PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli frontguard update-baselines
+  7. PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers npx -p @frontguard/cli frontguard run
+  8. sed -i '' 's/#1a56db/#db1a1a/' styles.css; ... frontguard run  (exit 0, undetected)
+  8b. rewrite styles.css with body background red + hero 3rem; ... frontguard run (exit 1, 6 regressions)
+  [post-clock] npx -p @frontguard/cli frontguard --version (= 0.2.2); git branch/log/ls-tree; ls frontguard-report
+
+ENVIRONMENT
+  macOS arm64 (Darwin 25.6.0), Node v24.20.0, npm 11.19.0, git 2.55.0
+  PLAYWRIGHT_BROWSERS_PATH=/tmp/stranger-20260916/pw-browsers (isolated; was empty; received chromium-1228, chromium_headless_shell-1228, ffmpeg-1011)
+  CLI: published @frontguard/cli 0.2.2 via npx -p (never repo source)
+  Demo app: node:http static server on :3000, routes / /about /pricing (+/contact 404 from init guess)
+  Repo untouched: all writes under /tmp/stranger-20260916; `git -C /Users/ravindra/projects/frontguard status` shows only pre-existing untracked docs/launch-verdict-2026-09-16/
+
+FRICTION ITEMS (README = frontguard-readonly/README.md at cloned HEAD)
+  F1. Init guesses a bogus route and Quick Start never says to verify routes.
+      README L64 (`init --yes`) + L78-83 (straight to update-baselines/run) with no
+      "check routes in frontguard.config.ts" step. For a non-framework app, init printed
+      "No specific framework detected — using defaults" and wrote
+      routes: ['/', '/about', '/contact']; our app has /pricing, not /contact, so
+      /contact baselined an HTTP 404 ("not found" plaintext) with zero warning in
+      update-baselines, run, or doctor output. Baseline branch literally contains
+      baselines/contact/{375,768,1440}/chromium.png of a 404 page.
+      Clashes with README L97 "Zero-config route discovery — Auto-crawls your app":
+      no crawl happened. A stranger ships a 404 baseline unknowingly.
+  F2. Default threshold 0.1 silently misses small visible changes; Quick Start never
+      mentions threshold. README L161 documents `threshold: 0.1` only in the
+      Configuration reference (10% changed-pixel ratio). Our blue->red single-line
+      text change rendered exit 0 "All pages match". A stranger's natural validation
+      ("small CSS mutation should fail") concludes the tool is broken. Quick Start
+      (L52-91) needs one line about threshold sensitivity or a saner default.
+  F3. init's own next-steps contradict the README flow. init printed: "1. Edit
+      frontguard.config.ts ... 3. Run: ... frontguard run / On first run, Frontguard
+      captures baselines." README L80-83 instead says run `update-baselines` then `run`,
+      and L67-69 requires a commit first "to create the baseline branch". Stranger must
+      guess which flow is canonical (README flow worked; init's "first run captures
+      baselines" path untested).
+  F4. Browser-install warning box scares without guidance. README L58
+      (`playwright install --with-deps chromium`) printed a big WARNING: "you are
+      running 'npx playwright install' without first installing your project's
+      dependencies... npm install @playwright/test" — yet the install then succeeded
+      (exit 0). A stranger can't tell whether they did something wrong. Also `--with-deps`
+      is Linux-only (apt) and a silent no-op on macOS; README L57-58 doesn't say that.
+  F5. doctor's baseline-branch hint omits update-baselines. doctor printed "Baseline
+      branch: 'frontguard-baselines' not found → It will be created automatically on
+      your first `frontguard run`." README L78-88's flow creates it via update-baselines
+      (which is what happened). Minor inconsistency; doctor should name update-baselines.
+  F6. Noisy/confusing update-baselines output. README L81's command printed
+      "Preparing worktree (checking out 'frontguard-baselines')" 10 times (once per
+      screenshot + manifest?). Looks like an error loop; exit was 0. Should be one line
+      or debug-level.
+  F7. init created unexplained node_modules/.cache/storybook empty dirs. README L64's
+      init created node_modules/.cache/storybook (empty) in our repo alongside
+      frontguard.config.ts + .gitignore. Undocumented side effect; .gitignore covers
+      node_modules/ so harmless, but a stranger `git status`es (clean, good) then finds
+      mystery dirs and wonders what phone-home happened.
+  F8. L78 ordering vs L85-88: "review the running app, accept baselines, publish the
+      orphan branch, then compare" reads as publish-then-compare, but the push command
+      (L88 `git push origin frontguard-baselines`) is documented after `run` as
+      "Local `run` does not need `origin`." The sentence ordering confused sequencing;
+      in practice local flow needs no push (we have no origin; all local steps passed).
+      Also "accept baselines" doesn't name the `update-baselines` command verbatim.
+  F9. "Console, JSON, and HTML evidence are written" (README L44-46) but no JSON found.
+      frontguard-report/ contained only report.html + empty images/ dir after three runs.
+      Either the JSON claim is stale or the flag/path is undiscoverable from Quick Start.
+      Related: report images/ dir was empty (total 0) — if images are inlined in HTML,
+      fine, but an empty images/ dir looks broken.
+  F10. Static-site strangers get no server guidance. README L72-76 says "start your app ...
+      Example: npm run dev" which assumes a framework dev script. Our throwaway needed a
+      hand-rolled node:http server; nothing in Quick Start helps a static-HTML stranger.
+      (Out-of-scope for framework users, but this test's 2-3 route static app is exactly
+      the case.)
+  H1. (Harness, NOT README) setsid missing on macOS cost 30s. README correctly assumes two
+      terminals ("App terminal (leave this running)"); single-shell harnesses must use a
+      managed background session instead. No README change needed; noted for timing honesty.
+
+TRANSCRIPT: this file (/tmp/stranger-20260916/transcript.txt), complete from CLOCK_START.
