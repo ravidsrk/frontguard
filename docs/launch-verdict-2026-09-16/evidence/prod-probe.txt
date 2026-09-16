@@ -1,0 +1,28 @@
+# C-8 evidence — live probes 2026-09-16T13:28:42Z
+# 'production serves main': probed directly, not via CI color
+
+200 https://frontguard.dev/
+308 https://frontguard.dev/pricing
+404 https://frontguard.dev/privacy
+404 https://frontguard.dev/terms
+404 https://frontguard.dev/status
+308 https://frontguard.dev/docs
+200 https://frontguard-web.ravidsrk.workers.dev/.deploy-version
+200 https://frontguard-web.ravidsrk.workers.dev/privacy
+200 https://frontguard-web.ravidsrk.workers.dev/terms
+200 https://frontguard-web.ravidsrk.workers.dev/status
+
+## deploy-version body:
+5f447df357fe91d1b6e808cb24050556f3f77300
+
+## DNS:
+api.frontguard.dev: 000UNRESOLVING/FAIL
+app.frontguard.dev: 000UNRESOLVING/FAIL
+## pricing body check:
+$29/mo. No per-screenshot pricing cliff, no
+$29/mo. No per-screenshot pricing cliff, no
+$29/mo. No per-screenshot pricing cliff, no
+$29
+14-day trial
+## npm:
+0.2.2
