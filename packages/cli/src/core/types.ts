@@ -782,6 +782,11 @@ export interface BaselineStorage {
   readBaseline(route: string, viewport: number, browser: BrowserEngine): Promise<Buffer | null>;
   /** Write (or overwrite) a baseline image. */
   writeBaseline(route: string, viewport: number, browser: BrowserEngine, buffer: Buffer): Promise<void>;
+  /** Write multiple baseline images (and optional manifest) in a single transaction. */
+  writeBaselines?(
+    entries: Array<{ route: string; viewport: number; browser?: BrowserEngine; buffer: Buffer }>,
+    manifest?: BaselineManifest,
+  ): Promise<void>;
   /** Read the baseline manifest. Returns `null` if none exists. */
   readManifest(): Promise<BaselineManifest | null>;
   /** Write (or overwrite) the baseline manifest. */

@@ -87,6 +87,7 @@ function runConfig(run: Run): string {
     threshold: run.threshold,
     ai: run.ai,
     reportUrl: run.reportUrl,
+    projectId: run.projectId,
     // CI linkage (owner/repo/prNumber/commitSha). Folded into the config blob
     // rather than dedicated columns so no schema migration is required. The MCP
     // `list_regressions` / `recent_runs` tools filter on this, so dropping it
@@ -113,7 +114,7 @@ function rowToRun(row: RunRow): Run {
     reportUrl: cfg.reportUrl ?? null,
     reportHtml: row.report_html ?? undefined,
     baselinesApproved: row.baselines_approved === 1,
-    projectId: row.project_id ?? undefined,
+    projectId: row.project_id ?? cfg.projectId ?? undefined,
     error: row.error ?? undefined,
     github: cfg.github ?? undefined,
   };
@@ -196,6 +197,7 @@ export class D1Store implements Store {
   }
 
   async createRun(run: Run, userId: string): Promise<void> {
+    const storedProject = run.projectId ? await this.getProjectById(run.projectId) : null;
     await this.db
       .prepare(
         `INSERT INTO runs (id, user_id, project_id, status, config, results, report_html, routes_count, regressions_count, baselines_approved, error, created_at, completed_at)
@@ -204,7 +206,7 @@ export class D1Store implements Store {
       .bind(
         run.id,
         userId,
-        run.projectId ?? null,
+        storedProject ? run.projectId! : null,
         run.status,
         runConfig(run),
         run.results ? JSON.stringify(run.results) : null,
@@ -260,12 +262,13 @@ export class D1Store implements Store {
       if (!row) return;
       const version = Number(row.version ?? 0);
       const merged = { ...rowToRun(row), ...patch };
+      const storedProject = merged.projectId ? await this.getProjectById(merged.projectId) : null;
       const res = await this.db
         .prepare(
           `UPDATE runs SET project_id = ?, status = ?, config = ?, results = ?, report_html = ?, routes_count = ?, regressions_count = ?, baselines_approved = ?, error = ?, completed_at = ?, version = version + 1 WHERE id = ? AND version = ?`,
         )
         .bind(
-          merged.projectId ?? null,
+          storedProject ? merged.projectId! : null,
           merged.status,
           runConfig(merged),
           merged.results ? JSON.stringify(merged.results) : null,
@@ -550,12 +553,13 @@ export class D1Store implements Store {
   async createMonitor(m: Monitor): Promise<void> {
     await this.db
       .prepare(
-        `INSERT INTO monitors (id, user_id, name, url, routes, viewports, interval_minutes, alert_threshold, alerts, enabled, last_run_at, last_status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO monitors (id, user_id, project_id, name, url, routes, viewports, interval_minutes, alert_threshold, alerts, enabled, last_run_at, last_status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         m.id,
         m.userId,
+        m.projectId ?? null,
         m.name,
         m.url,
         JSON.stringify(m.routes),
@@ -594,10 +598,11 @@ export class D1Store implements Store {
       const touchLease = 'leasedUntil' in patch;
       const leasedUntil = touchLease ? (patch.leasedUntil ?? null) : null;
       const sql = touchLease
-        ? `UPDATE monitors SET name = ?, url = ?, routes = ?, viewports = ?, interval_minutes = ?, alert_threshold = ?, alerts = ?, enabled = ?, last_run_at = ?, last_status = ?, leased_until = ?, version = version + 1 WHERE id = ? AND version = ?`
-        : `UPDATE monitors SET name = ?, url = ?, routes = ?, viewports = ?, interval_minutes = ?, alert_threshold = ?, alerts = ?, enabled = ?, last_run_at = ?, last_status = ?, version = version + 1 WHERE id = ? AND version = ?`;
+        ? `UPDATE monitors SET project_id = ?, name = ?, url = ?, routes = ?, viewports = ?, interval_minutes = ?, alert_threshold = ?, alerts = ?, enabled = ?, last_run_at = ?, last_status = ?, leased_until = ?, version = version + 1 WHERE id = ? AND version = ?`
+        : `UPDATE monitors SET project_id = ?, name = ?, url = ?, routes = ?, viewports = ?, interval_minutes = ?, alert_threshold = ?, alerts = ?, enabled = ?, last_run_at = ?, last_status = ?, version = version + 1 WHERE id = ? AND version = ?`;
       const binds = touchLease
         ? [
+            m.projectId ?? null,
             m.name,
             m.url,
             JSON.stringify(m.routes),
@@ -613,6 +618,7 @@ export class D1Store implements Store {
             version,
           ]
         : [
+            m.projectId ?? null,
             m.name,
             m.url,
             JSON.stringify(m.routes),
@@ -948,7 +954,18 @@ export class D1Store implements Store {
       .prepare(`SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`)
       .bind(projectId, limit, offset)
       .all<RunRow>();
-    return results.map(rowToRun);
+    if (results.length > 0) return results.map(rowToRun);
+    const { results: allRows } = await this.db
+      .prepare(`SELECT * FROM runs ORDER BY created_at DESC`)
+      .all<RunRow>();
+    return allRows
+      .map(rowToRun)
+      .filter(
+        (r) =>
+          r.projectId === projectId ||
+          Boolean(r.github?.owner && r.github?.repo && `${r.github.owner}/${r.github.repo}` === projectId),
+      )
+      .slice(offset, offset + limit);
   }
   async getProjectBaseline(projectId: string): Promise<Run | null> {
     const row = await this.db
@@ -957,10 +974,24 @@ export class D1Store implements Store {
       )
       .bind(projectId)
       .first<RunRow>();
-    return row ? rowToRun(row) : null;
+    if (row) return rowToRun(row);
+    const { results: approvedRows } = await this.db
+      .prepare(`SELECT * FROM runs WHERE baselines_approved = 1 ORDER BY created_at DESC`)
+      .all<RunRow>();
+    for (const candidate of approvedRows) {
+      const r = rowToRun(candidate);
+      if (
+        r.projectId === projectId ||
+        (r.github?.owner && r.github?.repo && `${r.github.owner}/${r.github.repo}` === projectId)
+      ) {
+        return r;
+      }
+    }
+    return null;
   }
 
   async addApproval(approval: BaselineApproval): Promise<void> {
+    const storedProject = approval.projectId ? await this.getProjectById(approval.projectId) : null;
     await this.db
       .prepare(
         `INSERT INTO baseline_approvals (id, run_id, project_id, reviewer_user_id, status, comment, created_at)
@@ -969,7 +1000,7 @@ export class D1Store implements Store {
       .bind(
         approval.id,
         approval.runId,
-        approval.projectId ?? null,
+        storedProject ? approval.projectId! : null,
         approval.reviewerUserId,
         approval.status,
         approval.comment ?? null,
@@ -1106,6 +1137,7 @@ function monitorFromRow(row: Record<string, unknown>): Monitor {
   return {
     id: String(row.id),
     userId: String(row.user_id),
+    ...(row.project_id != null ? { projectId: String(row.project_id) } : {}),
     name: String(row.name),
     url: String(row.url),
     routes: JSON.parse(String(row.routes ?? '[]')) as string[],

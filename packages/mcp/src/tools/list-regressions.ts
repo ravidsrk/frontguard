@@ -107,7 +107,10 @@ export async function listRegressions(
 ): Promise<ListRegressionsResult> {
   let run: CloudRun | null = null;
 
-  if (typeof input.pr_id === 'string' && /^run[_-]/i.test(input.pr_id)) {
+  if (
+    typeof input.pr_id === 'string' &&
+    /^(?:run[_-]|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$)/i.test(input.pr_id)
+  ) {
     try {
       run = await client.getRun(input.pr_id);
     } catch {

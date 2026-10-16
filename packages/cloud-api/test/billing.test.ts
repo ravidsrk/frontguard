@@ -163,6 +163,26 @@ describe('billing routes (dev mode)', () => {
 
     const team = await getMemoryStore().getTeam(teamId);
     expect(team?.plan).toBe('pro');
+    const members = await getMemoryStore().listMembers(teamId);
+    const owner = await getMemoryStore().getUser(members[0]!.userId);
+    expect(owner?.plan).toBe('pro');
+  });
+
+  it('usage returns team-pooled runs and screenshots when teamId is provided', async () => {
+    const teamRes = await app.request('/v1/teams', {
+      method: 'POST', headers: auth('alice'), body: JSON.stringify({ name: 'A' }),
+    });
+    const teamId = (await teamRes.json()).id;
+    const store = getMemoryStore();
+    await store.updateTeam(teamId, { plan: 'pro' });
+    const month = new Date().toISOString().slice(0, 7);
+    await store.incrementTeamUsage(teamId, month, 12, 48);
+
+    const res = await app.request(`/v1/billing/usage?teamId=${teamId}`, { headers: auth('alice') });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.plan).toBe('pro');
+    expect(json.usage).toEqual({ runs: 12, screenshots: 48 });
   });
 
   it('webhook returns 503 when STRIPE_WEBHOOK_SECRET is unset (P0-7)', async () => {

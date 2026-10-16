@@ -10,7 +10,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { loadCsf, type CsfFile } from '@storybook/csf-tools';
+import type { CsfFile } from '@storybook/csf-tools';
 import { logger } from '../utils/logger.js';
 
 /** Per-story Frontguard overrides from `parameters.frontguard`. */
@@ -103,9 +103,10 @@ export function normalizeFrontguardParams(raw: unknown): StoryFrontguardParamete
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
-function parseFrontguardFromCsfFile(filePath: string): Map<string, StoryFrontguardParameters> {
+async function parseFrontguardFromCsfFile(filePath: string): Promise<Map<string, StoryFrontguardParameters>> {
   const map = new Map<string, StoryFrontguardParameters>();
   const code = readFileSync(filePath, 'utf-8');
+  const { loadCsf } = await import('@storybook/csf-tools');
   const csf: CsfFile = loadCsf(code, { makeTitle: (userTitle) => userTitle || '' });
   csf.parse();
 
@@ -190,11 +191,19 @@ async function enrichFromPreview(
   const map = new Map<string, StoryFrontguardParameters>();
   if (storyIds.length === 0) return map;
 
-  const { chromium } = await import('playwright');
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--disable-gpu', '--no-sandbox', '--disable-setuid-sandbox'],
-  });
+  let browser;
+  try {
+    const { chromium } = await import('playwright');
+    browser = await chromium.launch({
+      headless: true,
+      args: ['--disable-gpu', '--no-sandbox', '--disable-setuid-sandbox'],
+    });
+  } catch (err) {
+    logger.debug(
+      `Storybook preview browser launch failed: ${(err as Error).message}`,
+    );
+    return map;
+  }
 
   try {
     const context = await browser.newContext();
@@ -282,6 +291,7 @@ export async function resolveStoryFrontguardParameters(
 
   const searchRoots = collectStorybookSearchRoots(options.projectRoot);
   const byFile = new Map<string, string[]>();
+  const staticallyInspectedIds = new Set<string>();
 
   for (const entry of entries) {
     if (resolved.has(entry.id) || !entry.importPath) continue;
@@ -292,23 +302,27 @@ export async function resolveStoryFrontguardParameters(
     byFile.set(filePath, ids);
   }
 
-  for (const [filePath] of byFile) {
+  for (const [filePath, ids] of byFile) {
     try {
-      const fromCsf = parseFrontguardFromCsfFile(filePath);
+      const fromCsf = await parseFrontguardFromCsfFile(filePath);
       for (const [storyId, params] of fromCsf) {
         if (!resolved.has(storyId)) resolved.set(storyId, params);
+      }
+      for (const id of ids) {
+        staticallyInspectedIds.add(id);
       }
     } catch (err) {
       logger.debug(`CSF parameter parse failed for ${filePath}: ${(err as Error).message}`);
     }
   }
 
+  const indexIncludesParameters = entries.some((e) => e.parameters !== undefined);
   const stillMissing =
-    options.storybookMajor === 8
+    options.storybookMajor === 8 && !indexIncludesParameters
       ? entries
           .map((e) => e.id)
-          .filter((id) => !resolved.has(id))
-      : needsEnrichment.filter((id) => !resolved.has(id));
+          .filter((id) => !resolved.has(id) && !staticallyInspectedIds.has(id))
+      : [];
 
   if (stillMissing.length > 0) {
     const fromPreview = await enrichFromPreview(

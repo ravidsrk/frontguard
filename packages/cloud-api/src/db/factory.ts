@@ -44,6 +44,12 @@ export interface Bindings {
    * is the only source of truth.
    */
   DAYTONA_API_KEY?: string;
+  /** Optional OpenAI API key forwarded into Daytona sandboxes for AI diff classification. */
+  OPENAI_API_KEY?: string;
+  /** Optional Anthropic API key forwarded into Daytona sandboxes for AI diff classification. */
+  ANTHROPIC_API_KEY?: string;
+  FRONTGUARD_OPENAI_KEY?: string;
+  FRONTGUARD_ANTHROPIC_KEY?: string;
 }
 
 /**

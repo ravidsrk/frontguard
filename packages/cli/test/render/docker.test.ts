@@ -11,6 +11,7 @@ import { resolve } from 'node:path';
 import {
   buildDockerArgs,
   stripDockerFlag,
+  rewriteDockerHostUrl,
   runDocker,
   imageIsAvailableLocallyOrInRegistry,
   DockerNotInstalledError,
@@ -438,3 +439,31 @@ describe('DockerNotInstalledError', () => {
     expect(err.message).toMatch(/install/i);
   });
 });
+
+describe('rewriteDockerHostUrl', () => {
+  it('rewrites localhost and 127.0.0.1 to host.docker.internal', () => {
+    expect(rewriteDockerHostUrl('http://localhost:3000')).toBe(
+      'http://host.docker.internal:3000',
+    );
+    expect(rewriteDockerHostUrl('http://127.0.0.1:8080/app?q=1')).toBe(
+      'http://host.docker.internal:8080/app?q=1',
+    );
+    expect(rewriteDockerHostUrl('https://staging.example.com')).toBe(
+      'https://staging.example.com',
+    );
+  });
+
+  it('rewrites --url localhost in buildDockerArgs', () => {
+    const args = buildDockerArgs({
+      argv: ['run', '--docker', '--url', 'http://localhost:3000'],
+      workspaceDir: '/tmp/proj',
+      image: DEFAULT_IMAGE,
+      env: {},
+      tty: false,
+    });
+    const idx = args.indexOf('--url');
+    expect(idx).toBeGreaterThan(-1);
+    expect(args[idx + 1]).toBe('http://host.docker.internal:3000');
+  });
+});
+

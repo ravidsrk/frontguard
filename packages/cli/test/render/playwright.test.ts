@@ -5,9 +5,11 @@
  * task generation, error result shapes, and configuration behavior by
  * reconstructing the task-building logic from the source.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Route, FrontguardConfig, BrowserEngine, ScreenshotResult } from '../../src/core/types.js';
 import { STORYBOOK_READY_SCRIPT } from '../../src/discovery/storybook.js';
+import { executeTask } from '../../src/render/playwright.js';
+import { logger } from '../../src/utils/logger.js';
 
 /** Replicate the internal RenderTask structure */
 interface RenderTask {
@@ -251,3 +253,61 @@ describe('ScreenshotResult Shape', () => {
     expect(result.consoleErrors[0]).toContain('TypeError');
   });
 });
+
+describe('executeTask', () => {
+  it('evaluates _perfScript before capturing page.content() and warns on HTTP >= 400', async () => {
+    const events: string[] = [];
+    const mockPage = {
+      on: vi.fn(),
+      goto: vi.fn().mockResolvedValue({ status: () => 404 }),
+      addStyleTag: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockImplementation(async (arg: unknown) => {
+        if (typeof arg === 'string') {
+          events.push(`evaluate:${arg}`);
+        }
+        return undefined;
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from('fake-png')),
+      content: vi.fn().mockImplementation(async () => {
+        events.push('content');
+        return '<html><body><script id="__frontguard_perf_data">{"ttfb":50}</script></body></html>';
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const mockContext = {
+      newPage: vi.fn().mockResolvedValue(mockPage),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const mockBrowser = {
+      newContext: vi.fn().mockResolvedValue(mockContext),
+    };
+
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const config: FrontguardConfig & { _perfScript?: string } = {
+      version: 1,
+      baseUrl: 'http://localhost:3000',
+      viewports: [1440],
+      browsers: ['chromium'],
+      threshold: 0.1,
+      ignore: [],
+      smartRender: false,
+      workers: 1,
+      pageTimeout: 5000,
+      maxHeight: 0,
+      outputDir: './report',
+      _perfScript: 'window.__perf()',
+    };
+
+    const result = await executeTask(
+      { route: { path: '/missing' }, viewport: 1440, browser: 'chromium' },
+      config,
+      new Map([['chromium', mockBrowser as any]]),
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith('Route /missing returned HTTP 404');
+    expect(events).toEqual(['evaluate:window.__perf()', 'content']);
+    expect(result.domSnapshot).toContain('__frontguard_perf_data');
+    warnSpy.mockRestore();
+  });
+});
+

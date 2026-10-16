@@ -15,7 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   baseline writes.
 - Repair the composite Action result contract, browser-version pinning, output
   mapping, artifacts, and update-only Git identity configuration.
-- Reconcile public launch claims with the verified CLI-only product surface.
+- Reconcile public launch claims with the verified CLI-only product surface and
+  keep AI classifications advisory so pass/fail exit codes remain deterministic.
+- Resolve Next.js App Router route groups (`(group)`), parallel route slots
+  (`@slot`), and Remix `_index` / nested route conventions during filesystem
+  route discovery, and support Storybook 8 static parameter cache formats.
+- Harden built-in plugins and CLI runtime: inject DOM measurement scripts in
+  Perf Budgets, release temporary image buffers in the Figma plugin, wire Judge
+  mode configuration into reporters, and batch Git orphan baseline commits with
+  deterministic Git identity fallbacks.
+- Synchronize Cloud API D1 schema and migrations, enforce monitor run foreign-key
+  and SSRF protections, harden GitHub/Vercel/Slack webhook handlers, and attach
+  custom-domain routes and HTTP security headers (`_headers`) to `apps/web`.
+- Apply supply-chain security updates and align version-sync coverage across
+  workspace packages and `SECURITY.md`.
 
 ## [0.2.2] - 2026-06-21
 

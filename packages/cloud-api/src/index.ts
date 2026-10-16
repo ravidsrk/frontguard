@@ -24,6 +24,8 @@ import { screenshotRoutes } from "./routes/screenshots.js";
 import { getScreenshotStore, type R2Bucket } from "./storage/screenshots.js";
 import {
   persistScreenshots,
+  promoteRunCurrentScreenshotsToBaseline,
+  selectApprovedBaselineScreenshots,
   type PendingScreenshot,
 } from "./storage/persist-screenshots.js";
 import { completeCheckRun } from "./github-callback.js";
@@ -317,16 +319,20 @@ app.post("/v1/run", async (c) => {
   }
 
   // Project scoping (Task 8.1): if a projectId is supplied, the caller must be
-  // a member of the project's team with run_tests capability.
+  // a member of the project's team with run_tests capability (unless projectId
+  // is a GitHub repository slug on a CI run with github metadata).
   let projectTeamId: string | undefined;
   if (data.projectId) {
     const project = await store.getProjectById(data.projectId);
-    if (!project) return c.json({ error: "Project not found" }, 404);
-    const member = await store.getMember(project.teamId, userId);
-    if (!member || !can(member.role, "run_tests")) {
-      return c.json({ error: "Not a member of the project team" }, 403);
+    if (project) {
+      const member = await store.getMember(project.teamId, userId);
+      if (!member || !can(member.role, "run_tests")) {
+        return c.json({ error: "Not a member of the project team" }, 403);
+      }
+      projectTeamId = project.teamId;
+    } else if (!data.github) {
+      return c.json({ error: "Project not found" }, 404);
     }
-    projectTeamId = project.teamId;
   }
 
   // Plan enforcement (Task 8.2, DM-3): resolve plan from team scope when present.
@@ -483,8 +489,9 @@ app.post("/v1/run", async (c) => {
 
   // Persist screenshots produced by the sandbox to R2 + metadata store.
   const blobs = getScreenshotStore(c.env?.SCREENSHOTS as R2Bucket | undefined);
+  const routePaths = routes.map((r) => (typeof r === "string" ? r : r.path));
   const onScreenshots = async (shots: PendingScreenshot[]): Promise<void> => {
-    await persistScreenshots(store, blobs, userId, runId, shots);
+    await persistScreenshots(store, blobs, userId, runId, shots, routePaths);
   };
 
   // Resolve the project's prior approved baselines so the sandbox can detect
@@ -494,12 +501,17 @@ app.post("/v1/run", async (c) => {
   // binding both exist; otherwise the run proceeds baseline-free.
   let baselineRestore: BaselineRestore | undefined;
   const screenshotsBucket = c.env?.SCREENSHOTS as BaselineBucket | undefined;
-  if (run.projectId && screenshotsBucket) {
-    const baselineRun = await store.getProjectBaseline(run.projectId);
+  const effectiveProjectId =
+    run.projectId ??
+    (run.github?.owner && run.github?.repo
+      ? `${run.github.owner}/${run.github.repo}`
+      : undefined);
+  if (effectiveProjectId && screenshotsBucket) {
+    const baselineRun = await store.getProjectBaseline(effectiveProjectId);
     if (baselineRun) {
-      const baselineShots = (
-        await store.listScreenshots(baselineRun.id)
-      ).filter((s) => s.type === "baseline");
+      const baselineShots = selectApprovedBaselineScreenshots(
+        await store.listScreenshots(baselineRun.id),
+      );
       if (baselineShots.length > 0) {
         baselineRestore = {
           bucket: screenshotsBucket,
@@ -678,6 +690,7 @@ app.post("/v1/baselines/:runId/approve", async (c) => {
   if (!hasAccess) return c.json({ error: "Run not found" }, 404);
 
   await store.updateRun(id, { baselinesApproved: true });
+  await promoteRunCurrentScreenshotsToBaseline(store, id);
   return c.json({ approved: true, runId: id });
 });
 
@@ -715,6 +728,67 @@ app.get("/v1/usage", async (c) => {
     period: "current_month",
     limits: { runs: 500, screenshots: 5000 },
   });
+});
+
+// ---------------------------------------------------------------------------
+// POST /v1/integrations/vercel/install — Register a Vercel integration install
+// ---------------------------------------------------------------------------
+app.post("/v1/integrations/vercel/install", async (c) => {
+  const store = c.get("store");
+  const userId = c.get("userId");
+  let body: {
+    configurationId?: string;
+    vercelTeamId?: string | null;
+    vercelUserId?: string | null;
+    installationType?: string;
+  };
+  try {
+    body = (await c.req.json()) as typeof body;
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  if (!body.configurationId) {
+    return c.json({ error: "configurationId is required" }, 400);
+  }
+
+  const teamKey = body.vercelTeamId ?? body.configurationId;
+  const teamId = `vercel_${teamKey}`;
+  const now = new Date().toISOString();
+  const existing = await store.getTeam(teamId);
+  if (!existing) {
+    await store.createTeam(
+      {
+        id: teamId,
+        name: body.vercelTeamId ? `Vercel (${body.vercelTeamId})` : `Vercel (${body.configurationId})`,
+        plan: "free",
+        createdAt: now,
+      },
+      userId,
+    );
+  }
+  await store.recordActivity({
+    id: crypto.randomUUID(),
+    teamId,
+    userId,
+    action: "integration.vercel.installed",
+    target: body.configurationId,
+    metadata: JSON.stringify({
+      configurationId: body.configurationId,
+      vercelTeamId: body.vercelTeamId ?? null,
+      vercelUserId: body.vercelUserId ?? null,
+      installationType: body.installationType ?? "external",
+    }),
+    createdAt: now,
+  });
+
+  return c.json(
+    {
+      installed: true,
+      teamId,
+      configurationId: body.configurationId,
+    },
+    existing ? 200 : 201,
+  );
 });
 
 // ---------------------------------------------------------------------------

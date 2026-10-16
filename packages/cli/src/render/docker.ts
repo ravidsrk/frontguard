@@ -162,6 +162,45 @@ export function stripDockerFlag(argv: readonly string[]): string[] {
 }
 
 /**
+ * Rewrites `localhost` or `127.0.0.1` URLs to `host.docker.internal` so the
+ * container can reach a dev server running on the host machine.
+ */
+export function rewriteDockerHostUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      parsed.hostname = 'host.docker.internal';
+      const suffix = rawUrl.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/?#]+/, '');
+      if (parsed.pathname === '/' && !suffix.startsWith('/')) {
+        return parsed.href.replace(/\/$/, '');
+      }
+      return parsed.href;
+    }
+    return rawUrl;
+  } catch {
+    return rawUrl;
+  }
+}
+
+function rewriteUrlFlagsInArgv(argv: readonly string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if ((arg === '--url' || arg === '-u') && i + 1 < argv.length) {
+      out.push(arg, rewriteDockerHostUrl(argv[i + 1]));
+      i++;
+    } else if (arg.startsWith('--url=')) {
+      out.push(`--url=${rewriteDockerHostUrl(arg.slice('--url='.length))}`);
+    } else if (arg.startsWith('-u=')) {
+      out.push(`-u=${rewriteDockerHostUrl(arg.slice('-u='.length))}`);
+    } else {
+      out.push(arg);
+    }
+  }
+  return out;
+}
+
+/**
  * Builds the full `docker run` argv list. Pure function: no I/O, no spawn.
  * Exposed for tests so they can assert the shape without running docker.
  *
@@ -226,7 +265,7 @@ export function buildDockerArgs(opts: {
 
   // The container's ENTRYPOINT is `frontguard`, so we only pass the CLI
   // subcommand + flags, never the `frontguard` binary name itself.
-  args.push(...stripDockerFlag(argv));
+  args.push(...rewriteUrlFlagsInArgv(stripDockerFlag(argv)));
 
   return args;
 }

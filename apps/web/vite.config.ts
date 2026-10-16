@@ -8,7 +8,7 @@ import viteReact from '@vitejs/plugin-react'
 const isTest = !!process.env.VITEST
 
 export default defineConfig({
-  server: { port: 3000 },
+  server: { port: 3000, host: true, allowedHosts: true },
   plugins: [
     ...(isTest ? [] : [cloudflare({ viteEnvironment: { name: 'ssr' } })]),
     tanstackStart(),

@@ -131,6 +131,12 @@ billingRoutes.post('/webhook', async (c) => {
       stripeCustomerId: billing.customerId,
       stripeSubscriptionId: billing.cancel ? undefined : billing.subscriptionId,
     });
+    const members = await store.listMembers(teamId);
+    for (const m of members) {
+      if (m.role === 'owner') {
+        await store.updateUserPlan(m.userId, billing.plan);
+      }
+    }
   }
   return c.json({ handled: true, type: billing.type, plan: billing.plan, teamId });
 });
@@ -174,21 +180,43 @@ billingRoutes.get('/usage', async (c) => {
 
   const store = getStore(c.env);
   const teamId = c.req.query('teamId');
+  const month = currentMonth();
   // Resolve the plan from the team (if given) else the user's default (free).
   // A team's plan may only be claimed by an actual member of that team.
   let planId = 'free';
+  let effectiveTeamId = teamId;
   if (teamId) {
     const member = await store.getMember(teamId, userId);
     if (!member) return c.json({ error: 'Not a member of the requested team' }, 403);
     const team = await store.getTeam(teamId);
     if (team) planId = team.plan;
+  } else {
+    const user = await store.getUser(userId);
+    if (user?.plan && user.plan !== 'free') {
+      planId = user.plan;
+    }
+    const teams = await store.listTeamsForUser(userId);
+    if (teams.length > 0 && planId === 'free') {
+      const paidTeam = teams.find((t) => t.plan !== 'free') ?? teams[0];
+      if (paidTeam) {
+        effectiveTeamId = paidTeam.id;
+        planId = paidTeam.plan;
+      }
+    }
   }
   const plan = getPlan(planId);
-  const usage = await store.getUsage(userId, currentMonth());
+  const userUsage = await store.getUsage(userId, month);
+  let runsCount = userUsage.runsCount;
+  let screenshotsCount = userUsage.screenshotsCount;
+  if (effectiveTeamId) {
+    const teamUsage = await store.getTeamUsage(effectiveTeamId, month);
+    runsCount = Math.max(runsCount, teamUsage.runsCount);
+    screenshotsCount = Math.max(screenshotsCount, teamUsage.screenshotsCount);
+  }
 
   return c.json({
     plan: plan.id,
-    usage: { runs: usage.runsCount, screenshots: usage.screenshotsCount },
+    usage: { runs: runsCount, screenshots: screenshotsCount },
     limits: {
       runs: plan.limits.runsPerMonth,
       screenshots: plan.limits.screenshotsPerMonth,

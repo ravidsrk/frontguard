@@ -91,6 +91,7 @@ describe('DaytonaSandbox.screenshot — injection safety', () => {
     expect(cmd).toContain(`'${uploads[0].path}'`);
     expect(cmd).toContain("--url 'http://localhost:3000/dashboard'");
     expect(cmd).toContain("--browser 'chromium'");
+    expect(cmd).toContain('--encoding base64');
   });
 
   it('throws a clear error if create() was not called', async () => {

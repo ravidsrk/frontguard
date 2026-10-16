@@ -103,32 +103,79 @@ export class ConsoleReporter implements Reporter {
 
     console.log('');
 
-    if (result.diffs.length === 0) {
+    const hasJudgements = (result.judgements?.length ?? 0) > 0;
+    if (result.diffs.length === 0 && !hasJudgements) {
       console.log(chalk.dim('  No routes were tested. Add routes to your config or use --url with --routes.'));
       console.log('');
       return;
     }
 
-    this.printRouteTable(result);
+    if (result.diffs.length > 0) {
+      this.printRouteTable(result);
 
-    const hasRegressions = result.summary.regressions > 0;
-    const hasWarnings = result.summary.warnings > 0;
-    const hasErrors = result.summary.errors > 0;
-    const hasNewPages = result.summary.newPages > 0;
+      const hasRegressions = result.summary.regressions > 0;
+      const hasWarnings = result.summary.warnings > 0;
+      const hasErrors = result.summary.errors > 0;
+      const hasNewPages = result.summary.newPages > 0;
 
-    if (!hasRegressions && !hasWarnings && !hasErrors && !hasNewPages) {
-      console.log(chalk.green.bold('  ✅ All pages match baselines'));
-      console.log('');
-    } else {
-      this.printRegressions(result);
-      this.printWarnings(result);
-      this.printNewPages(result);
+      if (!hasRegressions && !hasWarnings && !hasErrors && !hasNewPages) {
+        console.log(chalk.green.bold('  ✅ All pages match baselines'));
+        console.log('');
+      } else {
+        this.printRegressions(result);
+        this.printWarnings(result);
+        this.printNewPages(result);
+      }
+    }
+
+    if (hasJudgements) {
+      this.printJudgements(result);
     }
 
     this.printAccessibility(result);
     this.printPerformance(result);
     this.printThirdPartyScripts(result);
     this.printSummary(result);
+  }
+
+  // -------------------------------------------------------------------------
+  // Judge Mode Verdicts
+  // -------------------------------------------------------------------------
+
+  private printJudgements(result: RunResult): void {
+    const judgements = result.judgements;
+    if (!judgements || judgements.length === 0) return;
+
+    console.log(chalk.bold('  🧪 JUDGE VERDICTS'));
+    console.log('');
+    for (const j of judgements) {
+      const statusLabel = j.error
+        ? chalk.red('✘ ERROR')
+        : j.pass
+          ? chalk.green('✓ PASS')
+          : chalk.red('✘ FAIL');
+      const score = `${Math.round(j.confidence * 100)}%`;
+      console.log(
+        `    ${statusLabel}  ${chalk.bold(j.route.path)} @ ${j.viewport}px [${j.browser}]  ${chalk.dim(`(confidence: ${score})`)}`,
+      );
+      if (j.error) {
+        console.log(chalk.red(`      ${j.error}`));
+      } else if (j.issues.length > 0) {
+        for (const issue of j.issues) {
+          const sevColor =
+            issue.severity === 'critical'
+              ? chalk.red
+              : issue.severity === 'warning'
+                ? chalk.yellow
+                : chalk.dim;
+          console.log(
+            `      ${sevColor(`[${issue.severity}]`)} ${issue.category}: ${issue.description}` +
+              (issue.suggestion ? chalk.dim(` — ${issue.suggestion}`) : ''),
+          );
+        }
+      }
+    }
+    console.log('');
   }
 
   // -------------------------------------------------------------------------

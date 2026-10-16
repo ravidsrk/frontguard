@@ -18,16 +18,16 @@ if [ ! -f "$MIGRATION_MARKER" ]; then
   echo "[frontguard-api] applying D1 schema (first boot for this volume)"
   # `wrangler d1 execute --local` creates the SQLite database under
   # PERSIST_DIR/v3/d1 the first time it's invoked and then runs schema.sql.
-  npx --yes wrangler d1 execute frontguard \
+  if npx --yes wrangler d1 execute frontguard \
       --local \
       --persist-to "$PERSIST_DIR" \
-      --file src/db/schema.sql \
-    || {
-      echo "[frontguard-api] D1 migration failed — continuing with in-memory store"
-      # Don't hard-fail: the API will fall back to InMemoryStore (factory.ts)
-      # which is still useful for kicking the tyres before fixing the binding.
-    }
-  touch "$MIGRATION_MARKER"
+      --file src/db/schema.sql; then
+    touch "$MIGRATION_MARKER"
+  else
+    echo "[frontguard-api] D1 migration failed — continuing with in-memory store"
+    # Don't hard-fail: the API will fall back to InMemoryStore (factory.ts)
+    # which is still useful for kicking the tyres before fixing the binding.
+  fi
 else
   echo "[frontguard-api] D1 schema already applied (delete $MIGRATION_MARKER to re-run)"
 fi

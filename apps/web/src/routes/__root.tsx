@@ -9,8 +9,19 @@ import appCss from '../styles.css?url'
 
 // Workers SSR handles routing — no Cloudflare Pages _redirects SPA fallback needed.
 
+export const SECURITY_HEADERS: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+  'Content-Security-Policy':
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://frontguard.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+}
+
 export const Route = createRootRoute({
   notFoundComponent: NotFound,
+  headers: () => SECURITY_HEADERS,
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -23,7 +34,6 @@ export const Route = createRootRoute({
           'visual regression testing, AI visual testing, Playwright, Storybook visual testing, frontend testing, CSS regression, screenshot testing, open source visual testing, MCP server',
       },
       { name: 'referrer', content: 'strict-origin-when-cross-origin' },
-      { httpEquiv: 'X-Content-Type-Options', content: 'nosniff' },
     ],
     links: [
       { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },

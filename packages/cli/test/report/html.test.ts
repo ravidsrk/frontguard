@@ -266,4 +266,34 @@ describe('HTMLReporter', () => {
     expect(html).toContain('Discovery');
     expect(html).toContain('Render');
   });
+
+  it('report renders judgements section when judgements are present', () => {
+    const reporter = new HTMLReporter();
+    const result = makeRunResult([], {
+      judgements: [
+        {
+          route: { path: '/pricing', label: 'Pricing' },
+          viewport: 375,
+          browser: 'chromium',
+          pass: false,
+          confidence: 0.9,
+          issues: [
+            {
+              category: 'overflow',
+              severity: 'critical',
+              description: 'Card overflows horizontally',
+            },
+          ],
+          withDesignReference: true,
+        },
+      ],
+    });
+    const html = reporter.generateReport(result);
+
+    expect(html).toContain('id="judgements-section"');
+    expect(html).toContain('Judge Verdicts');
+    expect(html).toContain('/pricing');
+    expect(html).toContain('Card overflows horizontally');
+  });
 });
+

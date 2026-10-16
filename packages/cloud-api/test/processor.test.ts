@@ -117,4 +117,23 @@ describe('processRun — Daytona branch', () => {
     expect(run.status).toBe('failed');
     expect(run.error).toBe('sandbox boom');
   });
+
+  it('forwards OPENAI_API_KEY and ANTHROPIC_API_KEY from env to executeInSandbox', async () => {
+    executeInSandbox.mockResolvedValue({
+      results: [{ route: '/', viewport: 1440, status: 'unchanged', diffPercentage: 0 }],
+      reportHtml: '<html>ok</html>',
+    });
+    const run = makeRun({ ai: { provider: 'openai', model: 'gpt-4o' } });
+    await processRun(run, {
+      DAYTONA_API_KEY: 'dt_key',
+      OPENAI_API_KEY: 'sk-openai-test',
+      ANTHROPIC_API_KEY: 'sk-ant-test',
+    });
+    expect(executeInSandbox).toHaveBeenCalledOnce();
+    expect(executeInSandbox.mock.calls[0]![0]).toMatchObject({
+      daytonaApiKey: 'dt_key',
+      openaiKey: 'sk-openai-test',
+      anthropicKey: 'sk-ant-test',
+    });
+  });
 });

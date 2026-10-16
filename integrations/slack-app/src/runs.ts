@@ -18,7 +18,7 @@ import {
   SafeRenderTargetError,
   type HostResolver,
 } from '@frontguard/cloud-api/render-target';
-import { buildVisualResultBlocks, type RunSummary } from './slack-api.js';
+import { buildVisualResultBlocks, postSlackMessage, type RunSummary } from './slack-api.js';
 
 /**
  * URL validation for slash-command runs: `http(s)` only, and never private /
@@ -310,6 +310,8 @@ export async function deliverRunResult(opts: {
   runId: string;
   url: string;
   responseUrl: string;
+  botToken?: string;
+  channelId?: string;
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
@@ -327,16 +329,34 @@ export async function deliverRunResult(opts: {
       maxWaitMs: opts.maxWaitMs,
       intervalMs: opts.intervalMs,
     });
-    await postSlackResponse(opts.responseUrl, buildFollowUpResponse(final, opts.url), opts.fetchImpl);
+    const followUp = buildFollowUpResponse(final, opts.url);
+    const posted = opts.responseUrl
+      ? await postSlackResponse(opts.responseUrl, followUp, opts.fetchImpl)
+      : { ok: false };
+    if (!posted.ok && opts.botToken && opts.channelId) {
+      await postSlackMessage(
+        opts.botToken,
+        opts.channelId,
+        followUp.blocks,
+        followUp.text,
+        opts.fetchImpl,
+      );
+    }
   } catch (err) {
-    await postSlackResponse(
-      opts.responseUrl,
-      {
-        response_type: 'in_channel',
-        text: `Frontguard check errored for ${opts.url}: ${err instanceof Error ? err.message : String(err)}`,
-        replace_original: false,
-      },
-      opts.fetchImpl,
-    );
+    const errorText = `Frontguard check errored for ${opts.url}: ${err instanceof Error ? err.message : String(err)}`;
+    const posted = opts.responseUrl
+      ? await postSlackResponse(
+          opts.responseUrl,
+          {
+            response_type: 'in_channel',
+            text: errorText,
+            replace_original: false,
+          },
+          opts.fetchImpl,
+        )
+      : { ok: false };
+    if (!posted.ok && opts.botToken && opts.channelId) {
+      await postSlackMessage(opts.botToken, opts.channelId, [], errorText, opts.fetchImpl);
+    }
   }
 }

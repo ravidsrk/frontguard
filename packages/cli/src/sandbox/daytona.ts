@@ -131,7 +131,7 @@ export class DaytonaSandbox implements Sandbox {
     const cmd =
       `frontguard-render --url ${shellQuote(url)} --viewport ${shellQuote(String(params.viewport))} ` +
       `--browser ${shellQuote(params.browser)} --inject-css-file ${shellQuote(cssPath)} ` +
-      `--out /tmp/shot-b64.txt && cat /tmp/shot-b64.txt`;
+      `--encoding base64 --out /tmp/shot-b64.txt && cat /tmp/shot-b64.txt`;
 
     const res = await this.sandbox.process.executeCommand(cmd);
     if (res.exitCode !== 0) {

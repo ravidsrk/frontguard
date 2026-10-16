@@ -282,6 +282,15 @@ export const configSchema = z.object({
       projectRoot: z.string().min(1).optional(),
     })
     .optional(),
+
+  /** Judge mode configuration (optional Figma design references). */
+  judge: z
+    .object({
+      figmaFileKey: z.string().optional(),
+      figmaPages: z.record(z.string(), z.string()).optional(),
+      figmaScale: z.number().positive().optional(),
+    })
+    .optional(),
 });
 
 /** Inferred Zod output type — should match `FrontguardConfig`. */
@@ -315,6 +324,22 @@ export function defineConfig(
   config: UserFrontguardConfig,
 ): UserFrontguardConfig {
   return config;
+}
+
+/**
+ * Merges a base configuration with an override configuration, deep-merging
+ * nested `ai` and `judge` blocks.
+ */
+export function mergeConfigs(
+  base: FrontguardConfig,
+  override: Partial<FrontguardConfig>,
+): FrontguardConfig {
+  return {
+    ...base,
+    ...override,
+    ai: override.ai ? { ...base.ai, ...override.ai } : base.ai,
+    judge: override.judge ? { ...base.judge, ...override.judge } : base.judge,
+  };
 }
 
 // ---------------------------------------------------------------------------

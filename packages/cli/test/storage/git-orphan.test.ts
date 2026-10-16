@@ -538,4 +538,46 @@ describe('GitOrphanStorage in a repository without commits', () => {
       routes: {},
     });
   });
+
+  it('writes multiple baselines and manifest in a single commit via writeBaselines', async () => {
+    const storage = new GitOrphanStorage(repoDir, { mode: 'update' });
+    await storage.init();
+
+    const commitsBefore = execFileSync(
+      'git',
+      ['rev-list', '--count', 'frontguard-baselines'],
+      { cwd: repoDir, encoding: 'utf8' },
+    ).trim();
+
+    const buf1 = Buffer.from('png-1');
+    const buf2 = Buffer.from('png-2');
+    await storage.writeBaselines(
+      [
+        { route: '/', viewport: 1440, browser: 'chromium', buffer: buf1 },
+        { route: '/about', viewport: 375, browser: 'chromium', buffer: buf2 },
+      ],
+      {
+        schemaVersion: 1,
+        createdBy: 'frontguard@test',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        routes: {
+          '/': { viewports: [1440], browsers: ['chromium'], lastUpdated: '2026-01-01T00:00:00.000Z' },
+          '/about': { viewports: [375], browsers: ['chromium'], lastUpdated: '2026-01-01T00:00:00.000Z' },
+        },
+      },
+    );
+
+    const commitsAfter = execFileSync(
+      'git',
+      ['rev-list', '--count', 'frontguard-baselines'],
+      { cwd: repoDir, encoding: 'utf8' },
+    ).trim();
+
+    expect(Number(commitsAfter)).toBe(Number(commitsBefore) + 1);
+    expect(await storage.readBaseline('/', 1440, 'chromium')).toEqual(buf1);
+    expect(await storage.readBaseline('/about', 375, 'chromium')).toEqual(buf2);
+    const manifest = await storage.readManifest();
+    expect(Object.keys(manifest?.routes ?? {})).toEqual(['/', '/about']);
+  });
 });
+

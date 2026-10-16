@@ -19,7 +19,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { loadConfig } from '../core/config.js';
 import type { BrowserEngine, FrontguardConfig } from '../core/types.js';
 
@@ -114,22 +114,37 @@ export async function checkBrowsersAvailable(
 ): Promise<CheckResult> {
   let browserAvailable = isAvailable;
   if (!browserAvailable) {
-    let pw: typeof import('playwright');
-    try {
-      pw = await import('playwright');
-    } catch {
-      return {
-        name: 'Browser binaries',
-        status: 'fail',
-        message: 'cannot check browsers — Playwright is not installed',
-        fix: 'Install Playwright first: npm install playwright',
-        critical: true,
+    const customBrowsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
+    if (customBrowsersPath && customBrowsersPath !== '0') {
+      if (!existsSync(customBrowsersPath)) {
+        browserAvailable = () => false;
+      } else {
+        try {
+          const entries = readdirSync(customBrowsersPath);
+          browserAvailable = (browser) =>
+            entries.some((entry) => entry.toLowerCase().startsWith(browser));
+        } catch {
+          browserAvailable = () => false;
+        }
+      }
+    } else {
+      let pw: typeof import('playwright');
+      try {
+        pw = await import('playwright');
+      } catch {
+        return {
+          name: 'Browser binaries',
+          status: 'fail',
+          message: 'cannot check browsers — Playwright is not installed',
+          fix: 'Install Playwright first: npm install playwright',
+          critical: true,
+        };
+      }
+      browserAvailable = (browser) => {
+        const execPath = pw[browser].executablePath();
+        return Boolean(execPath && existsSync(execPath));
       };
     }
-    browserAvailable = (browser) => {
-      const execPath = pw[browser].executablePath();
-      return Boolean(execPath && existsSync(execPath));
-    };
   }
 
   const required = [...new Set(requiredBrowsers)];
@@ -158,6 +173,8 @@ export async function checkBrowsersAvailable(
     critical: true,
   };
 }
+
+export { checkBrowsersAvailable as checkPlaywrightBrowsers };
 
 /** Load config from a specific directory without leaving process.cwd changed. */
 async function loadConfigFrom(cwd: string): Promise<FrontguardConfig> {

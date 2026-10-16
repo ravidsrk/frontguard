@@ -714,14 +714,23 @@ export class InMemoryStore implements Store {
   async listProjectRuns(projectId: string, limit = 50, offset = 0): Promise<Run[]> {
     return [...this.runs.values()]
       .map((r) => r.run)
-      .filter((r) => r.projectId === projectId)
+      .filter(
+        (r) =>
+          r.projectId === projectId ||
+          Boolean(r.github?.owner && r.github?.repo && `${r.github.owner}/${r.github.repo}` === projectId),
+      )
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(offset, offset + limit);
   }
   async getProjectBaseline(projectId: string): Promise<Run | null> {
     const approved = [...this.runs.values()]
       .map((r) => r.run)
-      .filter((r) => r.projectId === projectId && r.baselinesApproved)
+      .filter(
+        (r) =>
+          (r.projectId === projectId ||
+            Boolean(r.github?.owner && r.github?.repo && `${r.github.owner}/${r.github.repo}` === projectId)) &&
+          r.baselinesApproved,
+      )
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return approved[0] ?? null;
   }

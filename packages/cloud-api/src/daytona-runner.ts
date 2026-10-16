@@ -1,19 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Daytona } from '@daytona/sdk';
 import type { SuggestedFix } from './types.js';
 import { orphanBaselinePath } from './storage/screenshots.js';
 
-/** Pinned CLI release — read from packages/cli/package.json so it cannot drift from VERSION. */
-const FRONTGUARD_CLI_VERSION = (
-  JSON.parse(
-    readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '../../cli/package.json'),
-      'utf8',
-    ),
-  ) as { version: string }
-).version;
+/** Pinned CLI release — constant so Workers/Docker bundles do not depend on relative fs reads. */
+const FRONTGUARD_CLI_VERSION = '0.2.3'; // allow-version-drift
 
 // ---------------------------------------------------------------------------
 // Types
@@ -53,6 +43,7 @@ export interface RunRequest {
   threshold: number;
   ai?: { provider: string; model?: string };
   openaiKey?: string;
+  anthropicKey?: string;
   /** Daytona API key — Workers must pass it explicitly (no Node env). */
   daytonaApiKey?: string;
   /**
@@ -111,14 +102,21 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
   let sandbox;
   let needsInstall = false;
 
+  const envVars: Record<string, string> = {
+    ...(request.openaiKey
+      ? { FRONTGUARD_OPENAI_KEY: request.openaiKey, OPENAI_API_KEY: request.openaiKey }
+      : {}),
+    ...(request.anthropicKey
+      ? { FRONTGUARD_ANTHROPIC_KEY: request.anthropicKey, ANTHROPIC_API_KEY: request.anthropicKey }
+      : {}),
+  };
+
   try {
     sandbox = await daytona.create(
       {
         snapshot: FRONTGUARD_SNAPSHOT,
         language: 'typescript',
-        envVars: {
-          ...(request.openaiKey ? { FRONTGUARD_OPENAI_KEY: request.openaiKey } : {}),
-        },
+        envVars,
         autoStopInterval: 5, // 5 min idle auto-stop
         autoDeleteInterval: 10, // 10 min auto-delete safety net
         ephemeral: true,
@@ -137,9 +135,7 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
           disk: 10,
         },
         language: 'typescript',
-        envVars: {
-          ...(request.openaiKey ? { FRONTGUARD_OPENAI_KEY: request.openaiKey } : {}),
-        },
+        envVars,
         autoStopInterval: 5,
         autoDeleteInterval: 10,
         ephemeral: true,

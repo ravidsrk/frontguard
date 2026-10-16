@@ -5,8 +5,12 @@
  */
 import Database from 'better-sqlite3';
 import type { D1Database, D1PreparedStatement } from '../../src/db/d1-store.js';
+import { createNodeSqliteD1, nodeSqliteAvailable } from './node-sqlite-d1.js';
 
 export function createSqliteD1(): { db: D1Database; raw: Database.Database } {
+  if (nodeSqliteAvailable) {
+    return createNodeSqliteD1() as unknown as { db: D1Database; raw: Database.Database };
+  }
   const raw = new Database(':memory:');
 
   const prepare = (query: string): D1PreparedStatement => {

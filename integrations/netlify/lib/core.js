@@ -100,6 +100,7 @@ export function parseGitHubRepo(repositoryUrl) {
  * @param {string} opts.apiKey
  * @param {string} opts.previewUrl
  * @param {string[]} [opts.routes]
+ * @param {string} [opts.projectId]
  * @param {typeof fetch} [fetchImpl]
  * @returns {Promise<{ id: string, statusUrl?: string }>}
  */
@@ -113,6 +114,7 @@ export async function triggerRun(opts, fetchImpl = fetch) {
     body: JSON.stringify({
       url: opts.previewUrl,
       routes: (opts.routes ?? ['/']).map((path) => ({ path })),
+      ...(opts.projectId ? { projectId: opts.projectId } : {}),
     }),
   });
   if (!res.ok) {

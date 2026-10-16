@@ -30,25 +30,122 @@ export interface ParsedScreenshotName {
 
 const KNOWN_BROWSERS = new Set(['chromium', 'firefox', 'webkit']);
 
+function candidateFragmentsForRoute(route: string): string[] {
+  const withoutLeadingSlash = route.replace(/^\//, '');
+  const slashToUnderscore = withoutLeadingSlash.replace(/\//g, '_') || 'index';
+  const slashToUnderscoreRoot = withoutLeadingSlash.replace(/\//g, '_') || '_root';
+  const safeChars = route.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/^_+|_+$/g, '') || '_root';
+  const slug = route.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'root';
+  return [
+    slashToUnderscore,
+    slashToUnderscoreRoot,
+    safeChars,
+    slug,
+    ...(route === '/' ? ['_root', 'index', 'root', ''] : []),
+  ];
+}
+
 /**
  * Reverse-parses a reporter image basename of the form
- * `<routeFragment>_<viewport>_<browser>_<diffIdx>_<type>`.
+ * `<routeFragment>_<viewport>_<browser>_<diffIdx>_<type>` or
+ * `<index>_<routeFragment>_<viewport>_<browser>_<diffIdx>_<type>`.
  *
- * The route fragment is itself underscore-sanitised, so we parse from the
- * right where the structure is unambiguous. Returns `null` if the name does
- * not match the expected shape.
+ * When `knownRoutes` is supplied, matches `routeFragment` (with or without a
+ * leading numeric index prefix) against the known route list so nested routes
+ * like `/blog/post-1` are recovered losslessly instead of becoming `/blog_post-1`.
  */
-export function parseScreenshotName(name: string): ParsedScreenshotName | null {
+export function parseScreenshotName(
+  name: string,
+  knownRoutes?: readonly string[],
+): ParsedScreenshotName | null {
   const m = name.match(/^(.*)_(\d+)_([a-z]+)_(\d+)_(baseline|current|diff)$/);
   if (!m) return null;
-  const [, routeFragment, viewportStr, browser, , type] = m;
+  const [, rawFragment, viewportStr, browser, , type] = m;
   if (!KNOWN_BROWSERS.has(browser)) return null;
   const viewport = Number(viewportStr);
   if (!Number.isFinite(viewport)) return null;
-  // Best-effort route recovery: the fragment was sanitised, so we present a
-  // leading-slash path derived from it (e.g. `home` -> `/home`, `_root` -> `/`).
-  const route = routeFragment === '_root' || routeFragment === '' ? '/' : `/${routeFragment}`;
+
+  const strippedFragment = rawFragment.replace(/^\d+_/, '');
+
+  if (knownRoutes && knownRoutes.length > 0) {
+    for (const candidateRoute of knownRoutes) {
+      const normalized = candidateRoute.startsWith('/') ? candidateRoute : `/${candidateRoute}`;
+      const fragments = candidateFragmentsForRoute(normalized);
+      if (fragments.includes(rawFragment) || fragments.includes(strippedFragment)) {
+        return {
+          route: normalized,
+          viewport,
+          browser,
+          type: type as ParsedScreenshotName['type'],
+        };
+      }
+    }
+  }
+
+  // Best-effort route recovery when no knownRoutes match: strip optional
+  // leading `${index}_` prefix emitted by the CLI HTML reporter and map root
+  // sentinels (`_root`, `index`, `''`) to `/`.
+  const fragment = /^\d+_.+/.test(rawFragment) ? strippedFragment : rawFragment;
+  const route =
+    fragment === '_root' || fragment === 'index' || fragment === '' ? '/' : `/${fragment}`;
   return { route, viewport, browser, type: type as ParsedScreenshotName['type'] };
+}
+
+/**
+ * Selects the effective baseline screenshot records from an approved baseline
+ * run. For each `(route, viewport, browser)` tuple, prefers `'current'` (the
+ * newly captured/approved image from that run) over `'baseline'` (which holds
+ * the pre-approval image when a regression run was approved), falling back to
+ * `'baseline'` when only `'baseline'` records exist.
+ */
+export function selectApprovedBaselineScreenshots(
+  shots: readonly ScreenshotRecord[],
+): ScreenshotRecord[] {
+  const byKey = new Map<string, ScreenshotRecord>();
+  for (const shot of shots) {
+    if (shot.type !== 'baseline' && shot.type !== 'current') continue;
+    const key = `${shot.route}\0${shot.viewport}\0${shot.browser}`;
+    const existing = byKey.get(key);
+    if (!existing || (existing.type === 'baseline' && shot.type === 'current')) {
+      byKey.set(key, shot);
+    }
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * Ensures an approved run has `'baseline'` screenshot records corresponding to
+ * its `'current'` screenshots so callers filtering by `type === 'baseline'`
+ * find the approved images.
+ */
+export async function promoteRunCurrentScreenshotsToBaseline(
+  store: Store,
+  runId: string,
+  now: () => string = () => new Date().toISOString(),
+): Promise<void> {
+  const shots = await store.listScreenshots(runId);
+  const existingBaselines = new Set(
+    shots
+      .filter((s) => s.type === 'baseline')
+      .map((s) => `${s.route}\0${s.viewport}\0${s.browser}`),
+  );
+  for (const shot of shots) {
+    if (shot.type !== 'current') continue;
+    const key = `${shot.route}\0${shot.viewport}\0${shot.browser}`;
+    if (existingBaselines.has(key)) continue;
+    existingBaselines.add(key);
+    await store.addScreenshot({
+      id: crypto.randomUUID(),
+      runId: shot.runId,
+      route: shot.route,
+      viewport: shot.viewport,
+      browser: shot.browser,
+      type: 'baseline',
+      r2Key: shot.r2Key,
+      sizeBytes: shot.sizeBytes,
+      createdAt: now(),
+    });
+  }
 }
 
 /**
@@ -62,11 +159,14 @@ export async function persistScreenshots(
   userId: string,
   runId: string,
   screenshots: PendingScreenshot[],
-  now: () => string = () => new Date().toISOString(),
+  nowOrRoutes: (() => string) | readonly string[] = () => new Date().toISOString(),
+  knownRoutes?: readonly string[],
 ): Promise<number> {
+  const now = typeof nowOrRoutes === 'function' ? nowOrRoutes : () => new Date().toISOString();
+  const routes = Array.isArray(nowOrRoutes) ? nowOrRoutes : knownRoutes;
   let persisted = 0;
   for (const shot of screenshots) {
-    const parsed = parseScreenshotName(shot.name);
+    const parsed = parseScreenshotName(shot.name, routes);
     if (!parsed) continue;
     const key = screenshotKey(userId, runId, parsed.type, parsed.route, parsed.viewport, parsed.browser);
     try {

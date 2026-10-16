@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS team_usage (
   month TEXT NOT NULL,
   runs_count INTEGER DEFAULT 0,
   screenshots_count INTEGER DEFAULT 0,
+  diffs_used INTEGER NOT NULL DEFAULT 0,
+  ai_calls_used INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (team_id, month)
 );
 
@@ -96,10 +99,11 @@ CREATE TABLE runs_new (
   regressions_count INTEGER DEFAULT 0,
   baselines_approved INTEGER DEFAULT 0,
   error TEXT,
+  version INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   completed_at TEXT
 );
-INSERT INTO runs_new SELECT * FROM runs;
+INSERT INTO runs_new (id, user_id, project_id, status, config, results, report_html, routes_count, regressions_count, baselines_approved, error, created_at, completed_at) SELECT id, user_id, project_id, status, config, results, report_html, routes_count, regressions_count, baselines_approved, error, created_at, completed_at FROM runs;
 DROP TABLE runs;
 ALTER TABLE runs_new RENAME TO runs;
 CREATE INDEX IF NOT EXISTS idx_runs_user ON runs(user_id, created_at);

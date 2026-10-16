@@ -38,6 +38,7 @@ import {
 import { getPlan, checkLimit } from "../billing/plans.js";
 import type { AlertEnv } from "../alerts/index.js";
 import { purgeTeamRunBlobs } from "../storage/purge-team-blobs.js";
+import { promoteRunCurrentScreenshotsToBaseline } from "../storage/persist-screenshots.js";
 import type { R2Bucket } from "../storage/screenshots.js";
 
 type Variables = { store: Store; userId: string };
@@ -568,6 +569,7 @@ teamRoutes.post(
 
     if (parsed.data.status === "approved") {
       await store.updateRun(runId, { baselinesApproved: true });
+      await promoteRunCurrentScreenshotsToBaseline(store, runId);
     }
     await logActivity(
       store,

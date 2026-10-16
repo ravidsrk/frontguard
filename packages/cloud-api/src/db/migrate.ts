@@ -71,9 +71,28 @@ async function getAppliedVersions(db: D1Database): Promise<Set<string>> {
  */
 async function applyMigration(db: D1Database, migration: Migration): Promise<number> {
   const statements = splitStatements(migration.sql);
+  const effectiveStatements: string[] = [];
+  for (const sql of statements) {
+    const match = /^ALTER\s+TABLE\s+(\w+)\s+ADD\s+(?:COLUMN\s+)?(\w+)\b/i.exec(sql);
+    if (match) {
+      const [, table, col] = match;
+      try {
+        const { results } = await db
+          .prepare(`PRAGMA table_info(${table})`)
+          .all<{ name: string }>();
+        if (results.some((r) => r.name === col)) {
+          effectiveStatements.push('SELECT 1');
+          continue;
+        }
+      } catch {
+        // Fall through and run the original statement
+      }
+    }
+    effectiveStatements.push(sql);
+  }
   const appliedAt = new Date().toISOString();
   const batch: D1PreparedStatement[] = [
-    ...statements.map((sql) => db.prepare(sql)),
+    ...effectiveStatements.map((sql) => db.prepare(sql)),
     db
       .prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)')
       .bind(migration.version, appliedAt),

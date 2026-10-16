@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { configSchema, detectSecrets, detectFramework } from '../../src/core/config.js';
+import { configSchema, detectSecrets, detectFramework, mergeConfigs } from '../../src/core/config.js';
 import { createTempDir, writeFiles } from '../fixtures/helpers.js';
 import { ZodError } from 'zod';
 
@@ -235,3 +235,44 @@ describe('detectFramework', () => {
     expect(detectFramework(tempDir)).toBeNull();
   });
 });
+
+describe('judge config and mergeConfigs', () => {
+  it('validates judge config in configSchema', () => {
+    const config = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      judge: {
+        figmaFileKey: 'fk-123',
+        figmaPages: { '/': '1:2', '/pricing': '3:4' },
+        figmaScale: 2,
+      },
+    });
+    expect(config.judge).toEqual({
+      figmaFileKey: 'fk-123',
+      figmaPages: { '/': '1:2', '/pricing': '3:4' },
+      figmaScale: 2,
+    });
+  });
+
+  it('deep-merges ai and judge blocks in mergeConfigs', () => {
+    const base = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      ai: { provider: 'openai', model: 'gpt-4o', autoApproveThreshold: 0.9 },
+      judge: { figmaFileKey: 'fk-base', figmaScale: 2 },
+    });
+    const merged = mergeConfigs(base, {
+      ai: { provider: 'openai', model: 'gpt-4.1', autoApproveThreshold: 0.85 },
+      judge: { figmaPages: { '/': '1:2' } },
+    });
+    expect(merged.ai).toEqual({
+      provider: 'openai',
+      model: 'gpt-4.1',
+      autoApproveThreshold: 0.85,
+    });
+    expect(merged.judge).toEqual({
+      figmaFileKey: 'fk-base',
+      figmaScale: 2,
+      figmaPages: { '/': '1:2' },
+    });
+  });
+});
+

@@ -89,30 +89,56 @@ export async function visualTest(
     }
   }
 
-  // Mask elements
-  if (opts.mask?.length) {
-    await page.evaluate((selectors: string[]) => {
-      for (const sel of selectors) {
-        document.querySelectorAll(sel).forEach((el) => {
-          (el as HTMLElement).style.cssText += 'visibility:hidden!important;';
+  const hasMasks = Boolean(opts.mask?.length || opts.maskRegions?.length);
+  let currentBuffer: Buffer;
+  try {
+    // Mask elements
+    if (opts.mask?.length) {
+      await page.evaluate((selectors: string[]) => {
+        for (const sel of selectors) {
+          document.querySelectorAll(sel).forEach((el) => {
+            const htmlEl = el as HTMLElement;
+            if (!htmlEl.hasAttribute('data-frontguard-prev-style')) {
+              htmlEl.setAttribute('data-frontguard-prev-style', htmlEl.getAttribute('style') ?? '');
+            }
+            htmlEl.style.cssText += 'visibility:hidden!important;';
+          });
+        }
+      }, opts.mask);
+    }
+
+    // Mask regions
+    if (opts.maskRegions?.length) {
+      await page.evaluate((regions: Array<{ x: number; y: number; width: number; height: number }>) => {
+        for (const r of regions) {
+          const d = document.createElement('div');
+          d.setAttribute('data-frontguard-mask-region', 'true');
+          d.style.cssText = `position:fixed;left:${r.x}px;top:${r.y}px;width:${r.width}px;height:${r.height}px;background:#808080;z-index:999999;`;
+          document.body.appendChild(d);
+        }
+      }, opts.maskRegions);
+    }
+
+    // Take screenshot
+    currentBuffer = await page.screenshot({ fullPage: opts.fullPage, type: 'png' });
+  } finally {
+    if (hasMasks) {
+      await page.evaluate(() => {
+        document.querySelectorAll('[data-frontguard-prev-style]').forEach((el) => {
+          const prev = el.getAttribute('data-frontguard-prev-style');
+          el.removeAttribute('data-frontguard-prev-style');
+          if (prev) {
+            el.setAttribute('style', prev);
+          } else {
+            el.removeAttribute('style');
+          }
         });
-      }
-    }, opts.mask);
+        document.querySelectorAll('[data-frontguard-mask-region]').forEach((el) => {
+          el.remove();
+        });
+      });
+    }
   }
-
-  // Mask regions
-  if (opts.maskRegions?.length) {
-    await page.evaluate((regions: Array<{ x: number; y: number; width: number; height: number }>) => {
-      for (const r of regions) {
-        const d = document.createElement('div');
-        d.style.cssText = `position:fixed;left:${r.x}px;top:${r.y}px;width:${r.width}px;height:${r.height}px;background:#808080;z-index:999999;`;
-        document.body.appendChild(d);
-      }
-    }, opts.maskRegions);
-  }
-
-  // Take screenshot
-  const currentBuffer = await page.screenshot({ fullPage: opts.fullPage, type: 'png' });
   const current = Buffer.from(currentBuffer);
 
   const baselineKey = getBaselineKey(page, name);
@@ -122,6 +148,7 @@ export async function visualTest(
 
   if (baseline === null || opts.update) {
     storage.writeBaseline(baselineKey, current);
+    storage.writeFile(baselineKey, 'current', current);
     return {
       passed: true,
       diffPercentage: 0,
@@ -156,5 +183,20 @@ export async function visualTest(
     result.ai = await analyzeWithAI(baseline, current, aiOpts);
   }
 
+  return result;
+}
+
+export async function expectVisual(
+  page: Page,
+  name: string,
+  options: VisualTestOptions = {}
+): Promise<VisualTestResult> {
+  const result = await visualTest(page, name, options);
+  if (!result.passed) {
+    const pct = (result.diffPercentage * 100).toFixed(2);
+    throw new Error(
+      `Visual regression detected for "${name}": ${pct}% diff (${result.diffPath ?? result.currentPath})`
+    );
+  }
   return result;
 }

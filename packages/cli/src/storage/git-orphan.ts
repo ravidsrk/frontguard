@@ -350,6 +350,41 @@ export class GitOrphanStorage implements BaselineStorage {
   }
 
   /**
+   * Write multiple baseline images and an optional manifest in a single
+   * worktree transaction and single commit.
+   */
+  async writeBaselines(
+    entries: Array<{
+      route: string;
+      viewport: number;
+      browser?: BrowserEngine;
+      buffer: Buffer;
+    }>,
+    manifest?: BaselineManifest,
+  ): Promise<void> {
+    this.ensureInitialized();
+    this.ensureWritable();
+    if (entries.length === 0 && !manifest) return;
+
+    await this.writeToOrphanBranch(
+      (worktreeDir) => {
+        for (const entry of entries) {
+          const browser = entry.browser ?? 'chromium';
+          const path = baselinePath(entry.route, entry.viewport, browser);
+          const fullPath = join(worktreeDir, path);
+          mkdirSync(dirname(fullPath), { recursive: true });
+          writeFileSync(fullPath, entry.buffer);
+        }
+        if (manifest) {
+          const manifestPath = join(worktreeDir, 'manifest.json');
+          writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+        }
+      },
+      `Update ${entries.length} baseline(s)`,
+    );
+  }
+
+  /**
    * Read the baseline manifest from the orphan branch.
    * Uses `git show` — no checkout required.
    *
@@ -590,12 +625,12 @@ export class GitOrphanStorage implements BaselineStorage {
     const tmpDir = mkdtempSync(join(tmpdir(), 'frontguard-init-'));
 
     try {
-      // Add a detached worktree in the temp directory
-      this.git('worktree', 'add', '--detach', tmpDir);
+      // Add a detached worktree in the temp directory without checking out files
+      this.git('worktree', 'add', '--detach', '--no-checkout', tmpDir);
 
-      // Inside the worktree, create the orphan branch
+      // Inside the worktree, create the orphan branch and clear the index
       this.gitIn(tmpDir, 'checkout', '--orphan', this.branch);
-      this.gitIn(tmpDir, 'rm', '-rf', '.');
+      this.gitIn(tmpDir, 'rm', '-rf', '--ignore-unmatch', '.');
 
       // Write initial manifest into the temp worktree
       const manifest: BaselineManifest = {
@@ -610,7 +645,18 @@ export class GitOrphanStorage implements BaselineStorage {
       );
 
       this.gitIn(tmpDir, 'add', 'manifest.json');
-      this.gitIn(tmpDir, 'commit', '-m', 'Initialize frontguard baselines');
+      this.gitIn(
+        tmpDir,
+        '-c',
+        'user.name=Frontguard',
+        '-c',
+        'user.email=frontguard@local',
+        '-c',
+        'commit.gpgsign=false',
+        'commit',
+        '-m',
+        'Initialize frontguard baselines',
+      );
     } finally {
       // Always clean up the worktree
       try {
@@ -651,7 +697,17 @@ export class GitOrphanStorage implements BaselineStorage {
       );
 
       this.git('add', 'manifest.json');
-      this.git('commit', '-m', 'Initialize frontguard baselines');
+      this.git(
+        '-c',
+        'user.name=Frontguard',
+        '-c',
+        'user.email=frontguard@local',
+        '-c',
+        'commit.gpgsign=false',
+        'commit',
+        '-m',
+        'Initialize frontguard baselines',
+      );
       this.git('checkout', originalRef);
     } catch (err) {
       // Attempt recovery
@@ -701,7 +757,18 @@ export class GitOrphanStorage implements BaselineStorage {
           return;
         }
 
-        this.gitIn(worktreeDir, 'commit', '-m', commitMessage);
+        this.gitIn(
+          worktreeDir,
+          '-c',
+          'user.name=Frontguard',
+          '-c',
+          'user.email=frontguard@local',
+          '-c',
+          'commit.gpgsign=false',
+          'commit',
+          '-m',
+          commitMessage,
+        );
         logger.debug(`Committed to ${this.branch}: ${commitMessage}`);
         return;
       } catch (err) {

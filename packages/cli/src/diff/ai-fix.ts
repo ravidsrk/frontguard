@@ -25,6 +25,7 @@ import {
   callOpenAI,
   callAnthropic,
   downscaleForAI,
+  wrapUntrusted,
 } from './ai-vision.js';
 import { retry } from '../utils/retry.js';
 import { logger } from '../utils/logger.js';
@@ -181,7 +182,7 @@ export async function generateFix(
   const diffB64 = diff.diffImage ? downscaleForAI(diff.diffImage).toString('base64') : undefined;
 
   const contextLines: string[] = [
-    `Route: ${diff.route.path} (viewport: ${diff.viewport}px, browser: ${diff.browser})`,
+    `Route: ${wrapUntrusted('route_path', diff.route.path)} (viewport: ${diff.viewport}px, browser: ${diff.browser})`,
     `Pixel diff: ${diff.diffPercentage.toFixed(2)}%`,
   ];
   if (diff.aiAnalysis?.explanation) {

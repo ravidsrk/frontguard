@@ -16,13 +16,16 @@ export const migration005BackgroundFailures: Migration = {
   sql: `
 CREATE TABLE IF NOT EXISTS background_failures (
   id TEXT PRIMARY KEY,
-  kind TEXT NOT NULL,
-  source_id TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'run',
+  source_id TEXT NOT NULL DEFAULT '',
+  run_id TEXT,
+  stage TEXT NOT NULL DEFAULT '',
+  message TEXT NOT NULL DEFAULT '',
   user_id TEXT,
-  error TEXT NOT NULL,
+  error TEXT NOT NULL DEFAULT '',
   attempt INTEGER NOT NULL DEFAULT 1,
   context TEXT,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_background_failures_source ON background_failures(kind, source_id);
 CREATE INDEX IF NOT EXISTS idx_background_failures_created ON background_failures(created_at);

@@ -20,7 +20,7 @@ declare module '@axe-core/playwright' {
 
    
   export default class AxeBuilder {
-    constructor(args: { page: any });
+    constructor(args: { page: unknown });
     withRules(rules: string[]): this;
     disableRules(rules: string[]): this;
     analyze(): Promise<AxeResults>;

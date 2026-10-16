@@ -395,4 +395,38 @@ describe('scheduler', () => {
     expect(dispatchSpy).toHaveBeenCalled();
     expect((await store.getMonitor('m1'))?.lastStatus).toBe('error');
   });
+
+  it('persists monitor screenshots into D1Store without violating screenshots.run_id foreign key', async () => {
+    const { createSqliteD1 } = await import('./helpers/sqlite-d1.js');
+    const { D1Store } = await import('../src/db/d1-store.js');
+    const { migrate } = await import('../src/db/migrate.js');
+
+    const { db } = createSqliteD1();
+    await migrate(db);
+    const d1Store = new D1Store(db);
+    await d1Store.createUser({ id: 'u1', plan: 'business', createdAt: 'now' });
+    const monitor = makeMonitor({ id: 'm-d1', userId: 'u1', routes: ['/', '/blog/post-1'] });
+    await d1Store.createMonitor(monitor);
+
+    vi.spyOn(processor, 'processRun').mockImplementation(async (run, _env, onScreenshots) => {
+      if (onScreenshots) {
+        await onScreenshots([
+          { name: '0_index_1440_chromium_0_current', type: 'current', bytes: new Uint8Array([1, 2]) },
+          { name: '1_blog_post-1_1440_chromium_0_current', type: 'current', bytes: new Uint8Array([3, 4]) },
+        ]);
+      }
+      run.status = 'completed';
+      run.results = [
+        { route: '/', viewport: 1440, status: 'new_baseline', diffPercentage: 0, timestamp: 'now' },
+        { route: '/blog/post-1', viewport: 1440, status: 'new_baseline', diffPercentage: 0, timestamp: 'now' },
+      ];
+    });
+
+    const result = await runMonitor({}, d1Store, monitor, new Date('2026-01-01T12:00:00Z'));
+    expect(result.run.status).toBe('passed');
+    expect(result.run.screenshots).toHaveLength(2);
+    expect(result.run.screenshots?.map((s) => s.route)).toEqual(
+      expect.arrayContaining(['/', '/blog/post-1']),
+    );
+  });
 });

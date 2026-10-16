@@ -25,10 +25,12 @@ import {
   parseSlashCommand,
   buildCommandResponse,
   decideCommand,
+  HELP_TEXT,
 } from './events.js';
 import { buildSlackAuthorizeUrl, exchangeSlackCode, type SlackOAuthConfig } from './oauth.js';
-import { putTeamInstall, type KVNamespace } from './storage.js';
+import { getTeamInstall, putTeamInstall, type KVNamespace } from './storage.js';
 import { submitCloudRun, deliverRunResult, assertSafeRunUrl } from './runs.js';
+import { postSlackMessage } from './slack-api.js';
 import { SafeRenderTargetError } from '@frontguard/cloud-api/render-target';
 
 export type { KVNamespace } from './storage.js';
@@ -53,12 +55,29 @@ export interface SlackAppEnv {
   SLACK_REDIRECT_URI?: string;
   /** Bot scopes (comma-separated). Defaults to `chat:write,commands`. */
   SLACK_SCOPES?: string;
+  /** Optional static bot token fallback for single-workspace deployments. */
+  SLACK_BOT_TOKEN?: string;
   /** Frontguard Cloud API base URL (your self-hosted deployment). */
   FRONTGUARD_API_URL?: string;
   /** Frontguard API key used to submit runs on behalf of the workspace. */
   FRONTGUARD_API_KEY?: string;
   /** KV namespace holding one record per installed Slack team. */
   SLACK_TEAMS?: KVNamespace;
+}
+
+/**
+ * Resolves the workspace bot token for a given `teamId` from the `SLACK_TEAMS`
+ * KV store (populated during OAuth install), falling back to `SLACK_BOT_TOKEN`.
+ */
+export async function resolveBotToken(
+  env: SlackAppEnv,
+  teamId?: string,
+): Promise<string | undefined> {
+  if (env.SLACK_TEAMS && teamId) {
+    const install = await getTeamInstall(env.SLACK_TEAMS, teamId);
+    if (install?.accessToken) return install.accessToken;
+  }
+  return env.SLACK_BOT_TOKEN;
 }
 
 const TS_HEADER = 'x-slack-request-timestamp';
@@ -110,6 +129,21 @@ export function createSlackApp() {
       // Slack expects the challenge echoed back verbatim.
       return c.text(decision.challenge);
     }
+    if (decision.kind === 'event') {
+      const botToken = await resolveBotToken(env, decision.teamId);
+      if (botToken && decision.channel && decision.eventType === 'app_mention') {
+        let ctx: ExecutionContextLike | undefined;
+        try {
+          ctx = c.executionCtx as ExecutionContextLike | undefined;
+        } catch {
+          ctx = undefined;
+        }
+        const work = postSlackMessage(botToken, decision.channel, [], HELP_TEXT);
+        if (ctx?.waitUntil) ctx.waitUntil(work);
+        else void work.catch(() => undefined);
+      }
+      return c.json({ ok: true });
+    }
     // Events are acknowledged immediately; real processing would be queued.
     return c.json({ ok: true });
   });
@@ -131,6 +165,7 @@ export function createSlackApp() {
     const cmd = parseSlashCommand(new URLSearchParams(raw));
     const ack = buildCommandResponse(cmd);
     const decision = decideCommand(cmd);
+    const botToken = await resolveBotToken(env, cmd.teamId);
 
     if (decision.kind === 'status') {
       const apiUrl = env.FRONTGUARD_API_URL;
@@ -161,6 +196,8 @@ export function createSlackApp() {
           runId: run.id,
           url: decision.url,
           responseUrl: cmd.responseUrl,
+          botToken,
+          channelId: cmd.channelId,
         });
         // On Workers, waitUntil keeps the request lifetime open. Outside of
         // Workers we just fire-and-forget — `.catch` so an unhandled rejection

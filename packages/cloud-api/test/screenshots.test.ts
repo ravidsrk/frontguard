@@ -170,4 +170,55 @@ describe('GET /v1/screenshots routes (dev mode)', () => {
     const res = await app.request(`/v1/screenshots/${runId}`, { headers: auth('intruder') });
     expect(res.status).toBe(404);
   });
+
+  it('allows team members to access screenshots for a project run owned by another teammate', async () => {
+    const { createHash } = await import('node:crypto');
+    const bobId = `demo:${createHash('sha256').update('bob').digest('hex')}`;
+    const store = getMemoryStore();
+    await store.createUser({ id: bobId, plan: 'free', createdAt: 'now' });
+
+    const teamRes = await app.request('/v1/teams', {
+      method: 'POST',
+      headers: auth('alice'),
+      body: JSON.stringify({ name: 'Acme' }),
+    });
+    const teamId = (await teamRes.json()).id as string;
+    await store.addMember({ teamId, userId: bobId, role: 'member', createdAt: 'now' });
+
+    const projRes = await app.request(`/v1/teams/${teamId}/projects`, {
+      method: 'POST',
+      headers: auth('alice'),
+      body: JSON.stringify({ name: 'Web' }),
+    });
+    const projectId = (await projRes.json()).id as string;
+
+    const runRes = await app.request('/v1/run', {
+      method: 'POST',
+      headers: auth('alice'),
+      body: JSON.stringify({ url: 'https://example.com', projectId }),
+    });
+    const runId = (await runRes.json()).id as string;
+
+    const blobs = getMemoryScreenshotStore();
+    const key = screenshotKey('alice-user', runId, 'current', '/', 1440, 'chromium');
+    await blobs.put(key, new Uint8Array([137, 80, 78, 71]));
+    await store.addScreenshot({
+      id: 'shot-team',
+      runId,
+      route: '/',
+      viewport: 1440,
+      browser: 'chromium',
+      type: 'current',
+      r2Key: key,
+      sizeBytes: 4,
+      createdAt: 'now',
+    });
+
+    const listRes = await app.request(`/v1/screenshots/${runId}`, { headers: auth('bob') });
+    expect(listRes.status).toBe(200);
+    expect((await listRes.json()).total).toBe(1);
+
+    const rawRes = await app.request(`/v1/screenshots/${runId}/shot-team/raw`, { headers: auth('bob') });
+    expect(rawRes.status).toBe(200);
+  });
 });

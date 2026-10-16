@@ -33,6 +33,15 @@ import {
 export interface KVNamespace {
   get(key: string): Promise<string | null>;
   put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+  delete?(key: string): Promise<void>;
+}
+
+async function deleteKvKey(kv: KVNamespace, key: string): Promise<void> {
+  if (typeof kv.delete === 'function') {
+    await kv.delete(key);
+  } else {
+    await kv.put(key, '');
+  }
 }
 
 /** TTL (seconds) for recorded webhook delivery ids used for idempotency. */
@@ -139,15 +148,22 @@ export function createVercelApp() {
         JSON.stringify({
           accessToken: integration.accessToken,
           teamId: integration.teamId,
+          userId: integration.userId,
           configurationId: callback.configurationId,
           installedAt,
         }),
       );
-      // Also key by Vercel teamId so webhooks (which know the team but not the
-      // configurationId) can resolve an installation in O(1).
+      // Also key by Vercel teamId (or userId for personal accounts) so webhooks
+      // can resolve an installation in O(1).
       if (integration.teamId) {
         await c.env.KV.put(
           `team:${integration.teamId}`,
+          JSON.stringify({ configurationId: callback.configurationId, installedAt }),
+        );
+      }
+      if (integration.userId) {
+        await c.env.KV.put(
+          `user:${integration.userId}`,
           JSON.stringify({ configurationId: callback.configurationId, installedAt }),
         );
       }
@@ -226,34 +242,110 @@ export function createVercelApp() {
       await c.env.KV.put(`delivery:${deliveryId}`, '1', { expirationTtl: DELIVERY_ID_TTL_SECONDS });
     }
 
+    // Handle integration uninstallation / revocation events by purging KV records.
+    if (
+      payload.type === 'integration-configuration.removed' ||
+      payload.type === 'integration-configuration-removed'
+    ) {
+      const configId =
+        payload.payload?.configuration?.id ??
+        payload.payload?.configurationId ??
+        payload.configurationId ??
+        undefined;
+      let teamId = payload.payload?.team?.id ?? payload.payload?.teamId ?? undefined;
+      let userId = payload.payload?.user?.id ?? undefined;
+      if (c.env?.KV) {
+        if (configId) {
+          const existing = await c.env.KV.get(`integration:${configId}`);
+          if (existing) {
+            try {
+              const parsed = JSON.parse(existing) as { teamId?: string; userId?: string };
+              teamId = teamId ?? parsed.teamId;
+              userId = userId ?? parsed.userId;
+            } catch {
+              /* ignore */
+            }
+          }
+          await deleteKvKey(c.env.KV, `integration:${configId}`);
+        }
+        if (teamId) {
+          await deleteKvKey(c.env.KV, `team:${teamId}`);
+        }
+        if (userId) {
+          await deleteKvKey(c.env.KV, `user:${userId}`);
+        }
+        const projectIds = new Set<string>();
+        if (payload.payload?.project?.id) projectIds.add(payload.payload.project.id);
+        for (const p of payload.payload?.projects ?? []) {
+          projectIds.add(typeof p === 'string' ? p : p.id);
+        }
+        for (const p of payload.payload?.configuration?.projects ?? []) {
+          projectIds.add(typeof p === 'string' ? p : p.id);
+        }
+        for (const pid of projectIds) {
+          if (pid) await deleteKvKey(c.env.KV, projectAuthorizationKey(pid));
+        }
+      }
+      return c.json({
+        triggered: false,
+        removed: true,
+        configurationId: configId ?? null,
+        reason: 'Integration configuration removed',
+      });
+    }
+
     const decision = decideFromWebhook(payload);
     if (!decision.trigger || !decision.previewUrl) {
       return c.json({ triggered: false, reason: decision.reason });
     }
 
     // Project authorization for custom-domain previews.
-    //
-    // Trust model (full details in webhook.ts and docs/integrations/vercel.mdx):
-    //  - A valid HMAC signature proves the event originated at Vercel for an
-    //    integration whose client secret we hold — i.e. someone installed
-    //    Frontguard. That alone is consent to receive preview URLs.
-    //  - We additionally require that the project (or its owning team) appear
-    //    in our KV install record. This lets users revoke an installation
-    //    (which deletes the KV record) and immediately stop the integration
-    //    from accepting custom-domain previews.
-    //  - `*.vercel.app` URLs bypass this check (Vercel owns that suffix), so
-    //    the integration keeps working before any project lookup is set up.
     let authorizedProject = false;
     if (c.env?.KV) {
       const projectId = decision.projectId;
       const teamId = decision.teamId;
-      if (projectId) {
-        const seen = await c.env.KV.get(projectAuthorizationKey(projectId));
-        if (seen) authorizedProject = true;
-      }
+      const configurationId = decision.configurationId;
+      const userId = decision.userId;
       if (!authorizedProject && teamId) {
         const installed = await c.env.KV.get(`team:${teamId}`);
         if (installed) authorizedProject = true;
+      }
+      if (!authorizedProject && configurationId) {
+        const installed = await c.env.KV.get(`integration:${configurationId}`);
+        if (installed) authorizedProject = true;
+      }
+      if (!authorizedProject && userId) {
+        const installed = await c.env.KV.get(`user:${userId}`);
+        if (installed) authorizedProject = true;
+      }
+      if (!authorizedProject && projectId) {
+        const seen = await c.env.KV.get(projectAuthorizationKey(projectId));
+        if (seen) {
+          try {
+            const parsed = JSON.parse(seen) as {
+              teamId?: string | null;
+              configurationId?: string | null;
+              userId?: string | null;
+            };
+            const hasOwnerRef = Boolean(parsed.teamId || parsed.configurationId || parsed.userId);
+            if (!hasOwnerRef) {
+              authorizedProject = true;
+            } else {
+              if (parsed.teamId && (await c.env.KV.get(`team:${parsed.teamId}`))) {
+                authorizedProject = true;
+              } else if (
+                parsed.configurationId &&
+                (await c.env.KV.get(`integration:${parsed.configurationId}`))
+              ) {
+                authorizedProject = true;
+              } else if (parsed.userId && (await c.env.KV.get(`user:${parsed.userId}`))) {
+                authorizedProject = true;
+              }
+            }
+          } catch {
+            authorizedProject = true;
+          }
+        }
       }
       // Lazy first-time registration: signature is verified, so we know the
       // event came from Vercel for our integration. Record the project so
@@ -261,7 +353,12 @@ export function createVercelApp() {
       if (authorizedProject && projectId) {
         await c.env.KV.put(
           projectAuthorizationKey(projectId),
-          JSON.stringify({ teamId: teamId ?? null, firstSeenAt: new Date().toISOString() }),
+          JSON.stringify({
+            teamId: teamId ?? null,
+            configurationId: configurationId ?? null,
+            userId: userId ?? null,
+            firstSeenAt: new Date().toISOString(),
+          }),
         );
       }
     }

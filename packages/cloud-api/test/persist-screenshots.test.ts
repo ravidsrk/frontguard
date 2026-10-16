@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryStore } from '../src/db/store.js';
 import { getMemoryScreenshotStore, resetMemoryScreenshotStore } from '../src/storage/screenshots.js';
-import { parseScreenshotName, persistScreenshots, type PendingScreenshot } from '../src/storage/persist-screenshots.js';
+import {
+  parseScreenshotName,
+  persistScreenshots,
+  promoteRunCurrentScreenshotsToBaseline,
+  selectApprovedBaselineScreenshots,
+  type PendingScreenshot,
+} from '../src/storage/persist-screenshots.js';
 
 describe('parseScreenshotName', () => {
   it('parses a standard reporter image basename', () => {
@@ -15,6 +21,27 @@ describe('parseScreenshotName', () => {
 
   it('maps the root sentinel to /', () => {
     expect(parseScreenshotName('_root_390_webkit_2_current')?.route).toBe('/');
+    expect(parseScreenshotName('0_index_1440_chromium_0_current')?.route).toBe('/');
+  });
+
+  it('recovers nested routes when knownRoutes are supplied (with or without CLI index prefix)', () => {
+    const knownRoutes = ['/', '/blog/post-1', '/docs/api/v2'];
+    expect(
+      parseScreenshotName('0_blog_post-1_1440_chromium_0_current', knownRoutes),
+    ).toEqual({
+      route: '/blog/post-1',
+      viewport: 1440,
+      browser: 'chromium',
+      type: 'current',
+    });
+    expect(
+      parseScreenshotName('docs_api_v2_375_webkit_1_diff', knownRoutes),
+    ).toEqual({
+      route: '/docs/api/v2',
+      viewport: 375,
+      browser: 'webkit',
+      type: 'diff',
+    });
   });
 
   it('rejects unknown browsers and malformed names', () => {
@@ -61,5 +88,32 @@ describe('persistScreenshots', () => {
     const count = await persistScreenshots(store, blobs, 'u', 'r', shots);
     expect(count).toBe(1);
     expect((await store.listScreenshots('r')).length).toBe(1);
+  });
+
+  it('prefers current over baseline in selectApprovedBaselineScreenshots and promotes current on approval', async () => {
+    const blobs = getMemoryScreenshotStore();
+    await persistScreenshots(
+      store,
+      blobs,
+      'u1',
+      'r1',
+      [
+        { name: '0_blog_post-1_1440_chromium_0_baseline', type: 'baseline', bytes: new Uint8Array([1]) },
+        { name: '0_blog_post-1_1440_chromium_0_current', type: 'current', bytes: new Uint8Array([2, 3]) },
+        { name: '1_pricing_1440_chromium_0_current', type: 'current', bytes: new Uint8Array([4]) },
+      ],
+      ['/blog/post-1', '/pricing'],
+    );
+    const allShots = await store.listScreenshots('r1');
+    const selected = selectApprovedBaselineScreenshots(allShots);
+    expect(selected).toHaveLength(2);
+    expect(selected.find((s) => s.route === '/blog/post-1')?.type).toBe('current');
+    expect(selected.find((s) => s.route === '/pricing')?.type).toBe('current');
+
+    await promoteRunCurrentScreenshotsToBaseline(store, 'r1');
+    const afterPromote = await store.listScreenshots('r1');
+    expect(
+      afterPromote.find((s) => s.route === '/pricing' && s.type === 'baseline'),
+    ).toBeDefined();
   });
 });

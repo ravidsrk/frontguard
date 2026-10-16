@@ -73,6 +73,7 @@ export const onSuccess = async ({ inputs = {}, utils }) => {
       apiKey,
       previewUrl: decision.previewUrl,
       routes: inputs.routes,
+      projectId: inputs.projectId || process.env.FRONTGUARD_PROJECT_ID,
     });
     log(`Run queued: ${triggered.id}`);
     run = await pollRun({ apiUrl, apiKey, runId: triggered.id });

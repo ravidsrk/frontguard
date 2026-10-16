@@ -85,18 +85,31 @@ export class FixPatternDB {
    */
   async open(): Promise<boolean> {
     if (this.db) return this.available;
-    let Ctor: SqliteConstructor;
+    if (this.path !== ':memory:') mkdirSync(dirname(this.path), { recursive: true });
+    let instance: SqliteDatabase | null = null;
     try {
       const mod = await import('better-sqlite3');
-      Ctor = (mod.default ?? mod) as unknown as SqliteConstructor;
+      const Ctor = (mod.default ?? mod) as unknown as SqliteConstructor;
+      instance = new Ctor(this.path);
     } catch {
+      try {
+        const sqliteMod = (await import('node:sqlite' as string)) as {
+          DatabaseSync?: SqliteConstructor;
+        };
+        if (sqliteMod.DatabaseSync) {
+          instance = new sqliteMod.DatabaseSync(this.path);
+        }
+      } catch {
+        // Neither better-sqlite3 nor node:sqlite available.
+      }
+    }
+    if (!instance) {
       logger.debug('better-sqlite3 not available — fix-pattern DB disabled.');
       this.available = false;
       return false;
     }
     try {
-      if (this.path !== ':memory:') mkdirSync(dirname(this.path), { recursive: true });
-      this.db = new Ctor(this.path);
+      this.db = instance;
       this.db.exec(SCHEMA);
       this.migrate();
       this.available = true;
@@ -193,7 +206,7 @@ export class FixPatternDB {
     const rejected = this.db
       .prepare(`SELECT COUNT(*) AS n FROM fix_patterns WHERE context_hash = ? AND accepted = 0`)
       .get(contextHash) as { n: number };
-    if (rejected.n > 0) return null;
+    if (Number(rejected.n) > 0) return null;
 
     // accept_count accumulates each time the same fix is recorded as accepted
     // for this context, so a single row can cross the reuse threshold.
@@ -224,7 +237,7 @@ export class FixPatternDB {
     const res = this.db
       .prepare(`UPDATE fix_patterns SET accepted = ? WHERE id = ?`)
       .run(accepted ? 1 : 0, id);
-    return res.changes > 0;
+    return Number(res.changes) > 0;
   }
 
   /** Returns all patterns (for export). */
@@ -255,7 +268,7 @@ export class FixPatternDB {
         p.route ?? null,
         p.viewport ?? null,
       );
-      count += res.changes;
+      count += Number(res.changes);
     }
     return count;
   }
@@ -271,7 +284,11 @@ export class FixPatternDB {
          FROM fix_patterns`,
       )
       .get() as { total: number; accepted: number | null; rejected: number | null };
-    return { total: row.total, accepted: row.accepted ?? 0, rejected: row.rejected ?? 0 };
+    return {
+      total: Number(row.total),
+      accepted: Number(row.accepted ?? 0),
+      rejected: Number(row.rejected ?? 0),
+    };
   }
 
   /** Closes the database. */

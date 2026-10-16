@@ -317,20 +317,9 @@ export async function discoverStorybookStories(
   const includes = sbConfig.stories ?? [];
   const excludes = sbConfig.exclude ?? [];
 
-  const paramMap = await resolveStoryFrontguardParameters(
-    normalizeBase(sbConfig.url),
-    Object.values(entries),
-    {
-      storybookMajor,
-      projectRoot: sbConfig.projectRoot,
-      fetchTimeoutMs: sbConfig.fetchTimeoutMs,
-    },
-  );
-
-  const routes: Route[] = [];
+  const candidateEntries: Array<(typeof entries)[string]> = [];
   let docsSkipped = 0;
   let filtered = 0;
-  let paramSkipped = 0;
 
   for (const entry of Object.values(entries)) {
     // Skip docs-only entries — they aren't capturable as a story preview.
@@ -351,6 +340,23 @@ export async function discoverStorybookStories(
       continue;
     }
 
+    candidateEntries.push(entry);
+  }
+
+  const paramMap = await resolveStoryFrontguardParameters(
+    normalizeBase(sbConfig.url),
+    candidateEntries,
+    {
+      storybookMajor,
+      projectRoot: sbConfig.projectRoot,
+      fetchTimeoutMs: sbConfig.fetchTimeoutMs,
+    },
+  );
+
+  const routes: Route[] = [];
+  let paramSkipped = 0;
+
+  for (const entry of candidateEntries) {
     const params = paramMap.get(entry.id) ?? entry.parameters?.frontguard;
     if (params?.skip) {
       paramSkipped++;

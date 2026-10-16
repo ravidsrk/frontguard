@@ -24,6 +24,10 @@ import {
   type MonitorAlert,
 } from "../alerts/index.js";
 import { getPlan, checkLimit, hasFeature } from "../billing/plans.js";
+import {
+  SafeRenderTargetError,
+  assertSafeRenderTarget,
+} from "../security/render-target.js";
 
 type Variables = { store: Store; userId: string };
 
@@ -40,6 +44,7 @@ export const monitorRoutes = new Hono<{
 const baseShape = {
   name: z.string().min(1).max(100),
   url: z.url(),
+  projectId: z.string().min(1).optional(),
   routes: z.array(z.string()).min(1),
   viewports: z.array(z.number().int().min(320).max(3840)),
   intervalMinutes: z.number().int().min(5).max(10_080),
@@ -81,6 +86,15 @@ monitorRoutes.post("/", async (c) => {
       400,
     );
   }
+  try {
+    await assertSafeRenderTarget(parsed.data.url);
+  } catch (err) {
+    if (err instanceof SafeRenderTargetError) {
+      return c.json({ error: err.message }, 400);
+    }
+    throw err;
+  }
+
   const store = c.get("store");
   const userId = c.get("userId");
 
@@ -115,6 +129,7 @@ monitorRoutes.post("/", async (c) => {
   const monitor: Monitor = {
     id: crypto.randomUUID(),
     userId,
+    ...(d.projectId ? { projectId: d.projectId } : {}),
     name: d.name,
     url: d.url,
     routes: d.routes,
@@ -152,6 +167,16 @@ monitorRoutes.patch("/:id", async (c) => {
       },
       400,
     );
+  }
+  if (parsed.data.url) {
+    try {
+      await assertSafeRenderTarget(parsed.data.url);
+    } catch (err) {
+      if (err instanceof SafeRenderTargetError) {
+        return c.json({ error: err.message }, 400);
+      }
+      throw err;
+    }
   }
   await store.updateMonitor(id, parsed.data);
   return c.json(await store.getMonitor(id));

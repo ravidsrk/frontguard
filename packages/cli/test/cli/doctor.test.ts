@@ -69,6 +69,25 @@ describe('doctor: checkBrowsersAvailable', () => {
     expect(r.status).toBe('pass');
     expect(r.message).toContain('chromium, firefox, webkit');
   });
+
+  it('checks PLAYWRIGHT_BROWSERS_PATH first when set', async () => {
+    const dir = makeTempDir();
+    try {
+      const { mkdirSync } = await import('node:fs');
+      mkdirSync(join(dir, 'chromium-1140'));
+      vi.stubEnv('PLAYWRIGHT_BROWSERS_PATH', dir);
+
+      const passRes = await checkBrowsersAvailable(['chromium']);
+      expect(passRes.status).toBe('pass');
+
+      const failRes = await checkBrowsersAvailable(['firefox']);
+      expect(failRes.status).toBe('fail');
+      expect(failRes.message).toContain('firefox');
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('doctor: getRequiredBrowsers', () => {

@@ -109,6 +109,8 @@ export async function sendWebhookAlert(webhookUrl: string, payload: AlertPayload
   }
 }
 
+let lastHistoryTimestampMs = 0;
+
 /**
  * Save a history entry to disk and prune old entries.
  */
@@ -122,7 +124,9 @@ function saveHistoryEntry(
   const dir = join(historyDir, slug);
   mkdirSync(dir, { recursive: true });
 
-  const filename = `${Date.now()}.json`;
+  const now = Date.now();
+  lastHistoryTimestampMs = now > lastHistoryTimestampMs ? now : lastHistoryTimestampMs + 1;
+  const filename = `${lastHistoryTimestampMs}.json`;
   writeFileSync(join(dir, filename), JSON.stringify(entry, null, 2));
 
   // Prune old entries

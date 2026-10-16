@@ -23,6 +23,7 @@ export interface VercelWebhookPayload {
   /** Unique event/delivery id Vercel assigns to each webhook event. */
   id?: string;
   type: string;
+  configurationId?: string | null;
   payload: {
     deployment?: {
       id: string;
@@ -32,6 +33,12 @@ export interface VercelWebhookPayload {
       target?: string | null; // "production" | "staging" | null (preview)
     };
     project?: { id: string; name?: string };
+    projects?: Array<{ id: string } | string>;
+    /** Integration configuration (present on personal & team installs and removal events). */
+    configuration?: { id?: string; projects?: Array<{ id: string } | string> } | null;
+    configurationId?: string | null;
+    /** Owning user (present on personal-account installs/events). */
+    user?: { id: string } | null;
     /** Owning team id (present on team-owned projects). */
     team?: { id: string } | null;
     teamId?: string | null;
@@ -49,6 +56,10 @@ export interface WebhookDecision {
   projectId?: string;
   /** The Vercel team id, when the project is team-owned. */
   teamId?: string;
+  /** The Vercel integration configuration id, when present on the webhook. */
+  configurationId?: string;
+  /** The Vercel user id, when present on personal-account webhooks. */
+  userId?: string;
   /** Git metadata extracted from the deployment, if present. */
   git?: {
     commitSha?: string;
@@ -182,12 +193,20 @@ export function decideFromWebhook(payload: VercelWebhookPayload): WebhookDecisio
 
   const meta = dep.meta ?? {};
   const teamId = payload.payload.team?.id ?? payload.payload.teamId ?? undefined;
+  const configurationId =
+    payload.payload.configuration?.id ??
+    payload.payload.configurationId ??
+    payload.configurationId ??
+    undefined;
+  const userId = payload.payload.user?.id ?? undefined;
   return {
     trigger: true,
     reason: 'Preview deployment succeeded',
     previewUrl: dep.url.startsWith('http') ? dep.url : `https://${dep.url}`,
     projectId: payload.payload.project?.id,
     teamId: teamId ?? undefined,
+    configurationId: configurationId ?? undefined,
+    userId,
     git: {
       commitSha: meta.githubCommitSha ?? meta.gitCommitSha,
       pullRequestId: meta.githubPrId ?? meta.githubCommitRef,
