@@ -20,7 +20,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { requireAuth, MissingApiKeyError, MissingApiUrlError } from './auth.js';
-import { CloudApiError, CloudClient } from './client/cloud.js';
+import {
+  CloudApiError,
+  CloudClient,
+  createLocalReportClient,
+  resolveLocalReportPath,
+} from './client/cloud.js';
 import {
   acceptBaseline,
   acceptBaselineInputSchema,
@@ -114,8 +119,10 @@ async function withCloudClient<T extends object>(
   fn: (client: CloudClient) => Promise<T>,
 ): Promise<CallToolResult> {
   try {
-    const auth = requireAuth();
-    const client = new CloudClient(auth);
+    const localReportPath = resolveLocalReportPath();
+    const client = localReportPath
+      ? createLocalReportClient(localReportPath)
+      : new CloudClient(requireAuth());
     const data = await fn(client);
     return {
       content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],

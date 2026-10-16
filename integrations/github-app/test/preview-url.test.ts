@@ -425,4 +425,67 @@ describe('handler — preview URL caching + run trigger', () => {
       globalThis.fetch = orig;
     }
   });
+
+  it('triggers the pending PR run when deployment_status arrives after pull_request', async () => {
+    const app = createGitHubApp();
+    const orig = globalThis.fetch;
+    let sentBody: Record<string, unknown> | null = null;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      const u = String(url);
+      if (u.includes('/access_tokens')) {
+        return new Response(JSON.stringify({ token: 'ghs_test' }), { status: 201 });
+      }
+      if (u.includes('/check-runs') && init?.method === 'POST') {
+        return new Response(JSON.stringify({ id: 888 }), { status: 201 });
+      }
+      if (u.includes('/contents/')) return new Response('no', { status: 404 });
+      if (u.includes('/v1/run')) {
+        sentBody = JSON.parse(init.body as string);
+        return new Response(JSON.stringify({ id: 'run_deferred' }), { status: 202 });
+      }
+      throw new Error(`Unhandled fetch: ${u}`);
+    }) as typeof fetch;
+    try {
+      const env = {
+        ...APP_ENV,
+        FRONTGUARD_API_URL: 'https://api.frontguard.dev',
+        FRONTGUARD_API_KEY: 'fg_x',
+      };
+      // 1. pull_request arrives first — no preview URL yet
+      const prRes = await postWebhook(app, 'pull_request', JSON.stringify(prEvent('sha-deferred')), env);
+      const prJson = await prRes.json();
+      expect(prJson.triggered).toBe(false);
+      expect(prJson.checkRunId).toBe(888);
+
+      // 2. deployment_status arrives later for the same commit (or branch)
+      const depBody = JSON.stringify({
+        deployment: { sha: 'sha-deferred', ref: 'feature', environment: 'Deploy Preview' },
+        deployment_status: {
+          state: 'success',
+          environment_url: 'https://deploy-preview-7--app.netlify.app',
+        },
+        repository: { name: 'web', owner: { login: 'acme' }, full_name: 'acme/web' },
+      });
+      const depRes = await postWebhook(app, 'deployment_status', depBody, env);
+      const depJson = await depRes.json();
+      expect(depJson.cached).toBe(true);
+      expect(depJson.triggered).toBe(true);
+      expect(depJson.runId).toBe('run_deferred');
+      expect(depJson.checkRunId).toBe(888);
+      expect(sentBody).toMatchObject({
+        url: 'https://deploy-preview-7--app.netlify.app',
+        previewSource: 'netlify-deployment',
+        projectId: 'acme/web',
+        checkRunId: 888,
+        github: {
+          owner: 'acme',
+          repo: 'web',
+          commitSha: 'sha-deferred',
+          prNumber: 7,
+        },
+      });
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
 });

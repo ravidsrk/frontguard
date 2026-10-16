@@ -71,11 +71,35 @@ export interface GitHubAppEnv {
  *
  * @internal
  */
+interface PendingPullRequest {
+  owner: string;
+  repo: string;
+  prNumber: number;
+  commitSha: string;
+  branch: string;
+  installationId?: number;
+  checkRunId?: number;
+  repoConfig: { path: string; format: string; content: string } | null;
+}
+
 const previewUrlCache = new Map<string, InferredPreviewUrl>();
+const pendingPrCache = new Map<string, PendingPullRequest>();
 
 /** Builds the cache key used for preview URLs. */
 function previewCacheKey(owner: string, repo: string, sha: string): string {
   return `${owner}/${repo}@${sha}`;
+}
+
+function rememberPendingPr(pending: PendingPullRequest): void {
+  pendingPrCache.set(previewCacheKey(pending.owner, pending.repo, pending.commitSha), pending);
+}
+
+function peekPendingPr(owner: string, repo: string, sha: string): PendingPullRequest | null {
+  return pendingPrCache.get(previewCacheKey(owner, repo, sha)) ?? null;
+}
+
+function deletePendingPr(owner: string, repo: string, sha: string): void {
+  pendingPrCache.delete(previewCacheKey(owner, repo, sha));
 }
 
 /**
@@ -103,6 +127,7 @@ export function recallPreviewUrl(
 /** Test-only: wipes the cache between runs. */
 export function clearPreviewUrlCache(): void {
   previewUrlCache.clear();
+  pendingPrCache.clear();
 }
 
 /** Constant-time string comparison to avoid leaking secrets via timing. */
@@ -184,7 +209,7 @@ export function createGitHubApp() {
       return c.json({ handled: true, bootstrapped: true, opened, skipped });
     }
 
-    // ── Vercel commit_status events → cache preview URL ─────────────────────
+    // ── Vercel commit_status events → cache preview URL (+ trigger pending PR) ─
     if (event === 'status') {
       let statusEvent: CommitStatusEvent;
       try {
@@ -194,18 +219,80 @@ export function createGitHubApp() {
       }
       const preview = previewUrlFromCommitStatus(statusEvent);
       if (preview && statusEvent.repository) {
-        rememberPreviewUrl(
-          statusEvent.repository.owner.login,
-          statusEvent.repository.name,
-          statusEvent.sha,
-          preview,
-        );
+        const owner = statusEvent.repository.owner.login;
+        const repo = statusEvent.repository.name;
+        rememberPreviewUrl(owner, repo, statusEvent.sha, preview);
+        const pending = peekPendingPr(owner, repo, statusEvent.sha);
+        if (pending && env.FRONTGUARD_API_URL && env.FRONTGUARD_API_KEY) {
+          try {
+            const res = await fetch(`${env.FRONTGUARD_API_URL}/v1/run`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${env.FRONTGUARD_API_KEY}`,
+              },
+              body: JSON.stringify({
+                url: preview.url,
+                previewSource: preview.source,
+                projectId: `${pending.owner}/${pending.repo}`,
+                github: {
+                  owner: pending.owner,
+                  repo: pending.repo,
+                  commitSha: pending.commitSha,
+                  prNumber: pending.prNumber,
+                },
+                installationId: pending.installationId,
+                checkRunId: pending.checkRunId,
+                config: pending.repoConfig,
+              }),
+            });
+            const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+            if (!res.ok || typeof data.id !== 'string' || !data.id) {
+              return c.json(
+                {
+                  handled: true,
+                  cached: true,
+                  triggered: false,
+                  source: preview.source,
+                  url: preview.url,
+                  error: data.error ?? `Cloud API returned HTTP ${res.status}`,
+                },
+                502,
+              );
+            }
+            deletePendingPr(owner, repo, statusEvent.sha);
+            return c.json({
+              handled: true,
+              cached: true,
+              triggered: true,
+              runId: data.id,
+              checkRunId: pending.checkRunId,
+              source: preview.source,
+              url: preview.url,
+              previewUrl: preview.url,
+              previewSource: preview.source,
+              config: pending.repoConfig?.path ?? null,
+            });
+          } catch (err) {
+            return c.json(
+              {
+                handled: true,
+                cached: true,
+                triggered: false,
+                source: preview.source,
+                url: preview.url,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              502,
+            );
+          }
+        }
         return c.json({ handled: true, cached: true, source: preview.source, url: preview.url });
       }
       return c.json({ handled: true, cached: false, reason: 'No preview URL detected' });
     }
 
-    // ── Netlify / Cloudflare deployment_status → cache preview URL ──────────
+    // ── Netlify / Cloudflare deployment_status → cache preview URL (+ trigger pending PR) ─
     if (event === 'deployment_status') {
       let depEvent: DeploymentStatusEvent;
       try {
@@ -215,12 +302,75 @@ export function createGitHubApp() {
       }
       const preview = previewUrlFromDeploymentStatus(depEvent);
       if (preview && depEvent.repository) {
-        rememberPreviewUrl(
-          depEvent.repository.owner.login,
-          depEvent.repository.name,
-          depEvent.deployment.sha,
-          preview,
-        );
+        const owner = depEvent.repository.owner.login;
+        const repo = depEvent.repository.name;
+        const sha = depEvent.deployment.sha;
+        rememberPreviewUrl(owner, repo, sha, preview);
+        const pending = peekPendingPr(owner, repo, sha);
+        if (pending && env.FRONTGUARD_API_URL && env.FRONTGUARD_API_KEY) {
+          try {
+            const res = await fetch(`${env.FRONTGUARD_API_URL}/v1/run`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${env.FRONTGUARD_API_KEY}`,
+              },
+              body: JSON.stringify({
+                url: preview.url,
+                previewSource: preview.source,
+                projectId: `${pending.owner}/${pending.repo}`,
+                github: {
+                  owner: pending.owner,
+                  repo: pending.repo,
+                  commitSha: pending.commitSha,
+                  prNumber: pending.prNumber,
+                },
+                installationId: pending.installationId,
+                checkRunId: pending.checkRunId,
+                config: pending.repoConfig,
+              }),
+            });
+            const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+            if (!res.ok || typeof data.id !== 'string' || !data.id) {
+              return c.json(
+                {
+                  handled: true,
+                  cached: true,
+                  triggered: false,
+                  source: preview.source,
+                  url: preview.url,
+                  error: data.error ?? `Cloud API returned HTTP ${res.status}`,
+                },
+                502,
+              );
+            }
+            deletePendingPr(owner, repo, sha);
+            return c.json({
+              handled: true,
+              cached: true,
+              triggered: true,
+              runId: data.id,
+              checkRunId: pending.checkRunId,
+              source: preview.source,
+              url: preview.url,
+              previewUrl: preview.url,
+              previewSource: preview.source,
+              config: pending.repoConfig?.path ?? null,
+            });
+          } catch (err) {
+            return c.json(
+              {
+                handled: true,
+                cached: true,
+                triggered: false,
+                source: preview.source,
+                url: preview.url,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              502,
+            );
+          }
+        }
         return c.json({ handled: true, cached: true, source: preview.source, url: preview.url });
       }
       return c.json({ handled: true, cached: false, reason: 'No preview URL detected' });
@@ -275,7 +425,11 @@ export function createGitHubApp() {
     //   3. null — we explicitly do NOT fall back to `pull_request.html_url`
     //      (which points at github.com, not the deployed preview) since that
     //      makes Frontguard test the PR page rather than the app.
-    const observed = recallPreviewUrl(decision.owner!, decision.repo!, decision.commitSha!);
+    const observed = recallPreviewUrl(
+      decision.owner!,
+      decision.repo!,
+      decision.commitSha!,
+    );
     const inferred = inferPreviewUrl({
       event: payload,
       template: env.FRONTGUARD_PREVIEW_URL_TEMPLATE,
@@ -283,6 +437,16 @@ export function createGitHubApp() {
     });
 
     if (!inferred) {
+      rememberPendingPr({
+        owner: decision.owner!,
+        repo: decision.repo!,
+        prNumber: decision.prNumber!,
+        commitSha: decision.commitSha!,
+        branch: payload.pull_request.head.ref,
+        installationId: decision.installationId,
+        checkRunId,
+        repoConfig,
+      });
       return c.json({
         handled: true,
         triggered: false,
@@ -306,6 +470,7 @@ export function createGitHubApp() {
           body: JSON.stringify({
             url: inferred.url,
             previewSource: inferred.source,
+            projectId: `${decision.owner}/${decision.repo}`,
             github: {
               owner: decision.owner,
               repo: decision.repo,

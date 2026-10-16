@@ -27,3 +27,7 @@ inputs:
       GitHub token for posting results to the PR. Prefer the GITHUB_TOKEN site
       environment variable.
     required: false
+  - name: projectId
+    description: >-
+      Optional Frontguard project ID to scope baseline lookups and runs.
+    required: false

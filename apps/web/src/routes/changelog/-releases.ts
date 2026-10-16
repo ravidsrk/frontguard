@@ -38,9 +38,134 @@ export const RELEASES: Release[] = [
     tagBorder: '#3a2a18',
     tagBg: '#1a130b',
     date: 'on main',
-    title: 'Storybook, OpenTelemetry & a native Slack app',
+    title: '0.2.3 (RC) — Fail-closed pipeline & production hardening',
     summary:
-      'The next release deepens integrations and observability — capture Storybook stories directly, export run metrics over OTLP, and post results to Slack.',
+      'Release candidate 0.2.3 hardens the comparison pipeline to fail closed, enforces read-only baseline checks, keeps AI classifications advisory, and closes route-discovery, plugin, and Cloud API schema gaps.',
+    groups: [
+      {
+        kind: 'changed',
+        items: [
+          {
+            term: 'Fail-closed pipeline & read-only baselines',
+            detail:
+              ' — empty comparisons, render/storage/AI errors, rejected judge calls, and diverged CI baselines fail closed; baseline writes require explicit update mode.',
+          },
+          {
+            term: 'Deterministic AI pass/fail contract',
+            detail:
+              ' — AI classifications and fix suggestions are advisory annotations and never silently downgrade failing pixel diffs.',
+          },
+          {
+            term: 'Framework route discovery & Storybook 8 cache',
+            detail:
+              ' — Next.js App Router route groups/parallel slots, Remix _index routes, and Storybook 8 static parameter caches are resolved accurately.',
+          },
+          {
+            term: 'Plugin, Git worktree & Cloud API hardening',
+            detail:
+              ' — Perf Budgets DOM script injection, Figma buffer cleanup, batch Git orphan baseline commits, D1 schema/migration sync, and webhook/SSRF guards.',
+          },
+        ],
+      },
+      {
+        kind: 'security',
+        items: [
+          {
+            term: 'HTTP security headers & supply-chain updates',
+            detail:
+              ' — strict CSP/HSTS/frame-ancestors headers on frontguard.dev, monitor SSRF validation, and updated transitive dependencies.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.2.2',
+    vColor: '#4fb477',
+    statusLabel: 'LATEST RELEASE',
+    tagColor: '#4fb477',
+    tagBorder: '#24472f',
+    tagBg: '#0e1410',
+    date: '2026-06-21',
+    isoDate: '2026-06-21',
+    title: 'Config loader & package metadata alignment',
+    summary:
+      'Preserves optional dependencies in the published CLI config loader and aligns README and release metadata across all five published npm packages.',
+    groups: [
+      {
+        kind: 'changed',
+        items: [
+          {
+            term: 'CLI config loader dependencies',
+            detail:
+              ' — keeps optional TypeScript/ESM config loader dependencies intact in the published @frontguard/cli tarball.',
+          },
+          {
+            term: 'Workspace package READMEs & version sync',
+            detail:
+              ' — ships workspace-local READMEs and closes release metadata drift across @frontguard/cli, @frontguard/playwright, @frontguard/mcp, create-frontguard-plugin, and @frontguard/netlify-plugin.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.2.1',
+    vColor: '#5b8def',
+    statusLabel: 'PATCH RELEASE',
+    tagColor: '#5b8def',
+    tagBorder: '#1f3256',
+    tagBg: '#0d1320',
+    date: '2026-06-20',
+    isoDate: '2026-06-20',
+    title: 'Production-close remediation',
+    summary:
+      'Republishes the five public npm packages with config loader, MCP stdio, Storybook 8.6, supply-chain, SSRF, and documentation fixes.',
+    groups: [
+      {
+        kind: 'changed',
+        items: [
+          {
+            term: 'CLI config loader & telemetry opt-out precedence',
+            detail:
+              ' — resolves .ts/.js/.mjs/.cjs configs cleanly and ensures environment opt-outs override telemetry.enabled.',
+          },
+          {
+            term: 'MCP server & Storybook 8.6 readiness',
+            detail:
+              ' — realpath-safe MCP entry guard with clean stdio JSON-RPC output, and Storybook 8.6 finished-phase parameter discovery.',
+          },
+          {
+            term: 'Netlify plugin & canonical install docs',
+            detail:
+              ' — inspects real cloud-api status values and standardizes scoped @frontguard/cli commands across docs.',
+          },
+        ],
+      },
+      {
+        kind: 'security',
+        items: [
+          {
+            term: 'Supply-chain & Slack SSRF guards',
+            detail:
+              ' — migrated to @daytona/sdk, cleared high/critical audit findings, and added SSRF validation on Slack slash-command URLs.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.2.0',
+    vColor: '#8c847a',
+    statusLabel: 'MINOR RELEASE',
+    tagColor: '#8c847a',
+    tagBorder: '#2a2622',
+    tagBg: '#131210',
+    date: '2026-06-17',
+    isoDate: '2026-06-17',
+    title: 'The "earn trust" release',
+    summary:
+      'The core engine is joined by an AI auto-fix moat, a cloud platform, production monitoring, and a full integration surface.',
     groups: [
       {
         kind: 'added',
@@ -70,26 +195,6 @@ export const RELEASES: Release[] = [
             detail:
               ' — axe-core violations are fused into the AI prompt so the model can correlate a visual change with a known a11y issue.',
           },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.2.0',
-    vColor: '#4fb477',
-    statusLabel: 'LATEST RELEASE',
-    tagColor: '#4fb477',
-    tagBorder: '#24472f',
-    tagBg: '#0e1410',
-    date: '2026-06-03',
-    isoDate: '2026-06-03',
-    title: 'The "earn trust" release',
-    summary:
-      'The core engine is joined by an AI auto-fix moat, a cloud platform, production monitoring, and a full integration surface.',
-    groups: [
-      {
-        kind: 'added',
-        items: [
           {
             term: 'frontguard doctor',
             detail:

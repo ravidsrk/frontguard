@@ -129,6 +129,19 @@ describe('triggerRun', () => {
     const fakeFetch = async () => new Response('nope', { status: 500 });
     await expect(triggerRun({ apiUrl: 'https://api', apiKey: 'k', previewUrl: 'https://p' }, fakeFetch)).rejects.toThrow(/500/);
   });
+
+  it('forwards projectId when provided so Cloud API can restore project baselines', async () => {
+    let body;
+    const fakeFetch = async (_u, init) => {
+      body = JSON.parse(init.body);
+      return new Response(JSON.stringify({ id: 'r_proj' }), { status: 200 });
+    };
+    await triggerRun(
+      { apiUrl: 'https://api', apiKey: 'k', previewUrl: 'https://p', projectId: 'proj_123' },
+      fakeFetch,
+    );
+    expect(body.projectId).toBe('proj_123');
+  });
 });
 
 describe('pollRun', () => {

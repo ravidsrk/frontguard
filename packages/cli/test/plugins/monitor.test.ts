@@ -229,6 +229,28 @@ describe('createMonitorPlugin', () => {
     expect(JSON.parse(readFileSync(join(historyDir, file), 'utf-8')).status).toBe('pass');
   });
 
+  it('does not overwrite history files when multiple viewports for the same URL complete in the same millisecond', () => {
+    const plugin = createMonitorPlugin({
+      urls: ['https://example.com'],
+      alertThreshold: 0.05,
+      historyDir: join(tempDir, 'history'),
+    });
+    plugin.setup!(makeContext());
+
+    plugin.afterCompare!(
+      [
+        makeDiff({ viewport: 375, diffPercentage: 1 }),
+        makeDiff({ viewport: 768, diffPercentage: 2 }),
+        makeDiff({ viewport: 1440, diffPercentage: 3 }),
+      ],
+      makeContext(),
+    );
+
+    const historyDir = join(tempDir, 'history', urlToSlug('https://example.com'));
+    const files = readdirSync(historyDir).filter((name) => name.endsWith('.json'));
+    expect(files).toHaveLength(3);
+  });
+
   it('records capture and tool errors as alerting errors even with a zero diff', async () => {
     const historyDir = join(tempDir, 'history');
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));

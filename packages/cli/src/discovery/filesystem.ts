@@ -185,7 +185,7 @@ function isRouteFile(fileName: string, framework: Framework): boolean {
  * @param framework - Detected framework
  * @returns Normalized route path (e.g. `/checkout`, `/about`)
  */
-function filePathToRoute(relativePath: string, framework: Framework): string {
+export function filePathToRoute(relativePath: string, framework: Framework): string | null {
   // Normalize separators to forward slashes
   let routePath = relativePath.replace(/\\/g, '/');
 
@@ -193,11 +193,20 @@ function filePathToRoute(relativePath: string, framework: Framework): string {
   const { ext } = parsePath(routePath);
   routePath = routePath.slice(0, -ext.length);
 
+  // Ignore Next.js parallel route slots (@slot) and intercepting routes ((.)x, (..)x, (...)x)
+  if (/(^|\/)@[^/]+(\/|$)/.test(routePath) || /\(\.+[^)]*\)/.test(routePath)) {
+    return null;
+  }
+
+  // Strip route groups like (marketing) or (auth)
+  routePath = routePath.replace(/\([^/]+\)\/?/g, '');
+
   switch (framework) {
     case 'nextjs-app':
       // app/checkout/page.tsx → /checkout
       // app/page.tsx → /
-      routePath = routePath.replace(/\/page$/, '');
+      routePath = routePath.replace(/(?:\/|^)page$/, '');
+      if (routePath === 'page') routePath = '';
       break;
 
     case 'nextjs-pages':
@@ -207,18 +216,25 @@ function filePathToRoute(relativePath: string, framework: Framework): string {
       if (routePath === 'index') routePath = '';
       break;
 
-    case 'remix':
+    case 'remix': {
       // Remix uses `.` as path separator in flat routes
       // e.g., `about.tsx` → `/about`, `checkout.step-1.tsx` → `/checkout/step-1`
-      routePath = routePath.replace(/\/index$/, '');
-      if (routePath === 'index' || routePath === '_index') routePath = '';
-      // Handle Remix flat route convention: dots become slashes
-      routePath = routePath.replace(/\./g, '/');
+      // `_index.tsx` → `/`, `dashboard._index.tsx` → `/dashboard`, `_auth.login.tsx` → `/login`
+      const rawSegments = routePath.split(/[./]/).filter(Boolean);
+      const hasIndex = rawSegments.some((seg) => seg === 'index' || seg === '_index');
+      const filtered = rawSegments.filter(
+        (seg) => seg !== 'index' && seg !== '_index' && !seg.startsWith('_'),
+      );
+      if (filtered.length === 0 && !hasIndex) {
+        return null;
+      }
+      routePath = filtered.join('/');
       break;
+    }
 
     case 'sveltekit':
       // src/routes/checkout/+page.svelte → /checkout
-      routePath = routePath.replace(/\/\+page$/, '');
+      routePath = routePath.replace(/(?:\/|^)\+page$/, '');
       if (routePath === '+page') routePath = '';
       break;
 
@@ -241,6 +257,8 @@ function filePathToRoute(relativePath: string, framework: Framework): string {
 
   return routePath;
 }
+
+export { filePathToRoute as fileToRoute };
 
 /**
  * Recursively scans a directory for route files.
@@ -314,6 +332,7 @@ function scanDirectory(
 
       const relativePath = relative(baseDir, fullPath);
       const routePath = filePathToRoute(relativePath, framework);
+      if (routePath === null) continue;
 
       // Deduplicate
       if (!routes.some((r) => r.path === routePath)) {

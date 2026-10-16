@@ -14,14 +14,15 @@ import { Hono } from 'hono';
 import type { Bindings } from '../db/factory.js';
 import type { Store } from '../db/store.js';
 import { getScreenshotStore, type R2Bucket } from '../storage/screenshots.js';
+import { isRunAccessibleByUser } from '../auth/run-access.js';
 
 type Variables = { store: Store; userId: string };
 
 export const screenshotRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-/** Ensures the caller owns the run; returns the owner check result. */
+/** Ensures the caller owns the run or is a member of its project's team. */
 async function ownsRun(store: Store, runId: string, userId: string): Promise<boolean> {
-  return (await store.getRunOwner(runId)) === userId;
+  return isRunAccessibleByUser(store, runId, userId);
 }
 
 // GET /v1/screenshots/:runId — metadata listing.

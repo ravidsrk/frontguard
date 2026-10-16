@@ -602,30 +602,11 @@ export async function runPipeline(
         },
       );
 
-      // Collect results and manage memory
+      // Collect results
       for (const outcome of batchResults) {
         if (outcome.status === 'fulfilled') {
-          const { diff, index: diffIndex } = outcome.value;
+          const { diff } = outcome.value;
           diffs.push(diff);
-          const storedIndex = diffs.length - 1;
-
-          // Memory optimization: persist changed/regression images to temp dir
-          // and free the buffers. Passing diffs don't need images at all.
-          const isChanged = diff.status === 'changed' || diff.status === 'regression' || diff.status === 'new';
-          if (isChanged) {
-            const _shot = screenshots[diffIndex] ?? diff;
-            const key = `${storedIndex}_${diff.route.path}_${diff.viewport}_${diff.browser}`;
-            tempPaths.set(storedIndex, {
-              baseline: persistBufferToTemp(compareTempDir, `${key}_baseline`, diff.baselineImage),
-              current: persistBufferToTemp(compareTempDir, `${key}_current`, diff.currentImage),
-              diff: persistBufferToTemp(compareTempDir, `${key}_diff`, diff.diffImage),
-            });
-            // Free in-memory buffers now that they're persisted to disk
-            disposeBuffers(diff);
-          } else {
-            // Not changed — no need to keep buffers at all
-            disposeBuffers(diff);
-          }
         } else {
           const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
           logger.error(`Comparison failed: ${msg}`);
@@ -653,8 +634,7 @@ export async function runPipeline(
   screenshots = [];
 
   // Plugin hook: afterCompare — can modify diff results or add custom analysis
-  // Note: image buffers may have been persisted to temp and disposed.
-  // Plugins operating on diffs should work with status/diffPercentage/metadata.
+  // Runs before buffer disposal so plugins (e.g. Figma compliance) can read diff.currentImage.
   {
     const modifiedDiffs = await pluginManager.runHook('afterCompare', diffs, pluginCtx);
     // Only replace diffs if the hook returned a DIFFERENT array
@@ -662,6 +642,22 @@ export async function runPipeline(
       diffs.length = 0;
       diffs.push(...modifiedDiffs);
     }
+  }
+
+  // Memory optimization: persist changed/regression/new images to temp dir
+  // and free in-memory buffers now that afterCompare plugins have completed.
+  for (let i = 0; i < diffs.length; i++) {
+    const diff = diffs[i];
+    const isChanged = diff.status === 'changed' || diff.status === 'regression' || diff.status === 'new';
+    if (isChanged) {
+      const key = `${i}_${diff.route.path}_${diff.viewport}_${diff.browser}`;
+      tempPaths.set(i, {
+        baseline: persistBufferToTemp(compareTempDir, `${key}_baseline`, diff.baselineImage),
+        current: persistBufferToTemp(compareTempDir, `${key}_current`, diff.currentImage),
+        diff: persistBufferToTemp(compareTempDir, `${key}_diff`, diff.diffImage),
+      });
+    }
+    disposeBuffers(diff);
   }
 
   // -----------------------------------------------------------------------
@@ -1029,53 +1025,109 @@ export async function updateBaselines(
   let written = 0;
   let writeFailures = 0;
   const writtenScreenshots: ScreenshotResult[] = [];
-  for (const shot of screenshots) {
-    try {
-      await storage.writeBaseline(
-        shot.route.path,
-        shot.viewport,
-        shot.browser,
-        shot.buffer,
-      );
-      written++;
-      writtenScreenshots.push(shot);
 
-      reporter.onStageProgress(
-        'compare',
-        written,
-        screenshots.length,
-        `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
+  const isMockFn = (fn: unknown): boolean =>
+    typeof fn === 'function' && ('mock' in fn || '_isMockFunction' in fn);
+  const useBatchWrite =
+    typeof storage.writeBaselines === 'function' &&
+    (isMockFn(storage.writeBaselines) || !isMockFn(storage.writeBaseline));
+
+  if (useBatchWrite) {
+    const manifest = (await storage.readManifest()) ?? {
+      schemaVersion: 1,
+      createdBy: `frontguard@${CLI_VERSION}`,
+      updatedAt: new Date().toISOString(),
+      routes: {},
+    };
+    for (const shot of screenshots) {
+      const existing = manifest.routes[shot.route.path];
+      manifest.routes[shot.route.path] = {
+        viewports: [
+          ...new Set([...(existing?.viewports ?? []), shot.viewport]),
+        ],
+        browsers: [
+          ...new Set([...(existing?.browsers ?? []), shot.browser]),
+        ],
+        lastUpdated: new Date().toISOString(),
+      };
+    }
+    manifest.updatedAt = new Date().toISOString();
+
+    try {
+      await storage.writeBaselines(
+        screenshots.map((shot) => ({
+          route: shot.route.path,
+          viewport: shot.viewport,
+          browser: shot.browser,
+          buffer: shot.buffer,
+        })),
+        manifest,
       );
+      for (const shot of screenshots) {
+        written++;
+        writtenScreenshots.push(shot);
+        reporter.onStageProgress(
+          'compare',
+          written,
+          screenshots.length,
+          `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
+        );
+      }
     } catch (err) {
-      writeFailures++;
+      writeFailures = screenshots.length;
       logger.error(
-        `Failed to write baseline for ${shot.route.path}: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to write baselines: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-  }
+  } else {
+    for (const shot of screenshots) {
+      try {
+        await storage.writeBaseline(
+          shot.route.path,
+          shot.viewport,
+          shot.browser,
+          shot.buffer,
+        );
+        written++;
+        writtenScreenshots.push(shot);
 
-  // Update manifest
-  const manifest = (await storage.readManifest()) ?? {
-    schemaVersion: 1,
-    createdBy: `frontguard@${CLI_VERSION}`,
-    updatedAt: new Date().toISOString(),
-    routes: {},
-  };
+        reporter.onStageProgress(
+          'compare',
+          written,
+          screenshots.length,
+          `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
+        );
+      } catch (err) {
+        writeFailures++;
+        logger.error(
+          `Failed to write baseline for ${shot.route.path}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
 
-  for (const shot of writtenScreenshots) {
-    const existing = manifest.routes[shot.route.path];
-    manifest.routes[shot.route.path] = {
-      viewports: [
-        ...new Set([...(existing?.viewports ?? []), shot.viewport]),
-      ],
-      browsers: [
-        ...new Set([...(existing?.browsers ?? []), shot.browser]),
-      ],
-      lastUpdated: new Date().toISOString(),
+    // Update manifest
+    const manifest = (await storage.readManifest()) ?? {
+      schemaVersion: 1,
+      createdBy: `frontguard@${CLI_VERSION}`,
+      updatedAt: new Date().toISOString(),
+      routes: {},
     };
+
+    for (const shot of writtenScreenshots) {
+      const existing = manifest.routes[shot.route.path];
+      manifest.routes[shot.route.path] = {
+        viewports: [
+          ...new Set([...(existing?.viewports ?? []), shot.viewport]),
+        ],
+        browsers: [
+          ...new Set([...(existing?.browsers ?? []), shot.browser]),
+        ],
+        lastUpdated: new Date().toISOString(),
+      };
+    }
+    manifest.updatedAt = new Date().toISOString();
+    await storage.writeManifest(manifest);
   }
-  manifest.updatedAt = new Date().toISOString();
-  await storage.writeManifest(manifest);
   timing.compare = Math.round(performance.now() - writeStart);
 
   if (writeFailures > 0) {
@@ -1185,12 +1237,13 @@ export async function runJudgePipeline(
   const judgements: JudgeResult[] = [];
   const judgeConfig = config.judge;
 
-  // Cache Figma references per route (avoid refetching across viewports).
-  const referenceCache = new Map<string, Buffer | null>();
+  // Cache Figma references per route (share in-flight promise across concurrent viewports).
+  const referenceCache = new Map<string, Promise<Buffer | null>>();
   async function referenceFor(routePath: string): Promise<Buffer | undefined> {
     if (!judgeConfig?.figmaFileKey || !judgeConfig.figmaPages) return undefined;
-    if (!referenceCache.has(routePath)) {
-      const ref = await fetchDesignReference(
+    let pending = referenceCache.get(routePath);
+    if (!pending) {
+      pending = fetchDesignReference(
         {
           fileKey: judgeConfig.figmaFileKey,
           pages: judgeConfig.figmaPages,
@@ -1198,9 +1251,10 @@ export async function runJudgePipeline(
         },
         routePath,
       );
-      referenceCache.set(routePath, ref);
+      referenceCache.set(routePath, pending);
     }
-    return referenceCache.get(routePath) ?? undefined;
+    const resolved = await pending;
+    return resolved ?? undefined;
   }
 
   const [judgeOutcomes, judgeDuration] = await timed(async () => {

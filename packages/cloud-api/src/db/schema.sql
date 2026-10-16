@@ -5,6 +5,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   github_id TEXT UNIQUE,
+  github_login TEXT,
   email TEXT,
   plan TEXT NOT NULL DEFAULT 'free',
   created_at TEXT NOT NULL
@@ -23,7 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 CREATE TABLE IF NOT EXISTS runs (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id),
-  project_id TEXT REFERENCES team_projects(id),
+  project_id TEXT REFERENCES team_projects(id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'queued',
   config TEXT NOT NULL,          -- JSON blob
   results TEXT,                  -- JSON blob
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS runs (
   regressions_count INTEGER DEFAULT 0,
   baselines_approved INTEGER DEFAULT 0,
   error TEXT,
+  version INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   completed_at TEXT
 );
@@ -41,7 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id, created_at);
 -- Screenshots (metadata only — images live in R2) -------------------------
 CREATE TABLE IF NOT EXISTS screenshots (
   id TEXT PRIMARY KEY,
-  run_id TEXT NOT NULL REFERENCES runs(id),
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   route TEXT NOT NULL,
   viewport INTEGER NOT NULL,
   browser TEXT NOT NULL,
@@ -68,11 +70,12 @@ CREATE TABLE IF NOT EXISTS teams (
   plan TEXT NOT NULL DEFAULT 'free',
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,
+  version INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS team_members (
-  team_id TEXT NOT NULL REFERENCES teams(id),
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id),
   role TEXT NOT NULL DEFAULT 'member',  -- owner, admin, member, viewer
   reviewer INTEGER NOT NULL DEFAULT 0,  -- designated baseline reviewer flag
@@ -83,19 +86,20 @@ CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
 
 CREATE TABLE IF NOT EXISTS team_invitations (
   id TEXT PRIMARY KEY,
-  team_id TEXT NOT NULL REFERENCES teams(id),
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   email TEXT,                            -- nullable: one of email/github_login required
   github_login TEXT,                     -- invite by GitHub handle
   role TEXT NOT NULL DEFAULT 'member',
   token TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL,
+  expires_at TEXT,
   accepted_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_team_invitations_team ON team_invitations(team_id);
 
 CREATE TABLE IF NOT EXISTS team_projects (
   id TEXT PRIMARY KEY,
-  team_id TEXT NOT NULL REFERENCES teams(id),
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   repo_url TEXT,
   config TEXT,
@@ -103,11 +107,23 @@ CREATE TABLE IF NOT EXISTS team_projects (
 );
 CREATE INDEX IF NOT EXISTS idx_team_projects_team ON team_projects(team_id);
 
+-- Team-scoped usage pool (DM-3) -------------------------------------------
+CREATE TABLE IF NOT EXISTS team_usage (
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  month TEXT NOT NULL,
+  runs_count INTEGER DEFAULT 0,
+  screenshots_count INTEGER DEFAULT 0,
+  diffs_used INTEGER NOT NULL DEFAULT 0,
+  ai_calls_used INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (team_id, month)
+);
+
 -- Baseline approvals (review workflow, Task 8.1) --------------------------
 CREATE TABLE IF NOT EXISTS baseline_approvals (
   id TEXT PRIMARY KEY,
-  run_id TEXT NOT NULL REFERENCES runs(id),
-  project_id TEXT REFERENCES team_projects(id),
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  project_id TEXT REFERENCES team_projects(id) ON DELETE CASCADE,
   reviewer_user_id TEXT NOT NULL REFERENCES users(id),
   status TEXT NOT NULL,                  -- approved, rejected
   comment TEXT,
@@ -118,7 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_baseline_approvals_run ON baseline_approvals(run_
 -- Team activity feed (Task 8.1) -------------------------------------------
 CREATE TABLE IF NOT EXISTS team_activity (
   id TEXT PRIMARY KEY,
-  team_id TEXT NOT NULL REFERENCES teams(id),
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   user_id TEXT,
   action TEXT NOT NULL,                  -- team.created, member.invited, etc.
   target TEXT,
@@ -131,6 +147,7 @@ CREATE INDEX IF NOT EXISTS idx_team_activity_team ON team_activity(team_id, crea
 CREATE TABLE IF NOT EXISTS monitors (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id),
+  project_id TEXT REFERENCES team_projects(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   url TEXT NOT NULL,
   routes TEXT NOT NULL,          -- JSON array
@@ -141,15 +158,18 @@ CREATE TABLE IF NOT EXISTS monitors (
   enabled INTEGER NOT NULL DEFAULT 1,
   last_run_at TEXT,
   last_status TEXT,
+  leased_until TEXT,
+  version INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_monitors_user ON monitors(user_id);
 CREATE INDEX IF NOT EXISTS idx_monitors_due ON monitors(enabled, last_run_at);
+CREATE INDEX IF NOT EXISTS idx_monitors_lease ON monitors(leased_until);
 
 -- Per-monitor run history (Task 6.1) --------------------------------------
 CREATE TABLE IF NOT EXISTS monitor_runs (
   id TEXT PRIMARY KEY,
-  monitor_id TEXT NOT NULL REFERENCES monitors(id),
+  monitor_id TEXT NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id),
   status TEXT NOT NULL,           -- passed, regression, error
   regressions_count INTEGER NOT NULL DEFAULT 0,
@@ -164,7 +184,7 @@ CREATE INDEX IF NOT EXISTS idx_monitor_runs_user ON monitor_runs(user_id, create
 
 -- Alert state per monitor (dedup + snooze, Task 6.2) ----------------------
 CREATE TABLE IF NOT EXISTS monitor_alert_state (
-  monitor_id TEXT PRIMARY KEY REFERENCES monitors(id),
+  monitor_id TEXT PRIMARY KEY REFERENCES monitors(id) ON DELETE CASCADE,
   last_fingerprint TEXT,         -- hash of the last alerted regression set
   last_alert_at TEXT,
   snoozed_until TEXT             -- ISO timestamp until which alerts are suppressed
@@ -193,8 +213,8 @@ CREATE INDEX IF NOT EXISTS idx_masks_match ON masks(user_id, route, viewport);
 -- (screenshot, decision); the screenshot row already knows route/viewport.
 CREATE TABLE IF NOT EXISTS screenshot_decisions (
   id TEXT PRIMARY KEY,
-  screenshot_id TEXT NOT NULL REFERENCES screenshots(id),
-  run_id TEXT NOT NULL REFERENCES runs(id),
+  screenshot_id TEXT NOT NULL REFERENCES screenshots(id) ON DELETE CASCADE,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id),
   decision TEXT NOT NULL,        -- accepted, rejected
   created_at TEXT NOT NULL
@@ -207,7 +227,7 @@ CREATE INDEX IF NOT EXISTS idx_screenshot_decisions_shot ON screenshot_decisions
 -- during a run. Bytes live in R2; this table is the metadata index.
 CREATE TABLE IF NOT EXISTS run_attachments (
   id TEXT PRIMARY KEY,
-  run_id TEXT NOT NULL REFERENCES runs(id),
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   kind TEXT NOT NULL,            -- trace, dom-snapshot, console-log, video, other
   name TEXT NOT NULL,
   r2_key TEXT NOT NULL,
@@ -227,3 +247,21 @@ CREATE TABLE IF NOT EXISTS usage_alert_state (
   last_alert_at TEXT,
   PRIMARY KEY (user_id, month)
 );
+
+-- Background failures dead-letter table (OPS-3) ---------------------------
+CREATE TABLE IF NOT EXISTS background_failures (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL DEFAULT 'run',
+  source_id TEXT NOT NULL DEFAULT '',
+  run_id TEXT,
+  stage TEXT NOT NULL DEFAULT '',
+  message TEXT NOT NULL DEFAULT '',
+  user_id TEXT,
+  error TEXT NOT NULL DEFAULT '',
+  attempt INTEGER NOT NULL DEFAULT 1,
+  context TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_background_failures_source ON background_failures(kind, source_id);
+CREATE INDEX IF NOT EXISTS idx_background_failures_created ON background_failures(created_at);
+

@@ -16,8 +16,21 @@ import { visualTest } from '../src/visual-test.js';
 
 const workDir = join(tmpdir(), `fg-integration-${process.pid}`);
 const baselineDir = join(workDir, 'baselines');
-const isCI = process.env.CI !== undefined || process.env.GITHUB_ACTIONS !== undefined;
-const skipBrowserTests = process.env.FRONTGUARD_SKIP_BROWSER_TESTS === '1' && !isCI;
+const isCI = process.env.GITHUB_ACTIONS !== undefined;
+const hasBrowserBinary = (() => {
+  try {
+    const execPath = chromium.executablePath();
+    const headlessPath = execPath.replace(
+      /\/chromium-(\d+)\/.*$/,
+      '/chromium_headless_shell-$1/chrome-linux/headless_shell',
+    );
+    return fs.existsSync(execPath) && fs.existsSync(headlessPath);
+  } catch {
+    return false;
+  }
+})();
+const skipBrowserTests =
+  (process.env.FRONTGUARD_SKIP_BROWSER_TESTS === '1' || !hasBrowserBinary) && !isCI;
 
 let browser: Browser;
 

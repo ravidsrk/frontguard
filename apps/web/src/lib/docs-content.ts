@@ -176,7 +176,7 @@ test('home', async ({ page }) =&gt; {
     'AI Analysis',
     'Guides',
     ['Scope', 'Providers', 'Evidence limits'],
-    `${note('OPTIONAL BYOK.', 'Model-assisted analysis is not required for local pixel comparison. Screenshot evidence is sent directly to the provider account you configure.')}${p('Changed screenshots can be classified as regression, intentional, or content_update with a confidence score and explanation. An intentional classification at 0.8 confidence or higher automatically downgrades a regression to a warning; inspect the model output before relying on that CI result.')}${p('Frontguard has not published a model precision/recall benchmark. The current validation run had AI disabled, so it cannot support an accuracy claim.')}`,
+    `${note('OPTIONAL BYOK.', 'Model-assisted analysis is not required for local pixel comparison. Screenshot evidence is sent directly to the provider account you configure.')}${p('Changed screenshots can be classified as regression, intentional, or content_update with a confidence score and explanation. AI analysis runs on every diff above threshold to explain visual changes, classify severity, and suggest candidate CSS fixes. AI annotations are advisory and never silently override pass/fail exit codes.')}${p('Frontguard has not published a model precision/recall benchmark. The current validation run had AI disabled, so it cannot support an accuracy claim.')}`,
   ),
   makeArticle(
     'guides/ai-fixes',

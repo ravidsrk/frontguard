@@ -10,7 +10,7 @@ import { Route as DocsRoute } from '../routes/docs'
 import { Route as DocArticleRoute } from '../routes/docs/$'
 import { Route as HomeRoute } from '../routes/index'
 import { Route as PricingRoute } from '../routes/pricing'
-import { Route as RootRoute } from '../routes/__root'
+import { Route as RootRoute, SECURITY_HEADERS } from '../routes/__root'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC = path.resolve(__dirname, '../../public')
@@ -181,8 +181,8 @@ describe('public SEO assets', () => {
   })
 })
 
-describe('root route — global head', () => {
-  it('includes sized favicons, apple-touch-icon, and global meta tags', async () => {
+describe('root route — global head and security headers', () => {
+  it('includes sized favicons, apple-touch-icon, global meta tags, and HTTP security headers', async () => {
     const head = await RootRoute.options.head?.({} as never)
     const meta = (head?.meta ?? []) as Array<Record<string, string>>
     const links = (head?.links ?? []) as Array<Record<string, string>>
@@ -204,9 +204,23 @@ describe('root route — global head', () => {
             'visual regression testing, AI visual testing, Playwright, Storybook visual testing, frontend testing, CSS regression, screenshot testing, open source visual testing, MCP server',
         },
         { name: 'referrer', content: 'strict-origin-when-cross-origin' },
-        { httpEquiv: 'X-Content-Type-Options', content: 'nosniff' },
       ]),
     )
+    expect(meta.some((m) => m.httpEquiv === 'X-Content-Type-Options')).toBe(false)
+    expect(SECURITY_HEADERS).toEqual(
+      expect.objectContaining({
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+      }),
+    )
+    const publicHeaders = readPublic('_headers')
+    expect(publicHeaders).toContain('X-Content-Type-Options: nosniff')
+    expect(publicHeaders).toContain('X-Frame-Options: DENY')
+    expect(publicHeaders).toContain('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload')
+    expect(publicHeaders).toContain("Content-Security-Policy: default-src 'self'")
   })
 })
 

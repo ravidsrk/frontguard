@@ -143,4 +143,65 @@ describe('discoverRoutesFromFilesystem', () => {
     expect(paths).toContain('/');
     expect(paths).toContain('/pricing');
   });
+
+  it('maps root app/page.tsx to "/" without generating "/page"', () => {
+    ({ dir: tempDir, cleanup } = createTempDir());
+    writeFiles(tempDir, {
+      'next.config.js': 'module.exports = {};',
+      'app/layout.tsx': 'export default function Layout({ children }) { return children; }',
+      'app/page.tsx': 'export default function Home() { return <div>Home</div>; }',
+    });
+
+    const routes = discoverRoutesFromFilesystem(tempDir);
+    expect(routes).not.toBeNull();
+    const paths = routes!.map((r) => r.path);
+    expect(paths).toEqual(['/']);
+    expect(paths).not.toContain('/page');
+  });
+
+  it('strips route groups and ignores parallel route slots and intercepting routes in Next.js App Router', () => {
+    ({ dir: tempDir, cleanup } = createTempDir());
+    writeFiles(tempDir, {
+      'next.config.js': 'module.exports = {};',
+      'app/layout.tsx': 'export default function Layout({ children }) { return children; }',
+      'app/(marketing)/page.tsx': 'export default function Home() {}',
+      'app/(marketing)/pricing/page.tsx': 'export default function Pricing() {}',
+      'app/@modal/login/page.tsx': 'export default function ModalLogin() {}',
+      'app/feed/(..)photo/page.tsx': 'export default function InterceptedPhoto() {}',
+    });
+
+    const routes = discoverRoutesFromFilesystem(tempDir);
+    expect(routes).not.toBeNull();
+    const paths = routes!.map((r) => r.path);
+    expect(paths).toContain('/');
+    expect(paths).toContain('/pricing');
+    expect(paths).not.toContain('/(marketing)/pricing');
+    expect(paths).not.toContain('/@modal/login');
+    expect(paths).not.toContain('/login');
+    expect(paths).not.toContain('/feed/(..)photo');
+    expect(paths).not.toContain('/feed/photo');
+  });
+
+  it('handles Remix _index, nested _index, and pathless layout prefixes', () => {
+    ({ dir: tempDir, cleanup } = createTempDir());
+    writeFiles(tempDir, {
+      'remix.config.js': 'module.exports = {};',
+      'app/routes/_index.tsx': 'export default function Index() {}',
+      'app/routes/dashboard._index.tsx': 'export default function DashboardIndex() {}',
+      'app/routes/_auth.login.tsx': 'export default function Login() {}',
+      'app/routes/_auth.tsx': 'export default function AuthLayout() {}',
+    });
+
+    const routes = discoverRoutesFromFilesystem(tempDir);
+    expect(routes).not.toBeNull();
+    const paths = routes!.map((r) => r.path);
+    expect(paths).toContain('/');
+    expect(paths).toContain('/dashboard');
+    expect(paths).toContain('/login');
+    expect(paths).not.toContain('/_index');
+    expect(paths).not.toContain('/dashboard/_index');
+    expect(paths).not.toContain('/_auth/login');
+    expect(paths).not.toContain('/_auth');
+  });
 });
+

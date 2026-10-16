@@ -34,8 +34,14 @@ import {
 } from '../dashboard/render.js';
 import { flakeScore } from '../dashboard/flake.js';
 import { SESSION_COOKIE, sessionSecret, verifySessionCookie } from '../auth/session.js';
+import { canUserMutateRun, isRunAccessibleByUser } from '../auth/run-access.js';
 import { getScreenshotStore, type R2Bucket } from '../storage/screenshots.js';
+import { promoteRunCurrentScreenshotsToBaseline } from '../storage/persist-screenshots.js';
 import { getPlan } from '../billing/plans.js';
+import {
+  SafeRenderTargetError,
+  assertSafeRenderTarget,
+} from '../security/render-target.js';
 
 type Variables = { store: Store; userId: string };
 
@@ -66,9 +72,22 @@ async function flakeMap(store: Store, monitors: Monitor[]): Promise<Record<strin
 /** Builds the dashboard's spend-cap chip from the user's plan + usage. */
 async function spendCapFor(store: Store, userId: string): Promise<SpendCap | undefined> {
   const user = await store.getUser(userId);
-  const plan = getPlan(user?.plan);
-  const usage = await store.getUsage(userId, currentMonth());
-  return { runs: usage.runsCount, runsLimit: plan.limits.runsPerMonth, planName: plan.name };
+  let plan = getPlan(user?.plan);
+  const month = currentMonth();
+  const usage = await store.getUsage(userId, month);
+  let runsCount = usage.runsCount;
+  const teams = await store.listTeamsForUser(userId);
+  if (teams.length > 0) {
+    const paidTeam = teams.find((t) => t.plan !== 'free') ?? teams[0];
+    if (paidTeam) {
+      if (plan.id === 'free' && paidTeam.plan !== 'free') {
+        plan = getPlan(paidTeam.plan);
+      }
+      const teamUsage = await store.getTeamUsage(paidTeam.id, month);
+      runsCount = Math.max(runsCount, teamUsage.runsCount);
+    }
+  }
+  return { runs: runsCount, runsLimit: plan.limits.runsPerMonth, planName: plan.name };
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +128,15 @@ sessionDashboardRoutes.post('/monitors', async (c) => {
   const name = String(form.name ?? '').trim();
   const url = String(form.url ?? '').trim();
   if (!name || !url) return c.redirect('/dashboard', 302);
+
+  try {
+    await assertSafeRenderTarget(url);
+  } catch (err) {
+    if (err instanceof SafeRenderTargetError) {
+      return c.json({ error: err.message }, 400);
+    }
+    return c.json({ error: 'Invalid monitor URL' }, 400);
+  }
 
   const routes = parseList(String(form.routes ?? ''));
   const slack = String(form.slack ?? '').trim();
@@ -249,7 +277,7 @@ sessionDashboardRoutes.get('/runs/:runId', async (c) => {
   if (!userId) return c.html(renderLogin());
   const store = getStore(c.env);
   const runId = c.req.param('runId');
-  if ((await store.getRunOwner(runId)) !== userId) {
+  if (!(await isRunAccessibleByUser(store, runId, userId))) {
     return c.html(renderLogin(), 404);
   }
   const [shots, decisions, attachments] = await Promise.all([
@@ -269,7 +297,7 @@ sessionDashboardRoutes.get('/runs/:runId/diffs/:diffId', async (c) => {
   const store = getStore(c.env);
   const runId = c.req.param('runId');
   const diffId = c.req.param('diffId');
-  if ((await store.getRunOwner(runId)) !== userId) return c.html(renderLogin(), 404);
+  if (!(await isRunAccessibleByUser(store, runId, userId))) return c.html(renderLogin(), 404);
   const shots = await store.listScreenshots(runId);
   const diff = shots.find((s) => s.id === diffId && s.type === 'diff');
   if (!diff) return c.json({ error: 'Diff not found' }, 404);
@@ -303,7 +331,8 @@ sessionDashboardRoutes.post('/runs/:runId/diffs/:diffId/accept', async (c) => {
   if (!userId) return c.json({ error: 'Unauthorized' }, 401);
   const store = getStore(c.env);
   const runId = c.req.param('runId');
-  if ((await store.getRunOwner(runId)) !== userId) return c.json({ error: 'Not found' }, 404);
+  if (!(await isRunAccessibleByUser(store, runId, userId))) return c.json({ error: 'Not found' }, 404);
+  if (!(await canUserMutateRun(store, runId, userId))) return c.json({ error: 'Forbidden' }, 403);
   const shots = await store.listScreenshots(runId);
   const diff = shots.find((s) => s.id === c.req.param('diffId') && s.type === 'diff');
   if (!diff) return c.json({ error: 'Diff not found' }, 404);
@@ -324,7 +353,8 @@ sessionDashboardRoutes.post('/runs/:runId/diffs/:diffId/reject', async (c) => {
   if (!userId) return c.json({ error: 'Unauthorized' }, 401);
   const store = getStore(c.env);
   const runId = c.req.param('runId');
-  if ((await store.getRunOwner(runId)) !== userId) return c.json({ error: 'Not found' }, 404);
+  if (!(await isRunAccessibleByUser(store, runId, userId))) return c.json({ error: 'Not found' }, 404);
+  if (!(await canUserMutateRun(store, runId, userId))) return c.json({ error: 'Forbidden' }, 403);
   const shots = await store.listScreenshots(runId);
   const diff = shots.find((s) => s.id === c.req.param('diffId') && s.type === 'diff');
   if (!diff) return c.json({ error: 'Diff not found' }, 404);
@@ -346,7 +376,8 @@ sessionDashboardRoutes.post('/runs/:runId/approve', async (c) => {
   if (!userId) return c.redirect('/dashboard', 302);
   const store = getStore(c.env);
   const runId = c.req.param('runId');
-  if ((await store.getRunOwner(runId)) !== userId) return c.json({ error: 'Run not found' }, 404);
+  if (!(await isRunAccessibleByUser(store, runId, userId))) return c.json({ error: 'Run not found' }, 404);
+  if (!(await canUserMutateRun(store, runId, userId))) return c.json({ error: 'Forbidden' }, 403);
 
   const contentType = c.req.header('Content-Type') ?? '';
   let diffIds: string[] = [];
@@ -384,6 +415,7 @@ sessionDashboardRoutes.post('/runs/:runId/approve', async (c) => {
   // If every diff was accepted, also flip the run-level baselinesApproved flag.
   if (accepted.length === validDiffIds.size) {
     await store.updateRun(runId, { baselinesApproved: true });
+    await promoteRunCurrentScreenshotsToBaseline(store, runId);
   }
 
   if (contentType.includes('application/json')) {
@@ -448,7 +480,7 @@ sessionDashboardRoutes.get('/runs/:runId/attachments', async (c) => {
   if (!userId) return c.html(renderLogin());
   const store = getStore(c.env);
   const runId = c.req.param('runId');
-  if ((await store.getRunOwner(runId)) !== userId) return c.html(renderLogin(), 404);
+  if (!(await isRunAccessibleByUser(store, runId, userId))) return c.html(renderLogin(), 404);
   const attachments = await store.listAttachments(runId);
   return c.html(renderRunAttachments(runId, attachments));
 });
@@ -460,7 +492,7 @@ sessionDashboardRoutes.post('/runs/:runId/attachments', async (c) => {
   if (!userId) return c.json({ error: 'Unauthorized' }, 401);
   const store = getStore(c.env);
   const runId = c.req.param('runId');
-  if ((await store.getRunOwner(runId)) !== userId) return c.json({ error: 'Run not found' }, 404);
+  if (!(await isRunAccessibleByUser(store, runId, userId))) return c.json({ error: 'Run not found' }, 404);
 
   const form = await c.req.parseBody();
   const kindRaw = String(form.kind ?? 'other');
@@ -497,7 +529,7 @@ sessionDashboardRoutes.get('/runs/:runId/attachments/:id/download', async (c) =>
   if (!userId) return c.json({ error: 'Unauthorized' }, 401);
   const store = getStore(c.env);
   const runId = c.req.param('runId');
-  if ((await store.getRunOwner(runId)) !== userId) return c.json({ error: 'Run not found' }, 404);
+  if (!(await isRunAccessibleByUser(store, runId, userId))) return c.json({ error: 'Run not found' }, 404);
   const att = await store.getAttachment(c.req.param('id'));
   if (!att || att.runId !== runId) return c.json({ error: 'Attachment not found' }, 404);
   const blobs = getScreenshotStore(c.env?.SCREENSHOTS as R2Bucket | undefined);
@@ -517,7 +549,7 @@ sessionDashboardRoutes.get('/screenshots/:runId/:id/raw', async (c) => {
   const store = getStore(c.env);
   const runId = c.req.param('runId');
   const id = c.req.param('id');
-  if ((await store.getRunOwner(runId)) !== userId) {
+  if (!(await isRunAccessibleByUser(store, runId, userId))) {
     return c.json({ error: 'Run not found' }, 404);
   }
   const shots = await store.listScreenshots(runId);

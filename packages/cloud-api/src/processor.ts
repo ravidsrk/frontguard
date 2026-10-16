@@ -13,6 +13,10 @@ export type ScreenshotSink = (screenshots: PendingScreenshot[]) => Promise<void>
 /** Subset of the Worker env that `processRun` reads. */
 export interface ProcessorEnv {
   DAYTONA_API_KEY?: string;
+  OPENAI_API_KEY?: string;
+  ANTHROPIC_API_KEY?: string;
+  FRONTGUARD_OPENAI_KEY?: string;
+  FRONTGUARD_ANTHROPIC_KEY?: string;
 }
 
 /**
@@ -46,6 +50,8 @@ export async function processRun(
     if (hasDaytona) {
       // Lazy-import to avoid loading @daytona/sdk when not needed
       const { executeInSandbox } = await import('./daytona-runner.js');
+      const openaiKey = env.OPENAI_API_KEY ?? env.FRONTGUARD_OPENAI_KEY;
+      const anthropicKey = env.ANTHROPIC_API_KEY ?? env.FRONTGUARD_ANTHROPIC_KEY;
       const sandboxResult = await executeInSandbox({
         url: run.url,
         routes: run.routes,
@@ -53,6 +59,8 @@ export async function processRun(
         browsers: run.browsers,
         threshold: run.threshold,
         ai: run.ai ?? undefined,
+        ...(openaiKey ? { openaiKey } : {}),
+        ...(anthropicKey ? { anthropicKey } : {}),
         daytonaApiKey: env.DAYTONA_API_KEY,
         baselineRestore,
       });

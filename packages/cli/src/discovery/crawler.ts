@@ -93,10 +93,10 @@ function isNonPageFile(url: string): boolean {
 /**
  * Checks if a URL matches any of the user-provided exclude patterns.
  *
- * Patterns are tried as RegExp first, then as simple substring matches
- * with basic glob support (`*` → `.*`).
+ * Patterns containing `*` are treated as globs (`*` → `.*`) first, and other
+ * patterns are tried as RegExp first with a substring fallback.
  */
-function isExcluded(url: string, excludePatterns: string[]): boolean {
+export function isExcluded(url: string, excludePatterns: string[]): boolean {
   const pathname = (() => {
     try {
       return new URL(url).pathname;
@@ -106,21 +106,23 @@ function isExcluded(url: string, excludePatterns: string[]): boolean {
   })();
 
   return excludePatterns.some((pattern) => {
-    // Try as regex first
+    if (pattern.includes('*')) {
+      const escaped = pattern
+        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*');
+      try {
+        const globRegex = new RegExp(`^${escaped}$`);
+        return globRegex.test(pathname) || globRegex.test(url);
+      } catch {
+        return pathname.includes(pattern);
+      }
+    }
+
     try {
       const regex = new RegExp(pattern);
       return regex.test(pathname) || regex.test(url);
     } catch {
-      // Treat as glob — convert `*` to `.*`
-      const escaped = pattern
-        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-        .replace(/\*/g, '.*');
-      try {
-        const globRegex = new RegExp(`^${escaped}$`);
-        return globRegex.test(pathname);
-      } catch {
-        return pathname.includes(pattern);
-      }
+      return pathname.includes(pattern);
     }
   });
 }
@@ -182,7 +184,30 @@ export async function discoverRoutes(config: FrontguardConfig): Promise<Route[]>
 
   logger.debug('Launching headless Chromium for route discovery');
 
-  const browser = await chromium.launch({ headless: true });
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+  } catch (launchErr) {
+    try {
+      const probe = await fetch(resolvedStartUrl, {
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (probe.status >= 500) {
+        throw new Error(`Server returned ${probe.status}`);
+      }
+    } catch (probeErr) {
+      const cause = (probeErr as { cause?: { message?: string; code?: string } })?.cause;
+      const msg = [
+        probeErr instanceof Error ? probeErr.message : String(probeErr),
+        cause?.message,
+        cause?.code,
+      ]
+        .filter(Boolean)
+        .join(' ');
+      throw new Error(`Cannot reach base URL "${resolvedStartUrl}": ${msg}.`);
+    }
+    throw launchErr;
+  }
 
   // Build context options
   const contextOptions: Record<string, unknown> = {

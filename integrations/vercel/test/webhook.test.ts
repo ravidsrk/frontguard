@@ -22,6 +22,9 @@ function memoryKV(): KVNamespace & { store: Map<string, string> } {
     async put(key: string, value: string) {
       store.set(key, value);
     },
+    async delete(key: string) {
+      store.delete(key);
+    },
   };
 }
 
@@ -508,5 +511,116 @@ describe('webhook HTTP handler', () => {
     } finally {
       globalThis.fetch = origFetch;
     }
+  });
+
+  it('accepts custom-domain previews for personal-account installs (team is null, configurationId present)', async () => {
+    const app = createVercelApp();
+    const kv = memoryKV();
+    kv.store.set(
+      'integration:icfg_personal',
+      JSON.stringify({
+        accessToken: 'tok_p',
+        userId: 'usr_personal',
+        configurationId: 'icfg_personal',
+        installedAt: '2026-06-15T00:00:00.000Z',
+      }),
+    );
+
+    const payload: VercelWebhookPayload = {
+      type: 'deployment.succeeded',
+      payload: {
+        deployment: {
+          id: 'dpl_personal',
+          url: 'preview.personal-app.dev',
+          target: null,
+        },
+        project: { id: 'prj_personal' },
+        team: null,
+        configuration: { id: 'icfg_personal' },
+      },
+    };
+    const body = JSON.stringify(payload);
+
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ id: 'run_personal', statusUrl: '/v1/runs/run_personal' }), {
+        status: 202,
+      })) as typeof fetch;
+    try {
+      const res = await app.request(
+        '/api/webhook',
+        { method: 'POST', body, headers: { 'x-vercel-signature': sign(body) } },
+        {
+          VERCEL_CLIENT_SECRET: SECRET,
+          FRONTGUARD_API_URL: 'https://api.frontguard.dev',
+          FRONTGUARD_API_KEY: 'fg_x',
+          KV: kv,
+        },
+      );
+      const json = await res.json();
+      expect(res.status).toBe(200);
+      expect(json.triggered).toBe(true);
+      expect(json.runId).toBe('run_personal');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('purges KV records and revokes custom-domain authorization on integration-configuration.removed', async () => {
+    const app = createVercelApp();
+    const kv = memoryKV();
+    kv.store.set(
+      'integration:icfg_revoke',
+      JSON.stringify({
+        accessToken: 'tok_r',
+        teamId: 'team_revoke',
+        configurationId: 'icfg_revoke',
+        installedAt: 'x',
+      }),
+    );
+    kv.store.set('team:team_revoke', JSON.stringify({ configurationId: 'icfg_revoke', installedAt: 'x' }));
+    kv.store.set(
+      'project:prj_revoke',
+      JSON.stringify({ teamId: 'team_revoke', configurationId: 'icfg_revoke', firstSeenAt: 'x' }),
+    );
+
+    const removeBody = JSON.stringify({
+      type: 'integration-configuration.removed',
+      payload: {
+        configuration: { id: 'icfg_revoke' },
+        team: { id: 'team_revoke' },
+      },
+    });
+    const removeRes = await app.request(
+      '/api/webhook',
+      { method: 'POST', body: removeBody, headers: { 'x-vercel-signature': sign(removeBody) } },
+      { VERCEL_CLIENT_SECRET: SECRET, KV: kv },
+    );
+    expect(removeRes.status).toBe(200);
+    const removeJson = await removeRes.json();
+    expect(removeJson.removed).toBe(true);
+    expect(kv.store.has('integration:icfg_revoke')).toBe(false);
+    expect(kv.store.has('team:team_revoke')).toBe(false);
+
+    // Subsequent custom-domain deployment for that team/project must now be rejected.
+    const deployBody = JSON.stringify({
+      type: 'deployment.succeeded',
+      payload: {
+        deployment: { id: 'dpl_after_revoke', url: 'preview.revoked-acme.com', target: null },
+        project: { id: 'prj_revoke' },
+        team: { id: 'team_revoke' },
+      },
+    });
+    const deployRes = await app.request(
+      '/api/webhook',
+      { method: 'POST', body: deployBody, headers: { 'x-vercel-signature': sign(deployBody) } },
+      {
+        VERCEL_CLIENT_SECRET: SECRET,
+        FRONTGUARD_API_URL: 'https://api.frontguard.dev',
+        FRONTGUARD_API_KEY: 'fg_x',
+        KV: kv,
+      },
+    );
+    expect(deployRes.status).toBe(400);
   });
 });

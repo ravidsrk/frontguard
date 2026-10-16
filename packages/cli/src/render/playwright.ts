@@ -181,7 +181,7 @@ export async function renderPages(
 /**
  * Execute a single render task: open page, navigate, screenshot, close.
  */
-async function executeTask(
+export async function executeTask(
   task: RenderTask,
   config: FrontguardConfig,
   browserMap: Map<BrowserEngine, Browser>,
@@ -244,10 +244,13 @@ async function executeTask(
     const url = new URL(task.route.path, config.baseUrl).href;
     logger.debug(`Navigating to ${url} [${task.browser} ${task.viewport}px]`);
 
-    await page.goto(url, {
+    const response = await page.goto(url, {
       waitUntil: 'networkidle',
       timeout: config.pageTimeout ?? 30_000,
     });
+    if (response && response.status() >= 400) {
+      logger.warn(`Route ${task.route.path} returned HTTP ${response.status()}`);
+    }
 
     // --- Smart render: freeze animations, wait for fonts -----------------------
     if (config.smartRender !== false) {
@@ -336,6 +339,12 @@ async function executeTask(
     // --- Crop to maxHeight if configured ---------------------------------------
     if (config.maxHeight && config.maxHeight > 0) {
       screenshotBuffer = Buffer.from(await cropToMaxHeight(screenshotBuffer, config.maxHeight));
+    }
+
+    // --- Evaluate performance collection script if injected by plugin ----------
+    const perfScript = (config as { _perfScript?: string })._perfScript;
+    if (typeof perfScript === 'string' && perfScript.trim().length > 0) {
+      await page.evaluate(perfScript).catch(() => {});
     }
 
     // --- Capture DOM snapshot --------------------------------------------------

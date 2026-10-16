@@ -266,4 +266,30 @@ describe('JSONReporter', () => {
     expect(() => reporter.onStageProgress('render', 1, 10, 'test')).not.toThrow();
     expect(() => reporter.onStageComplete('compare', 'test')).not.toThrow();
   });
+
+  it('includes judgements in JSON output when present', () => {
+    const reporter = new JSONReporter();
+    const result = makeRunResult([], {
+      judgements: [
+        {
+          route: { path: '/', label: 'Home' },
+          viewport: 1440,
+          browser: 'chromium',
+          pass: true,
+          confidence: 0.95,
+          issues: [],
+          withDesignReference: false,
+        },
+      ],
+    });
+
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    reporter.onComplete(result);
+    const parsed = JSON.parse(spy.mock.calls[0][0] as string);
+    expect(parsed.judgements).toHaveLength(1);
+    expect(parsed.judgements[0].route.path).toBe('/');
+    expect(parsed.judgements[0].pass).toBe(true);
+    spy.mockRestore();
+  });
 });
+

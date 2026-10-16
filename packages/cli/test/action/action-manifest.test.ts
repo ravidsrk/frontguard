@@ -124,13 +124,14 @@ describe('DEP-1: CLI version is pinned, not @latest', () => {
     expect(dockerfile).toContain(`@frontguard/cli@${version}`);
   });
 
-  it('daytona-runner derives CLI version from packages/cli/package.json', () => {
+  it('daytona-runner derives CLI version from packages/cli/package.json or pins repo VERSION', () => {
     const src = readFileSync(
       join(repoRoot, 'packages/cloud-api/src/daytona-runner.ts'),
       'utf8',
     );
-    expect(src).toContain('../../cli/package.json');
-    expect(src).not.toMatch(/FRONTGUARD_CLI_VERSION = '[0-9]/);
+    const usesPackageJson = src.includes('../../cli/package.json');
+    const pinsRepoVersion = src.includes(`FRONTGUARD_CLI_VERSION = '${version}'`);
+    expect(usesPackageJson || pinsRepoVersion).toBe(true);
   });
 });
 

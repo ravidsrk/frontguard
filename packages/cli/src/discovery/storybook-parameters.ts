@@ -10,7 +10,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { loadCsf, type CsfFile } from '@storybook/csf-tools';
+import type { CsfFile } from '@storybook/csf-tools';
 import { logger } from '../utils/logger.js';
 
 /** Per-story Frontguard overrides from `parameters.frontguard`. */
@@ -33,7 +33,7 @@ function storyIframePath(storyId: string): string {
 interface AstNode {
   type: string;
   value?: unknown;
-  properties?: Array<{ key?: AstNode; value?: AstNode }>;
+  properties?: Array<{ type?: string; key?: AstNode; value?: AstNode }>;
   elements?: Array<AstNode | null>;
   name?: string;
 }
@@ -103,11 +103,65 @@ export function normalizeFrontguardParams(raw: unknown): StoryFrontguardParamete
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
-function parseFrontguardFromCsfFile(filePath: string): Map<string, StoryFrontguardParameters> {
-  const map = new Map<string, StoryFrontguardParameters>();
+function isAstFullyStatic(node: AstNode | undefined | null): boolean {
+  if (!node) return false;
+  switch (node.type) {
+    case 'StringLiteral':
+    case 'NumericLiteral':
+    case 'BooleanLiteral':
+    case 'Literal':
+      return true;
+    case 'ObjectExpression':
+      return (node.properties ?? []).every(
+        (prop) =>
+          prop.type !== 'SpreadElement' &&
+          (prop.key?.type === 'Identifier' || prop.key?.type === 'StringLiteral') &&
+          isAstFullyStatic(prop.value),
+      );
+    case 'ArrayExpression':
+      return (node.elements ?? []).every((el) => el !== null && isAstFullyStatic(el));
+    default:
+      return false;
+  }
+}
+
+function isParametersNodeStaticallyResolved(node: AstNode | undefined | null): boolean {
+  if (!node) return true;
+  if (node.type !== 'ObjectExpression') return false;
+  for (const prop of node.properties ?? []) {
+    if (prop.type === 'SpreadElement') return false;
+    const key =
+      prop.key?.type === 'Identifier'
+        ? prop.key.name
+        : prop.key?.type === 'StringLiteral'
+          ? String(prop.key.value)
+          : undefined;
+    if (key === 'frontguard') {
+      return isAstFullyStatic(prop.value);
+    }
+  }
+  return true;
+}
+
+async function parseFrontguardFromCsfFile(filePath: string): Promise<{
+  params: Map<string, StoryFrontguardParameters>;
+  staticallyCompleteIds: Set<string>;
+}> {
+  const params = new Map<string, StoryFrontguardParameters>();
+  const staticallyCompleteIds = new Set<string>();
   const code = readFileSync(filePath, 'utf-8');
+  const { loadCsf } = await import('@storybook/csf-tools');
   const csf: CsfFile = loadCsf(code, { makeTitle: (userTitle) => userTitle || '' });
   csf.parse();
+
+  const metaAnnotations = (csf as unknown as { _metaAnnotations?: { parameters?: AstNode } })
+    ._metaAnnotations;
+  const metaParamsAst = metaAnnotations?.parameters;
+  const metaResolved = isParametersNodeStaticallyResolved(metaParamsAst);
+  const metaParameters = metaParamsAst
+    ? (extractStaticValue(metaParamsAst) as Record<string, unknown> | undefined)
+    : undefined;
+  const metaFrontguard = normalizeFrontguardParams(metaParameters?.frontguard);
 
   const stories = csf._stories as Record<
     string,
@@ -119,14 +173,24 @@ function parseFrontguardFromCsfFile(filePath: string): Map<string, StoryFrontgua
     const storyId = story.id ?? exportName;
     const annotation = annotations[exportName];
     const parametersAst = annotation?.parameters;
+    const storyResolved = isParametersNodeStaticallyResolved(parametersAst);
     const parameters = parametersAst
       ? (extractStaticValue(parametersAst) as Record<string, unknown> | undefined)
       : undefined;
-    const frontguard = normalizeFrontguardParams(parameters?.frontguard);
-    if (frontguard) map.set(storyId, frontguard);
+    const storyFrontguard = normalizeFrontguardParams(parameters?.frontguard);
+    const merged =
+      metaFrontguard || storyFrontguard
+        ? { ...(metaFrontguard ?? {}), ...(storyFrontguard ?? {}) }
+        : undefined;
+    if (merged && Object.keys(merged).length > 0) {
+      params.set(storyId, merged);
+    }
+    if (metaResolved && storyResolved) {
+      staticallyCompleteIds.add(storyId);
+    }
   }
 
-  return map;
+  return { params, staticallyCompleteIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -190,11 +254,19 @@ async function enrichFromPreview(
   const map = new Map<string, StoryFrontguardParameters>();
   if (storyIds.length === 0) return map;
 
-  const { chromium } = await import('playwright');
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--disable-gpu', '--no-sandbox', '--disable-setuid-sandbox'],
-  });
+  let browser;
+  try {
+    const { chromium } = await import('playwright');
+    browser = await chromium.launch({
+      headless: true,
+      args: ['--disable-gpu', '--no-sandbox', '--disable-setuid-sandbox'],
+    });
+  } catch (err) {
+    logger.debug(
+      `Storybook preview browser launch failed: ${(err as Error).message}`,
+    );
+    return map;
+  }
 
   try {
     const context = await browser.newContext();
@@ -282,6 +354,7 @@ export async function resolveStoryFrontguardParameters(
 
   const searchRoots = collectStorybookSearchRoots(options.projectRoot);
   const byFile = new Map<string, string[]>();
+  const staticallyInspectedIds = new Set<string>();
 
   for (const entry of entries) {
     if (resolved.has(entry.id) || !entry.importPath) continue;
@@ -292,23 +365,48 @@ export async function resolveStoryFrontguardParameters(
     byFile.set(filePath, ids);
   }
 
+  const previewCandidates = [
+    '.storybook/preview.ts',
+    '.storybook/preview.tsx',
+    '.storybook/preview.js',
+    '.storybook/preview.jsx',
+    '.storybook/preview.mjs',
+    '.storybook/preview.cjs',
+  ];
+  const hasGlobalPreviewFrontguard = searchRoots.some((root) =>
+    previewCandidates.some((rel) => {
+      const p = join(root, rel);
+      try {
+        return existsSync(p) && readFileSync(p, 'utf-8').includes('frontguard');
+      } catch {
+        return false;
+      }
+    }),
+  );
+
   for (const [filePath] of byFile) {
     try {
-      const fromCsf = parseFrontguardFromCsfFile(filePath);
-      for (const [storyId, params] of fromCsf) {
+      const fromCsf = await parseFrontguardFromCsfFile(filePath);
+      for (const [storyId, params] of fromCsf.params) {
         if (!resolved.has(storyId)) resolved.set(storyId, params);
+      }
+      if (!hasGlobalPreviewFrontguard) {
+        for (const id of fromCsf.staticallyCompleteIds) {
+          staticallyInspectedIds.add(id);
+        }
       }
     } catch (err) {
       logger.debug(`CSF parameter parse failed for ${filePath}: ${(err as Error).message}`);
     }
   }
 
+  const indexIncludesParameters = entries.some((e) => e.parameters !== undefined);
   const stillMissing =
-    options.storybookMajor === 8
+    options.storybookMajor === 8 && !indexIncludesParameters
       ? entries
           .map((e) => e.id)
-          .filter((id) => !resolved.has(id))
-      : needsEnrichment.filter((id) => !resolved.has(id));
+          .filter((id) => !resolved.has(id) && !staticallyInspectedIds.has(id))
+      : [];
 
   if (stillMissing.length > 0) {
     const fromPreview = await enrichFromPreview(

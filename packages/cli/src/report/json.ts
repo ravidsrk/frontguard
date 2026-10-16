@@ -87,6 +87,7 @@ interface SerializedRunResult {
   summary: RunResult['summary'];
   timing: RunResult['timing'];
   diffs: SerializedDiff[];
+  judgements?: RunResult['judgements'];
   accessibility?: RunResult['accessibility'];
   perf?: RunResult['perf'];
   thirdPartyScripts?: RunResult['thirdPartyScripts'];
@@ -107,9 +108,10 @@ interface SerializedRunResult {
 function serializeRunResult(result: RunResult): SerializedRunResult {
   return {
     baselineUpdate: result.baselineUpdate,
-    summary: result.summary,
+    summary: result.baselineUpdate ? result.summary : result.summary,
     timing: result.timing,
     diffs: result.diffs.map(serializeDiff),
+    judgements: result.judgements,
     accessibility: result.accessibility,
     perf: result.perf,
     thirdPartyScripts: result.thirdPartyScripts,

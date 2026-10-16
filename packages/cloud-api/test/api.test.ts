@@ -410,3 +410,51 @@ describe('GET /dashboard — production session-secret fail-closed', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('POST /v1/integrations/vercel/install & GitHub slug projectId', () => {
+  it('registers a Vercel integration installation and creates/reuses a workspace team', async () => {
+    const res = await request('/v1/integrations/vercel/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        configurationId: 'icfg_test_1',
+        vercelTeamId: 'team_v1',
+        vercelUserId: 'usr_v1',
+        installationType: 'marketplace',
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body).toEqual({
+      installed: true,
+      teamId: 'vercel_team_v1',
+      configurationId: 'icfg_test_1',
+    });
+
+    // Idempotent repeat call returns 200
+    const repeat = await request('/v1/integrations/vercel/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        configurationId: 'icfg_test_1',
+        vercelTeamId: 'team_v1',
+      }),
+    });
+    expect(repeat.status).toBe(200);
+  });
+
+  it('allows POST /v1/run with a GitHub repo slug projectId when github linkage is present', async () => {
+    const res = await request('/v1/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: 'https://example.com',
+        projectId: 'acme/web',
+        github: { owner: 'acme', repo: 'web', prNumber: 7, commitSha: 'abc1234' },
+      }),
+    });
+    expect(res.status).toBe(202);
+    const data = await res.json();
+    expect(data.id).toBeDefined();
+  });
+});

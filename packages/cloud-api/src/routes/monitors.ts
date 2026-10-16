@@ -18,12 +18,17 @@ import { z } from "zod";
 import type { Bindings } from "../db/factory.js";
 import type { Store } from "../db/store.js";
 import type { Monitor } from "../db/monitors.js";
+import { can } from "../db/teams.js";
 import {
   dispatchAlerts,
   type AlertEnv,
   type MonitorAlert,
 } from "../alerts/index.js";
 import { getPlan, checkLimit, hasFeature } from "../billing/plans.js";
+import {
+  SafeRenderTargetError,
+  assertSafeRenderTarget,
+} from "../security/render-target.js";
 
 type Variables = { store: Store; userId: string };
 
@@ -40,6 +45,7 @@ export const monitorRoutes = new Hono<{
 const baseShape = {
   name: z.string().min(1).max(100),
   url: z.url(),
+  projectId: z.string().min(1).optional(),
   routes: z.array(z.string()).min(1),
   viewports: z.array(z.number().int().min(320).max(3840)),
   intervalMinutes: z.number().int().min(5).max(10_080),
@@ -81,6 +87,15 @@ monitorRoutes.post("/", async (c) => {
       400,
     );
   }
+  try {
+    await assertSafeRenderTarget(parsed.data.url);
+  } catch (err) {
+    if (err instanceof SafeRenderTargetError) {
+      return c.json({ error: err.message }, 400);
+    }
+    throw err;
+  }
+
   const store = c.get("store");
   const userId = c.get("userId");
 
@@ -112,9 +127,19 @@ monitorRoutes.post("/", async (c) => {
   }
 
   const d = parsed.data;
+  if (d.projectId) {
+    const project = await store.getProjectById(d.projectId);
+    if (!project) return c.json({ error: "Project not found" }, 404);
+    const member = await store.getMember(project.teamId, userId);
+    if (!member || !can(member.role, "run_tests")) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+  }
+
   const monitor: Monitor = {
     id: crypto.randomUUID(),
     userId,
+    ...(d.projectId ? { projectId: d.projectId } : {}),
     name: d.name,
     url: d.url,
     routes: d.routes,
@@ -138,9 +163,10 @@ monitorRoutes.get("/:id", async (c) => {
 
 monitorRoutes.patch("/:id", async (c) => {
   const store = c.get("store");
+  const userId = c.get("userId");
   const id = c.req.param("id");
   const m = await store.getMonitor(id);
-  if (!m || m.userId !== c.get("userId"))
+  if (!m || m.userId !== userId)
     return c.json({ error: "Monitor not found" }, 404);
 
   const parsed = updateSchema.safeParse(await c.req.json().catch(() => ({})));
@@ -152,6 +178,24 @@ monitorRoutes.patch("/:id", async (c) => {
       },
       400,
     );
+  }
+  if (parsed.data.projectId) {
+    const project = await store.getProjectById(parsed.data.projectId);
+    if (!project) return c.json({ error: "Project not found" }, 404);
+    const member = await store.getMember(project.teamId, userId);
+    if (!member || !can(member.role, "run_tests")) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+  }
+  if (parsed.data.url) {
+    try {
+      await assertSafeRenderTarget(parsed.data.url);
+    } catch (err) {
+      if (err instanceof SafeRenderTargetError) {
+        return c.json({ error: err.message }, 400);
+      }
+      throw err;
+    }
   }
   await store.updateMonitor(id, parsed.data);
   return c.json(await store.getMonitor(id));

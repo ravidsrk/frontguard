@@ -200,9 +200,9 @@ describe('runJudgePipeline', () => {
     );
   });
 
-  it('caches Figma references across batches for the same route', async () => {
-    // 6 same-route screenshots span two batches (AI_BATCH_SIZE = 5); the cache
-    // dedupes the reference fetch from the 2nd batch onward.
+  it('caches Figma references across concurrent viewports and batches for the same route', async () => {
+    // 6 same-route screenshots span two batches (AI_BATCH_SIZE = 5); the promise cache
+    // dedupes the reference fetch across all concurrent viewports and subsequent batches.
     renderPages.mockResolvedValue(Array.from({ length: 6 }, () => shot('/', 1440)));
     fetchDesignReference.mockResolvedValue(Buffer.from('design'));
     judgeScreenshot.mockResolvedValue(verdict('/', true, { withDesignReference: true }));
@@ -215,8 +215,7 @@ describe('runJudgePipeline', () => {
       makeReporter(),
     );
 
-    // First batch of 5 races (all miss → 5 fetches); 2nd batch hits the cache.
-    expect(fetchDesignReference.mock.calls.length).toBeLessThan(6);
+    expect(fetchDesignReference).toHaveBeenCalledTimes(1);
     expect(judgeScreenshot).toHaveBeenCalledTimes(6);
   });
 

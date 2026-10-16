@@ -7,6 +7,9 @@
  * The cloud-api is stubbed via a `fetch` override so the suite stays hermetic.
  */
 
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -16,7 +19,7 @@ import {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import { createServer } from '../src/index.js';
-import { CloudClient, diffIdFor, parseDiffId } from '../src/client/cloud.js';
+import { CloudClient, createLocalReportClient, diffIdFor, parseDiffId } from '../src/client/cloud.js';
 import {
   acceptBaseline,
   acceptBaselineOutputSchema,
@@ -165,6 +168,23 @@ describe('list_regressions', () => {
     const out = await listRegressions(client, { pr_id: 'run_pr42' });
     expect(out.runId).toBe('run_pr42');
     expect(out.count).toBe(1);
+  });
+
+  it('resolves a UUIDv4 run id directly via getRun', async () => {
+    const uuidRunId = '550e8400-e29b-41d4-a716-446655440000';
+    const uuidRun = { ...SAMPLE_RUN, id: uuidRunId };
+    const client = new CloudClient(AUTH, {
+      fetch: (async (input: Parameters<typeof fetch>[0]) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+        const path = new URL(url).pathname;
+        if (path === `/v1/runs/${uuidRunId}`) return Response.json(uuidRun);
+        return new Response('Not found', { status: 404 });
+      }) as typeof fetch,
+    });
+    const out = await listRegressions(client, { pr_id: uuidRunId });
+    expect(out.runId).toBe(uuidRunId);
+    expect(out.count).toBe(1);
+    expect(out.regressions[0].diffId).toBe(`${uuidRunId}:/pricing:1280`);
   });
 
   it('respects the repo filter', async () => {
@@ -555,5 +575,56 @@ describe('MCP server tools/list + tools/call', () => {
     expect(extractText(res)).toMatch(/FRONTGUARD_API_KEY/);
     await client.close();
     await server.close();
+  });
+
+  it('serves local CLI JSON reports via FRONTGUARD_LOCAL_REPORT without FRONTGUARD_API_KEY', async () => {
+    delete process.env.FRONTGUARD_API_KEY;
+    const tmpDir = mkdtempSync(join(tmpdir(), 'fg-mcp-local-'));
+    const reportPath = join(tmpDir, 'report.json');
+    writeFileSync(
+      reportPath,
+      JSON.stringify({
+        url: 'http://localhost:3000',
+        timestamp: '2026-06-15T12:00:00.000Z',
+        results: [
+          {
+            route: '/pricing',
+            viewport: 1280,
+            status: 'regression',
+            diffPercentage: 0.045,
+            classification: 'regression',
+            suggestedFix: {
+              fixType: 'css',
+              category: 'spacing-fix',
+              patch: '.pricing { gap: 16px; }',
+              confidence: 0.9,
+              explanation: 'Spacing changed on pricing grid',
+              target: '.pricing',
+            },
+          },
+        ],
+      }),
+    );
+    process.env.FRONTGUARD_LOCAL_REPORT = reportPath;
+    try {
+      const localClient = createLocalReportClient(reportPath);
+      const listed = await listRegressions(localClient, { pr_id: 'run_local' });
+      expect(listed.count).toBe(1);
+      expect(listed.regressions[0].route).toBe('/pricing');
+
+      const { client, server } = await connectPair();
+      const res = (await client.callTool({
+        name: 'get_suggested_fix',
+        arguments: { diff_id: 'run_local:/pricing:1280' },
+      })) as CallToolResult;
+      expect(res.isError).toBeFalsy();
+      const data = JSON.parse(extractText(res));
+      expect(data.fix.patch).toContain('.pricing');
+      await client.close();
+      await server.close();
+    } finally {
+      delete process.env.FRONTGUARD_LOCAL_REPORT;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

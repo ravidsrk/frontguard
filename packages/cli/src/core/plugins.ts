@@ -189,6 +189,7 @@ export class PluginManager {
    * If no hook returns a value, the original first argument is returned
    * unchanged (pass-through).
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async runHook(hook: string, ...args: unknown[]): Promise<any> {
     const currentArgs = [...args];
 

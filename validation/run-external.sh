@@ -259,10 +259,11 @@ run_repo() {
     } >>"${out_file}"
     while IFS= read -r route; do
       [[ -z "${route}" ]] && continue
-      local full_url="${url%/}${route}"
+      local base_url="${url%/}"
+      local full_url="${base_url}${route}"
       echo "    [${pass_name}] • ${full_url}"
       local result
-      if result="$(${FG_BIN} run --url "${full_url}" ${extra_flag} --output json 2>>"${WORK_DIR}/frontguard.log")"; then
+      if result="$(${FG_BIN} run --url "${base_url}" --routes "${route}" ${extra_flag} --output json 2>>"${WORK_DIR}/frontguard.log")"; then
         :
       else
         echo "WARNING: frontguard ${pass_name} run failed for ${full_url}" >&2

@@ -344,4 +344,45 @@ describe('/slack/oauth/callback — install persistence', () => {
       globalThis.fetch = orig;
     }
   });
+
+  it('uses the workspace token stored in SLACK_TEAMS KV when handling app_mention events', async () => {
+    const kv = memoryKV();
+    await kv.put(
+      'team:T_MULTI',
+      JSON.stringify({
+        teamId: 'T_MULTI',
+        teamName: 'MultiTeam',
+        accessToken: 'xoxb-multi-workspace-token',
+        installedAt: '2026-06-15T00:00:00.000Z',
+      }),
+    );
+    const orig = globalThis.fetch;
+    let slackAuthHeader: string | undefined;
+    globalThis.fetch = (async (input: string, init?: RequestInit) => {
+      if (String(input).includes('slack.com/api/chat.postMessage')) {
+        slackAuthHeader = (init?.headers as Record<string, string>)?.Authorization;
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      return new Response('ok', { status: 200 });
+    }) as typeof fetch;
+    try {
+      const body = JSON.stringify({
+        type: 'event_callback',
+        team_id: 'T_MULTI',
+        event: { type: 'app_mention', channel: 'C_MULTI', text: '<@U1> help' },
+      });
+      const ts = String(Math.floor(Date.now() / 1000));
+      const sig = await signSlack(body, ts, SECRET);
+      const res = await app.request(
+        '/slack/events',
+        { method: 'POST', headers: signedHeaders(body, ts, sig), body },
+        { SLACK_SIGNING_SECRET: SECRET, SLACK_TEAMS: kv },
+      );
+      expect(res.status).toBe(200);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(slackAuthHeader).toBe('Bearer xoxb-multi-workspace-token');
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
 });

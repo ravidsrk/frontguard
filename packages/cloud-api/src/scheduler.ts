@@ -26,7 +26,11 @@ import { dispatchAlertsWithState, type MonitorAlert, type AlertEnv } from './ale
 import { getPlan, hasFeature } from './billing/plans.js';
 import type { Run } from './types.js';
 import { getScreenshotStore, type R2Bucket } from './storage/screenshots.js';
-import { persistScreenshots, type PendingScreenshot } from './storage/persist-screenshots.js';
+import {
+  persistScreenshots,
+  selectApprovedBaselineScreenshots,
+  type PendingScreenshot,
+} from './storage/persist-screenshots.js';
 import type { BaselineRestore } from './daytona-runner.js';
 import { compareDiffToThreshold } from './threshold.js';
 import {
@@ -127,11 +131,11 @@ async function resolveMonitorBaseline(
   if (!bucket) return undefined;
 
   if (monitor.projectId) {
-    const baselineRun = await store.getProjectBaseline(monitor.projectId);
+    const baselineRun = await store.getProjectBaseline(monitor.projectId, monitor.userId);
     if (baselineRun) {
       const approvedRefs = buildMonitorScreenshotRefs(
         monitor.routes,
-        (await store.listScreenshots(baselineRun.id)).filter((s) => s.type === 'baseline'),
+        selectApprovedBaselineScreenshots(await store.listScreenshots(baselineRun.id)),
       );
       const approved = baselineRestoreFromRefs(approvedRefs, bucket);
       if (approved) return approved;
@@ -168,6 +172,8 @@ async function attemptCheck(
   env: SchedulerEnv,
   store: Store,
 ): Promise<CheckAttempt> {
+  const baselineRestore = await resolveMonitorBaseline(store, monitor, env.SCREENSHOTS as R2Bucket | undefined);
+
   const run: Run = {
     id: crypto.randomUUID(),
     status: 'queued',
@@ -180,15 +186,18 @@ async function attemptCheck(
     createdAt: now.toISOString(),
     results: null,
     reportUrl: null,
+    ...(monitor.projectId ? { projectId: monitor.projectId } : {}),
   };
+
+  await store.createRun(run, monitor.userId);
 
   const blobs = getScreenshotStore(env.SCREENSHOTS as R2Bucket | undefined);
   const onScreenshots = async (shots: PendingScreenshot[]): Promise<void> => {
-    await persistScreenshots(store, blobs, monitor.userId, run.id, shots);
+    await persistScreenshots(store, blobs, monitor.userId, run.id, shots, monitor.routes);
   };
-  const baselineRestore = await resolveMonitorBaseline(store, monitor, env.SCREENSHOTS as R2Bucket | undefined);
 
   await processRun(run, env, onScreenshots, baselineRestore);
+  await store.updateRun(run.id, run);
 
   const screenshotRefs = buildMonitorScreenshotRefs(
     monitor.routes,

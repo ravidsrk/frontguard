@@ -65,21 +65,7 @@ function isNonPageFile(url: string): boolean {
   }
 }
 
-function isExcluded(url: string, excludePatterns: string[]): boolean {
-  const pathname = (() => {
-    try { return new URL(url).pathname; } catch { return url; }
-  })();
-
-  return excludePatterns.some((pattern) => {
-    try {
-      const re = new RegExp(pattern);
-      return re.test(pathname);
-    } catch {
-      const globRe = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-      return globRe.test(pathname) || pathname.includes(pattern);
-    }
-  });
-}
+import { isExcluded } from '../../src/discovery/crawler.js';
 
 describe('Crawler URL Canonicalization', () => {
   it('strips query parameters', () => {
@@ -184,8 +170,9 @@ describe('Crawler Exclude Patterns', () => {
     expect(isExcluded('https://example.com/admin/settings', ['/admin/'])).toBe(true);
   });
 
-  it('matches glob patterns', () => {
+  it('matches glob patterns without treating /* as zero-or-more slashes', () => {
     expect(isExcluded('https://example.com/admin/users', ['/admin/*'])).toBe(true);
+    expect(isExcluded('https://example.com/admin', ['/admin/*'])).toBe(false);
   });
 
   it('does not exclude non-matching paths', () => {

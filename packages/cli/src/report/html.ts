@@ -94,6 +94,7 @@ ${renderHeader(result)}
       <p>← Select a route from the sidebar to view details</p>
     </div>
     ${routeData.map((r, i) => renderRouteDetail(r.path, r.diffs, i, resolveImage)).join('\n    ')}
+    ${renderJudgementsSection(result)}
     ${renderAccessibilitySection(result)}
     ${renderPerformanceSection(result)}
     ${renderThirdPartyScriptsSection(result)}
@@ -451,6 +452,45 @@ function renderThirdPartyScriptsSection(result: RunResult): string {
 
   return `<section class="tps-section" id="tps-section">
       <h2>🧩 Third-party scripts</h2>
+      ${blocks}
+    </section>`;
+}
+
+function renderJudgementsSection(result: RunResult): string {
+  const judgements = result.judgements;
+  if (!judgements || judgements.length === 0) return '';
+
+  const blocks = judgements
+    .map((j) => {
+      const status = j.error ? 'error' : j.pass ? 'pass' : 'regression';
+      const statusText = j.error ? 'ERROR' : j.pass ? 'PASS' : 'FAIL';
+      const score = `${Math.round(j.confidence * 100)}%`;
+      const issuesHtml = j.error
+        ? `<div class="error-box"><strong>Error:</strong> ${escapeHtml(j.error)}</div>`
+        : j.issues.length > 0
+          ? `<ul class="judge-issues">${j.issues
+              .map(
+                (i) =>
+                  `<li>${severityBadge(i.severity)} <strong>${escapeHtml(i.category)}:</strong> ${escapeHtml(i.description)}${
+                    i.suggestion ? ` <em>(${escapeHtml(i.suggestion)})</em>` : ''
+                  }</li>`,
+              )
+              .join('\n')}</ul>`
+          : `<p class="judge-no-issues">No issues detected.</p>`;
+
+      return `<div class="judge-route" data-pass="${j.pass}">
+        <div class="judge-route-header">
+          ${statusIcon(status)}
+          <strong>${escapeHtml(j.route.path)}</strong>
+          <span class="judge-meta">@ ${j.viewport}px [${escapeHtml(j.browser)}] · ${statusText} · Confidence: ${score}</span>
+        </div>
+        ${issuesHtml}
+      </div>`;
+    })
+    .join('\n');
+
+  return `<section class="judgements-section" id="judgements-section">
+      <h2>🧪 Judge Verdicts</h2>
       ${blocks}
     </section>`;
 }

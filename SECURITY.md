@@ -8,16 +8,23 @@ Do NOT open a public GitHub issue for security vulnerabilities.
 
 ## Supported Versions
 
-| Version | Supported |
-|---------|-----------|
-| 0.2.x   | ✅        |
-| 0.1.x   | ✅        |
+| Package | Version | Supported |
+|---------|---------|-----------|
+| `@frontguard/cli` | `0.2.x` | ✅ |
+| `@frontguard/playwright` | `0.2.x` | ✅ |
+| `@frontguard/mcp` | `0.2.x` | ✅ |
+| `create-frontguard-plugin` | `0.2.x` | ✅ |
+| `@frontguard/netlify-plugin` | `0.2.x` | ✅ |
+| All packages | `< 0.2.0` | ❌ |
 
 ## Scope
 
 The following are in scope:
-- The `frontguard` npm package
-- The `@frontguard/playwright` npm package  
+- The `@frontguard/cli` npm package
+- The `@frontguard/playwright` npm package
+- The `@frontguard/mcp` npm package
+- The `create-frontguard-plugin` npm package
+- The `@frontguard/netlify-plugin` npm package
 - The frontguard GitHub Action
 - The frontguard.dev cloud API
 

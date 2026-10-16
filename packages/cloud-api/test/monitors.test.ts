@@ -230,6 +230,7 @@ describe('/v1/monitors routes (dev mode)', () => {
   });
 
   it('sends a test alert to configured channels', async () => {
+    const id = await createMonitor(auth(), { alerts: { slack: 'https://hooks.example.com/x' } });
     let calls = 0;
     let payload = '';
     const realFetch = globalThis.fetch;
@@ -239,7 +240,6 @@ describe('/v1/monitors routes (dev mode)', () => {
       return new Response('{}', { status: 200 });
     }) as unknown as typeof fetch;
     try {
-      const id = await createMonitor(auth(), { alerts: { slack: 'https://hooks.example.com/x' } });
       const res = await app.request(`/v1/monitors/${id}/test-alert`, { method: 'POST', headers: auth() });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -249,6 +249,25 @@ describe('/v1/monitors routes (dev mode)', () => {
     } finally {
       globalThis.fetch = realFetch;
     }
+  });
+
+  it('rejects private/loopback/non-https URLs in POST and PATCH /v1/monitors (SSRF guard)', async () => {
+    for (const badUrl of ['http://example.com', 'https://127.0.0.1', 'https://169.254.169.254', 'https://localhost']) {
+      const res = await app.request('/v1/monitors', {
+        method: 'POST',
+        headers: auth(),
+        body: JSON.stringify({ name: 'Bad', url: badUrl }),
+      });
+      expect(res.status).toBe(400);
+    }
+
+    const id = await createMonitor();
+    const patchRes = await app.request(`/v1/monitors/${id}`, {
+      method: 'PATCH',
+      headers: auth(),
+      body: JSON.stringify({ url: 'https://127.0.0.1/admin' }),
+    });
+    expect(patchRes.status).toBe(400);
   });
 
   it('rejects a test alert when no channels are configured', async () => {

@@ -186,7 +186,35 @@ const FILE_EDITS: Array<{ file: string; edits: RequiredEdit[] }> = [
       },
     ],
   },
+  {
+    file: "packages/cloud-api/src/daytona-runner.ts",
+    edits: [
+      readFileSync(
+        join(ROOT, "packages/cloud-api/src/daytona-runner.ts"),
+        "utf8",
+      ).includes("readFileSync(")
+        ? {
+            find: /const FRONTGUARD_CLI_VERSION = \([\s\S]*?\)\.version;/g,
+            replace:
+              readFileSync(
+                join(ROOT, "packages/cloud-api/src/daytona-runner.ts"),
+                "utf8",
+              ).match(/const FRONTGUARD_CLI_VERSION = \([\s\S]*?\)\.version;/)?.[0] ??
+              `const FRONTGUARD_CLI_VERSION = '${version}';`,
+            label: "daytona-runner FRONTGUARD_CLI_VERSION",
+            expected: 1,
+          }
+        : {
+            find: /const FRONTGUARD_CLI_VERSION = '[^']*';/g,
+            replace: `const FRONTGUARD_CLI_VERSION = '${version}';`,
+            label: "daytona-runner FRONTGUARD_CLI_VERSION",
+            expected: 1,
+          },
+    ],
+  },
 ];
+
+export const SOURCE_VERSION_FILES = FILE_EDITS.map((entry) => entry.file);
 
 const drift: string[] = [];
 

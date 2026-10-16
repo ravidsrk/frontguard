@@ -211,4 +211,64 @@ describe('D1Store (SQLite-backed)', () => {
     expect(teamUsage.runsCount).toBe(5);
     expect(teamUsage.screenshotsCount).toBe(15);
   });
+
+  it('persists monitor projectId and works on a database initialized directly from schema.sql', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { dirname, join } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const { splitStatements } = await import('../src/db/migrate.js');
+    const { SCHEMA_SQL } = await import('../src/db/schema.js');
+
+    const schemaSqlFile = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/db/schema.sql'),
+      'utf8',
+    );
+    expect(schemaSqlFile.trim()).toBe(SCHEMA_SQL.trim());
+
+    const { db, raw } = createSqliteD1();
+    for (const stmt of splitStatements(schemaSqlFile)) {
+      raw.exec(stmt);
+    }
+    const directStore = new D1Store(db);
+    await directStore.createUser({
+      id: 'u1',
+      githubLogin: 'octocat',
+      plan: 'business',
+      createdAt: 'now',
+    });
+    expect((await directStore.getUser('u1'))?.githubLogin).toBe('octocat');
+
+    await directStore.createTeam({ id: 't1', name: 'Acme', plan: 'business', createdAt: 'now' }, 'u1');
+    await directStore.createProject({ id: 'p1', teamId: 't1', name: 'Web', createdAt: 'now' });
+
+    await directStore.createMonitor({
+      id: 'm1',
+      userId: 'u1',
+      projectId: 'p1',
+      name: 'Prod Web',
+      url: 'https://example.com',
+      routes: ['/'],
+      viewports: [1440],
+      intervalMinutes: 60,
+      alertThreshold: 0.05,
+      enabled: true,
+      createdAt: 'now',
+    });
+
+    const loaded = await directStore.getMonitor('m1');
+    expect(loaded?.projectId).toBe('p1');
+
+    await directStore.updateMonitor('m1', { name: 'Prod Web 2' });
+    expect((await directStore.getMonitor('m1'))?.projectId).toBe('p1');
+
+    await directStore.recordBackgroundFailure({
+      id: 'bf1',
+      kind: 'run',
+      sourceId: 'r1',
+      error: 'test failure',
+      attempt: 1,
+      createdAt: 'now',
+    });
+    expect(await directStore.listBackgroundFailures()).toHaveLength(1);
+  });
 });

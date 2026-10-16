@@ -226,7 +226,7 @@ const honest = [
   {
     label: "YOU STAY IN THE LOOP",
     color: "#4fb477",
-    body: "High-confidence intentional classifications automatically downgrade regressions to warnings. With fix verification enabled, a verified fix is automatically recorded as an accepted local fix-pattern signal. Neither behavior updates baselines; review model output and patches.",
+    body: "Let AI explain what changed, classify shift severity, and suggest candidate CSS fixes while keeping pass/fail decisions deterministic. With fix verification enabled, a verified fix is automatically recorded as an accepted local fix-pattern signal. Neither behavior updates baselines; review model output and patches.",
   },
   {
     label: "NUMBERS, NOT CLAIMS",

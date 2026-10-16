@@ -375,4 +375,47 @@ describe('ConsoleReporter', () => {
     expect(rows.find((line) => line.includes('firefox'))).toContain('✘');
     expect(rows.find((line) => line.includes('webkit'))).toContain('✘');
   });
+
+  it('renders judgements summary when result.judgements is non-empty and diffs is empty', () => {
+    const reporter = new ConsoleReporter();
+    const result = makeRunResult([], {
+      summary: { total: 2, passed: 1, regressions: 1, warnings: 0, newPages: 0, errors: 0 },
+      judgements: [
+        {
+          route: { path: '/', label: 'Home' },
+          viewport: 1440,
+          browser: 'chromium',
+          pass: true,
+          confidence: 0.92,
+          issues: [],
+          withDesignReference: false,
+        },
+        {
+          route: { path: '/pricing', label: 'Pricing' },
+          viewport: 375,
+          browser: 'chromium',
+          pass: false,
+          confidence: 0.88,
+          issues: [
+            {
+              category: 'overflow',
+              severity: 'critical',
+              description: 'CTA button overflows viewport',
+              suggestion: 'Add max-width: 100%',
+            },
+          ],
+          withDesignReference: true,
+        },
+      ],
+    });
+
+    reporter.onComplete(result);
+
+    const output = collectOutput(logSpy);
+    expect(output).not.toContain('No routes were tested');
+    expect(output).toContain('JUDGE VERDICTS');
+    expect(output).toContain('/pricing');
+    expect(output).toContain('CTA button overflows viewport');
+  });
 });
+

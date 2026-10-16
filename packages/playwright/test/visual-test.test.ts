@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test as playwrightTest, type TestInfo } from '@playwright/test';
 import { PNG } from 'pngjs';
-import { visualTest } from '../src/visual-test.js';
+import { visualTest, expectVisual } from '../src/index.js';
 
 const TEST_BASELINE_DIR = '__test_visual_baselines__';
 
@@ -94,8 +94,9 @@ describe('visualTest', () => {
     expect(result.isNewBaseline).toBe(true);
     expect(result.diffPercentage).toBe(0);
 
-    // Baseline file should exist
+    // Baseline and current files should exist
     expect(fs.existsSync(result.baselinePath)).toBe(true);
+    expect(fs.existsSync(result.currentPath)).toBe(true);
   });
 
   it('second run with same image passes', async () => {
@@ -247,7 +248,7 @@ describe('visualTest', () => {
     expect(page.reload).toHaveBeenCalledTimes(1);
   });
 
-  it('calls evaluate for mask selectors', async () => {
+  it('calls evaluate for mask selectors and cleans up in finally', async () => {
     const img = createPNG(50, 50, [128, 128, 128, 255]);
     const page = createMockPage(img);
 
@@ -256,12 +257,12 @@ describe('visualTest', () => {
       mask: ['.ad-banner', '#timestamp'],
     });
 
-    expect(page.evaluate).toHaveBeenCalledTimes(1);
+    expect(page.evaluate).toHaveBeenCalledTimes(2);
     const evalArgs = page.evaluate.mock.calls[0];
     expect(evalArgs[1]).toEqual(['.ad-banner', '#timestamp']);
   });
 
-  it('calls evaluate for mask regions', async () => {
+  it('calls evaluate for mask regions and cleans up in finally', async () => {
     const img = createPNG(50, 50, [128, 128, 128, 255]);
     const page = createMockPage(img);
 
@@ -270,7 +271,7 @@ describe('visualTest', () => {
       maskRegions: [{ x: 10, y: 10, width: 50, height: 50 }],
     });
 
-    expect(page.evaluate).toHaveBeenCalledTimes(1);
+    expect(page.evaluate).toHaveBeenCalledTimes(2);
   });
 
   it('respects custom threshold', async () => {
@@ -372,5 +373,21 @@ describe('visualTest', () => {
     expect(readablePath).toContain(process.platform);
     expect(readablePath).toContain('checkout');
     expect(readablePath).toContain('1280x720');
+  });
+
+  it('expectVisual resolves when visualTest passes and throws on regression', async () => {
+    const img1 = createPNG(20, 20, [128, 128, 128, 255]);
+    const img2 = createPNG(20, 20, [255, 0, 0, 255]);
+
+    const res = await expectVisual(createMockPage(img1), 'expect-visual', {
+      baselineDir: TEST_BASELINE_DIR,
+    });
+    expect(res.passed).toBe(true);
+
+    await expect(
+      expectVisual(createMockPage(img2), 'expect-visual', {
+        baselineDir: TEST_BASELINE_DIR,
+      })
+    ).rejects.toThrow(/Visual regression detected for "expect-visual"/);
   });
 });
