@@ -4,10 +4,12 @@
   "compatibility_date": "2026-06-12",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
-  "routes": [
-    { "pattern": "frontguard.dev/*", "zone_name": "frontguard.dev" },
-    { "pattern": "www.frontguard.dev/*", "zone_name": "frontguard.dev" }
-  ],
+  // H-07: Uncomment `routes` once CLOUDFLARE_API_TOKEN includes Zone -> Workers Routes -> Edit
+  // permission, or attach frontguard.dev / www.frontguard.dev as Custom Domains in the Cloudflare Dashboard:
+  // "routes": [
+  //   { "pattern": "frontguard.dev/*", "zone_name": "frontguard.dev" },
+  //   { "pattern": "www.frontguard.dev/*", "zone_name": "frontguard.dev" }
+  // ],
   // Serve static assets (public/ files like /agents.md, /openapi.json,
   // /.well-known/mcp.json) before invoking the SSR worker, so uploaded assets
   // are served at their paths instead of the worker 404-ing them.
