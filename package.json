@@ -77,7 +77,7 @@
   "devDependencies": {
     "husky": "^9.1.7",
     "lint-staged": "^17.5.1",
-    "playwright": "1.62.1"
+    "playwright": "1.63.0"
   },
   "lint-staged": {
     "packages/cli/src/**/*.ts": [
