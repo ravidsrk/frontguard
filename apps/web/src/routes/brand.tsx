@@ -126,11 +126,11 @@ function Brand() {
     <div style={s('background: #0d0c0b; color: #b8b0a6; min-height: 100vh;')}>
       <Nav active="brand" />
 
-      <div style={s('padding: 56px 28px 80px;')}>
+      <main id="main-content" style={s('padding: 56px 28px 80px;')}>
         <div style={s('max-width: 1080px; margin: 0 auto;')}>
           <h1
             style={s(
-              'font-size: 52px; letter-spacing: -0.04em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px; line-height: 1.0;',
+              'font-size: clamp(36px, 5.5vw, 52px); letter-spacing: -0.04em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px; line-height: 1.0;',
             )}
           >
             The Frontguard
@@ -298,6 +298,7 @@ function Brand() {
             CANVAS &amp; INK — warm neutrals
           </div>
           <div
+            className="fg-swatches-grid"
             style={s(
               'display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 32px;',
             )}
@@ -609,7 +610,7 @@ function Brand() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

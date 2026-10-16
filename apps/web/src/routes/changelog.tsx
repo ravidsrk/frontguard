@@ -73,6 +73,7 @@ function Changelog() {
     <div style={s('background: #0d0c0b; color: #b8b0a6; min-height: 100vh;')}>
       <Nav active="changelog" />
 
+      <main id="main-content">
       <header style={s('max-width: 860px; margin: 0 auto; padding: 72px 28px 36px;')}>
         <div
           style={s(
@@ -83,7 +84,7 @@ function Changelog() {
         </div>
         <h1
           style={s(
-            'font-size: 48px; line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;',
+            'font-size: clamp(34px, 5vw, 48px); line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;',
           )}
         >
           What's new in Frontguard
@@ -201,6 +202,7 @@ function Changelog() {
           </a>
         </div>
       </section>
+      </main>
 
       <Footer />
     </div>

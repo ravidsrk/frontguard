@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { RouterProvider } from '@tanstack/react-router'
 import { getRouter } from '../router'
 import { Route } from '../routes/index'
@@ -21,6 +21,36 @@ describe('home route — real product content', () => {
         name: /^Catch the regression,\s*not the noise\.$/,
       }),
     ).toBeInTheDocument()
+  })
+
+  it('renders a semantic main landmark, skip link, and accessible copy buttons', () => {
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content')
+    expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute(
+      'href',
+      '#main-content',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Copy command: npm install @frontguard/cli' }),
+    ).toHaveAttribute('type', 'button')
+    expect(
+      screen.getByRole('button', {
+        name: 'Copy command: npx -p @frontguard/cli frontguard init --ci',
+      }),
+    ).toHaveAttribute('type', 'button')
+  })
+
+  it('renders the interactive visual diff inspector and switches between inspection modes', () => {
+    const inspector = screen.getByTestId('visual-diff-inspector')
+    expect(inspector).toBeInTheDocument()
+    expect(within(inspector).getByText(/CONNECTED-COMPONENT CLUSTER OVERLAY/i)).toBeInTheDocument()
+    expect(within(inspector).getByText(/Chroma SSIM \(YCbCr\)/i)).toBeInTheDocument()
+
+    fireEvent.click(within(inspector).getByRole('tab', { name: /01 · Side-by-side/i }))
+    expect(within(inspector).getByText(/BASELINE · frontguard-baselines/i)).toBeInTheDocument()
+    expect(within(inspector).getByText(/CURRENT · PR branch render/i)).toBeInTheDocument()
+
+    fireEvent.click(within(inspector).getByRole('tab', { name: /03 · MCP Visual Cortex/i }))
+    expect(within(inspector).getByText(/inspect_diff_cluster_dom → verify_css_patch/i)).toBeInTheDocument()
   })
 
   it('renders the published validation limits instead of unsupported market statistics', () => {
@@ -118,5 +148,6 @@ describe('home route — SEO head', () => {
       [expect.objectContaining({ name: 'Free CLI', price: '0' })],
     )
     expect(jsonLd).not.toHaveProperty('aggregateRating')
+    expect(head?.scripts?.length).toBeGreaterThanOrEqual(2)
   })
 })

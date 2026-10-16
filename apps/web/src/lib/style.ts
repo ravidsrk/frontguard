@@ -9,7 +9,12 @@ import type { CSSProperties } from 'react'
  * mockups instead of hand-camelCasing hundreds of style objects. Kebab-case
  * properties are converted to camelCase; custom properties (--x) are preserved.
  */
+const styleCache = new Map<string, CSSProperties>()
+
 export function s(css: string): CSSProperties {
+  const cached = styleCache.get(css)
+  if (cached) return cached
+
   const out: Record<string, string> = {}
   for (const decl of css.split(';')) {
     const i = decl.indexOf(':')
@@ -22,7 +27,9 @@ export function s(css: string): CSSProperties {
       : prop.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
     out[key] = value
   }
-  return out as CSSProperties
+  const frozen = Object.freeze(out) as CSSProperties
+  styleCache.set(css, frozen)
+  return frozen
 }
 
 /** Frontguard palette — single source of truth for colors used in TS logic. */

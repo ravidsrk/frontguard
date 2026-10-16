@@ -78,6 +78,7 @@ function Comparisons() {
     <div style={s('background: #0d0c0b; color: #b8b0a6; min-height: 100vh;')}>
       <Nav active="compare" />
 
+      <main id="main-content">
       <header style={s('max-width: 1200px; margin: 0 auto; padding: 76px 28px 44px; text-align: center;')}>
         <div
           style={s(
@@ -88,7 +89,7 @@ function Comparisons() {
         </div>
         <h1
           style={s(
-            'font-size: 52px; line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;',
+            'font-size: clamp(36px, 5.5vw, 52px); line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;',
           )}
         >
           Frontguard vs. everyone else.
@@ -346,7 +347,7 @@ function Comparisons() {
           >
             Install the CLI, capture and review baselines explicitly, then compare changes locally.
           </p>
-          <div style={s('display: flex; gap: 14px; justify-content: center;')}>
+          <div style={s('display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;')}>
             <a
               href="/docs"
               className="fg-btn-primary"
@@ -368,6 +369,7 @@ function Comparisons() {
           </div>
         </div>
       </section>
+      </main>
 
       <Footer />
     </div>

@@ -13,6 +13,11 @@ import {
   partitionRepos,
 } from "../lib/validation-data";
 import { buildSeoHead } from "../lib/seo";
+import {
+  FRONTGUARD_ORGANIZATION,
+  FRONTGUARD_WEBSITE,
+  jsonLdScript,
+} from "../lib/schema-org";
 
 const SEO_TITLE = "Frontguard — Catch the regression, not the noise";
 const SEO_DESCRIPTION =
@@ -54,6 +59,10 @@ export const Route = createFileRoute("/")({
       description: SEO_DESCRIPTION,
       path: "/",
       extraMeta: [{ "script:ld+json": SOFTWARE_JSON_LD }],
+      scripts: [
+        jsonLdScript(FRONTGUARD_ORGANIZATION),
+        jsonLdScript(FRONTGUARD_WEBSITE),
+      ],
     }),
   component: Home,
 });
@@ -79,7 +88,7 @@ const stages = [
   {
     num: "04",
     title: "Diff",
-    desc: "Pixel comparison with an SSIM fallback for perceptual matching.",
+    desc: "Pixel comparison with connected-component diff clustering, chroma YCbCr SSIM, and CW-SSIM.",
   },
   {
     num: "05",
@@ -112,7 +121,7 @@ const features = [
   {
     tag: "STORAGE",
     title: "Git-native baselines",
-    desc: "Stored in an orphan branch — zero bloat on your main branch.",
+    desc: "Stored in an orphan branch with SHA-256 manifest tracking and single-commit batching.",
   },
   {
     tag: "PREVIEW",
@@ -259,7 +268,7 @@ const pillars = [
     n: "01 / DETECT",
     c: "#4fb477",
     h: "Find what changed",
-    p: "Pixel comparison across configured viewports and browsers, with masks, thresholds, and optional multi-render consensus to control expected variation.",
+    p: "Pixel comparison across configured viewports and browsers, with connected-component diff clustering, chroma/CW-SSIM perceptual scoring, masks, and optional multi-render consensus.",
   },
   {
     n: "02 / UNDERSTAND",
@@ -525,6 +534,301 @@ function InstallTabs() {
   );
 }
 
+const DIFF_INSPECTOR_TABS = [
+  { id: "side-by-side", label: "01 · Side-by-side" },
+  { id: "cluster-ssim", label: "02 · Cluster + SSIM" },
+  { id: "mcp-cortex", label: "03 · MCP Visual Cortex" },
+] as const;
+
+function VisualDiffInspector() {
+  const [mode, setMode] = useState<(typeof DIFF_INSPECTOR_TABS)[number]["id"]>(
+    "cluster-ssim",
+  );
+
+  return (
+    <div
+      data-testid="visual-diff-inspector"
+      style={s(
+        "margin-top: 28px; border: 1px solid #2a2622; background: #121110; overflow: hidden;",
+      )}
+    >
+      <div
+        style={s(
+          "display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #211e1b; background: #161412;",
+        )}
+      >
+        <div style={s("display: flex; align-items: center; gap: 10px;")}>
+          <span
+            style={s(
+              "display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e5484d;",
+            )}
+          />
+          <span
+            style={s(
+              `font-family: ${MONO}; font-size: 12px; color: #f5f1ea; font-weight: 600;`,
+            )}
+          >
+            /dashboard @ 375px · chromium
+          </span>
+          <span
+            style={s(
+              `font-family: ${MONO}; font-size: 11px; color: #e5484d; border: 1px solid #4a2424; background: #1c1010; padding: 2px 7px;`,
+            )}
+          >
+            4.2% PIXEL DIFF · 1 CLUSTER
+          </span>
+        </div>
+        <div
+          role="tablist"
+          aria-label="Visual diff inspection view"
+          style={s("display: flex; flex-wrap: wrap; gap: 6px;")}
+        >
+          {DIFF_INSPECTOR_TABS.map((t) => {
+            const active = mode === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setMode(t.id)}
+                style={s(
+                  `cursor: pointer; font-family: ${MONO}; font-size: 11.5px; padding: 6px 11px; border: 1px solid ${active ? "#e8862e" : "#322d28"}; background: ${active ? "#1f160d" : "#131210"}; color: ${active ? "#f5f1ea" : "#8c847a"};`,
+                )}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {mode === "side-by-side" && (
+        <div
+          className="fg-responsive-grid"
+          style={s(
+            "display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 20px;",
+          )}
+        >
+          <div
+            style={s(
+              "border: 1px solid #24472f; background: #0e1410; padding: 16px;",
+            )}
+          >
+            <div
+              style={s(
+                `display: flex; justify-content: space-between; font-family: ${MONO}; font-size: 11px; color: #4fb477; margin-bottom: 12px;`,
+              )}
+            >
+              <span>BASELINE · frontguard-baselines</span>
+              <span>sha256: 9f8a…3c12</span>
+            </div>
+            <div
+              style={s(
+                "border: 1px solid #211e1b; background: #0d0c0b; padding: 12px; display: grid; gap: 8px;",
+              )}
+            >
+              <div
+                style={s(
+                  `height: 22px; background: #161412; border: 1px solid #2a2622; display: flex; align-items: center; padding: 0 8px; font-family: ${MONO}; font-size: 10px; color: #8c847a;`,
+                )}
+              >
+                nav · stacked mobile drawer (collapsed)
+              </div>
+              <div
+                style={s(
+                  "display: grid; grid-template-columns: 1fr; gap: 8px;",
+                )}
+              >
+                <div
+                  style={s(
+                    `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px; font-family: ${MONO}; font-size: 10.5px; color: #d8d0c5;`,
+                  )}
+                >
+                  main.dashboard-content · width 100%
+                </div>
+                <div
+                  style={s(
+                    `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px; font-family: ${MONO}; font-size: 10.5px; color: #8c847a;`,
+                  )}
+                >
+                  section.metrics-cards · 1 column @ 375px
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={s(
+              "border: 1px solid #4a2424; background: #170f0e; padding: 16px;",
+            )}
+          >
+            <div
+              style={s(
+                `display: flex; justify-content: space-between; font-family: ${MONO}; font-size: 11px; color: #e5484d; margin-bottom: 12px;`,
+              )}
+            >
+              <span>CURRENT · PR branch render</span>
+              <span>OVERLAP DETECTED</span>
+            </div>
+            <div
+              style={s(
+                "border: 1px solid #211e1b; background: #0d0c0b; padding: 12px; display: grid; gap: 8px; position: relative;",
+              )}
+            >
+              <div
+                style={s(
+                  `height: 22px; background: #161412; border: 1px solid #2a2622; display: flex; align-items: center; padding: 0 8px; font-family: ${MONO}; font-size: 10px; color: #8c847a;`,
+                )}
+              >
+                nav · top bar
+              </div>
+              <div style={s("position: relative; display: grid; gap: 8px;")}>
+                <div
+                  style={s(
+                    `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px 8px 8px 136px; font-family: ${MONO}; font-size: 10.5px; color: #8c847a;`,
+                  )}
+                >
+                  main.dashboard-content (clipped)
+                </div>
+                <div
+                  style={s(
+                    `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px 8px 8px 136px; font-family: ${MONO}; font-size: 10.5px; color: #8c847a;`,
+                  )}
+                >
+                  section.metrics-cards (clipped)
+                </div>
+                <div
+                  style={s(
+                    `position: absolute; left: 0; top: 0; bottom: 0; width: 128px; background: rgba(229, 72, 77, 0.18); border: 1px dashed #e5484d; padding: 8px; font-family: ${MONO}; font-size: 10px; color: #f5f1ea; display: flex; align-items: center;`,
+                  )}
+                >
+                  aside.dashboard-sidebar (fixed 128px overlap)
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mode === "cluster-ssim" && (
+        <div
+          className="fg-responsive-grid"
+          style={s(
+            "display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px; padding: 20px; align-items: center;",
+          )}
+        >
+          <div
+            style={s(
+              "border: 1px solid #2a2622; background: #0d0c0b; padding: 16px; position: relative;",
+            )}
+          >
+            <div
+              style={s(
+                `font-family: ${MONO}; font-size: 11px; color: #8c847a; margin-bottom: 10px; display: flex; justify-content: space-between;`,
+              )}
+            >
+              <span>CONNECTED-COMPONENT CLUSTER OVERLAY (SoM)</span>
+              <span style={s("color: #e8862e;")}>Cluster #1</span>
+            </div>
+            <div
+              style={s(
+                "border: 1px solid #211e1b; background: #131210; padding: 14px; position: relative; min-height: 118px;",
+              )}
+            >
+              <div
+                style={s(
+                  "border: 2px solid #e5484d; background: rgba(229, 72, 77, 0.14); padding: 12px; max-width: 240px; position: relative;",
+                )}
+              >
+                <span
+                  style={s(
+                    `position: absolute; top: -10px; left: -1px; background: #e5484d; color: #0d0c0b; font-family: ${MONO}; font-size: 10px; font-weight: 700; padding: 1px 6px;`,
+                  )}
+                >
+                  [1] bbox 148×164
+                </span>
+                <div
+                  style={s(
+                    `font-family: ${MONO}; font-size: 11px; color: #f5f1ea; margin-top: 4px;`,
+                  )}
+                >
+                  aside.dashboard-sidebar
+                </div>
+                <div
+                  style={s(
+                    `font-family: ${MONO}; font-size: 10.5px; color: #c8c0b6; margin-top: 4px;`,
+                  )}
+                >
+                  1,842 diff pixels · density 0.76
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={s(
+              "display: grid; gap: 10px; border: 1px solid #2a2622; background: #131210; padding: 16px;",
+            )}
+          >
+            <div
+              style={s(
+                `font-family: ${MONO}; font-size: 11px; color: #e8862e; letter-spacing: 0.05em;`,
+              )}
+            >
+              REGION-SCOPED PERCEPTUAL METRICS
+            </div>
+            {[
+              { k: "Chroma SSIM (YCbCr)", v: "0.61 (structural color shift)" },
+              { k: "Complex Wavelet (CW-SSIM)", v: "0.54 (non-hinting distortion)" },
+              { k: "Anti-dilution guard", v: "Blocks global whitespace override" },
+            ].map((m) => (
+              <div
+                key={m.k}
+                style={s(
+                  "display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid #211e1b; padding-top: 8px; font-size: 12.5px;",
+                )}
+              >
+                <span style={s("color: #8c847a;")}>{m.k}</span>
+                <span style={s(`font-family: ${MONO}; color: #f5f1ea;`)}>
+                  {m.v}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {mode === "mcp-cortex" && (
+        <div style={s("padding: 20px;")}>
+          <div
+            style={s(
+              `font-family: ${MONO}; font-size: 11px; color: #5b8def; margin-bottom: 10px;`,
+            )}
+          >
+            @frontguard/mcp · inspect_diff_cluster_dom → verify_css_patch
+          </div>
+          <pre
+            style={s(
+              `margin: 0; padding: 16px; background: #0d0c0b; border: 1px solid #211e1b; font-family: ${MONO}; font-size: 12px; line-height: 1.65; color: #d8d0c5; overflow-x: auto;`,
+            )}
+          >
+            {`{
+  "tool": "verify_css_patch",
+  "diffId": "run_local:/dashboard@375@chromium",
+  "targetSelector": "aside.dashboard-sidebar",
+  "normalizedPatch": "aside.dashboard-sidebar { position: static; width: 100%; }",
+  "validSyntax": true,
+  "selectorMatchedTarget": true,
+  "recommendation": "apply"
+}`}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ValidationSection() {
   const { aggregate, runDate, cliVersion, aiEnabled } = VALIDATION;
   const { booted, skipped } = partitionRepos(VALIDATION);
@@ -564,7 +868,7 @@ function ValidationSection() {
       </p>
       <h2
         style={s(
-          "font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;",
+          "font-size: clamp(28px, 4.5vw, 38px); letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;",
         )}
       >
         Numbers from a real harness, not a slide.
@@ -579,6 +883,7 @@ function ValidationSection() {
         figure ships until the AI classification pass clears the gate.
       </p>
       <div
+        className="fg-stat-grid"
         style={s(
           "display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 32px;",
         )}
@@ -752,6 +1057,7 @@ function Home() {
     >
       <Nav />
 
+      <main id="main-content">
       {/* ============ HERO ============ */}
       <header
         id="top"
@@ -780,7 +1086,7 @@ function Home() {
             </div>
             <h1
               style={s(
-                "font-size: 58px; line-height: 1.02; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 22px;",
+                "font-size: clamp(36px, 6vw, 58px); line-height: 1.02; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 22px;",
               )}
             >
               Catch the regression,
@@ -820,6 +1126,9 @@ function Home() {
                 @frontguard/cli
               </span>
               <button
+                type="button"
+                aria-label="Copy command: npm install @frontguard/cli"
+                aria-live="polite"
                 onClick={() => copyInstall("npm install @frontguard/cli")}
                 className="fg-btn-ghost"
                 style={s(
@@ -830,7 +1139,7 @@ function Home() {
               </button>
             </div>
 
-            <div style={s("display: flex; gap: 14px;")}>
+            <div style={s("display: flex; gap: 14px; flex-wrap: wrap;")}>
               <Link
                 to={"/docs" as "/"}
                 className="fg-btn-primary"
@@ -842,6 +1151,8 @@ function Home() {
               </Link>
               <a
                 href="https://github.com/ravidsrk/frontguard"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="fg-btn-ghost"
                 style={s(
                   "border: 1px solid #322d28; color: #f5f1ea; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 14px; padding: 14px 26px; text-decoration: none;",
@@ -894,7 +1205,7 @@ function Home() {
               </div>
               <div
                 style={s(
-                  "font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.85; padding: 18px 20px; color: #b8b0a6; white-space: pre;",
+                  "font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.85; padding: 18px 20px; color: #b8b0a6; white-space: pre; overflow-x: auto;",
                 )}
                 dangerouslySetInnerHTML={{ __html: TERMINAL_HTML }}
               />
@@ -973,6 +1284,7 @@ function Home() {
             </p>
           </div>
           <div
+            className="fg-stat-grid"
             style={s(
               "display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: #211e1b; border: 1px solid #211e1b;",
             )}
@@ -1007,7 +1319,7 @@ function Home() {
         <p style={eyebrow}>// HOW FRONTGUARD THINKS</p>
         <h2
           style={s(
-            "font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 48px; max-width: 620px;",
+            "font-size: clamp(28px, 4.5vw, 38px); letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 48px; max-width: 620px;",
           )}
         >
           Not just "pixels differ." Detect, understand, fix.
@@ -1059,7 +1371,7 @@ function Home() {
         <p style={eyebrow}>// RUN IT YOUR WAY</p>
         <h2
           style={s(
-            "font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 14px;",
+            "font-size: clamp(28px, 4.5vw, 38px); letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 14px;",
           )}
         >
           One command, or three lines.
@@ -1171,7 +1483,7 @@ function Home() {
         <p style={eyebrow}>// THE PIPELINE</p>
         <h2
           style={s(
-            "font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 14px;",
+            "font-size: clamp(28px, 4.5vw, 38px); letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 14px;",
           )}
         >
           Six local stages, no Frontguard account required.
@@ -1186,6 +1498,7 @@ function Home() {
           provider.
         </p>
         <div
+          className="fg-pipeline-grid"
           style={s(
             "display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; border: 1px solid #2a2622;",
           )}
@@ -1221,6 +1534,7 @@ function Home() {
             </div>
           ))}
         </div>
+        <VisualDiffInspector />
       </section>
 
       {/* ============ AI CLASSIFICATION ============ */}
@@ -1238,7 +1552,7 @@ function Home() {
               <p style={eyebrow}>// AI CLASSIFICATION</p>
               <h2
                 style={s(
-                  "font-size: 36px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;",
+                  "font-size: clamp(26px, 4vw, 36px); letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;",
                 )}
               >
                 Optional model-assisted classification for visual diffs.
@@ -1368,7 +1682,7 @@ function Home() {
         <p style={eyebrow}>// EVERYTHING IN THE BOX</p>
         <h2
           style={s(
-            "font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 48px;",
+            "font-size: clamp(28px, 4.5vw, 38px); letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 48px;",
           )}
         >
           CLI-first. Zero dashboards required.
@@ -1423,7 +1737,7 @@ function Home() {
             <p style={eyebrow}>// CONFIGURATION</p>
             <h2
               style={s(
-                "font-size: 36px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;",
+                "font-size: clamp(26px, 4vw, 36px); letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;",
               )}
             >
               One file. Sensible defaults.
@@ -1519,7 +1833,7 @@ function Home() {
         <p style={eyebrow}>// HOW IT COMPARES</p>
         <h2
           style={s(
-            "font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 40px;",
+            "font-size: clamp(28px, 4.5vw, 38px); letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 40px;",
           )}
         >
           Experimental CSS suggestion verification, clearly labeled.
@@ -1527,12 +1841,20 @@ function Home() {
         <div style={s("border: 1px solid #2a2622; overflow-x: auto;")}>
           <table
             style={s(
-              "width: 100%; border-collapse: collapse; font-size: 13.5px;",
+              "width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 640px;",
             )}
           >
+            <caption
+              style={s(
+                "position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0);",
+              )}
+            >
+              Feature comparison between Frontguard, Percy, Chromatic, BackstopJS, and Lost Pixel
+            </caption>
             <thead>
               <tr style={s("background: #161412;")}>
                 <th
+                  scope="col"
                   style={s(
                     `text-align: left; padding: 16px 18px; font-family: ${MONO}; font-size: 11px; color: #7c746b; font-weight: 500; letter-spacing: 0.04em;`,
                   )}
@@ -1548,6 +1870,7 @@ function Home() {
                 ].map((h, i) => (
                   <th
                     key={h}
+                    scope="col"
                     style={s(
                       `padding: 16px 14px; font-family: ${MONO}; font-size: 12px; color: ${i === 0 ? "#e8862e" : "#8c847a"}; font-weight: ${i === 0 ? 700 : 500};`,
                     )}
@@ -1564,9 +1887,14 @@ function Home() {
                   className="fg-cmp-row"
                   style={s("border-top: 1px solid #211e1b;")}
                 >
-                  <td style={s("padding: 14px 18px; color: #d8d0c5;")}>
+                  <th
+                    scope="row"
+                    style={s(
+                      "padding: 14px 18px; color: #d8d0c5; font-weight: 400; text-align: left;",
+                    )}
+                  >
                     {row.cap}
-                  </td>
+                  </th>
                   <td
                     style={s(
                       `text-align: center; padding: 14px; color: #4fb477; font-family: ${MONO}; font-weight: 700;`,
@@ -1648,6 +1976,7 @@ function Home() {
             </code>
           </div>
           <div
+            className="fg-plugins-grid"
             style={s(
               "display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;",
             )}
@@ -1684,7 +2013,7 @@ function Home() {
         <p style={eyebrow}>// NO MAGIC, JUST HONEST</p>
         <h2
           style={s(
-            "font-size: 38px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 14px;",
+            "font-size: clamp(28px, 4.5vw, 38px); letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 14px;",
           )}
         >
           We'll tell you what it isn't.
@@ -1744,7 +2073,7 @@ function Home() {
           </span>
           <h2
             style={s(
-              "font-size: 44px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;",
+              "font-size: clamp(30px, 5vw, 44px); letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;",
             )}
           >
             Ship with confidence.
@@ -1759,18 +2088,21 @@ function Home() {
           </p>
           <div
             style={s(
-              "display: inline-flex; align-items: stretch; border: 1px solid #322d28; background: #161412; margin-bottom: 24px;",
+              "display: inline-flex; align-items: stretch; border: 1px solid #322d28; background: #161412; margin-bottom: 24px; max-width: 100%;",
             )}
           >
             <span
               style={s(
-                `font-family: ${MONO}; font-size: 14px; color: #e6e0d6; padding: 14px 20px; white-space: nowrap;`,
+                `font-family: ${MONO}; font-size: 14px; color: #e6e0d6; padding: 14px 20px; white-space: nowrap; overflow-x: auto;`,
               )}
             >
               <span style={s("color: #7c746b;")}>$ </span>npx -p @frontguard/cli
               frontguard init --ci
             </span>
             <button
+              type="button"
+              aria-label="Copy command: npx -p @frontguard/cli frontguard init --ci"
+              aria-live="polite"
               onClick={() =>
                 copyInit("npx -p @frontguard/cli frontguard init --ci")
               }
@@ -1782,7 +2114,7 @@ function Home() {
               {initLabel}
             </button>
           </div>
-          <div style={s("display: flex; gap: 14px; justify-content: center;")}>
+          <div style={s("display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;")}>
             <Link
               to={"/docs" as "/"}
               className="fg-btn-primary"
@@ -1794,6 +2126,8 @@ function Home() {
             </Link>
             <a
               href="https://github.com/ravidsrk/frontguard"
+              target="_blank"
+              rel="noopener noreferrer"
               className="fg-btn-ghost"
               style={s(
                 `border: 1px solid #322d28; color: #f5f1ea; font-family: ${MONO}; font-weight: 500; font-size: 14px; padding: 14px 28px; text-decoration: none;`,
@@ -1804,6 +2138,7 @@ function Home() {
           </div>
         </div>
       </section>
+      </main>
 
       <Footer />
     </div>
