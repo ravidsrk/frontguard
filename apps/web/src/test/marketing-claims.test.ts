@@ -22,6 +22,7 @@ const CLAIM_SURFACES = [
   path.join(REPO_ROOT, 'packages/cli/src/render/docker.ts'),
   path.join(REPO_ROOT, 'docs/ops-actions.md'),
   path.join(WEB_SRC, 'routes/index.tsx'),
+  ...walkFiles(path.join(WEB_SRC, 'components/home')),
   path.join(WEB_SRC, 'routes/pricing.tsx'),
   path.join(WEB_SRC, 'routes/comparisons.tsx'),
   path.join(WEB_SRC, 'lib/docs-content.ts'),

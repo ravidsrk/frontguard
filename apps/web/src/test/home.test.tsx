@@ -42,6 +42,23 @@ describe('home route — real product content', () => {
     ).toHaveAttribute('type', 'button')
   })
 
+  it('renders the interactive hero optical viewfinder with viewport switching and split-curtain slider', () => {
+    const viewfinder = screen.getByTestId('hero-optical-viewfinder')
+    expect(viewfinder).toBeInTheDocument()
+    expect(within(viewfinder).getByText(/✘ REGRESSION · 1\.84%/i)).toBeInTheDocument()
+
+    const vp375 = within(viewfinder).getByRole('button', { name: '375px' })
+    fireEvent.click(vp375)
+    expect(vp375).toHaveAttribute('aria-pressed', 'true')
+    expect(within(viewfinder).getByText(/✘ REGRESSION · 3\.12%/i)).toBeInTheDocument()
+
+    const slider = within(viewfinder).getByRole('slider', {
+      name: /hero baseline vs current split slider/i,
+    })
+    fireEvent.change(slider, { target: { value: '75' } })
+    expect(within(viewfinder).getByText('75%')).toBeInTheDocument()
+  })
+
   it('renders the interactive visual diff inspector and switches between inspection modes via click and keyboard', () => {
     const inspector = screen.getByTestId('visual-diff-inspector')
     expect(inspector).toBeInTheDocument()
@@ -51,6 +68,11 @@ describe('home route — real product content', () => {
     )
     expect(within(inspector).getByText(/CONNECTED-COMPONENT CLUSTER OVERLAY/i)).toBeInTheDocument()
     expect(within(inspector).getByText(/Chroma SSIM \(YCbCr\)/i)).toBeInTheDocument()
+
+    const stabilityBtn = within(inspector).getByRole('button', { name: /waitForStability/i })
+    expect(stabilityBtn).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(stabilityBtn)
+    expect(stabilityBtn).toHaveAttribute('aria-pressed', 'false')
 
     const tablist = within(inspector).getByRole('tablist', {
       name: /visual diff inspection view/i,
