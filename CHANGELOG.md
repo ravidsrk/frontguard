@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add frame stability convergence and spatial motion attribution (`waitForStability` / `--wait-for-stability`) that polls consecutive frames until subpixel convergence and pinpoints `motionClusters` when animations fail to settle.
+- Add layout-preserving sensitive-DOM pixel and HTML snapshot redaction (`redactSensitive` / `--redact-sensitive`) across light DOM and open shadow roots for password, credit-card, OTP, and `[data-frontguard-redact]` elements.
+- Add declarative pre-capture route interactions (`actions`: `click`, `hover`, `fill`, `press`, `waitForSelector`, `wait`), `waitForSelector`, and `colorScheme` (`light` | `dark`) emulation per route and globally.
+- Add component-scoped `selector` capture, `redactSensitive`, and `waitForStable` options to `@frontguard/playwright` (`visualTest` and `expectVisual`).
+- Add built-in offline CLI documentation (`frontguard guide [topic] [--json]`) and agent skill package (`skills/frontguard/`).
+
 ### Fixed
 
 - Fail closed on empty comparisons, render/storage/AI errors, rejected judge

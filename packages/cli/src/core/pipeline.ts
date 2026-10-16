@@ -46,6 +46,18 @@ export {
   computeRegionSimilarity,
   type RegionSimilarityMetrics,
 } from '../diff/ssim.js';
+export {
+  captureStableScreenshot,
+  compareConsecutiveFrames,
+  type StabilityOptions,
+  type StabilityResult,
+  type FrameConvergenceComparison,
+} from '../render/stability.js';
+export {
+  DEFAULT_SENSITIVE_SELECTORS,
+  resolveRedactSelectors,
+  redactSensitiveDomHtml,
+} from '../render/redaction.js';
 import { discoverRoutes } from '../discovery/crawler.js';
 import { discoverRoutesFromFilesystem } from '../discovery/filesystem.js';
 import { discoverStorybookRoutesForConfig } from '../discovery/storybook.js';
@@ -229,6 +241,9 @@ export function toRouteObjects(entries: RouteEntry[]): Route[] {
       threshold: entry.threshold,
       ignore: entry.ignore,
       viewport: entry.viewport,
+      waitForSelector: entry.waitForSelector,
+      colorScheme: entry.colorScheme,
+      actions: entry.actions,
     };
   });
 }

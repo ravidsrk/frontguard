@@ -8,7 +8,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Route, FrontguardConfig, BrowserEngine, ScreenshotResult } from '../../src/core/types.js';
 import { STORYBOOK_READY_SCRIPT } from '../../src/discovery/storybook.js';
-import { executeTask } from '../../src/render/playwright.js';
+import { executeTask, executeRouteActions } from '../../src/render/playwright.js';
 import { logger } from '../../src/utils/logger.js';
 
 /** Replicate the internal RenderTask structure */
@@ -308,6 +308,108 @@ describe('executeTask', () => {
     expect(events).toEqual(['evaluate:window.__perf()', 'content']);
     expect(result.domSnapshot).toContain('__frontguard_perf_data');
     warnSpy.mockRestore();
+  });
+
+  it('executes pre-capture route actions, emulates colorScheme, and scrubs redacted HTML inputs', async () => {
+    const actionOrder: string[] = [];
+    const mockPage = {
+      on: vi.fn(),
+      goto: vi.fn().mockResolvedValue({ status: () => 200 }),
+      addStyleTag: vi.fn().mockResolvedValue(undefined),
+      waitForSelector: vi.fn().mockImplementation(async (sel: string) => {
+        actionOrder.push(`waitForSelector:${sel}`);
+      }),
+      click: vi.fn().mockImplementation(async (sel: string) => {
+        actionOrder.push(`click:${sel}`);
+      }),
+      hover: vi.fn().mockImplementation(async (sel: string) => {
+        actionOrder.push(`hover:${sel}`);
+      }),
+      fill: vi.fn().mockImplementation(async (sel: string, val: string) => {
+        actionOrder.push(`fill:${sel}=${val}`);
+      }),
+      press: vi.fn().mockImplementation(async (sel: string, key: string) => {
+        actionOrder.push(`press:${sel}:${key}`);
+      }),
+      waitForTimeout: vi.fn().mockImplementation(async (ms: number) => {
+        actionOrder.push(`wait:${ms}`);
+      }),
+      evaluate: vi.fn().mockResolvedValue(1),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from('fake-png')),
+      content: vi
+        .fn()
+        .mockResolvedValue(
+          '<html><body><input type="password" value="super-secret-pw"></body></html>',
+        ),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const mockContext = {
+      newPage: vi.fn().mockResolvedValue(mockPage),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const mockBrowser = {
+      newContext: vi.fn().mockResolvedValue(mockContext),
+    };
+
+    const config: FrontguardConfig = {
+      version: 1,
+      baseUrl: 'http://localhost:3000',
+      viewports: [1440],
+      browsers: ['chromium'],
+      threshold: 0.1,
+      ignore: [],
+      smartRender: false,
+      workers: 1,
+      pageTimeout: 5000,
+      maxHeight: 0,
+      outputDir: './report',
+      redactSensitive: true,
+    };
+
+    const route: Route = {
+      path: '/login',
+      colorScheme: 'dark',
+      waitForSelector: '#app-mounted',
+      actions: [
+        { type: 'click', selector: '#open-login' },
+        { type: 'fill', selector: '#email', value: 'user@example.com' },
+        { type: 'hover', selector: '#submit' },
+        { type: 'press', selector: '#submit', key: 'Enter' },
+        { type: 'wait', ms: 50 },
+      ],
+    };
+
+    const result = await executeTask(
+      { route, viewport: 1440, browser: 'chromium' },
+      config,
+      new Map([['chromium', mockBrowser as any]]),
+    );
+
+    expect(mockBrowser.newContext).toHaveBeenCalledWith(
+      expect.objectContaining({ colorScheme: 'dark' }),
+    );
+    expect(actionOrder).toEqual([
+      'waitForSelector:#app-mounted',
+      'click:#open-login',
+      'fill:#email=user@example.com',
+      'hover:#submit',
+      'press:#submit:Enter',
+      'wait:50',
+    ]);
+    expect(result.domSnapshot).toContain('value="[REDACTED]"');
+    expect(result.domSnapshot).not.toContain('super-secret-pw');
+  });
+
+  it('executeRouteActions caps wait duration at 30_000ms', async () => {
+    const mockPage = {
+      waitForTimeout: vi.fn().mockResolvedValue(undefined),
+    };
+    await executeRouteActions(
+      mockPage as any,
+      [{ type: 'wait', ms: 99_999 }],
+      5000,
+    );
+    expect(mockPage.waitForTimeout).toHaveBeenCalledWith(30_000);
   });
 });
 

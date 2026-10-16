@@ -18,12 +18,19 @@ import {
 import type {
   FrontguardConfig,
   Route,
+  RouteAction,
   ScreenshotResult,
   BrowserEngine,
 } from '../core/types.js';
 import { logger } from '../utils/logger.js';
 import { cropToMaxHeight } from './crop.js';
 import { STORYBOOK_READY_SCRIPT } from '../discovery/storybook.js';
+import { captureStableScreenshot } from './stability.js';
+import {
+  applySensitiveRedactionInPage,
+  redactSensitiveDomHtml,
+  resolveRedactSelectors,
+} from './redaction.js';
 
 // ---------------------------------------------------------------------------
 // Browser engine map
@@ -196,7 +203,7 @@ export async function executeTask(
     );
   }
 
-  // --- Create context (handles auth storage state) ---------------------------
+  // --- Create context (handles auth storage state & colorScheme) -------------
   let context: BrowserContext;
   try {
     const contextOptions: Record<string, unknown> = {
@@ -205,6 +212,11 @@ export async function executeTask(
 
     if (config.auth?.storageState) {
       contextOptions.storageState = config.auth.storageState;
+    }
+
+    const effectiveColorScheme = task.route.colorScheme ?? config.colorScheme;
+    if (effectiveColorScheme) {
+      contextOptions.colorScheme = effectiveColorScheme;
     }
 
     context = await browser.newContext(contextOptions);
@@ -259,6 +271,18 @@ export async function executeTask(
 
       // Wait for all web fonts to finish loading
       await page.evaluate(() => document.fonts.ready);
+    }
+
+    // --- Optional per-route waitForSelector & pre-capture interaction steps ----
+    if (task.route.waitForSelector) {
+      await page.waitForSelector(task.route.waitForSelector, {
+        state: 'visible',
+        timeout: config.pageTimeout ?? 30_000,
+      });
+    }
+
+    if (task.route.actions && task.route.actions.length > 0) {
+      await executeRouteActions(page, task.route.actions, config.pageTimeout ?? 30_000);
     }
 
     // --- Storybook integration: wait for play() to complete --------------------
@@ -318,11 +342,51 @@ export async function executeTask(
       }, rects);
     }
 
-    // --- Take screenshot (with optional anti-flake multi-render) ---------------
+    // --- Apply sensitive input redaction if configured -------------------------
+    const redactSelectors = resolveRedactSelectors(config.redactSensitive);
+    let redactedCount: number | undefined;
+    if (redactSelectors.length > 0) {
+      redactedCount = await page.evaluate(applySensitiveRedactionInPage, redactSelectors);
+    }
+
+    // --- Take screenshot (with optional stability convergence or anti-flake) ---
     let screenshotBuffer: Buffer;
+    let stabilityMetadata: ScreenshotResult['stability'];
     const antiFlakeRenders = config.antiFlakeRenders ?? 1;
 
-    if (antiFlakeRenders > 1) {
+    if (config.waitForStability) {
+      const stabilityOpts =
+        typeof config.waitForStability === 'object' ? config.waitForStability : {};
+      const stability = await captureStableScreenshot(
+        async () => Buffer.from(await page!.screenshot({ fullPage: true, type: 'png' })),
+        async (ms) => {
+          if (typeof page!.waitForTimeout === 'function') {
+            await page!.waitForTimeout(ms);
+          } else {
+            await new Promise((r) => setTimeout(r, ms));
+          }
+        },
+        stabilityOpts,
+      );
+      screenshotBuffer = stability.buffer;
+      stabilityMetadata = {
+        settled: stability.settled,
+        attempts: stability.attempts,
+        unstableRatio: stability.unstableRatio,
+        ...(stability.motionClusters.length > 0
+          ? { motionClusters: stability.motionClusters }
+          : {}),
+      };
+      if (!stability.settled) {
+        const topCluster = stability.motionClusters[0];
+        const clusterHint = topCluster
+          ? `; top unstable region at (${topCluster.bbox.x},${topCluster.bbox.y} ${topCluster.bbox.width}x${topCluster.bbox.height})`
+          : '';
+        logger.warn(
+          `Route ${task.route.path} did not visually settle after ${stability.attempts} frames (${(stability.unstableRatio * 100).toFixed(2)}% variance${clusterHint})`,
+        );
+      }
+    } else if (antiFlakeRenders > 1) {
       const buffers: Buffer[] = [];
       for (let i = 0; i < antiFlakeRenders; i++) {
         if (i > 0) await page.waitForTimeout(100);
@@ -347,8 +411,10 @@ export async function executeTask(
       await page.evaluate(perfScript).catch(() => {});
     }
 
-    // --- Capture DOM snapshot --------------------------------------------------
-    const domSnapshot = await page.content();
+    // --- Capture DOM snapshot (with optional sensitive attribute scrubbing) ----
+    const rawDomSnapshot = await page.content();
+    const domSnapshot =
+      redactSelectors.length > 0 ? redactSensitiveDomHtml(rawDomSnapshot) : rawDomSnapshot;
 
     const duration = Date.now() - startTime;
     logger.debug(`Captured ${task.route.path} [${task.browser} ${task.viewport}px] in ${duration}ms`);
@@ -362,6 +428,8 @@ export async function executeTask(
       consoleErrors,
       timestamp: Date.now(),
       duration,
+      ...(redactedCount !== undefined ? { redactedCount } : {}),
+      ...(stabilityMetadata !== undefined ? { stability: stabilityMetadata } : {}),
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -438,4 +506,50 @@ function findConsensusScreenshot(buffers: Buffer[]): Buffer {
   logger.debug(`Anti-flake: ${buffers.length} renders, ${groups.length} unique frames, consensus group has ${groups[0].count} matches`);
   return groups[0].buffer;
 }
+
+/**
+ * Executes declarative pre-capture interaction steps on a Playwright page.
+ */
+export async function executeRouteActions(
+  page: Page,
+  actions: RouteAction[],
+  timeoutMs: number,
+): Promise<void> {
+  for (const action of actions) {
+    switch (action.type) {
+      case 'click':
+        await page.click(action.selector, { timeout: timeoutMs });
+        break;
+      case 'hover':
+        await page.hover(action.selector, { timeout: timeoutMs });
+        break;
+      case 'fill':
+        await page.fill(action.selector, action.value, { timeout: timeoutMs });
+        break;
+      case 'press':
+        if (action.selector) {
+          await page.press(action.selector, action.key, { timeout: timeoutMs });
+        } else {
+          await page.keyboard.press(action.key);
+        }
+        break;
+      case 'waitForSelector':
+        await page.waitForSelector(action.selector, {
+          state: action.state ?? 'visible',
+          timeout: timeoutMs,
+        });
+        break;
+      case 'wait': {
+        const clampedMs = Math.min(Math.max(0, action.ms), 30_000);
+        if (typeof page.waitForTimeout === 'function') {
+          await page.waitForTimeout(clampedMs);
+        } else {
+          await new Promise((r) => setTimeout(r, clampedMs));
+        }
+        break;
+      }
+    }
+  }
+}
+
 

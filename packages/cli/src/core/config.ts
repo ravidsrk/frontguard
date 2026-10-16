@@ -100,9 +100,51 @@ const imageUploadSchema = z
 /** Browser engine enum. */
 const browserEngineSchema = z.enum(["chromium", "firefox", "webkit"]);
 
+/** Color scheme enum. */
+const colorSchemeSchema = z.enum(["light", "dark"]);
+
+/** Declarative pre-capture route action schema. */
+const routeActionSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("click"),
+    selector: z.string().min(1, "click action selector must not be empty"),
+  }),
+  z.object({
+    type: z.literal("hover"),
+    selector: z.string().min(1, "hover action selector must not be empty"),
+  }),
+  z.object({
+    type: z.literal("fill"),
+    selector: z.string().min(1, "fill action selector must not be empty"),
+    value: z.string(),
+  }),
+  z.object({
+    type: z.literal("press"),
+    selector: z.string().min(1).optional(),
+    key: z.string().min(1, "press action key must not be empty"),
+  }),
+  z.object({
+    type: z.literal("waitForSelector"),
+    selector: z.string().min(1, "waitForSelector action selector must not be empty"),
+    state: z.enum(["visible", "attached", "hidden"]).optional(),
+  }),
+  z.object({
+    type: z.literal("wait"),
+    ms: z.number().int().nonnegative(),
+  }),
+]);
+
+/** Stability convergence schema. */
+const stabilityConfigSchema = z.object({
+  maxAttempts: z.number().int().min(2).max(10).optional(),
+  intervalMs: z.number().int().nonnegative().max(5_000).optional(),
+  pixelThreshold: z.number().min(0).max(1).optional(),
+  maxUnstableRatio: z.number().min(0).max(1).optional(),
+});
+
 /**
  * Zod schema for a per-route configuration object.
- * Allows overriding threshold / ignore / viewport per route.
+ * Allows overriding threshold / ignore / viewport / actions / colorScheme per route.
  */
 const routeConfigSchema = z.object({
   path: z.string().min(1, "route.path must not be empty"),
@@ -114,6 +156,9 @@ const routeConfigSchema = z.object({
   ignore: z.array(ignoreRuleSchema).optional(),
   viewport: z.array(z.number().int().positive()).optional(),
   label: z.string().optional(),
+  waitForSelector: z.string().min(1).optional(),
+  colorScheme: colorSchemeSchema.optional(),
+  actions: z.array(routeActionSchema).optional(),
 });
 
 /** A route entry — either a plain string path or a {@link routeConfigSchema}. */
@@ -290,6 +335,19 @@ export const configSchema = z.object({
       figmaPages: z.record(z.string(), z.string()).optional(),
       figmaScale: z.number().positive().optional(),
     })
+    .optional(),
+
+  /** Global browser color scheme emulation ('light' or 'dark'). */
+  colorScheme: colorSchemeSchema.optional(),
+
+  /** Redact sensitive inputs (password, cc-*, [data-frontguard-redact]) in screenshots and DOM snapshots. */
+  redactSensitive: z
+    .union([z.boolean(), z.array(z.string().min(1))])
+    .optional(),
+
+  /** Wait for two consecutive frames to visually converge before accepting a screenshot. */
+  waitForStability: z
+    .union([z.boolean(), stabilityConfigSchema])
     .optional(),
 });
 

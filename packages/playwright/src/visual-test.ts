@@ -89,8 +89,26 @@ export async function visualTest(
     }
   }
 
-  const hasMasks = Boolean(opts.mask?.length || opts.maskRegions?.length);
+  const defaultSensitiveSelectors = [
+    'input[type="password"]',
+    'input[autocomplete="current-password"]',
+    'input[autocomplete="new-password"]',
+    'input[autocomplete="one-time-code"]',
+    'input[autocomplete^="cc-"]',
+    '[data-frontguard-redact]',
+    '[data-sensitive]',
+  ];
+  const redactSelectors = !opts.redactSensitive
+    ? []
+    : opts.redactSensitive === true
+      ? defaultSensitiveSelectors
+      : [...new Set([...defaultSensitiveSelectors, ...opts.redactSensitive])];
+
+  const hasMasks = Boolean(
+    opts.mask?.length || opts.maskRegions?.length || redactSelectors.length,
+  );
   let currentBuffer: Buffer;
+  let settled: boolean | undefined;
   try {
     // Mask elements
     if (opts.mask?.length) {
@@ -107,6 +125,21 @@ export async function visualTest(
       }, opts.mask);
     }
 
+    // Redact sensitive inputs while keeping their box geometry intact
+    if (redactSelectors.length > 0) {
+      await page.evaluate((selectors: string[]) => {
+        const combined = selectors.join(', ');
+        document.querySelectorAll(combined).forEach((el) => {
+          const htmlEl = el as HTMLElement;
+          if (!htmlEl.hasAttribute('data-frontguard-prev-style')) {
+            htmlEl.setAttribute('data-frontguard-prev-style', htmlEl.getAttribute('style') ?? '');
+          }
+          htmlEl.style.cssText +=
+            'color:transparent!important;text-shadow:none!important;caret-color:transparent!important;';
+        });
+      }, redactSelectors);
+    }
+
     // Mask regions
     if (opts.maskRegions?.length) {
       await page.evaluate((regions: Array<{ x: number; y: number; width: number; height: number }>) => {
@@ -119,8 +152,44 @@ export async function visualTest(
       }, opts.maskRegions);
     }
 
-    // Take screenshot
-    currentBuffer = await page.screenshot({ fullPage: opts.fullPage, type: 'png' });
+    const takeCapture = async (): Promise<Buffer> => {
+      if (opts.selector && typeof (page as unknown as { locator?: unknown }).locator === 'function') {
+        const rawLoc = (
+          page as unknown as {
+            locator: (s: string) => {
+              first?: () => { screenshot: (o: { type: 'png' }) => Promise<Buffer> };
+              screenshot?: (o: { type: 'png' }) => Promise<Buffer>;
+            };
+          }
+        ).locator(opts.selector);
+        const target = typeof rawLoc.first === 'function' ? rawLoc.first() : rawLoc;
+        return Buffer.from(await target.screenshot!({ type: 'png' }));
+      }
+      return Buffer.from(await page.screenshot({ fullPage: opts.fullPage, type: 'png' }));
+    };
+
+    if (opts.waitForStable) {
+      const stableCfg = typeof opts.waitForStable === 'object' ? opts.waitForStable : {};
+      const maxAttempts = Math.max(2, stableCfg.maxAttempts ?? 3);
+      const intervalMs = Math.max(0, stableCfg.intervalMs ?? 80);
+      let prev = await takeCapture();
+      settled = false;
+      for (let attempt = 1; attempt < maxAttempts; attempt++) {
+        if (intervalMs > 0) {
+          await new Promise((r) => setTimeout(r, intervalMs));
+        }
+        const next = await takeCapture();
+        if (prev.equals(next) || compareImages(prev, next, opts.threshold).passed) {
+          prev = next;
+          settled = true;
+          break;
+        }
+        prev = next;
+      }
+      currentBuffer = prev;
+    } else {
+      currentBuffer = await takeCapture();
+    }
   } finally {
     if (hasMasks) {
       await page.evaluate(() => {
@@ -141,7 +210,7 @@ export async function visualTest(
   }
   const current = Buffer.from(currentBuffer);
 
-  const baselineKey = getBaselineKey(page, name);
+  const baselineKey = getBaselineKey(page, opts.selector ? `${name}__${opts.selector}` : name);
 
   // Load or create baseline
   const baseline = storage.readBaseline(baselineKey);
@@ -155,6 +224,7 @@ export async function visualTest(
       baselinePath: storage.getPath(baselineKey),
       currentPath: storage.getPath(baselineKey, 'current'),
       isNewBaseline: true,
+      ...(settled !== undefined ? { settled } : {}),
     };
   }
 
@@ -175,6 +245,7 @@ export async function visualTest(
     diffPath: diff.diffBuffer ? storage.getPath(baselineKey, 'diff') : undefined,
     ssim: diff.ssim,
     isNewBaseline: false,
+    ...(settled !== undefined ? { settled } : {}),
   };
 
   // AI analysis if enabled and diff detected
