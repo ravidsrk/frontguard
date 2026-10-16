@@ -390,28 +390,27 @@ export function parseDiffId(
   const runId = diffId.slice(0, first);
   const rawRest = diffId.slice(first + 1); // `route…:viewport[:browser]` or `route@viewport[@browser]`
   if (!runId || !rawRest) return null;
-  const rest = rawRest.includes(':') ? rawRest : rawRest.replace(/@/g, ':');
 
-  const lastColon = rest.lastIndexOf(':');
-  if (lastColon === -1) return null; // need at least `route:viewport`
+  const lastDelim = Math.max(rawRest.lastIndexOf(':'), rawRest.lastIndexOf('@'));
+  if (lastDelim === -1) return null; // need at least `route:viewport` or `route@viewport`
 
-  const lastSeg = rest.slice(lastColon + 1);
+  const lastSeg = rawRest.slice(lastDelim + 1);
   const lastIsNumeric = lastSeg !== '' && Number.isFinite(Number(lastSeg));
 
   if (lastIsNumeric) {
-    // 3-segment legacy form: `route:viewport`.
-    const route = rest.slice(0, lastColon);
+    // 3-segment form: `route:viewport` or `route@viewport`.
+    const route = rawRest.slice(0, lastDelim);
     if (!route) return null;
     return { runId, route, viewport: Number(lastSeg) };
   }
 
-  // 4-segment form: `route:viewport:browser`.
+  // 4-segment form: `route:viewport:browser` or `route@viewport@browser`.
   const browser = lastSeg;
-  const beforeBrowser = rest.slice(0, lastColon); // `route:viewport`
-  const vpColon = beforeBrowser.lastIndexOf(':');
-  if (vpColon === -1) return null;
-  const vpSeg = beforeBrowser.slice(vpColon + 1);
-  const route = beforeBrowser.slice(0, vpColon);
+  const beforeBrowser = rawRest.slice(0, lastDelim);
+  const vpDelim = Math.max(beforeBrowser.lastIndexOf(':'), beforeBrowser.lastIndexOf('@'));
+  if (vpDelim === -1) return null;
+  const vpSeg = beforeBrowser.slice(vpDelim + 1);
+  const route = beforeBrowser.slice(0, vpDelim);
   if (!route || !browser || vpSeg === '' || !Number.isFinite(Number(vpSeg))) return null;
   return { runId, route, viewport: Number(vpSeg), browser };
 }

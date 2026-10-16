@@ -1,6 +1,6 @@
 {
   "version": "0.2.3",
-  "testFiles": 68,
+  "testFiles": 69,
   "sourceFiles": 60,
   "plugins": 5,
   "bundleSize": {
@@ -10,7 +10,7 @@
     "unpackedKB": 1953
   },
   "display": {
-    "testFiles": "68 test files",
+    "testFiles": "69 test files",
     "sourceFiles": "60 source files",
     "plugins": "5 built-in plugins",
     "version": "v0.2.3",

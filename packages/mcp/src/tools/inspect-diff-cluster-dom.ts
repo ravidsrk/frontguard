@@ -132,52 +132,37 @@ export async function inspectDiffClusterDom(
   }
 
   const defaultTarget = inferTargetSelector(match);
-  const rawClusters = match.clusters && match.clusters.length > 0 ? match.clusters : null;
+  const rawClusters = match.clusters && match.clusters.length > 0 ? match.clusters : [];
 
   let clusters: DiffClusterInspectionItem[] = rawClusters
-    ? rawClusters.map((c, idx) => ({
+    .map((c, idx) => {
+      const bbox = c.bbox ??
+        (typeof c.x === 'number' &&
+        typeof c.y === 'number' &&
+        typeof c.width === 'number' &&
+        typeof c.height === 'number'
+          ? { x: c.x, y: c.y, width: c.width, height: c.height }
+          : null);
+      if (!bbox) return null;
+      return {
         id: typeof c.id === 'number' ? c.id : idx + 1,
-        bbox: c.bbox ?? {
-          x: Number(c.x ?? 0),
-          y: Number(c.y ?? 0),
-          width: Number(c.width ?? match.viewport),
-          height: Number(c.height ?? Math.max(40, Math.round(match.viewport * 0.25))),
-        },
+        bbox,
         targetSelector:
           typeof c.targetSelector === 'string' && c.targetSelector.trim()
             ? c.targetSelector.trim()
             : defaultTarget,
-      }))
-    : [
-        {
-          id: 1,
-          bbox: {
-            x: 0,
-            y: 0,
-            width: match.viewport,
-            height: Math.max(40, Math.round(match.viewport * 0.25)),
-          },
-          targetSelector: defaultTarget,
-        },
-      ];
+      };
+    })
+    .filter((c): c is DiffClusterInspectionItem => c !== null);
 
   if (input.cluster_id !== undefined) {
     const filtered = clusters.filter((c) => c.id === input.cluster_id);
-    clusters =
-      filtered.length > 0
-        ? filtered
-        : [
-            {
-              id: input.cluster_id,
-              bbox: {
-                x: 0,
-                y: 0,
-                width: match.viewport,
-                height: Math.max(40, Math.round(match.viewport * 0.25)),
-              },
-              targetSelector: defaultTarget,
-            },
-          ];
+    if (filtered.length === 0) {
+      throw new Error(
+        `Cluster #${input.cluster_id} not found for diff ${input.diff_id}.`,
+      );
+    }
+    clusters = filtered;
   }
 
   const explanation = match.explanation ?? match.suggestedFix?.explanation ?? null;

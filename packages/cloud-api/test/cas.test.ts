@@ -131,7 +131,8 @@ describe('Cloud CAS routes (/v1/cas)', () => {
     });
     expect(getRes.status).toBe(200);
     expect(getRes.headers.get('Content-Type')).toBe('image/png');
-    expect(getRes.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
+    expect(getRes.headers.get('Cache-Control')).toBe('private, max-age=31536000, immutable');
+    expect(getRes.headers.get('Vary')).toContain('Authorization');
     const returnedBytes = new Uint8Array(await getRes.arrayBuffer());
     expect(returnedBytes).toEqual(pngBytes1);
   });

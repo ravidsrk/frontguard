@@ -78,6 +78,13 @@ const SAMPLE_RUN = {
         explanation: 'Pricing card content overflowed at 1280px; clip overflow.',
         target: '.pricing-card',
       },
+      clusters: [
+        {
+          id: 1,
+          bbox: { x: 40, y: 120, width: 320, height: 180 },
+          targetSelector: '.pricing-card',
+        },
+      ],
     },
   ],
 };
@@ -407,23 +414,34 @@ describe('inspect_diff_cluster_dom', () => {
     expect(out.viewport).toBe(1280);
     expect(out.clusters[0].targetSelector).toBe('.pricing-card');
   });
+
+  it('throws when requested cluster_id does not exist on the diff', async () => {
+    const client = buildClient({ approved: [] });
+    await expect(
+      inspectDiffClusterDom(client, {
+        diff_id: 'run_pr42:/pricing:1280',
+        cluster_id: 99,
+      }),
+    ).rejects.toThrow(/Cluster #99 not found/);
+  });
 });
 
 describe('verify_css_patch', () => {
-  it('recommends apply for a valid, grounded CSS patch', async () => {
+  it('recommends apply for a valid, grounded CSS patch and preserves string whitespace', async () => {
     const client = buildClient({ approved: [] });
     const out = await verifyCssPatch(client, {
       diff_id: 'run_pr42:/pricing:1280',
       target_selector: '.pricing-card',
-      css_patch: '.pricing-card { overflow: hidden; }',
+      css_patch: '.pricing-card { content: "a   b"; overflow: hidden; }',
     });
     expect(out.validSyntax).toBe(true);
     expect(out.selectorMatchedTarget).toBe(true);
     expect(out.dangerousProperties).toEqual([]);
+    expect(out.normalizedPatch).toContain('"a   b"');
     expect(out.recommendation).toBe('apply');
   });
 
-  it('rejects a CSS patch with unbalanced braces', async () => {
+  it('rejects a CSS patch with unbalanced braces or malformed property names', async () => {
     const client = buildClient({ approved: [] });
     const out = await verifyCssPatch(client, {
       diff_id: 'run_pr42:/pricing:1280',
@@ -433,6 +451,14 @@ describe('verify_css_patch', () => {
     expect(out.validSyntax).toBe(false);
     expect(out.recommendation).toBe('reject');
     expect(out.reason).toMatch(/unbalanced braces|invalid syntax/i);
+
+    const badProp = await verifyCssPatch(client, {
+      diff_id: 'run_pr42:/pricing:1280',
+      target_selector: '.pricing-card',
+      css_patch: '.pricing-card { color red: blue; }',
+    });
+    expect(badProp.validSyntax).toBe(false);
+    expect(badProp.recommendation).toBe('reject');
   });
 
   it('rejects dangerous @import and external url() injection', async () => {
@@ -448,7 +474,7 @@ describe('verify_css_patch', () => {
     expect(out.recommendation).toBe('reject');
   });
 
-  it('recommends refine when target_selector does not match recorded diff target', async () => {
+  it('recommends refine when target_selector or rule selector does not match recorded diff target', async () => {
     const client = buildClient({ approved: [] });
     const out = await verifyCssPatch(client, {
       diff_id: 'run_pr42:/pricing:1280',
@@ -458,6 +484,15 @@ describe('verify_css_patch', () => {
     expect(out.validSyntax).toBe(true);
     expect(out.selectorMatchedTarget).toBe(false);
     expect(out.recommendation).toBe('refine');
+
+    const mismatchedRule = await verifyCssPatch(client, {
+      diff_id: 'run_pr42:/pricing:1280',
+      target_selector: '.pricing-card',
+      css_patch: '.other-selector { overflow: hidden; }',
+    });
+    expect(mismatchedRule.validSyntax).toBe(true);
+    expect(mismatchedRule.selectorMatchedTarget).toBe(false);
+    expect(mismatchedRule.recommendation).toBe('refine');
   });
 });
 
@@ -472,6 +507,23 @@ describe('promote_baseline', () => {
       }),
     ).rejects.toThrow(/confirm_reviewed must be true/);
     expect(state.approved).toEqual([]);
+  });
+
+  it('rejects baseline promotion in local-report mode', async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'fg-mcp-promote-'));
+    const reportPath = join(tmpDir, 'report.json');
+    writeFileSync(reportPath, JSON.stringify({ id: 'run_local', results: [] }));
+    try {
+      const localClient = createLocalReportClient(reportPath);
+      await expect(
+        promoteBaseline(localClient, {
+          run_id: 'run_local',
+          confirm_reviewed: true,
+        }),
+      ).rejects.toThrow(/not supported in local-report mode/);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it('promotes changed routes when confirm_reviewed is true', async () => {
@@ -490,7 +542,7 @@ describe('promote_baseline', () => {
     expect(state.approved).toEqual(['run_pr42']);
   });
 
-  it('filters to requested routes subset and resolves PR numbers', async () => {
+  it('filters to requested routes subset when all changed routes are included and resolves PR numbers', async () => {
     const state: StubState = { approved: [] };
     const client = buildClient(state);
     const out = await promoteBaseline(client, {
@@ -502,13 +554,27 @@ describe('promote_baseline', () => {
     expect(out.runId).toBe('run_pr42');
     expect(out.promotedRoutes).toEqual(['/pricing']);
     expect(state.approved).toEqual(['run_pr42']);
+
+    await expect(
+      promoteBaseline(client, {
+        run_id: '42',
+        routes: ['/'],
+        confirm_reviewed: true,
+      }),
+    ).rejects.toThrow(/Cannot partially promote routes/);
   });
 });
 
 describe('diffId helpers', () => {
-  it('round-trips through diffIdFor + parseDiffId', () => {
+  it('round-trips through diffIdFor + parseDiffId and preserves @ inside routes', () => {
     const id = diffIdFor('run_pr42', { route: '/pricing', viewport: 1280 });
     expect(parseDiffId(id)).toEqual({ runId: 'run_pr42', route: '/pricing', viewport: 1280 });
+    expect(parseDiffId('run_pr42:/users/alice@example.com@1280@webkit')).toEqual({
+      runId: 'run_pr42',
+      route: '/users/alice@example.com',
+      viewport: 1280,
+      browser: 'webkit',
+    });
   });
 
   it('rejects malformed ids', () => {

@@ -194,20 +194,16 @@ export function compareScreenshot(
     const diffMask = new Uint8Array(totalPixels);
     for (let i = 0; i < totalPixels; i++) {
       const idx = i << 2;
-      // pixelmatch writes diff pixels as pure red [255, 0, 0] while unchanged/AA pixels are grayscale (R === G === B)
+      // Count red diff pixels [255, 0, 0], excluding yellow [255, 255, 0] anti-aliasing pixels.
       if (
-        diffPng.data[idx] !== diffPng.data[idx + 1] ||
-        diffPng.data[idx] !== diffPng.data[idx + 2]
+        diffPng.data[idx] === 255 &&
+        diffPng.data[idx + 1] === 0 &&
+        diffPng.data[idx + 2] === 0
       ) {
         diffMask[i] = 1;
       }
     }
     clusters = extractDiffClusters(diffMask, width, height);
-    for (const cluster of clusters) {
-      const metrics = computeRegionSimilarity(baselinePng, currentPng, cluster.bbox);
-      cluster.chromaSSIM = metrics.chromaSSIM;
-      cluster.cwSSIM = metrics.cwSSIM;
-    }
     result.clusters = clusters;
   }
 
@@ -230,17 +226,26 @@ export function compareScreenshot(
       );
     }
 
+    // Lazily compute region-scoped Chroma/CW-SSIM only on bounded clusters in the borderline zone
+    for (const cluster of clusters) {
+      if (cluster.bbox.width * cluster.bbox.height <= 65536) {
+        const metrics = computeRegionSimilarity(baselinePng, currentPng, cluster.bbox);
+        cluster.chromaSSIM = metrics.chromaSSIM;
+        cluster.cwSSIM = metrics.cwSSIM;
+      }
+    }
+
     // Localized cluster anti-dilution guard:
     // Prevent global background whitespace from masking a dense, localized UI mutation
     // (e.g. a broken button or badge on a large page) whose local chromaSSIM < 0.70.
-    const topCluster = clusters[0];
-    const hasSevereLocalizedChange =
-      topCluster !== undefined &&
-      topCluster.rawDiffPixels >= 32 &&
-      topCluster.density >= 0.5 &&
-      totalPixels >= 10000 &&
-      topCluster.chromaSSIM !== undefined &&
-      topCluster.chromaSSIM < 0.70;
+    const hasSevereLocalizedChange = clusters.some(
+      (cluster) =>
+        cluster.rawDiffPixels >= 32 &&
+        cluster.density >= 0.5 &&
+        totalPixels >= 10000 &&
+        cluster.chromaSSIM !== undefined &&
+        cluster.chromaSSIM < 0.70,
+    );
 
     if (ssim !== undefined && ssim > ssimThreshold && !hasSevereLocalizedChange) {
       logger.debug(

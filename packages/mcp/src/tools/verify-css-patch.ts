@@ -42,22 +42,126 @@ export const verifyCssPatchOutputSchema = z.object({
   reason: z.string(),
 });
 
-function hasBalancedBraces(css: string): { balanced: boolean; hasBraces: boolean } {
+function stripCssComments(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+interface ParsedCssStructure {
+  balanced: boolean;
+  hasBraces: boolean;
+  ruleSelectors: string[];
+  declarationBlocks: string[];
+}
+
+function parseCssStructure(rawCss: string): ParsedCssStructure {
+  const css = stripCssComments(rawCss);
   let depth = 0;
   let hasBraces = false;
-  for (const ch of css) {
+  let inSingle = false;
+  let inDouble = false;
+  let lastTopIdx = 0;
+  let blockStart = -1;
+  const ruleSelectors: string[] = [];
+  const declarationBlocks: string[] = [];
+
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i];
+    const prev = i > 0 ? css[i - 1] : '';
+    if (ch === "'" && !inDouble && prev !== '\\') {
+      inSingle = !inSingle;
+      continue;
+    }
+    if (ch === '"' && !inSingle && prev !== '\\') {
+      inDouble = !inDouble;
+      continue;
+    }
+    if (inSingle || inDouble) continue;
+
     if (ch === '{') {
+      hasBraces = true;
+      if (depth === 0) {
+        const selector = css.slice(lastTopIdx, i).trim();
+        // Strip leading @import statements before the rule selector if present
+        const cleanedSelector = selector.replace(/^(?:@import\s+[^;]+;\s*)+/i, '').trim();
+        ruleSelectors.push(cleanedSelector);
+        blockStart = i + 1;
+      }
       depth += 1;
-      hasBraces = true;
+      if (depth > 1) {
+        return { balanced: false, hasBraces: true, ruleSelectors, declarationBlocks };
+      }
     } else if (ch === '}') {
-      depth -= 1;
       hasBraces = true;
+      depth -= 1;
       if (depth < 0) {
-        return { balanced: false, hasBraces: true };
+        return { balanced: false, hasBraces: true, ruleSelectors, declarationBlocks };
+      }
+      if (depth === 0 && blockStart !== -1) {
+        declarationBlocks.push(css.slice(blockStart, i).trim());
+        blockStart = -1;
+        lastTopIdx = i + 1;
       }
     }
   }
-  return { balanced: depth === 0, hasBraces };
+
+  const trailing = css.slice(lastTopIdx).trim();
+  if (hasBraces && trailing.length > 0) {
+    return { balanced: false, hasBraces, ruleSelectors, declarationBlocks };
+  }
+
+  return {
+    balanced: depth === 0 && !inSingle && !inDouble,
+    hasBraces,
+    ruleSelectors,
+    declarationBlocks,
+  };
+}
+
+function splitTopLevelDeclarations(block: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let inSingle = false;
+  let inDouble = false;
+  let parenDepth = 0;
+
+  for (let i = 0; i < block.length; i++) {
+    const ch = block[i];
+    const prev = i > 0 ? block[i - 1] : '';
+    if (ch === "'" && !inDouble && prev !== '\\') {
+      inSingle = !inSingle;
+    } else if (ch === '"' && !inSingle && prev !== '\\') {
+      inDouble = !inDouble;
+    } else if (!inSingle && !inDouble) {
+      if (ch === '(') parenDepth += 1;
+      else if (ch === ')') parenDepth = Math.max(0, parenDepth - 1);
+      else if (ch === ';' && parenDepth === 0) {
+        parts.push(current.trim());
+        current = '';
+        continue;
+      }
+    }
+    current += ch;
+  }
+  if (current.trim().length > 0) {
+    parts.push(current.trim());
+  }
+  return parts.filter((p) => p.length > 0);
+}
+
+function isValidDeclarationBlock(block: string): boolean {
+  const decls = splitTopLevelDeclarations(block);
+  if (decls.length === 0) return false;
+  const propPattern = /^(?:--[a-zA-Z0-9_-]+|-?[a-zA-Z][a-zA-Z0-9_-]*)$/;
+  for (const decl of decls) {
+    const colonIdx = decl.indexOf(':');
+    if (colonIdx <= 0) return false;
+    const prop = decl.slice(0, colonIdx).trim();
+    const val = decl.slice(colonIdx + 1).trim();
+    if (!propPattern.test(prop) || !val || /[{}]/.test(val)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function isValidSelectorSyntax(selector: string): boolean {
@@ -67,7 +171,11 @@ function isValidSelectorSyntax(selector: string): boolean {
   return true;
 }
 
-function detectDangerousProperties(css: string, targetSelector: string): string[] {
+function detectDangerousProperties(
+  css: string,
+  targetSelector: string,
+  ruleSelectors: string[],
+): string[] {
   const findings: string[] = [];
 
   if (/@import\b/i.test(css)) {
@@ -83,30 +191,46 @@ function detectDangerousProperties(css: string, targetSelector: string): string[
   }
 
   const rootSelectorPattern = /^(?:html|body|:root|#root|#app|main|\*)$/i;
-  const isRootTarget =
-    rootSelectorPattern.test(targetSelector.trim()) ||
-    /(?:^|[},]\s*)(?:html|body|:root|#root|#app|\*)\s*\{/i.test(css);
+  const allSelectors = [targetSelector.trim(), ...ruleSelectors.map((s) => s.trim())];
+  const isRootTarget = allSelectors.some((sel) =>
+    sel
+      .split(',')
+      .map((s) => s.trim())
+      .some((s) => rootSelectorPattern.test(s)),
+  );
 
-  if (/display\s*:\s*none\s*!important/i.test(css) && isRootTarget) {
+  if (/display\s*:\s*none\s*!important/i.test(css)) {
     findings.push('display: none !important');
-  } else if (/display\s*:\s*none\s*!important/i.test(css)) {
-    findings.push('display: none !important');
+  } else if (isRootTarget && /display\s*:\s*none\b/i.test(css)) {
+    findings.push('display: none (root container)');
   }
 
   if (/visibility\s*:\s*hidden\s*!important/i.test(css) && isRootTarget) {
     findings.push('visibility: hidden !important');
+  } else if (isRootTarget && /visibility\s*:\s*hidden\b/i.test(css)) {
+    findings.push('visibility: hidden (root container)');
   }
 
   return findings;
 }
 
 function normalizeCssPatch(rawPatch: string, targetSelector: string): string {
-  const collapsed = rawPatch.replace(/\s+/g, ' ').trim();
-  if (!collapsed.includes('{') && !collapsed.includes('}')) {
-    const decl = collapsed.endsWith(';') ? collapsed : `${collapsed};`;
+  const trimmed = rawPatch.trim();
+  if (!trimmed.includes('{') && !trimmed.includes('}')) {
+    const decl = trimmed.endsWith(';') ? trimmed : `${trimmed};`;
     return `${targetSelector.trim()} { ${decl} }`;
   }
-  return collapsed;
+  return trimmed;
+}
+
+function selectorsEqualOrTokenMatch(a: string, b: string): boolean {
+  const normA = a.trim();
+  const normB = b.trim();
+  if (!normA || !normB) return false;
+  if (normA === normB) return true;
+  const tokensA = normA.split(',').map((s) => s.trim()).filter(Boolean);
+  const tokensB = normB.split(',').map((s) => s.trim()).filter(Boolean);
+  return tokensA.some((t) => tokensB.includes(t));
 }
 
 export async function verifyCssPatch(
@@ -137,24 +261,29 @@ export async function verifyCssPatch(
 
   const rawPatch = input.css_patch.trim();
   const targetSelector = input.target_selector.trim();
-  const { balanced, hasBraces } = hasBalancedBraces(rawPatch);
+  const structure = parseCssStructure(rawPatch);
 
-  let validSyntax = balanced && isValidSelectorSyntax(targetSelector);
+  let validSyntax = structure.balanced && isValidSelectorSyntax(targetSelector);
   if (validSyntax) {
-    if (hasBraces) {
-      const openIdx = rawPatch.indexOf('{');
-      const closeIdx = rawPatch.lastIndexOf('}');
-      const selectorPart = rawPatch.slice(0, openIdx).trim();
-      const bodyPart = rawPatch.slice(openIdx + 1, closeIdx).trim();
-      if (!selectorPart || !bodyPart || !bodyPart.includes(':')) {
+    if (structure.hasBraces) {
+      if (
+        structure.ruleSelectors.length === 0 ||
+        structure.ruleSelectors.some((s) => !isValidSelectorSyntax(s)) ||
+        structure.declarationBlocks.length === 0 ||
+        structure.declarationBlocks.some((b) => !isValidDeclarationBlock(b))
+      ) {
         validSyntax = false;
       }
-    } else if (!rawPatch.includes(':')) {
+    } else if (!isValidDeclarationBlock(rawPatch)) {
       validSyntax = false;
     }
   }
 
-  const dangerousProperties = detectDangerousProperties(rawPatch, targetSelector);
+  const dangerousProperties = detectDangerousProperties(
+    rawPatch,
+    targetSelector,
+    structure.ruleSelectors,
+  );
   const normalizedPatch = normalizeCssPatch(rawPatch, targetSelector);
 
   const recordedTarget = match.suggestedFix?.target?.trim();
@@ -162,17 +291,22 @@ export async function verifyCssPatch(
     .map((c) => c.targetSelector?.trim())
     .filter((s): s is string => Boolean(s));
 
-  let selectorMatchedTarget = isValidSelectorSyntax(targetSelector);
+  const patchSelectorsAlignWithTarget =
+    !structure.hasBraces ||
+    (structure.ruleSelectors.length > 0 &&
+      structure.ruleSelectors.every((ruleSel) =>
+        selectorsEqualOrTokenMatch(ruleSel, targetSelector),
+      ));
+
+  let selectorMatchedTarget =
+    isValidSelectorSyntax(targetSelector) && patchSelectorsAlignWithTarget;
   if (selectorMatchedTarget && (recordedTarget || clusterTargets.length > 0)) {
     const knownTargets = [
       ...(recordedTarget ? [recordedTarget] : []),
       ...clusterTargets,
     ];
-    selectorMatchedTarget = knownTargets.some(
-      (known) =>
-        known === targetSelector ||
-        targetSelector.includes(known) ||
-        known.includes(targetSelector),
+    selectorMatchedTarget = knownTargets.some((known) =>
+      selectorsEqualOrTokenMatch(known, targetSelector),
     );
   }
 
@@ -187,7 +321,9 @@ export async function verifyCssPatch(
     reason = `CSS patch contains dangerous properties or directives: ${dangerousProperties.join(', ')}.`;
   } else if (!selectorMatchedTarget) {
     recommendation = 'refine';
-    reason = `Target selector "${targetSelector}" does not align with recorded diff target "${recordedTarget ?? 'unknown'}".`;
+    reason = !patchSelectorsAlignWithTarget
+      ? `Rule selector in css_patch does not match target_selector "${targetSelector}".`
+      : `Target selector "${targetSelector}" does not align with recorded diff target "${recordedTarget ?? 'unknown'}".`;
   } else {
     recommendation = 'apply';
     reason =

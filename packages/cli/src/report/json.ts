@@ -8,7 +8,7 @@
  * @module report/json
  */
 
-import type { Reporter, PipelineStage, RunResult, DiffResult } from '../core/types.js';
+import type { Reporter, PipelineStage, RunResult, DiffResult, DiffCluster } from '../core/types.js';
 
 // ---------------------------------------------------------------------------
 // JSON Reporter
@@ -58,6 +58,7 @@ interface SerializedDiff {
   hasCurrentImage: boolean;
   hasDiffImage: boolean;
   comparisonMethod?: 'byte-identical' | 'pixelmatch';
+  clusters?: DiffCluster[];
   aiAnalysis?: {
     classification: string;
     explanation: string;
@@ -139,6 +140,10 @@ function serializeDiff(diff: DiffResult): SerializedDiff {
     hasDiffImage: !!diff.diffImage,
     comparisonMethod: diff.comparisonMethod,
   };
+
+  if (diff.clusters && diff.clusters.length > 0) {
+    serialized.clusters = diff.clusters;
+  }
 
   if (diff.aiAnalysis) {
     serialized.aiAnalysis = {

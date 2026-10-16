@@ -12,6 +12,7 @@
  */
 
 import { Hono, type Context } from 'hono';
+import { getPlan } from '../billing/plans.js';
 import type { Bindings } from '../db/factory.js';
 import type { Store, User } from '../db/store.js';
 
@@ -34,6 +35,9 @@ export const MAX_CAS_CHECK_HASHES = 1000;
 /** Maximum size in bytes of a single CAS PNG blob (25 MB). */
 export const MAX_CAS_BLOB_BYTES = 25 * 1024 * 1024;
 
+/** Maximum number of blobs retained in the fallback in-memory CAS store. */
+export const MAX_CAS_MEMORY_BLOBS = 500;
+
 const SHA256_LOWER_HEX_RE = /^[0-9a-f]{64}$/;
 const SHA256_HEX_RE = /^[0-9a-fA-F]{64}$/;
 
@@ -45,21 +49,90 @@ export function resetCasMemoryStore(): void {
   casMemoryStore.clear();
 }
 
-/** Resolves the tenant scope (`teamId ?? user.id`) for CAS storage keys. */
-async function resolveCasScope(
+function currentMonth(): string {
+  return new Date().toISOString().slice(0, 7);
+}
+
+/** Reads request body stream up to `maxBytes`, aborting early if exceeded. */
+async function readBoundedBody(
+  req: Request,
+  maxBytes: number,
+): Promise<{ ok: true; buffer: ArrayBuffer } | { ok: false; reason: 'empty' | 'too_large' }> {
+  const contentLengthHeader = req.headers.get('content-length');
+  if (contentLengthHeader !== null) {
+    const contentLength = Number(contentLengthHeader);
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      return { ok: false, reason: 'too_large' };
+    }
+  }
+
+  if (!req.body) {
+    return { ok: false, reason: 'empty' };
+  }
+
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && value.byteLength > 0) {
+        totalBytes += value.byteLength;
+        if (totalBytes > maxBytes) {
+          await reader.cancel().catch(() => {});
+          return { ok: false, reason: 'too_large' };
+        }
+        chunks.push(value);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (totalBytes === 0) {
+    return { ok: false, reason: 'empty' };
+  }
+
+  const merged = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { ok: true, buffer: merged.buffer };
+}
+
+/** Resolves the tenant scope (`teamId ?? user.id`) and billing context for CAS storage keys. */
+async function resolveCasTenant(
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
-): Promise<string> {
+): Promise<{ scope: string; userId: string; teamId?: string; planId: string }> {
   const userId = c.get('userId');
   const store = c.get('store');
   const queryTeamId = c.req.query('teamId');
   if (queryTeamId && store) {
     const member = await store.getMember(queryTeamId, userId);
-    if (member) return queryTeamId;
+    if (member) {
+      const team = await store.getTeam(queryTeamId);
+      return {
+        scope: queryTeamId,
+        userId,
+        teamId: queryTeamId,
+        planId: team?.plan ?? 'free',
+      };
+    }
   }
   const user = store ? await store.getUser(userId) : null;
   const userWithTeam = user as (User & { teamId?: string }) | null;
-  const scope = userWithTeam?.teamId ?? user?.id ?? userId;
-  return scope;
+  const teamId = userWithTeam?.teamId;
+  const scope = teamId ?? user?.id ?? userId;
+  return {
+    scope,
+    userId,
+    teamId,
+    planId: user?.plan ?? 'free',
+  };
 }
 
 /** Resolves the R2 bucket binding if configured. */
@@ -113,7 +186,7 @@ casRoutes.post('/check', async (c) => {
     hashes.push(h);
   }
 
-  const scope = await resolveCasScope(c);
+  const { scope } = await resolveCasTenant(c);
   const bucket = getCasBucket(c.env);
   const existing: string[] = [];
   const missing: string[] = [];
@@ -154,31 +227,73 @@ casRoutes.put('/blobs/:sha256', async (c) => {
     );
   }
 
-  const buf = await c.req.arrayBuffer();
-  if (buf.byteLength === 0) {
-    return c.json({ error: 'Blob payload must not be empty' }, 400);
+  const readResult = await readBoundedBody(c.req.raw, MAX_CAS_BLOB_BYTES);
+  if (!readResult.ok) {
+    if (readResult.reason === 'empty') {
+      return c.json({ error: 'Blob payload must not be empty' }, 400);
+    }
+    return c.json({ error: 'Blob payload exceeds maximum size of 25 MB' }, 413);
   }
-  if (buf.byteLength > MAX_CAS_BLOB_BYTES) {
-    return c.json({ error: 'Blob payload exceeds maximum size of 25 MB' }, 400);
-  }
+  const buf = readResult.buffer;
 
   const actualHash = await sha256Hex(buf);
   if (actualHash !== sha256) {
     return c.json({ error: 'SHA-256 digest mismatch' }, 400);
   }
 
-  const scope = await resolveCasScope(c);
+  const { scope, userId, teamId, planId } = await resolveCasTenant(c);
   const key = casObjectKey(scope, sha256);
   const bucket = getCasBucket(c.env);
+  const store = c.get('store');
+
+  let alreadyExists = false;
+  if (bucket) {
+    const headObj =
+      typeof bucket.head === 'function' ? await bucket.head(key) : await bucket.get(key);
+    alreadyExists = headObj !== null && headObj !== undefined;
+  } else {
+    alreadyExists = casMemoryStore.has(key);
+  }
+
+  if (!alreadyExists && store) {
+    const plan = getPlan(planId);
+    const screenshotLimit = plan.limits.screenshotsPerMonth;
+    const month = currentMonth();
+    const meterTeam = Boolean(teamId && plan.id !== 'free');
+    if (screenshotLimit !== null) {
+      const reserved = meterTeam
+        ? await store.tryReserveTeamScreenshots(teamId!, month, screenshotLimit, 1)
+        : await store.tryReserveScreenshots(userId, month, screenshotLimit, 1);
+      if (!reserved) {
+        return c.json(
+          {
+            error: `Monthly screenshot limit reached (${screenshotLimit} on the ${plan.name} plan).`,
+            limit: screenshotLimit,
+          },
+          402,
+        );
+      }
+    } else if (meterTeam) {
+      await store.incrementTeamUsage(teamId!, month, 0, 1);
+    } else {
+      await store.incrementUsage(userId, month, 0, 1);
+    }
+  }
 
   if (bucket) {
     await bucket.put(key, buf, {
       httpMetadata: {
         contentType: 'image/png',
-        cacheControl: 'public, max-age=31536000, immutable',
+        cacheControl: 'private, max-age=31536000, immutable',
       },
     });
   } else {
+    if (!casMemoryStore.has(key) && casMemoryStore.size >= MAX_CAS_MEMORY_BLOBS) {
+      const oldestKey = casMemoryStore.keys().next().value;
+      if (oldestKey !== undefined) {
+        casMemoryStore.delete(oldestKey);
+      }
+    }
     casMemoryStore.set(key, new Uint8Array(buf));
   }
 
@@ -200,7 +315,7 @@ casRoutes.get('/blobs/:sha256', async (c) => {
   }
 
   const sha256 = sha256Param.toLowerCase();
-  const scope = await resolveCasScope(c);
+  const { scope } = await resolveCasTenant(c);
   const key = casObjectKey(scope, sha256);
   const bucket = getCasBucket(c.env);
 
@@ -220,6 +335,7 @@ casRoutes.get('/blobs/:sha256', async (c) => {
 
   return c.body(bytes as unknown as ArrayBuffer, 200, {
     'Content-Type': 'image/png',
-    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Cache-Control': 'private, max-age=31536000, immutable',
+    Vary: 'Authorization',
   });
 });

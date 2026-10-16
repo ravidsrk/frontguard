@@ -68,9 +68,29 @@ export async function promoteBaseline(
     );
   }
 
+  if (client.mode === 'local-report') {
+    throw new Error(
+      'Baseline promotion is not supported in local-report mode because JSON reports do not store baseline PNGs. Run `npx frontguard update-baselines` via CLI to update local baselines.',
+    );
+  }
+
   const run = await resolveRun(client, input.run_id);
   const routeSet = input.routes && input.routes.length > 0 ? new Set(input.routes) : null;
   const results = run.results ?? [];
+  const allChangedDiffs = results.filter(
+    (r) => r.status !== 'pass' && r.status !== 'unchanged',
+  );
+
+  if (routeSet) {
+    const unselectedChangedRoutes = Array.from(
+      new Set(allChangedDiffs.filter((r) => !routeSet.has(r.route)).map((r) => r.route)),
+    );
+    if (unselectedChangedRoutes.length > 0) {
+      throw new Error(
+        `Cannot partially promote routes [${Array.from(routeSet).join(', ')}] because cloud baseline approval is whole-run and would also approve unreviewed routes: ${unselectedChangedRoutes.join(', ')}. Include all changed routes or promote locally via CLI.`,
+      );
+    }
+  }
 
   const matchingDiffs = results.filter((r) =>
     routeSet ? routeSet.has(r.route) : r.status !== 'pass' && r.status !== 'unchanged',

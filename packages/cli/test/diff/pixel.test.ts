@@ -200,6 +200,7 @@ describe('Perceptual Diffing v2: cluster extraction and anti-dilution SSIM guard
     });
 
     expect(result.status).toBe('regression');
+    expect(result.ssim).toBeGreaterThan(0.98);
     expect(result.ssimOverride).toBeUndefined();
     expect(result.clusters).toBeDefined();
     expect(result.clusters!.length).toBe(1);
