@@ -310,19 +310,61 @@ test(<span style="color: #98c379;">'home page'</span>, <span style="color: #c678
   expect(result.passed).toBe(<span style="color: #56b6c2;">true</span>);
 });`;
 
+const CONFIG_CODE = `export default {
+  baseUrl: 'http://localhost:3000',
+
+  // auto-discover routes or configure pre-capture actions
+  discover: {
+    startUrl: '/',
+    maxDepth: 3,
+    exclude: ['/admin/*', '/api/*'],
+  },
+  routes: [
+    {
+      path: '/pricing',
+      actions: [
+        { type: 'waitForSelector', selector: '[data-ready]' },
+        { type: 'click', selector: '[data-billing="annual"]' },
+      ],
+    },
+  ],
+
+  viewports: [375, 768, 1440],
+  browsers: ['chromium'],
+  colorScheme: 'dark',
+  waitForStability: true,
+  redactSensitive: true,
+  threshold: 0.01,
+
+  // AI analysis (optional, BYOK)
+  ai: { provider: 'openai', model: 'gpt-4o' },
+};`;
+
 const CONFIG_HTML = `<span style="color: #c678dd;">export default</span> {
   baseUrl: <span style="color: #98c379;">'http://localhost:3000'</span>,
 
-  <span style="color: #564f48;">// auto-discover routes (zero config)</span>
+  <span style="color: #564f48;">// auto-discover routes or configure pre-capture actions</span>
   discover: {
     startUrl: <span style="color: #98c379;">'/'</span>,
     maxDepth: <span style="color: #e8862e;">3</span>,
     exclude: [<span style="color: #98c379;">'/admin/*'</span>, <span style="color: #98c379;">'/api/*'</span>],
   },
+  routes: [
+    {
+      path: <span style="color: #98c379;">'/pricing'</span>,
+      actions: [
+        { type: <span style="color: #98c379;">'waitForSelector'</span>, selector: <span style="color: #98c379;">'[data-ready]'</span> },
+        { type: <span style="color: #98c379;">'click'</span>, selector: <span style="color: #98c379;">'[data-billing="annual"]'</span> },
+      ],
+    },
+  ],
 
   viewports: [<span style="color: #e8862e;">375</span>, <span style="color: #e8862e;">768</span>, <span style="color: #e8862e;">1440</span>],
   browsers: [<span style="color: #98c379;">'chromium'</span>],
-  threshold: <span style="color: #e8862e;">0.1</span>,
+  colorScheme: <span style="color: #98c379;">'dark'</span>,
+  waitForStability: <span style="color: #56b6c2;">true</span>,
+  redactSensitive: <span style="color: #56b6c2;">true</span>,
+  threshold: <span style="color: #e8862e;">0.01</span>,
 
   <span style="color: #564f48;">// AI analysis (optional, BYOK)</span>
   ai: { provider: <span style="color: #98c379;">'openai'</span>, model: <span style="color: #98c379;">'gpt-4o'</span> },
@@ -544,6 +586,35 @@ function VisualDiffInspector() {
   const [mode, setMode] = useState<(typeof DIFF_INSPECTOR_TABS)[number]["id"]>(
     "cluster-ssim",
   );
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    const currentIndex = DIFF_INSPECTOR_TABS.findIndex((t) => t.id === mode);
+    const last = DIFF_INSPECTOR_TABS.length - 1;
+    let next: number;
+    switch (e.key) {
+      case "ArrowRight":
+        next = currentIndex === last ? 0 : currentIndex + 1;
+        break;
+      case "ArrowLeft":
+        next = currentIndex === 0 ? last : currentIndex - 1;
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = last;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    const nextTab = DIFF_INSPECTOR_TABS[next];
+    if (nextTab) {
+      setMode(nextTab.id);
+      tabRefs.current[next]?.focus();
+    }
+  }
 
   return (
     <div
@@ -581,16 +652,23 @@ function VisualDiffInspector() {
         <div
           role="tablist"
           aria-label="Visual diff inspection view"
+          onKeyDown={onKeyDown}
           style={s("display: flex; flex-wrap: wrap; gap: 6px;")}
         >
-          {DIFF_INSPECTOR_TABS.map((t) => {
+          {DIFF_INSPECTOR_TABS.map((t, i) => {
             const active = mode === t.id;
             return (
               <button
                 key={t.id}
+                ref={(el) => {
+                  tabRefs.current[i] = el;
+                }}
                 type="button"
                 role="tab"
+                id={`diff-tab-${t.id}`}
                 aria-selected={active}
+                aria-controls={`diff-panel-${t.id}`}
+                tabIndex={active ? 0 : -1}
                 onClick={() => setMode(t.id)}
                 style={s(
                   `cursor: pointer; font-family: ${MONO}; font-size: 11.5px; padding: 6px 11px; border: 1px solid ${active ? "#e8862e" : "#322d28"}; background: ${active ? "#1f160d" : "#131210"}; color: ${active ? "#f5f1ea" : "#8c847a"};`,
@@ -603,217 +681,223 @@ function VisualDiffInspector() {
         </div>
       </div>
 
-      {mode === "side-by-side" && (
-        <div
-          className="fg-responsive-grid"
-          style={s(
-            "display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 20px;",
-          )}
-        >
+      <div
+        role="tabpanel"
+        id={`diff-panel-${mode}`}
+        aria-labelledby={`diff-tab-${mode}`}
+        tabIndex={0}
+      >
+        {mode === "side-by-side" && (
           <div
+            className="fg-responsive-grid"
             style={s(
-              "border: 1px solid #24472f; background: #0e1410; padding: 16px;",
+              "display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 20px;",
             )}
           >
             <div
               style={s(
-                `display: flex; justify-content: space-between; font-family: ${MONO}; font-size: 11px; color: #4fb477; margin-bottom: 12px;`,
-              )}
-            >
-              <span>BASELINE · frontguard-baselines</span>
-              <span>sha256: 9f8a…3c12</span>
-            </div>
-            <div
-              style={s(
-                "border: 1px solid #211e1b; background: #0d0c0b; padding: 12px; display: grid; gap: 8px;",
+                "border: 1px solid #24472f; background: #0e1410; padding: 16px;",
               )}
             >
               <div
                 style={s(
-                  `height: 22px; background: #161412; border: 1px solid #2a2622; display: flex; align-items: center; padding: 0 8px; font-family: ${MONO}; font-size: 10px; color: #8c847a;`,
+                  `display: flex; justify-content: space-between; font-family: ${MONO}; font-size: 11px; color: #4fb477; margin-bottom: 12px;`,
                 )}
               >
-                nav · stacked mobile drawer (collapsed)
+                <span>BASELINE · frontguard-baselines</span>
+                <span>sha256: 9f8a…3c12</span>
               </div>
               <div
                 style={s(
-                  "display: grid; grid-template-columns: 1fr; gap: 8px;",
+                  "border: 1px solid #211e1b; background: #0d0c0b; padding: 12px; display: grid; gap: 8px;",
                 )}
               >
                 <div
                   style={s(
-                    `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px; font-family: ${MONO}; font-size: 10.5px; color: #d8d0c5;`,
+                    `height: 22px; background: #161412; border: 1px solid #2a2622; display: flex; align-items: center; padding: 0 8px; font-family: ${MONO}; font-size: 10px; color: #8c847a;`,
                   )}
                 >
-                  main.dashboard-content · width 100%
+                  nav · stacked mobile drawer (collapsed)
                 </div>
                 <div
                   style={s(
-                    `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px; font-family: ${MONO}; font-size: 10.5px; color: #8c847a;`,
+                    "display: grid; grid-template-columns: 1fr; gap: 8px;",
                   )}
                 >
-                  section.metrics-cards · 1 column @ 375px
+                  <div
+                    style={s(
+                      `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px; font-family: ${MONO}; font-size: 10.5px; color: #d8d0c5;`,
+                    )}
+                  >
+                    main.dashboard-content · width 100%
+                  </div>
+                  <div
+                    style={s(
+                      `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px; font-family: ${MONO}; font-size: 10.5px; color: #8c847a;`,
+                    )}
+                  >
+                    section.metrics-cards · 1 column @ 375px
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div
-            style={s(
-              "border: 1px solid #4a2424; background: #170f0e; padding: 16px;",
-            )}
-          >
             <div
               style={s(
-                `display: flex; justify-content: space-between; font-family: ${MONO}; font-size: 11px; color: #e5484d; margin-bottom: 12px;`,
-              )}
-            >
-              <span>CURRENT · PR branch render</span>
-              <span>OVERLAP DETECTED</span>
-            </div>
-            <div
-              style={s(
-                "border: 1px solid #211e1b; background: #0d0c0b; padding: 12px; display: grid; gap: 8px; position: relative;",
+                "border: 1px solid #4a2424; background: #170f0e; padding: 16px;",
               )}
             >
               <div
                 style={s(
-                  `height: 22px; background: #161412; border: 1px solid #2a2622; display: flex; align-items: center; padding: 0 8px; font-family: ${MONO}; font-size: 10px; color: #8c847a;`,
+                  `display: flex; justify-content: space-between; font-family: ${MONO}; font-size: 11px; color: #e5484d; margin-bottom: 12px;`,
                 )}
               >
-                nav · top bar
+                <span>CURRENT · PR branch render</span>
+                <span>OVERLAP DETECTED</span>
               </div>
-              <div style={s("position: relative; display: grid; gap: 8px;")}>
+              <div
+                style={s(
+                  "border: 1px solid #211e1b; background: #0d0c0b; padding: 12px; display: grid; gap: 8px; position: relative;",
+                )}
+              >
                 <div
                   style={s(
-                    `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px 8px 8px 136px; font-family: ${MONO}; font-size: 10.5px; color: #8c847a;`,
+                    `height: 22px; background: #161412; border: 1px solid #2a2622; display: flex; align-items: center; padding: 0 8px; font-family: ${MONO}; font-size: 10px; color: #8c847a;`,
                   )}
                 >
-                  main.dashboard-content (clipped)
+                  nav · top bar
                 </div>
-                <div
-                  style={s(
-                    `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px 8px 8px 136px; font-family: ${MONO}; font-size: 10.5px; color: #8c847a;`,
-                  )}
-                >
-                  section.metrics-cards (clipped)
-                </div>
-                <div
-                  style={s(
-                    `position: absolute; left: 0; top: 0; bottom: 0; width: 128px; background: rgba(229, 72, 77, 0.18); border: 1px dashed #e5484d; padding: 8px; font-family: ${MONO}; font-size: 10px; color: #f5f1ea; display: flex; align-items: center;`,
-                  )}
-                >
-                  aside.dashboard-sidebar (fixed 128px overlap)
+                <div style={s("position: relative; display: grid; gap: 8px;")}>
+                  <div
+                    style={s(
+                      `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px 8px 8px 136px; font-family: ${MONO}; font-size: 10.5px; color: #8c847a;`,
+                    )}
+                  >
+                    main.dashboard-content (clipped)
+                  </div>
+                  <div
+                    style={s(
+                      `height: 46px; background: #131210; border: 1px solid #2a2622; padding: 8px 8px 8px 136px; font-family: ${MONO}; font-size: 10.5px; color: #8c847a;`,
+                    )}
+                  >
+                    section.metrics-cards (clipped)
+                  </div>
+                  <div
+                    style={s(
+                      `position: absolute; left: 0; top: 0; bottom: 0; width: 128px; background: rgba(229, 72, 77, 0.18); border: 1px dashed #e5484d; padding: 8px; font-family: ${MONO}; font-size: 10px; color: #f5f1ea; display: flex; align-items: center;`,
+                    )}
+                  >
+                    aside.dashboard-sidebar (fixed 128px overlap)
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {mode === "cluster-ssim" && (
-        <div
-          className="fg-responsive-grid"
-          style={s(
-            "display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px; padding: 20px; align-items: center;",
-          )}
-        >
+        {mode === "cluster-ssim" && (
           <div
+            className="fg-responsive-grid"
             style={s(
-              "border: 1px solid #2a2622; background: #0d0c0b; padding: 16px; position: relative;",
+              "display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px; padding: 20px; align-items: center;",
             )}
           >
             <div
               style={s(
-                `font-family: ${MONO}; font-size: 11px; color: #8c847a; margin-bottom: 10px; display: flex; justify-content: space-between;`,
-              )}
-            >
-              <span>CONNECTED-COMPONENT CLUSTER OVERLAY (SoM)</span>
-              <span style={s("color: #e8862e;")}>Cluster #1</span>
-            </div>
-            <div
-              style={s(
-                "border: 1px solid #211e1b; background: #131210; padding: 14px; position: relative; min-height: 118px;",
+                "border: 1px solid #2a2622; background: #0d0c0b; padding: 16px; position: relative;",
               )}
             >
               <div
                 style={s(
-                  "border: 2px solid #e5484d; background: rgba(229, 72, 77, 0.14); padding: 12px; max-width: 240px; position: relative;",
+                  `font-family: ${MONO}; font-size: 11px; color: #8c847a; margin-bottom: 10px; display: flex; justify-content: space-between;`,
                 )}
               >
-                <span
-                  style={s(
-                    `position: absolute; top: -10px; left: -1px; background: #e5484d; color: #0d0c0b; font-family: ${MONO}; font-size: 10px; font-weight: 700; padding: 1px 6px;`,
-                  )}
-                >
-                  [1] bbox 148×164
-                </span>
+                <span>CONNECTED-COMPONENT CLUSTER OVERLAY (SoM)</span>
+                <span style={s("color: #e8862e;")}>Cluster #1</span>
+              </div>
+              <div
+                style={s(
+                  "border: 1px solid #211e1b; background: #131210; padding: 14px; position: relative; min-height: 118px;",
+                )}
+              >
                 <div
                   style={s(
-                    `font-family: ${MONO}; font-size: 11px; color: #f5f1ea; margin-top: 4px;`,
+                    "border: 2px solid #e5484d; background: rgba(229, 72, 77, 0.14); padding: 12px; max-width: 240px; position: relative;",
                   )}
                 >
-                  aside.dashboard-sidebar
-                </div>
-                <div
-                  style={s(
-                    `font-family: ${MONO}; font-size: 10.5px; color: #c8c0b6; margin-top: 4px;`,
-                  )}
-                >
-                  1,842 diff pixels · density 0.76
+                  <span
+                    style={s(
+                      `position: absolute; top: -10px; left: -1px; background: #e5484d; color: #0d0c0b; font-family: ${MONO}; font-size: 10px; font-weight: 700; padding: 1px 6px;`,
+                    )}
+                  >
+                    [1] bbox 148×164
+                  </span>
+                  <div
+                    style={s(
+                      `font-family: ${MONO}; font-size: 11px; color: #f5f1ea; margin-top: 4px;`,
+                    )}
+                  >
+                    aside.dashboard-sidebar
+                  </div>
+                  <div
+                    style={s(
+                      `font-family: ${MONO}; font-size: 10.5px; color: #c8c0b6; margin-top: 4px;`,
+                    )}
+                  >
+                    1,842 diff pixels · density 0.76
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div
-            style={s(
-              "display: grid; gap: 10px; border: 1px solid #2a2622; background: #131210; padding: 16px;",
-            )}
-          >
             <div
               style={s(
-                `font-family: ${MONO}; font-size: 11px; color: #e8862e; letter-spacing: 0.05em;`,
+                "display: grid; gap: 10px; border: 1px solid #2a2622; background: #131210; padding: 16px;",
               )}
             >
-              REGION-SCOPED PERCEPTUAL METRICS
-            </div>
-            {[
-              { k: "Chroma SSIM (YCbCr)", v: "0.61 (structural color shift)" },
-              { k: "Complex Wavelet (CW-SSIM)", v: "0.54 (non-hinting distortion)" },
-              { k: "Anti-dilution guard", v: "Blocks global whitespace override" },
-            ].map((m) => (
               <div
-                key={m.k}
                 style={s(
-                  "display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid #211e1b; padding-top: 8px; font-size: 12.5px;",
+                  `font-family: ${MONO}; font-size: 11px; color: #e8862e; letter-spacing: 0.05em;`,
                 )}
               >
-                <span style={s("color: #8c847a;")}>{m.k}</span>
-                <span style={s(`font-family: ${MONO}; color: #f5f1ea;`)}>
-                  {m.v}
-                </span>
+                REGION-SCOPED PERCEPTUAL METRICS
               </div>
-            ))}
+              {[
+                { k: "Chroma SSIM (YCbCr)", v: "0.61 (structural color shift)" },
+                { k: "Complex Wavelet (CW-SSIM)", v: "0.54 (non-hinting distortion)" },
+                { k: "Anti-dilution guard", v: "Blocks global whitespace override" },
+              ].map((m) => (
+                <div
+                  key={m.k}
+                  style={s(
+                    "display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid #211e1b; padding-top: 8px; font-size: 12.5px;",
+                  )}
+                >
+                  <span style={s("color: #8c847a;")}>{m.k}</span>
+                  <span style={s(`font-family: ${MONO}; color: #f5f1ea;`)}>
+                    {m.v}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {mode === "mcp-cortex" && (
-        <div style={s("padding: 20px;")}>
-          <div
-            style={s(
-              `font-family: ${MONO}; font-size: 11px; color: #5b8def; margin-bottom: 10px;`,
-            )}
-          >
-            @frontguard/mcp · inspect_diff_cluster_dom → verify_css_patch
-          </div>
-          <pre
-            style={s(
-              `margin: 0; padding: 16px; background: #0d0c0b; border: 1px solid #211e1b; font-family: ${MONO}; font-size: 12px; line-height: 1.65; color: #d8d0c5; overflow-x: auto;`,
-            )}
-          >
-            {`{
+        {mode === "mcp-cortex" && (
+          <div style={s("padding: 20px;")}>
+            <div
+              style={s(
+                `font-family: ${MONO}; font-size: 11px; color: #5b8def; margin-bottom: 10px;`,
+              )}
+            >
+              @frontguard/mcp · inspect_diff_cluster_dom → verify_css_patch
+            </div>
+            <pre
+              style={s(
+                `margin: 0; padding: 16px; background: #0d0c0b; border: 1px solid #211e1b; font-family: ${MONO}; font-size: 12px; line-height: 1.65; color: #d8d0c5; overflow-x: auto;`,
+              )}
+            >
+              {`{
   "tool": "verify_css_patch",
   "diffId": "run_local:/dashboard@375@chromium",
   "targetSelector": "aside.dashboard-sidebar",
@@ -822,9 +906,10 @@ function VisualDiffInspector() {
   "selectorMatchedTarget": true,
   "recommendation": "apply"
 }`}
-          </pre>
-        </div>
-      )}
+            </pre>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1044,6 +1129,7 @@ function ValidationSection() {
 function Home() {
   const [installLabel, copyInstall] = useCopy();
   const [initLabel, copyInit] = useCopy();
+  const [configLabel, copyConfig] = useCopy();
 
   const eyebrow = s(
     `font-family: ${MONO}; font-size: 12px; color: #e8862e; letter-spacing: 0.08em; margin: 0 0 14px;`,
@@ -1789,31 +1875,45 @@ function Home() {
           >
             <div
               style={s(
-                "display: flex; align-items: center; gap: 8px; padding: 11px 16px; border-bottom: 1px solid #211e1b; background: #161412;",
+                "display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 16px; border-bottom: 1px solid #211e1b; background: #161412;",
               )}
             >
-              <span
+              <div style={s("display: flex; align-items: center; gap: 8px;")}>
+                <span
+                  style={s(
+                    "width: 10px; height: 10px; border-radius: 50%; background: #322d28;",
+                  )}
+                />
+                <span
+                  style={s(
+                    "width: 10px; height: 10px; border-radius: 50%; background: #322d28;",
+                  )}
+                />
+                <span
+                  style={s(
+                    "width: 10px; height: 10px; border-radius: 50%; background: #322d28;",
+                  )}
+                />
+                <span
+                  style={s(
+                    `margin-left: 10px; font-family: ${MONO}; font-size: 12px; color: #564f48;`,
+                  )}
+                >
+                  frontguard.config.ts
+                </span>
+              </div>
+              <button
+                type="button"
+                aria-label="Copy frontguard.config.ts"
+                aria-live="polite"
+                onClick={() => copyConfig(CONFIG_CODE)}
+                className="fg-btn-ghost"
                 style={s(
-                  "width: 10px; height: 10px; border-radius: 50%; background: #322d28;",
-                )}
-              />
-              <span
-                style={s(
-                  "width: 10px; height: 10px; border-radius: 50%; background: #322d28;",
-                )}
-              />
-              <span
-                style={s(
-                  "width: 10px; height: 10px; border-radius: 50%; background: #322d28;",
-                )}
-              />
-              <span
-                style={s(
-                  `margin-left: 10px; font-family: ${MONO}; font-size: 12px; color: #564f48;`,
+                  `font-family: ${MONO}; font-size: 12px; color: #b8b0a6; background: #1f1c19; border: 1px solid #322d28; padding: 6px 14px; cursor: pointer;`,
                 )}
               >
-                frontguard.config.ts
-              </span>
+                {configLabel}
+              </button>
             </div>
             <pre
               style={s(

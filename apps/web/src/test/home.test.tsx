@@ -37,19 +37,29 @@ describe('home route — real product content', () => {
         name: 'Copy command: npx -p @frontguard/cli frontguard init --ci',
       }),
     ).toHaveAttribute('type', 'button')
+    expect(
+      screen.getByRole('button', { name: 'Copy frontguard.config.ts' }),
+    ).toHaveAttribute('type', 'button')
   })
 
-  it('renders the interactive visual diff inspector and switches between inspection modes', () => {
+  it('renders the interactive visual diff inspector and switches between inspection modes via click and keyboard', () => {
     const inspector = screen.getByTestId('visual-diff-inspector')
     expect(inspector).toBeInTheDocument()
+    expect(within(inspector).getByRole('tabpanel')).toHaveAttribute(
+      'id',
+      'diff-panel-cluster-ssim',
+    )
     expect(within(inspector).getByText(/CONNECTED-COMPONENT CLUSTER OVERLAY/i)).toBeInTheDocument()
     expect(within(inspector).getByText(/Chroma SSIM \(YCbCr\)/i)).toBeInTheDocument()
 
-    fireEvent.click(within(inspector).getByRole('tab', { name: /01 · Side-by-side/i }))
+    const tablist = within(inspector).getByRole('tablist', {
+      name: /visual diff inspection view/i,
+    })
+    fireEvent.keyDown(tablist, { key: 'ArrowLeft' })
     expect(within(inspector).getByText(/BASELINE · frontguard-baselines/i)).toBeInTheDocument()
     expect(within(inspector).getByText(/CURRENT · PR branch render/i)).toBeInTheDocument()
 
-    fireEvent.click(within(inspector).getByRole('tab', { name: /03 · MCP Visual Cortex/i }))
+    fireEvent.keyDown(tablist, { key: 'End' })
     expect(within(inspector).getByText(/inspect_diff_cluster_dom → verify_css_patch/i)).toBeInTheDocument()
   })
 

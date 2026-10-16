@@ -8,7 +8,7 @@
  * @module dashboard/render
  */
 
-import type { Monitor, MonitorRun } from '../db/monitors.js';
+import type { Monitor, MonitorRun, MonitorAlertState } from '../db/monitors.js';
 import type { ScreenshotRecord, ScreenshotDecision } from '../db/store.js';
 import type { IgnoreMask } from '../db/masks.js';
 import type { RunAttachment } from '../db/attachments.js';
@@ -43,78 +43,84 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/** Shared dark-theme stylesheet used across all dashboard pages. */
+/** Shared warm industrial dark-theme stylesheet used across all dashboard pages. */
 const SHARED_STYLES = `
-  :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --text:#e6edf3; --muted:#8b949e; --accent:#58a6ff; }
+  :root { --bg:#0d0c0b; --panel:#131210; --panel-raised:#1f1c19; --border:#2a2622; --text:#f5f1ea; --muted:#8c847a; --accent:#e8862e; --accent-hi:#f59b45; --green:#4fb477; --amber:#e8862e; --red:#e5484d; --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
   * { box-sizing: border-box; }
-  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
-  header { padding:24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; }
-  header h1 { font-size:18px; margin:0; }
+  :focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 2px; }
+  body { margin:0; font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
+  .skip-link { position:absolute; left:-9999px; top:8px; z-index:100; padding:8px 14px; background:var(--accent); color:#0d0c0b; font-weight:700; border-radius:6px; text-decoration:none; }
+  .skip-link:focus { left:16px; }
+  header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; background:var(--panel); }
+  header h1 { font-size:18px; margin:0; letter-spacing:-0.01em; }
   header a { color:var(--accent); text-decoration:none; font-size:14px; margin-left:auto; }
-  .wrap { max-width:1000px; margin:0 auto; padding:24px; }
+  .wrap { max-width:1040px; margin:0 auto; padding:24px; }
   a { color:var(--accent); }
   .stats { display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
   .stat { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:16px 20px; flex:1; min-width:120px; }
-  .stat .n { font-size:28px; font-weight:700; }
+  .stat .n { font-size:28px; font-weight:700; font-variant-numeric: tabular-nums; font-family:var(--mono); }
   .stat .l { color:var(--muted); font-size:13px; }
   table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
-  th,td { text-align:left; padding:12px 16px; border-bottom:1px solid var(--border); font-size:14px; vertical-align:top; }
-  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; }
+  th,td { text-align:left; padding:12px 16px; border-bottom:1px solid var(--border); font-size:14px; vertical-align:top; font-variant-numeric: tabular-nums; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.04em; background:var(--panel-raised); }
   tr:last-child td { border-bottom:none; }
   .mname { font-weight:600; }
-  .murl { color:var(--muted); font-size:12px; }
-  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600; }
-  .badge.ok { background:rgba(63,185,80,.15); color:#3fb950; }
-  .badge.err { background:rgba(248,81,73,.15); color:#ff7b72; }
-  .badge.warn { background:rgba(210,153,34,.15); color:#e3b341; }
-  .badge.idle { background:rgba(139,148,158,.15); color:var(--muted); }
+  .murl { color:var(--muted); font-size:12px; font-family:var(--mono); }
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600; font-variant-numeric: tabular-nums; }
+  .badge.ok { background:rgba(79,180,119,.15); color:var(--green); }
+  .badge.err { background:rgba(229,72,77,.15); color:var(--red); }
+  .badge.warn { background:rgba(232,134,46,.15); color:var(--amber); }
+  .badge.idle { background:rgba(140,132,122,.15); color:var(--muted); }
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
-  .dot.on { background:#3fb950; } .dot.off { background:var(--muted); }
-  h2 { font-size:15px; margin:32px 0 12px; }
+  .dot.on { background:var(--green); } .dot.off { background:var(--muted); }
+  h2 { font-size:15px; margin:32px 0 12px; letter-spacing:-0.01em; }
   ul.activity { list-style:none; padding:0; margin:0; background:var(--panel); border:1px solid var(--border); border-radius:8px; }
   ul.activity li { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); font-size:14px; }
   ul.activity li:last-child { border-bottom:none; }
-  .atime { color:var(--muted); font-size:12px; min-width:70px; }
-  .aurl { flex:1; }
+  .atime { color:var(--muted); font-size:12px; min-width:70px; font-family:var(--mono); font-variant-numeric: tabular-nums; }
+  .aurl { flex:1; font-family:var(--mono); font-size:13px; }
   .empty { color:var(--muted); text-align:center; }
-  code { background:rgba(110,118,129,.2); padding:2px 6px; border-radius:4px; font-size:12px; }
+  code { background:rgba(245,241,234,.08); padding:2px 6px; border-radius:4px; font-size:12px; font-family:var(--mono); }
   form.inline { display:inline; margin:0; }
   .card { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; }
   label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
   input, textarea, select { width:100%; padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:14px; font-family:inherit; }
   .grid2 { display:flex; gap:16px; flex-wrap:wrap; }
   .grid2 > div { flex:1; min-width:180px; }
-  button, .btn { cursor:pointer; padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-size:13px; font-weight:600; text-decoration:none; display:inline-block; }
-  button.primary { background:var(--accent); color:#0d1117; border-color:var(--accent); margin-top:16px; }
-  button.danger { color:#ff7b72; border-color:rgba(248,81,73,.4); }
+  button, .btn { cursor:pointer; padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:var(--panel-raised); color:var(--text); font-size:13px; font-weight:600; text-decoration:none; display:inline-block; }
+  button.primary, .btn.primary { background:var(--accent); color:#0d0c0b; border-color:var(--accent); margin-top:16px; }
+  button.primary:hover, .btn.primary:hover { background:var(--accent-hi); border-color:var(--accent-hi); }
+  button.danger { color:var(--red); border-color:rgba(229,72,77,.4); }
   .actions { display:flex; gap:8px; flex-wrap:wrap; }
   .shots { display:flex; gap:16px; flex-wrap:wrap; }
   .shot { flex:1; min-width:200px; }
   .shot img { width:100%; border:1px solid var(--border); border-radius:6px; background:#000; }
-  .shot .cap { color:var(--muted); font-size:12px; margin-bottom:6px; text-transform:uppercase; }
+  .shot .cap { color:var(--muted); font-size:12px; margin-bottom:6px; text-transform:uppercase; font-family:var(--mono); }
   .group { margin-bottom:24px; }
   .login { max-width:420px; margin:80px auto; text-align:center; }
   .login .btn { margin-top:20px; font-size:15px; padding:10px 20px; }
+  .snooze-banner { display:flex; align-items:center; gap:8px; padding:10px 14px; margin-bottom:16px; background:rgba(232,134,46,.12); border:1px solid var(--amber); border-radius:8px; color:var(--amber); font-size:13px; font-weight:600; }
+  .run-summary { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:12px 16px; margin-bottom:16px; background:var(--panel); border:1px solid var(--border); border-radius:8px; font-size:13px; }
 
   /* --- Flake badge (Task 15.2) ----------------------------------------- */
-  .flake { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .flake { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:700; font-variant-numeric: tabular-nums; font-family:var(--mono); }
   .flake-dot { width:6px; height:6px; border-radius:50%; }
-  .flake-green { background:rgba(63,185,80,.12); color:#3fb950; }
-  .flake-green .flake-dot { background:#3fb950; }
-  .flake-yellow { background:rgba(210,153,34,.15); color:#e3b341; }
-  .flake-yellow .flake-dot { background:#e3b341; }
-  .flake-red { background:rgba(248,81,73,.15); color:#ff7b72; }
-  .flake-red .flake-dot { background:#ff7b72; }
+  .flake-green { background:rgba(79,180,119,.14); color:var(--green); }
+  .flake-green .flake-dot { background:var(--green); }
+  .flake-yellow { background:rgba(232,134,46,.16); color:var(--amber); }
+  .flake-yellow .flake-dot { background:var(--amber); }
+  .flake-red { background:rgba(229,72,77,.16); color:var(--red); }
+  .flake-red .flake-dot { background:var(--red); }
 
   /* --- Spend-cap header bar (Task 15.7) -------------------------------- */
-  .spend { display:flex; align-items:center; gap:10px; padding:6px 12px; border:1px solid var(--border); border-radius:8px; font-size:12px; }
+  .spend { display:flex; align-items:center; gap:10px; padding:6px 12px; border:1px solid var(--border); border-radius:8px; font-size:12px; background:var(--panel-raised); }
   .spend .label { color:var(--muted); }
-  .spend .bar { width:120px; height:6px; background:#21262d; border-radius:3px; overflow:hidden; }
-  .spend .fill { height:100%; background:#3fb950; transition:width .2s; }
-  .spend.warn .fill { background:#e3b341; }
-  .spend.crit .fill { background:#ff7b72; }
-  .spend.crit { border-color:rgba(248,81,73,.4); }
-  .spend strong { color:var(--text); font-weight:700; font-variant-numeric:tabular-nums; }
+  .spend .bar { width:120px; height:6px; background:var(--bg); border-radius:3px; overflow:hidden; }
+  .spend .fill { height:100%; background:var(--green); transition:width .2s; }
+  .spend.warn .fill { background:var(--amber); }
+  .spend.crit .fill { background:var(--red); }
+  .spend.crit { border-color:rgba(229,72,77,.4); }
+  .spend strong { color:var(--text); font-weight:700; font-variant-numeric: tabular-nums; font-family:var(--mono); }
 
   /* --- History page filters (Task 15.1) -------------------------------- */
   .filters { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 20px; }
@@ -127,10 +133,10 @@ const SHARED_STYLES = `
   /* --- Diff viewer (Task 15.3) ----------------------------------------- */
   .viewer-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:16px; padding:10px 14px; background:var(--panel); border:1px solid var(--border); border-radius:8px; }
   .viewer-toolbar .spacer { flex:1; }
-  .viewer-toolbar kbd { background:#21262d; border:1px solid var(--border); border-radius:4px; padding:1px 6px; font-size:11px; font-family:ui-monospace,monospace; color:var(--muted); }
+  .viewer-toolbar kbd { background:var(--panel-raised); border:1px solid var(--border); border-radius:4px; padding:1px 6px; font-size:11px; font-family:var(--mono); color:var(--muted); }
   .viewer-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px; }
   .viewer-cell { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px; position:relative; }
-  .viewer-cell .cap { color:var(--muted); font-size:12px; text-transform:uppercase; margin-bottom:8px; letter-spacing:.04em; }
+  .viewer-cell .cap { color:var(--muted); font-size:12px; text-transform:uppercase; margin-bottom:8px; letter-spacing:.04em; font-family:var(--mono); }
   .viewer-cell img { width:100%; display:block; border-radius:4px; background:#000; }
   .viewer-cell .ph { color:var(--muted); text-align:center; padding:40px 12px; border:1px dashed var(--border); border-radius:4px; }
   .viewer-stage { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:16px; position:relative; min-height:400px; }
@@ -139,7 +145,7 @@ const SHARED_STYLES = `
   .viewer-stage .layer { position:absolute; inset:0; pointer-events:none; }
   .viewer-stage .layer.diff-overlay { mix-blend-mode:screen; opacity:.85; }
   .viewer-stage .layer.heatmap { filter:hue-rotate(180deg) saturate(2.5) contrast(1.5); opacity:.85; }
-  .viewer-stage .mask { position:absolute; background:rgba(88,166,255,.18); border:2px dashed #58a6ff; box-sizing:border-box; }
+  .viewer-stage .mask { position:absolute; background:rgba(232,134,46,.18); border:2px dashed var(--accent); box-sizing:border-box; }
   .viewer-stage.painting { cursor:crosshair; }
   .viewer-stage.painting .layer { pointer-events:auto; }
   .nav-arrows { display:flex; gap:8px; align-items:center; }
@@ -148,25 +154,43 @@ const SHARED_STYLES = `
 
   /* --- Bulk approve (Task 15.4) ---------------------------------------- */
   .bulk-bar { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--panel); border:1px solid var(--border); border-radius:8px; margin-bottom:16px; }
-  .bulk-bar .count { font-weight:700; }
+  .bulk-bar .count { font-weight:700; font-variant-numeric: tabular-nums; }
   .bulk-bar .actions { margin-left:auto; }
   .group .group-head { display:flex; align-items:center; gap:10px; margin:24px 0 8px; }
   .group .group-head h2 { margin:0; }
   .group .group-head input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); margin:0; }
   .group .group-decision { font-size:12px; padding:2px 8px; border-radius:10px; }
-  .group .group-decision.accepted { background:rgba(63,185,80,.15); color:#3fb950; }
-  .group .group-decision.rejected { background:rgba(248,81,73,.15); color:#ff7b72; }
+  .group .group-decision.accepted { background:rgba(79,180,119,.15); color:var(--green); }
+  .group .group-decision.rejected { background:rgba(229,72,77,.15); color:var(--red); }
 
   /* --- Attachments + masks settings (Tasks 15.5/15.6) ----------------- */
   ul.attachments { list-style:none; padding:0; margin:0; background:var(--panel); border:1px solid var(--border); border-radius:8px; }
   ul.attachments li { display:flex; gap:12px; align-items:center; padding:10px 14px; border-bottom:1px solid var(--border); font-size:13px; }
   ul.attachments li:last-child { border-bottom:none; }
-  ul.attachments .kind { color:var(--muted); min-width:90px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
-  ul.attachments .size { color:var(--muted); font-size:12px; margin-left:auto; }
+  ul.attachments .kind { color:var(--muted); min-width:90px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; font-family:var(--mono); }
+  ul.attachments .size { color:var(--muted); font-size:12px; margin-left:auto; font-family:var(--mono); font-variant-numeric: tabular-nums; }
   .mask-thumb { display:flex; gap:12px; align-items:center; padding:10px 14px; border-bottom:1px solid var(--border); }
-  .mask-thumb .swatch { width:48px; height:32px; border:2px dashed #58a6ff; background:rgba(88,166,255,.18); border-radius:4px; flex-shrink:0; }
+  .mask-thumb .swatch { width:48px; height:32px; border:2px dashed var(--accent); background:rgba(232,134,46,.18); border-radius:4px; flex-shrink:0; }
   .mask-thumb .meta { flex:1; font-size:13px; }
-  .mask-thumb .meta .where { color:var(--muted); font-size:12px; }
+  .mask-thumb .meta .where { color:var(--muted); font-size:12px; font-family:var(--mono); }
+
+  /* --- Responsive breakpoints ------------------------------------------ */
+  @media (max-width: 768px) {
+    header { flex-wrap:wrap; padding:16px; }
+    header a { margin-left:0; }
+    .wrap { padding:16px; }
+    table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .viewer-grid { grid-template-columns:1fr; }
+    .viewer-toolbar { gap:6px; padding:10px; }
+    .bulk-bar { flex-wrap:wrap; }
+  }
+  @media (max-width: 640px) {
+    .stats { flex-direction:column; }
+    .grid2 { flex-direction:column; }
+    .shots { flex-direction:column; }
+    ul.activity li { flex-wrap:wrap; }
+    .group .group-head { flex-wrap:wrap; }
+  }
 `;
 
 /** Renders the standard dark-theme document shell. */
@@ -177,9 +201,13 @@ function page(title: string, bodyInner: string): string {
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>${escapeHtml(title)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
 <style>${SHARED_STYLES}</style>
 </head>
 <body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
 ${bodyInner}
 </body>
 </html>`;
@@ -295,9 +323,13 @@ export function renderDashboard(
         .slice(0, 10)
         .map((r) => {
           const regr = r.results?.filter((x) => x.classification === 'regression').length ?? 0;
+          const urlEl =
+            sessioned && r.id
+              ? `<a href="/dashboard/runs/${escapeHtml(r.id)}" class="aurl">${escapeHtml(r.url)}</a>`
+              : `<span class="aurl">${escapeHtml(r.url)}</span>`;
           return `<li>
           <span class="atime">${relativeTime(r.completedAt ?? r.createdAt, now)}</span>
-          <span class="aurl">${escapeHtml(r.url)}</span>
+          ${urlEl}
           <span class="badge ${regr > 0 ? 'err' : 'ok'}">${regr > 0 ? `${regr} regression(s)` : 'clean'}</span>
         </li>`;
         })
@@ -312,12 +344,12 @@ export function renderDashboard(
     : '';
 
   const inner = `<header><h1>🛡 Frontguard Monitoring</h1>${headerExtra}</header>
-<div class="wrap">
+<div class="wrap" id="main-content" role="main">
   <div class="stats">
     <div class="stat"><div class="n">${monitors.length}</div><div class="l">Monitors</div></div>
     <div class="stat"><div class="n">${enabled}</div><div class="l">Enabled</div></div>
-    <div class="stat"><div class="n" style="color:#3fb950">${passing}</div><div class="l">Passing</div></div>
-    <div class="stat"><div class="n" style="color:#ff7b72">${failing}</div><div class="l">Failing</div></div>
+    <div class="stat"><div class="n" style="color:var(--green)">${passing}</div><div class="l">Passing</div></div>
+    <div class="stat"><div class="n" style="color:var(--red)">${failing}</div><div class="l">Failing</div></div>
   </div>
 
   <table>
@@ -339,19 +371,19 @@ function renderCreateForm(): string {
   <div class="card">
     <form method="post" action="/dashboard/monitors">
       <div class="grid2">
-        <div><label>Name</label><input name="name" required placeholder="Marketing site"/></div>
-        <div><label>URL</label><input name="url" required type="url" placeholder="https://example.com"/></div>
+        <div><label for="create-name">Name</label><input id="create-name" name="name" required placeholder="Marketing site"/></div>
+        <div><label for="create-url">URL</label><input id="create-url" name="url" required type="url" placeholder="https://example.com"/></div>
       </div>
       <div class="grid2">
-        <div><label>Routes (comma-separated)</label><input name="routes" placeholder="/, /pricing, /blog"/></div>
-        <div><label>Interval (minutes)</label><input name="intervalMinutes" type="number" value="60" min="5"/></div>
+        <div><label for="create-routes">Routes (comma-separated)</label><input id="create-routes" name="routes" placeholder="/, /pricing, /blog"/></div>
+        <div><label for="create-interval">Interval (minutes)</label><input id="create-interval" name="intervalMinutes" type="number" value="60" min="5"/></div>
       </div>
       <div class="grid2">
-        <div><label>Alert threshold (0–1)</label><input name="alertThreshold" type="number" min="0" max="1" step="0.01" value="0.05"/></div>
-        <div><label>Slack webhook URL</label><input name="slack" type="url" placeholder="https://hooks.slack.com/…"/></div>
+        <div><label for="create-threshold">Alert threshold (0–1)</label><input id="create-threshold" name="alertThreshold" type="number" min="0" max="1" step="0.01" value="0.05"/></div>
+        <div><label for="create-slack">Slack webhook URL</label><input id="create-slack" name="slack" type="url" placeholder="https://hooks.slack.com/…"/></div>
       </div>
-      <label>Alert emails (comma-separated)</label>
-      <input name="email" placeholder="alerts@example.com, oncall@example.com"/>
+      <label for="create-email">Alert emails (comma-separated)</label>
+      <input id="create-email" name="email" placeholder="alerts@example.com, oncall@example.com"/>
       <button type="submit" class="primary">Create monitor</button>
     </form>
   </div>`;
@@ -360,7 +392,7 @@ function renderCreateForm(): string {
 /** Renders the login page with a "Sign in with GitHub" button. */
 export function renderLogin(): string {
   const inner = `<header><h1>🛡 Frontguard Monitoring</h1></header>
-<div class="wrap">
+<div class="wrap" id="main-content" role="main">
   <div class="login">
     <h2>Sign in to your dashboard</h2>
     <p class="murl">Authenticate with GitHub to manage your monitors.</p>
@@ -375,8 +407,15 @@ function runStatusBadge(status: string): string {
   switch (status) {
     case 'passed':
       return '<span class="badge ok">✓ passed</span>';
+    case 'completed':
+      return '<span class="badge ok">✓ completed</span>';
     case 'regression':
       return '<span class="badge err">✘ regression</span>';
+    case 'failed':
+      return '<span class="badge err">✘ failed</span>';
+    case 'running':
+    case 'queued':
+      return `<span class="badge idle">• ${escapeHtml(status)}</span>`;
     default:
       return '<span class="badge warn">⚠ error</span>';
   }
@@ -386,16 +425,29 @@ function runStatusBadge(status: string): string {
  * Renders the per-monitor detail page: configuration, an editable alert config
  * + snooze form, and a timeline of recent runs (newest first).
  *
- * @param monitor - The monitor.
- * @param runs    - Recent monitor runs (already newest-first).
- * @param now     - Current time (injectable for tests).
+ * @param monitor    - The monitor.
+ * @param runs       - Recent monitor runs (already newest-first).
+ * @param now        - Current time (injectable for tests).
+ * @param alertState - Optional alert state for active snooze banner.
  */
-export function renderMonitorDetail(monitor: Monitor, runs: MonitorRun[], now = new Date()): string {
+export function renderMonitorDetail(
+  monitor: Monitor,
+  runs: MonitorRun[],
+  now: Date | number = new Date(),
+  alertState?: MonitorAlertState | null,
+): string {
+  const nowDate = typeof now === 'number' ? new Date(now) : now;
   const id = escapeHtml(monitor.id);
   const slack = escapeHtml(monitor.alerts?.slack ?? '');
   const emails = escapeHtml((monitor.alerts?.email ?? []).join(', '));
   const score = flakeScore(runs);
   const badge = renderFlakeBadge(score);
+
+  const isSnoozed =
+    alertState?.snoozedUntil && new Date(alertState.snoozedUntil).getTime() > nowDate.getTime();
+  const snoozeBanner = isSnoozed
+    ? `<div class="snooze-banner">⏸ Alerts snoozed until ${escapeHtml(alertState!.snoozedUntil!)}</div>`
+    : '';
 
   const timeline = runs.length
     ? runs
@@ -404,7 +456,7 @@ export function renderMonitorDetail(monitor: Monitor, runs: MonitorRun[], now = 
             ? `<a href="/dashboard/runs/${escapeHtml(r.id)}">View screenshots</a>`
             : '';
           return `<tr>
-        <td>${relativeTime(r.createdAt, now)}</td>
+        <td>${relativeTime(r.createdAt, nowDate)}</td>
         <td>${runStatusBadge(r.status)}</td>
         <td>${r.regressionsCount}</td>
         <td>${r.attempts}</td>
@@ -415,7 +467,8 @@ export function renderMonitorDetail(monitor: Monitor, runs: MonitorRun[], now = 
     : '<tr><td colspan="5" class="empty">No runs recorded yet.</td></tr>';
 
   const inner = `<header><h1>🛡 ${escapeHtml(monitor.name)}</h1><a href="/dashboard">← Dashboard</a></header>
-<div class="wrap">
+<div class="wrap" id="main-content" role="main">
+  ${snoozeBanner}
   <div class="card">
     <div class="mname">${escapeHtml(monitor.name)}</div>
     <div class="murl">${escapeHtml(monitor.url)}</div>
@@ -427,11 +480,11 @@ export function renderMonitorDetail(monitor: Monitor, runs: MonitorRun[], now = 
   <div class="card">
     <form method="post" action="/dashboard/monitors/${id}/alerts">
       <div class="grid2">
-        <div><label>Alert threshold (0–1)</label><input name="alertThreshold" type="number" min="0" max="1" step="0.01" value="${monitor.alertThreshold}"/></div>
-        <div><label>Slack webhook URL</label><input name="slack" type="url" value="${slack}" placeholder="https://hooks.slack.com/…"/></div>
+        <div><label for="alert-threshold">Alert threshold (0–1)</label><input id="alert-threshold" name="alertThreshold" type="number" min="0" max="1" step="0.01" value="${monitor.alertThreshold}"/></div>
+        <div><label for="alert-slack">Slack webhook URL</label><input id="alert-slack" name="slack" type="url" value="${slack}" placeholder="https://hooks.slack.com/…"/></div>
       </div>
-      <label>Alert emails (comma-separated)</label>
-      <input name="email" value="${emails}" placeholder="alerts@example.com"/>
+      <label for="alert-email">Alert emails (comma-separated)</label>
+      <input id="alert-email" name="email" value="${emails}" placeholder="alerts@example.com"/>
       <button type="submit" class="primary">Save alerts</button>
     </form>
   </div>
@@ -439,7 +492,7 @@ export function renderMonitorDetail(monitor: Monitor, runs: MonitorRun[], now = 
   <h2>Snooze alerts</h2>
   <div class="card">
     <form method="post" action="/dashboard/monitors/${id}/snooze" class="actions">
-      <input name="hours" type="number" value="24" min="0" max="720" style="max-width:120px"/>
+      <input id="snooze-hours" name="hours" type="number" value="24" min="0" max="720" aria-label="Snooze hours" style="max-width:120px"/>
       <button type="submit">Snooze (hours)</button>
     </form>
     <p class="murl">Set 0 to clear an active snooze.</p>
@@ -466,7 +519,7 @@ export function renderMonitorDetail(monitor: Monitor, runs: MonitorRun[], now = 
  *
  * @param runId       - The run id.
  * @param screenshots - Screenshot metadata for the run.
- * @param opts        - Optional interactive features.
+ * @param opts        - Optional interactive features and run metadata.
  */
 export function renderScreenshotComparison(
   runId: string,
@@ -475,6 +528,7 @@ export function renderScreenshotComparison(
     sessioned?: boolean;
     decisions?: ScreenshotDecision[];
     attachments?: RunAttachment[];
+    run?: Run | null;
   } = {},
 ): string {
   const rid = escapeHtml(runId);
@@ -500,7 +554,15 @@ export function renderScreenshotComparison(
           const diffShot = shots.find((s) => s.type === 'diff');
           const anyShot = shots[0];
           const route = anyShot.route;
+          const viewportNum = anyShot.viewport;
           const decision = diffShot ? decisionByShot.get(diffShot.id) : undefined;
+          const matchedResult =
+            opts.run?.results?.find(
+              (r) =>
+                r.route === route &&
+                r.viewport === viewportNum &&
+                (!r.browser || !browser || r.browser === browser),
+            ) ?? opts.run?.results?.find((r) => r.route === route && r.viewport === viewportNum);
 
           const cols = (['baseline', 'current', 'diff'] as const)
             .map((type) => {
@@ -521,6 +583,9 @@ export function renderScreenshotComparison(
           const decisionLabel = decision
             ? `<span class="group-decision ${escapeHtml(decision.decision)}">${decision.decision}</span>`
             : '';
+          const resultMeta = matchedResult
+            ? `<span class="murl">${matchedResult.diffPercentage.toFixed(2)}%</span> <span class="badge ${(matchedResult.classification ?? matchedResult.status) === 'regression' ? 'err' : 'ok'}">${escapeHtml(matchedResult.classification ?? matchedResult.status)}</span>`
+            : '';
           const viewerLink =
             sessioned && diffShot
               ? `<a class="btn" href="/dashboard/runs/${rid}/diffs/${escapeHtml(diffShot.id)}">Open diff viewer</a>`
@@ -530,6 +595,7 @@ export function renderScreenshotComparison(
         <div class="group-head">
           ${checkbox}
           <h2>${escapeHtml(route)} @ ${escapeHtml(viewportStr)}px${browser ? ' · ' + escapeHtml(browser) : ''}</h2>
+          ${resultMeta}
           ${decisionLabel}
           <span class="spacer" style="flex:1"></span>
           ${viewerLink}
@@ -557,6 +623,14 @@ export function renderScreenshotComparison(
     sessioned && opts.attachments?.length
       ? `<p><a class="btn" href="/dashboard/runs/${rid}/attachments">View ${opts.attachments.length} attachment${opts.attachments.length === 1 ? '' : 's'} →</a></p>`
       : '';
+
+  const runSummary = opts.run
+    ? `<div class="run-summary">
+    <span><strong>Target:</strong> <code>${escapeHtml(opts.run.url)}</code></span>
+    ${runStatusBadge(opts.run.status)}
+    <span class="murl">Created ${escapeHtml(opts.run.createdAt)}</span>
+  </div>`
+    : '';
 
   const bulkScript = sessioned
     ? `<script>
@@ -586,8 +660,9 @@ export function renderScreenshotComparison(
     : '';
 
   const inner = `<header><h1>🛡 Screenshot comparison</h1><a href="/dashboard">← Dashboard</a></header>
-<div class="wrap">
+<div class="wrap" id="main-content" role="main">
   <p class="murl">Run <code>${rid}</code></p>
+  ${runSummary}
   ${attachmentsLink}
   ${bulkBar}
   ${groupsHtml}
@@ -672,7 +747,7 @@ export function renderMonitorHistory(
     : '<tr><td colspan="5" class="empty">No runs match the current filters.</td></tr>';
 
   const inner = `<header><h1>🛡 ${escapeHtml(monitor.name)} — history</h1><a href="/dashboard/monitors/${id}">← Monitor</a></header>
-<div class="wrap">
+<div class="wrap" id="main-content" role="main">
   <div class="card">
     <div class="mname">${escapeHtml(monitor.name)}</div>
     <div class="murl">${escapeHtml(monitor.url)}</div>
@@ -728,10 +803,10 @@ export interface DiffViewerData {
 }
 
 /**
- * Renders the full-screen diff viewer with overlay/heatmap toggle, drag-paint
- * mask creation, and keyboard shortcuts (A/R/I/←/→). All routes are POSTed
- * by the inline script using fetch so the page doesn't full-reload between
- * actions.
+ * Renders the full-screen diff viewer with overlay/heatmap/swipe toggle,
+ * opacity/swipe slider, drag-paint mask creation, and keyboard shortcuts
+ * (A/R/I/←/→). All routes are POSTed by the inline script using fetch so
+ * the page doesn't full-reload between actions.
  */
 export function renderDiffViewer(data: DiffViewerData): string {
   const rid = escapeHtml(data.runId);
@@ -755,7 +830,7 @@ export function renderDiffViewer(data: DiffViewerData): string {
   );
 
   const inner = `<header><h1>🛡 Diff viewer</h1><a href="/dashboard/runs/${rid}">← Run</a></header>
-<div class="wrap">
+<div class="wrap" id="main-content" role="main">
   <div class="viewer-toolbar">
     <strong>${route}</strong>
     <span class="murl">@ ${viewport}px · ${browser}</span>
@@ -768,6 +843,10 @@ export function renderDiffViewer(data: DiffViewerData): string {
     <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:0">
       <input type="radio" name="mode" value="heatmap" style="width:auto;margin:0"/> Heatmap
     </label>
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:0">
+      <input type="radio" name="mode" value="swipe" style="width:auto;margin:0"/> Swipe
+    </label>
+    <input type="range" id="stage-slider" min="0" max="100" value="50" aria-label="Comparison slider" style="width:110px;accent-color:var(--accent)"/>
     <span class="spacer" style="flex:0 0 16px"></span>
     <button type="button" id="approve" title="Accept this baseline (A)">Accept <kbd>A</kbd></button>
     <button type="button" id="reject" class="danger" title="Reject this diff (R)">Reject <kbd>R</kbd></button>
@@ -791,6 +870,7 @@ export function renderDiffViewer(data: DiffViewerData): string {
 
   <div class="viewer-stage" id="stage">
     <div class="stage-inner" id="stage-inner">
+      ${data.baseline ? `<img id="swipe-base-img" class="layer" style="display:none" alt="baseline" src="${baselineUrl}"/>` : ''}
       ${data.current ? `<img id="base-img" alt="current" src="${currentUrl}"/>` : `<img id="base-img" alt="diff" src="${diffUrl}"/>`}
       <img id="diff-overlay" class="layer diff-overlay" alt="diff overlay" src="${diffUrl}"/>
       <div id="mask-layer" class="layer" style="pointer-events:none"></div>
@@ -817,6 +897,9 @@ export function renderDiffViewer(data: DiffViewerData): string {
   var overlay = document.getElementById('diff-overlay');
   var maskLayer = document.getElementById('mask-layer');
   var baseImg = document.getElementById('base-img');
+  var swipeBase = document.getElementById('swipe-base-img');
+  var slider = document.getElementById('stage-slider');
+  var currentMode = 'overlay';
 
   function syncSize(){
     if (!baseImg || !maskLayer) return;
@@ -847,15 +930,34 @@ export function renderDiffViewer(data: DiffViewerData): string {
     });
   }
 
-  // Mode toggle: overlay vs heatmap.
+  // Mode toggle: overlay vs heatmap vs swipe + slider control.
+  function applyMode(){
+    var val = slider ? Number(slider.value) : 50;
+    if (!overlay) return;
+    overlay.classList.remove('diff-overlay', 'heatmap');
+    overlay.classList.add('layer');
+    if (currentMode === 'swipe') {
+      overlay.style.display = 'none';
+      if (swipeBase) swipeBase.style.display = 'block';
+      if (baseImg) baseImg.style.cssText = 'clip-path: inset(0 0 0 ' + val + '%)';
+    } else {
+      overlay.style.display = 'block';
+      if (swipeBase) swipeBase.style.display = 'none';
+      if (baseImg) baseImg.style.cssText = '';
+      overlay.classList.add(currentMode === 'heatmap' ? 'heatmap' : 'diff-overlay');
+      overlay.style.opacity = String(val / 100);
+    }
+  }
+
   document.querySelectorAll('input[name=mode]').forEach(function(r){
     r.addEventListener('change', function(){
-      if (!overlay) return;
-      overlay.classList.remove('diff-overlay', 'heatmap');
-      overlay.classList.add('layer');
-      overlay.classList.add(r.value === 'heatmap' ? 'heatmap' : 'diff-overlay');
+      currentMode = r.value;
+      applyMode();
     });
   });
+  if (slider) {
+    slider.addEventListener('input', applyMode);
+  }
 
   // Painting state.
   var painting = false, startX = 0, startY = 0, dragRect = null;
@@ -945,6 +1047,7 @@ export function renderDiffViewer(data: DiffViewerData): string {
   document.getElementById('reject').addEventListener('click', reject);
 
   document.addEventListener('keydown', function(e){
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
     if (e.key === 'a' || e.key === 'A') approve();
     else if (e.key === 'r' || e.key === 'R') reject();
@@ -986,7 +1089,7 @@ export function renderMasksSettings(masks: IgnoreMask[], now = new Date()): stri
     : '<p class="empty">No saved masks. Paint one from the diff viewer (press <kbd>I</kbd>).</p>';
 
   const inner = `<header><h1>🛡 Ignore regions</h1><a href="/dashboard">← Dashboard</a></header>
-<div class="wrap">
+<div class="wrap" id="main-content" role="main">
   <p class="murl">Masks tell visual diffs to skip a rectangle on a given route + viewport (e.g. live timestamps, ads). Painted in the diff viewer.</p>
   <div class="card" style="padding:0">
     ${rows}
@@ -1016,7 +1119,7 @@ export function renderRunAttachments(runId: string, attachments: RunAttachment[]
     : '<li class="empty" style="justify-content:center">No attachments for this run.</li>';
 
   const inner = `<header><h1>🛡 Attachments</h1><a href="/dashboard/runs/${rid}">← Run</a></header>
-<div class="wrap">
+<div class="wrap" id="main-content" role="main">
   <p class="murl">Run <code>${rid}</code> · traces, DOM snapshots, console logs, and any other artifacts captured during the run.</p>
   <ul class="attachments">${items}</ul>
 </div>`;

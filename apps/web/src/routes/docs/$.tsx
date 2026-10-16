@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { articles, FIRST_DOC_SLUG, type Article } from '../../lib/docs-content'
 import { buildSeoHead, canonicalUrl } from '../../lib/seo'
@@ -72,6 +73,59 @@ const MONO = "'JetBrains Mono', monospace"
 function DocArticle() {
   const { _splat: slug } = Route.useParams()
   const idx = articles.findIndex((a) => a.id === slug)
+  const articleRef = useRef<HTMLDivElement>(null)
+  const activeId = idx !== -1 ? articles[idx]?.id : undefined
+
+  useEffect(() => {
+    const root = articleRef.current
+    if (!root || !activeId) return
+    const timers: number[] = []
+    const createdButtons: HTMLButtonElement[] = []
+
+    const pres = root.querySelectorAll('pre')
+    pres.forEach((pre) => {
+      const header = pre.previousElementSibling as HTMLElement | null
+      const target = header ?? pre.parentElement
+      if (!target || target.querySelector('.fg-code-copy-btn')) return
+
+      if (header) {
+        header.style.display = 'flex'
+        header.style.alignItems = 'center'
+        header.style.justifyContent = 'space-between'
+        header.style.gap = '12px'
+      }
+
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.className = 'fg-code-copy-btn fg-btn-ghost'
+      btn.setAttribute('aria-label', 'Copy code snippet')
+      btn.textContent = 'Copy'
+      btn.style.cssText =
+        "font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #b8b0a6; background: #1f1c19; border: 1px solid #322d28; padding: 3px 10px; cursor: pointer;"
+
+      btn.addEventListener('click', () => {
+        const text = pre.textContent ?? ''
+        try {
+          void navigator.clipboard?.writeText(text)
+        } catch {
+          /* noop */
+        }
+        btn.textContent = 'Copied ✓'
+        const timer = window.setTimeout(() => {
+          btn.textContent = 'Copy'
+        }, 1800)
+        timers.push(timer)
+      })
+
+      target.appendChild(btn)
+      createdButtons.push(btn)
+    })
+
+    return () => {
+      timers.forEach((t) => window.clearTimeout(t))
+      createdButtons.forEach((b) => b.remove())
+    }
+  }, [activeId])
 
   if (idx === -1) {
     return (
@@ -100,7 +154,9 @@ function DocArticle() {
         <span style={s('color: #e8862e;')}>{cur.section}</span> / {cur.label}
       </div>
 
-      <article dangerouslySetInnerHTML={{ __html: cur.html }} />
+      <div ref={articleRef}>
+        <article key={cur.id} dangerouslySetInnerHTML={{ __html: cur.html }} />
+      </div>
 
       <div className="fg-docs-pagination" style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 28px; margin-top: 16px; border-top: 1px solid #211e1b;')}>
         {prev ? (

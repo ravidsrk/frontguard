@@ -17,13 +17,13 @@ export default function RootLayout({
       <head>
         <script src="https://cdn.tailwindcss.com"></script>
       </head>
-      <body className="bg-gray-950 text-white antialiased">
-        <nav className="border-b border-gray-800 px-6 py-4">
+      <body className="bg-[#0d0c0b] bg-stone-950 text-stone-100 antialiased">
+        <nav className="border-b border-stone-800 px-6 py-4">
           <div className="mx-auto flex max-w-6xl items-center justify-between">
-            <a href="/" className="text-xl font-bold text-indigo-400">
+            <a href="/" className="text-xl font-bold text-amber-400">
               Acme Inc
             </a>
-            <div className="flex gap-6 text-sm text-gray-400">
+            <div className="flex gap-6 text-sm text-stone-400">
               <a href="/" className="hover:text-white transition">Home</a>
               <a href="/pricing" className="hover:text-white transition">Pricing</a>
               <a href="/about" className="hover:text-white transition">About</a>
@@ -36,9 +36,9 @@ export default function RootLayout({
         >
           {children}
         </main>
-        <footer className="border-t border-gray-800 px-6 py-8 text-center text-sm text-gray-500">
+        <footer className="border-t border-stone-800 px-6 py-8 text-center text-sm text-stone-500">
           © 2025 Acme Inc. Visual testing powered by{' '}
-          <a href="https://github.com/ravidsrk/frontguard" className="text-indigo-400 hover:underline">
+          <a href="https://github.com/ravidsrk/frontguard" className="text-amber-400 hover:underline">
             Frontguard
           </a>
         </footer>

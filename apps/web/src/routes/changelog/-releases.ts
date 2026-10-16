@@ -75,6 +75,11 @@ export const RELEASES: Release[] = [
             detail:
               ' — adds inspect_diff_cluster_dom, verify_css_patch, and promote_baseline to @frontguard/mcp with local report fallback, plus SHA-256 Git CAS manifest tracking and Cloud CAS endpoints.',
           },
+          {
+            term: 'CLI agent guide, render convergence & sensitive DOM redaction',
+            detail:
+              ' — adds frontguard guide [topic] (--json), waitForStability multi-frame convergence, redactSensitive DOM/HTML input masking, and pre-capture route actions with colorScheme emulation.',
+          },
         ],
       },
       {

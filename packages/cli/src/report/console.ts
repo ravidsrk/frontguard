@@ -308,6 +308,44 @@ export class ConsoleReporter implements Reporter {
   // Regressions Detail
   // -------------------------------------------------------------------------
 
+  private printDiffTelemetry(diff: RunResult['diffs'][number]): void {
+    const metricParts: string[] = [];
+    if (diff.ssim !== undefined) {
+      metricParts.push(`SSIM ${(diff.ssim * 100).toFixed(1)}%`);
+    }
+    if (diff.clusters && diff.clusters.length > 0) {
+      const largest = diff.clusters[0];
+      let clusterDesc = `${diff.clusters.length} cluster${diff.clusters.length !== 1 ? 's' : ''} — largest (${largest.bbox.x}, ${largest.bbox.y}) ${largest.bbox.width}×${largest.bbox.height}px`;
+      const simParts: string[] = [];
+      if (largest.chromaSSIM !== undefined) {
+        simParts.push(`Chroma SSIM ${(largest.chromaSSIM * 100).toFixed(1)}%`);
+      }
+      if (largest.cwSSIM !== undefined) {
+        simParts.push(`CW-SSIM ${(largest.cwSSIM * 100).toFixed(1)}%`);
+      }
+      if (simParts.length > 0) {
+        clusterDesc += ` [${simParts.join(', ')}]`;
+      }
+      metricParts.push(clusterDesc);
+    }
+    if (metricParts.length > 0) {
+      console.log(chalk.dim(`    Metrics: ${metricParts.join(' · ')}`));
+    }
+
+    if (diff.stability && !diff.stability.settled) {
+      const motionPct = (diff.stability.unstableRatio * 100).toFixed(2);
+      const primaryMotion = diff.stability.motionClusters?.[0];
+      const motionCoords = primaryMotion
+        ? ` — primary motion at (${primaryMotion.bbox.x}, ${primaryMotion.bbox.y}) ${primaryMotion.bbox.width}×${primaryMotion.bbox.height}px`
+        : '';
+      console.log(
+        chalk.yellow(
+          `    ⚠ Unsettled frame: ${motionPct}% motion variance after ${diff.stability.attempts} attempts${motionCoords}`,
+        ),
+      );
+    }
+  }
+
   private printRegressions(result: RunResult): void {
     const regressions = result.diffs.filter((d) => d.status === 'regression');
     if (regressions.length === 0) return;
@@ -319,6 +357,7 @@ export class ConsoleReporter implements Reporter {
       const label = `${diff.route.path} @ ${diff.viewport}px`;
       console.log(chalk.red(`    ${label}`));
       console.log(chalk.dim(`    Diff: ${diff.diffPercentage.toFixed(2)}% pixels changed`));
+      this.printDiffTelemetry(diff);
 
       if (diff.aiAnalysis) {
         const ai = diff.aiAnalysis;
@@ -375,6 +414,7 @@ export class ConsoleReporter implements Reporter {
       const label = `${diff.route.path} @ ${diff.viewport}px`;
       console.log(chalk.yellow(`    ${label}`));
       console.log(chalk.dim(`    Diff: ${diff.diffPercentage.toFixed(2)}% pixels changed`));
+      this.printDiffTelemetry(diff);
 
       if (diff.aiAnalysis) {
         console.log(chalk.dim(`    AI: `) + diff.aiAnalysis.explanation);

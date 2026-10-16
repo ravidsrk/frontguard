@@ -21,6 +21,12 @@ function PrivacyPage() {
     >
       <h2>Optional providers</h2>
       <p>Model-assisted analysis is opt-in. When configured, screenshot evidence and route metadata are sent directly to the OpenAI or Anthropic account selected in your configuration.</p>
+      <p>
+        Enable <code>redactSensitive: true</code> in <code>frontguard.config.ts</code> (or pass{' '}
+        <code>--redact-sensitive</code> on the CLI) to mask password, email, payment, and token inputs and scrub{' '}
+        <code>domSnapshot</code> text/attribute values locally before screenshots are captured or uploaded to an
+        AI provider.
+      </p>
       <h2>Telemetry</h2>
       <p>
         CLI usage telemetry is disabled by default (<code>telemetry: false</code>). If you explicitly opt in (via{' '}

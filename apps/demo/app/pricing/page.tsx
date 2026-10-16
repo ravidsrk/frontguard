@@ -47,7 +47,7 @@ export default function Pricing() {
         <h1 className="mb-4 text-4xl font-extrabold tracking-tight sm:text-5xl">
           Simple, transparent pricing
         </h1>
-        <p className="text-lg text-gray-400">
+        <p className="text-lg text-stone-400">
           Start free. Upgrade when you need more power.
         </p>
       </div>
@@ -58,34 +58,34 @@ export default function Pricing() {
             key={plan.name}
             className={`rounded-2xl border p-8 ${
               plan.highlighted
-                ? 'border-indigo-500 bg-indigo-500/5 ring-1 ring-indigo-500'
-                : 'border-gray-800 bg-gray-900'
+                ? 'border-amber-500 bg-amber-500/5 ring-1 ring-amber-500'
+                : 'border-stone-800 bg-stone-900'
             }`}
           >
             {plan.highlighted && (
-              <div className="mb-4 inline-block rounded-full bg-indigo-600 px-3 py-0.5 text-xs font-semibold text-white">
+              <div className="mb-4 inline-block rounded-full bg-amber-500 px-3 py-0.5 text-xs font-semibold text-stone-950">
                 Most Popular
               </div>
             )}
             <h2 className="text-xl font-bold text-white">{plan.name}</h2>
-            <p className="mt-1 text-sm text-gray-400">{plan.description}</p>
+            <p className="mt-1 text-sm text-stone-400">{plan.description}</p>
             <div className="mt-6 flex items-baseline gap-1">
               <span className="text-4xl font-extrabold text-white">{plan.price}</span>
-              <span className="text-gray-500">{plan.period}</span>
+              <span className="text-stone-500">{plan.period}</span>
             </div>
             <ul className="mt-8 space-y-3">
               {plan.features.map((f) => (
-                <li key={f} className="flex items-center gap-2 text-sm text-gray-300">
-                  <span className="text-indigo-400">✓</span> {f}
+                <li key={f} className="flex items-center gap-2 text-sm text-stone-300">
+                  <span className="text-amber-400">✓</span> {f}
                 </li>
               ))}
             </ul>
             <a
-              href="#"
+              href="/about"
               className={`mt-8 block rounded-lg py-2.5 text-center font-semibold transition ${
                 plan.highlighted
-                  ? 'bg-indigo-600 text-white hover:bg-indigo-500'
-                  : 'border border-gray-700 text-gray-300 hover:border-gray-500'
+                  ? 'bg-amber-500 text-stone-950 hover:bg-amber-400'
+                  : 'border border-stone-700 text-stone-300 hover:border-stone-500'
               }`}
             >
               {plan.cta}

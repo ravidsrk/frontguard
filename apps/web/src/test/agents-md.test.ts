@@ -16,8 +16,12 @@ describe('agents.md', () => {
     for (const tool of [
       'recent_runs',
       'list_regressions',
+      'inspect_diff_cluster_dom',
       'get_suggested_fix',
+      'verify_css_patch',
+      'promote_baseline',
       'accept_baseline',
+      'frontguard guide',
     ]) {
       expect(content).toContain(tool)
     }

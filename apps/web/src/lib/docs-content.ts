@@ -9,11 +9,18 @@ export type Article = {
   html: string
 }
 
+export function slugifyHeading(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
 const h1 = (text: string) =>
   `<h1 style="font-size: 42px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px; line-height: 1.05;">${text}</h1>`
 
 const h2 = (text: string) =>
-  `<h2 style="font-size: 26px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 40px 0 16px;">${text}</h2>`
+  `<h2 id="${slugifyHeading(text)}" style="scroll-margin-top: 84px; font-size: 26px; letter-spacing: -0.02em; font-weight: 600; color: #f5f1ea; margin: 40px 0 16px;">${text}</h2>`
 
 const p = (text: string) =>
   `<p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 18px;">${text}</p>`
@@ -99,23 +106,36 @@ $ npx -p @frontguard/cli frontguard run`)}${p('Exit code 0 means comparisons pas
     'CLI Commands',
     'Reference',
     ['Commands', 'Threshold units', 'Exit codes', 'Monitoring'],
-    `${p('The supported command surface includes run, init, update-baselines, doctor, monitor, fix-pattern commands, and plugin subcommands.')}${code('terminal', `$ frontguard run --url http://localhost:3000 --threshold 0.01
+    `${h2('Commands')}${p('The supported command surface includes run, init, update-baselines, doctor, guide, monitor, fix-pattern commands, and plugin subcommands.')}${code('terminal', `$ frontguard run --url http://localhost:3000 --threshold 0.01 --wait-for-stability --redact-sensitive --color-scheme dark
 $ frontguard update-baselines --url http://localhost:3000
 $ frontguard doctor
+$ frontguard guide [topic] --json
 $ frontguard monitor --url https://example.com --threshold 0.05
-$ frontguard monitor --history`)}${h2('Threshold units')}${p('Changed-pixel ratio (0-1; 0.01 = 1%). Legacy values over 1 are deprecated. The monitor alert threshold uses the same ratio convention: 0.05 = 5%.')}${h2('Exit codes')}${list(['0: comparisons passed or produced warnings only.', '1: regressions or unaccepted new screenshots.', '2: no comparisons or any tool error; errors take precedence over regressions.'])}${h2('Monitoring')}${p('The local monitor command records run history under .frontguard/monitor-history by default. Webhook delivery is best-effort; no managed cloud scheduler is generally available.')}`,
+$ frontguard monitor --history`)}${p('Use frontguard guide [topic] (topics: setup, diffing, mcp, playwright, ci) with --json for offline CLI and coding-agent reference output. Capture flags include --wait-for-stability for multi-frame render convergence, --redact-sensitive to mask sensitive inputs and scrub DOM snapshots before capture, and --color-scheme &lt;scheme&gt; (light or dark) to emulate prefers-color-scheme.')}${h2('Threshold units')}${p('Changed-pixel ratio (0-1; 0.01 = 1%). Legacy values over 1 are deprecated. The monitor alert threshold uses the same ratio convention: 0.05 = 5%.')}${h2('Exit codes')}${list(['0: comparisons passed or produced warnings only.', '1: regressions or unaccepted new screenshots.', '2: no comparisons or any tool error; errors take precedence over regressions.'])}${h2('Monitoring')}${p('The local monitor command records run history under .frontguard/monitor-history by default. Webhook delivery is best-effort; no managed cloud scheduler is generally available.')}`,
   ),
   makeArticle(
     'cli/configuration',
     'Configuration',
     'Reference',
     ['Minimal configuration', 'Optional controls'],
-    `${p('Configuration lives in frontguard.config.ts. Threshold values are fractions from 0 to 1.')}${code('frontguard.config.ts', `export default {
+    `${h2('Minimal configuration')}${p('Configuration lives in frontguard.config.ts. Threshold values are fractions from 0 to 1.')}${code('frontguard.config.ts', `export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
-  routes: ['/', '/pricing'],
+  routes: [
+    '/',
+    {
+      path: '/pricing',
+      actions: [
+        { type: 'waitForSelector', selector: '[data-ready]' },
+        { type: 'click', selector: '[data-billing="annual"]' },
+      ],
+    },
+  ],
   viewports: [375, 768, 1440],
   browsers: ['chromium'],
+  colorScheme: 'dark',
+  waitForStability: true,
+  redactSensitive: true,
   threshold: 0.01,
   ignore: [],
   smartRender: true,
@@ -123,7 +143,7 @@ $ frontguard monitor --history`)}${h2('Threshold units')}${p('Changed-pixel rati
   pageTimeout: 30000,
   maxHeight: 5000,
   outputDir: '.frontguard/results',
-}`)}${p('Optional controls include masks, SSIM fallback, time freezing, configurable multi-render consensus, telemetry opt-in, and BYOK analysis. Verify an option against the installed package version before adding it.')}`,
+}`)}${h2('Optional controls')}${p('Optional controls include colorScheme (light or dark), waitForStability for multi-frame layout convergence, redactSensitive for masking password/email/token fields and scrubbing DOM snapshots, per-route actions (click, hover, fill, press, waitForSelector, wait), masks, region-scoped Chroma-SSIM (YCbCr) and CW-SSIM cluster similarity, time freezing, configurable multi-render consensus, telemetry opt-in, and BYOK analysis. Verify an option against the installed package version before adding it.')}`,
   ),
   makeArticle(
     'playwright/index',
@@ -151,11 +171,11 @@ test('home', async ({ page }) =&gt; {
     'API Reference',
     'Reference',
     ['Signature', 'Options', 'Result'],
-    `${code('typescript', `visualTest(
+    `${h2('Signature')}${code('typescript', `visualTest(
   page: Page,
   name: string,
   options?: VisualTestOptions,
-): Promise&lt;VisualTestResult&gt;`)}${p('Options include threshold, fullPage, mask, maskRegions, optional AI, freezeTime, baselineDir, and update. Threshold is the fraction of pixels that may differ (0-1).')}${p('The result includes passed, diffPercentage, paths, optional AI output, SSIM, and isNewBaseline. Compare the returned result in your test; the function does not call a Playwright assertion for you.')}`,
+): Promise&lt;VisualTestResult&gt;`)}${h2('Options')}${p('Options include threshold, selector (component-scoped locator capture), fullPage, mask, maskRegions, redactSensitive, waitForStable, optional AI, freezeTime, baselineDir, and update. Threshold is the fraction of pixels that may differ (0-1).')}${h2('Result')}${p('The result includes passed, diffPercentage, paths, settled (frame convergence metadata from waitForStable), optional AI output, SSIM, and isNewBaseline. Compare the returned result in your test; the function does not call a Playwright assertion for you.')}`,
   ),
   makeArticle(
     'ci-cd/index',
@@ -265,8 +285,12 @@ $ frontguard monitor --history`)}${p('CLI monitor records run history under .fro
     'MCP server',
     'Integrations',
     ['Configuration', 'Tools', 'Approval limit'],
-    `${cloudNotice}${code('configuration', `FRONTGUARD_API_URL=https://your-frontguard-api.example.com
-FRONTGUARD_API_KEY=&lt;frontguard-api-key&gt;`)}${p('The MCP server can list accessible runs and regressions and return stored suggestions. accept_baseline records whole-run approval metadata only. Screenshot promotion is not implemented.')}`,
+    `${cloudNotice}${h2('Configuration')}${code('configuration', `# Local report mode (reads ./frontguard-report/report.json by default)
+FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json
+
+# Verified Cloud API deployment
+FRONTGUARD_API_URL=https://your-frontguard-api.example.com
+FRONTGUARD_API_KEY=&lt;frontguard-api-key&gt;`)}${h2('Tools')}${p('The MCP server exposes 7 tools across local report mode (FRONTGUARD_LOCAL_REPORT or ./frontguard-report/report.json) and a verified Cloud API deployment: list_regressions, inspect_diff_cluster_dom, get_suggested_fix, verify_css_patch, promote_baseline, accept_baseline, and recent_runs.')}${h2('Approval limit')}${p('Use promote_baseline in local mode to promote a verified screenshot into the local baseline store. In cloud mode, accept_baseline records whole-run approval metadata only; cloud screenshot promotion is not implemented.')}`,
   ),
   makeArticle(
     'integrations/storybook',

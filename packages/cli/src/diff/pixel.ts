@@ -85,6 +85,8 @@ export function compareScreenshot(
       currentImage: current.buffer,
       comparisonMethod: 'byte-identical',
       comparedAgainstBaseline,
+      ...(current.stability ? { stability: current.stability } : {}),
+      ...(current.redactedCount !== undefined ? { redactedCount: current.redactedCount } : {}),
     };
   }
 
@@ -182,6 +184,8 @@ export function compareScreenshot(
     currentImage: current.buffer,
     comparisonMethod: 'pixelmatch',
     comparedAgainstBaseline,
+    ...(current.stability ? { stability: current.stability } : {}),
+    ...(current.redactedCount !== undefined ? { redactedCount: current.redactedCount } : {}),
   };
 
   if (noteMsg) {
@@ -189,6 +193,9 @@ export function compareScreenshot(
   }
 
   // --- Extract connected-component diff clusters -----------------------------
+  const ssimEnabled = ssimOptions?.enabled ?? true;
+  const ssimThreshold = ssimOptions?.ssimThreshold ?? 0.98;
+
   let clusters: DiffCluster[] = [];
   if (numDiffPixels > 0) {
     const diffMask = new Uint8Array(totalPixels);
@@ -204,13 +211,19 @@ export function compareScreenshot(
       }
     }
     clusters = extractDiffClusters(diffMask, width, height);
+    if (ssimEnabled) {
+      for (const cluster of clusters) {
+        if (cluster.bbox.width * cluster.bbox.height <= 65536) {
+          const metrics = computeRegionSimilarity(baselinePng, currentPng, cluster.bbox);
+          cluster.chromaSSIM = metrics.chromaSSIM;
+          cluster.cwSSIM = metrics.cwSSIM;
+        }
+      }
+    }
     result.clusters = clusters;
   }
 
   // --- SSIM fallback for borderline diffs -----------------------------------
-  const ssimEnabled = ssimOptions?.enabled ?? true;
-  const ssimThreshold = ssimOptions?.ssimThreshold ?? 0.98;
-
   if (
     ssimEnabled &&
     diffPercentage > 0 &&
@@ -224,15 +237,6 @@ export function compareScreenshot(
         `SSIM computation failed for ${current.route.path} @ ${current.viewport}px — ` +
           `falling back to pixel-only result: ${err instanceof Error ? err.message : String(err)}`,
       );
-    }
-
-    // Lazily compute region-scoped Chroma/CW-SSIM only on bounded clusters in the borderline zone
-    for (const cluster of clusters) {
-      if (cluster.bbox.width * cluster.bbox.height <= 65536) {
-        const metrics = computeRegionSimilarity(baselinePng, currentPng, cluster.bbox);
-        cluster.chromaSSIM = metrics.chromaSSIM;
-        cluster.cwSSIM = metrics.cwSSIM;
-      }
     }
 
     // Localized cluster anti-dilution guard:
@@ -278,6 +282,8 @@ export function createNewPageResult(current: ScreenshotResult): DiffResult {
     diffImage: undefined,
     baselineImage: undefined,
     currentImage: current.buffer,
+    ...(current.stability ? { stability: current.stability } : {}),
+    ...(current.redactedCount !== undefined ? { redactedCount: current.redactedCount } : {}),
   };
 }
 
@@ -299,6 +305,8 @@ function errorResult(current: ScreenshotResult, message: string): DiffResult {
     baselineImage: undefined,
     currentImage: current.buffer,
     error: message,
+    ...(current.stability ? { stability: current.stability } : {}),
+    ...(current.redactedCount !== undefined ? { redactedCount: current.redactedCount } : {}),
   };
 }
 

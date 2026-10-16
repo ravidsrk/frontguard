@@ -586,6 +586,8 @@ export async function runPipeline(
               status: 'error',
               diffPercentage: 0,
               error: renderError,
+              ...(shot.stability ? { stability: shot.stability } : {}),
+              ...(shot.redactedCount !== undefined ? { redactedCount: shot.redactedCount } : {}),
             };
           } else {
             const baseline = await storage.readBaseline(

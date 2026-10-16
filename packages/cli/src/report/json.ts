@@ -58,7 +58,11 @@ interface SerializedDiff {
   hasCurrentImage: boolean;
   hasDiffImage: boolean;
   comparisonMethod?: 'byte-identical' | 'pixelmatch';
+  ssim?: number;
+  ssimOverride?: boolean;
   clusters?: DiffCluster[];
+  stability?: DiffResult['stability'];
+  redactedCount?: number;
   aiAnalysis?: {
     classification: string;
     explanation: string;
@@ -141,8 +145,24 @@ function serializeDiff(diff: DiffResult): SerializedDiff {
     comparisonMethod: diff.comparisonMethod,
   };
 
+  if (diff.ssim !== undefined) {
+    serialized.ssim = diff.ssim;
+  }
+
+  if (diff.ssimOverride !== undefined) {
+    serialized.ssimOverride = diff.ssimOverride;
+  }
+
   if (diff.clusters && diff.clusters.length > 0) {
     serialized.clusters = diff.clusters;
+  }
+
+  if (diff.stability) {
+    serialized.stability = diff.stability;
+  }
+
+  if (diff.redactedCount !== undefined) {
+    serialized.redactedCount = diff.redactedCount;
   }
 
   if (diff.aiAnalysis) {
