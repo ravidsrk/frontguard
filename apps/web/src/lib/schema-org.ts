@@ -47,6 +47,11 @@ export const FRONTGUARD_WEBSITE_REF = {
   publisher: FRONTGUARD_ORGANIZATION_REF,
 }
 
+export const FRONTGUARD_WEBSITE = {
+  '@context': SCHEMA_CONTEXT,
+  ...FRONTGUARD_WEBSITE_REF,
+}
+
 export function breadcrumbListJsonLd(items: Array<{ name: string; path: string }>): JsonLdNode {
   return {
     '@context': SCHEMA_CONTEXT,

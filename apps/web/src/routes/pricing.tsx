@@ -153,7 +153,7 @@ const faqs = [
   },
   {
     q: 'Is there an MCP server for in-IDE agents?',
-    a: '@frontguard/mcp is a pre-release interface for list_regressions, get_suggested_fix, recent_runs, and whole-run approval. It requires an explicit verified API deployment. accept_baseline records approval but does not promote screenshots.',
+    a: '@frontguard/mcp exposes 7 tools for coding agents: list_regressions, get_suggested_fix, recent_runs, accept_baseline, inspect_diff_cluster_dom, verify_css_patch, and promote_baseline. It works locally against ./frontguard-report/report.json (or FRONTGUARD_LOCAL_REPORT) without a server, or against an explicit FRONTGUARD_API_URL deployment.',
   },
   {
     q: "What's the data retention policy for screenshots?",
@@ -214,6 +214,7 @@ function Pricing() {
     <div style={s('background: #0d0c0b; color: #b8b0a6; min-height: 100vh;')}>
       <Nav active="pricing" />
 
+      <main id="main-content">
       <header style={s('max-width: 1200px; margin: 0 auto; padding: 80px 28px 48px; text-align: center;')}>
         <div
           style={s(
@@ -225,7 +226,7 @@ function Pricing() {
         </div>
         <h1
           style={s(
-            'font-size: 54px; line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;',
+            'font-size: clamp(36px, 6vw, 54px); line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;',
           )}
         >
           Pricing that respects
@@ -338,10 +339,10 @@ function Pricing() {
         >
           Compare plans
         </h2>
-        <div style={s('border: 1px solid #2a2622;')} data-testid="compare-matrix">
+        <div style={s('border: 1px solid #2a2622; overflow-x: auto;')} data-testid="compare-matrix">
           <div
             style={s(
-              'display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; background: #161412; border-bottom: 1px solid #211e1b;',
+              'display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; min-width: 600px; background: #161412; border-bottom: 1px solid #211e1b;',
             )}
           >
             <div
@@ -378,7 +379,7 @@ function Pricing() {
               key={row.cap}
               data-testid="matrix-row"
               style={s(
-                'display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; border-bottom: 1px solid #211e1b;',
+                'display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; min-width: 600px; border-bottom: 1px solid #211e1b;',
               )}
             >
               <div style={s('padding: 14px 20px; font-size: 13.5px; color: #d8d0c5;')}>
@@ -446,7 +447,7 @@ function Pricing() {
         <div style={s('max-width: 1200px; margin: 0 auto; padding: 80px 28px; text-align: center;')}>
           <h2
             style={s(
-              'font-size: 40px; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;',
+              'font-size: clamp(28px, 4.5vw, 40px); letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;',
             )}
           >
             Start with the free local CLI.
@@ -471,6 +472,7 @@ function Pricing() {
               type="button"
               onClick={copyInstall}
               aria-label="Copy command: npm install @frontguard/cli"
+              aria-live="polite"
               className="fg-btn-ghost"
               style={s(
                 `font-family: ${MONO}; font-size: 12px; color: #b8b0a6; background: #1f1c19; border: none; border-left: 1px solid #322d28; padding: 0 18px; cursor: pointer;`,
@@ -479,7 +481,7 @@ function Pricing() {
               {copyLabel}
             </button>
           </div>
-          <div style={s('display: flex; gap: 14px; justify-content: center;')}>
+          <div style={s('display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;')}>
             <a
               href="/docs"
               className="fg-btn-primary"
@@ -501,6 +503,7 @@ function Pricing() {
           </div>
         </div>
       </section>
+      </main>
 
       <Footer />
     </div>

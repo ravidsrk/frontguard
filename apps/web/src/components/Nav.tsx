@@ -13,11 +13,15 @@ const LINKS = [
 export function Nav({ active }: { active?: string }) {
   return (
     <nav
+      aria-label="Primary navigation"
       className="fg-nav"
       style={s(
         'position: sticky; top: 0; z-index: 50; background: rgba(13,12,11,0.82); backdrop-filter: blur(12px); border-bottom: 1px solid #211e1b;',
       )}
     >
+      <a href="#main-content" className="fg-skip-link">
+        Skip to main content
+      </a>
       <div
         className="fg-nav-inner"
         style={s(
@@ -46,20 +50,26 @@ export function Nav({ active }: { active?: string }) {
             "display: flex; align-items: center; gap: 28px; font-family: 'JetBrains Mono', monospace; font-size: 13px;",
           )}
         >
-          {LINKS.map((l) => (
-            <Link
-              key={l.to}
-              to={l.to as '/'}
-              className="fg-navlink"
-              style={s(
-                `color: ${active === l.label ? '#f5f1ea' : '#b8b0a6'}; text-decoration: none;`,
-              )}
-            >
-              {l.label}
-            </Link>
-          ))}
+          {LINKS.map((l) => {
+            const isCurrent = active === l.label
+            return (
+              <Link
+                key={l.to}
+                to={l.to as '/'}
+                aria-current={isCurrent ? 'page' : undefined}
+                className="fg-navlink"
+                style={s(
+                  `color: ${isCurrent ? '#f5f1ea' : '#b8b0a6'}; text-decoration: none; ${isCurrent ? 'border-bottom: 2px solid #e8862e; padding-bottom: 2px;' : ''}`,
+                )}
+              >
+                {l.label}
+              </Link>
+            )
+          })}
           <a
             href="https://github.com/ravidsrk/frontguard"
+            target="_blank"
+            rel="noopener noreferrer"
             className="fg-btn-primary fg-nav-cta"
             style={s(
               'background: #e8862e; color: #0d0c0b; font-weight: 700; padding: 9px 16px; text-decoration: none;',

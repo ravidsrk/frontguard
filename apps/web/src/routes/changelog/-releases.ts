@@ -65,6 +65,16 @@ export const RELEASES: Release[] = [
             detail:
               ' — Perf Budgets DOM script injection, Figma buffer cleanup, batch Git orphan baseline commits, D1 schema/migration sync, and webhook/SSRF guards.',
           },
+          {
+            term: 'Perceptual diffing v2 & connected-component clustering',
+            detail:
+              ' — connected-component diff bounding boxes, region-scoped chroma YCbCr SSIM + 4-orientation CW-SSIM, localized anti-dilution guard, and Set-of-Mark cropping.',
+          },
+          {
+            term: 'Visual Cortex MCP tools & Cloud CAS deduplication',
+            detail:
+              ' — adds inspect_diff_cluster_dom, verify_css_patch, and promote_baseline to @frontguard/mcp with local report fallback, plus SHA-256 Git CAS manifest tracking and Cloud CAS endpoints.',
+          },
         ],
       },
       {

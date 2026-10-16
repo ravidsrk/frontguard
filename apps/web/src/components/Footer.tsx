@@ -93,7 +93,14 @@ export function Footer() {
                   {l.label}
                 </Link>
               ) : (
-                <a key={l.label} href={l.href} className="fg-link" style={linkStyle}>
+                <a
+                  key={l.label}
+                  href={l.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="fg-link"
+                  style={linkStyle}
+                >
                   {l.label}
                 </a>
               ),
