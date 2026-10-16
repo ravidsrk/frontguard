@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { PNG } from 'pngjs';
-import { computeSSIM, toGrayscale } from '../../src/diff/ssim.js';
+import {
+  computeSSIM,
+  toGrayscale,
+  computeChromaSSIM,
+  computeRegionSimilarity,
+} from '../../src/diff/ssim.js';
 import { createTestPng } from '../fixtures/helpers.js';
 
 // ---------------------------------------------------------------------------
@@ -171,3 +176,95 @@ describe('toGrayscale', () => {
     expect(gray[0]).toBe(0);
   });
 });
+
+describe('computeChromaSSIM & computeRegionSimilarity', () => {
+  it('detects isoluminant color changes (red vs green with identical BT.709 luminance) where grayscale computeSSIM returns > 0.99', () => {
+    // Red (255, 0, 0) has BT.709 Y = 0.2126 * 255 = 54.213
+    // Green (0, 76, 0) has BT.709 Y = 0.7152 * 76  = 54.355
+    const red = createTestPng(64, 64, 255, 0, 0);
+    const green = createTestPng(64, 64, 0, 76, 0);
+
+    const graySSIM = computeSSIM(red, green);
+    expect(graySSIM).toBeGreaterThan(0.99);
+
+    const chromaSSIM = computeChromaSSIM(red, green);
+    expect(chromaSSIM).toBeLessThan(0.5);
+
+    const regionMetrics = computeRegionSimilarity(
+      PNG.sync.read(red),
+      PNG.sync.read(green),
+      { x: 0, y: 0, width: 64, height: 64 },
+    );
+    expect(regionMetrics.chromaSSIM).toBeLessThan(0.5);
+  });
+
+  it('detects a localized 16x16 corrupted button on a 200x200 canvas without whitespace dilution', () => {
+    const width = 200;
+    const height = 200;
+    const bbox = { x: 80, y: 80, width: 16, height: 16 };
+
+    const baselineBuf = createCustomPng(width, height, (x, y) => {
+      if (x >= bbox.x && x < bbox.x + bbox.width && y >= bbox.y && y < bbox.y + bbox.height) {
+        return [0, 120, 255, 255]; // Primary blue button
+      }
+      return [255, 255, 255, 255]; // White background
+    });
+
+    const currentBuf = createCustomPng(width, height, (x, y) => {
+      if (x >= bbox.x && x < bbox.x + bbox.width && y >= bbox.y && y < bbox.y + bbox.height) {
+        return [255, 40, 0, 255]; // Corrupted red button
+      }
+      return [255, 255, 255, 255]; // White background
+    });
+
+    // Global SSIM is diluted by 99.36% identical white canvas
+    const globalSSIM = computeSSIM(baselineBuf, currentBuf);
+    expect(globalSSIM).toBeGreaterThan(0.98);
+
+    // Region-scoped similarity inside bbox is not diluted and drops sharply
+    const regionMetrics = computeRegionSimilarity(
+      PNG.sync.read(baselineBuf),
+      PNG.sync.read(currentBuf),
+      bbox,
+    );
+    expect(regionMetrics.chromaSSIM).toBeLessThan(0.5);
+  });
+
+  it('keeps cwSSIM high (> 0.85) on a 1px subpixel shifted pattern compared to unstructured noise', () => {
+    const width = 64;
+    const height = 64;
+    const bbox = { x: 8, y: 8, width: 48, height: 48 };
+
+    const original = PNG.sync.read(
+      createCustomPng(width, height, (x, _y) => {
+        const v = x % 8 < 4 ? 200 : 50;
+        return [v, v, v, 255];
+      }),
+    );
+
+    const shifted1px = PNG.sync.read(
+      createCustomPng(width, height, (x, _y) => {
+        const sx = (x + width - 1) % width;
+        const v = sx % 8 < 4 ? 200 : 50;
+        return [v, v, v, 255];
+      }),
+    );
+
+    const noise = PNG.sync.read(
+      createCustomPng(width, height, (x, y) => {
+        // Deterministic pseudo-random unstructured noise
+        const hash = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        const v = Math.floor((hash - Math.floor(hash)) * 255);
+        return [v, v, v, 255];
+      }),
+    );
+
+    const shiftedMetrics = computeRegionSimilarity(original, shifted1px, bbox);
+    const noiseMetrics = computeRegionSimilarity(original, noise, bbox);
+
+    expect(shiftedMetrics.cwSSIM).toBeGreaterThan(0.85);
+    expect(noiseMetrics.cwSSIM).toBeLessThan(0.5);
+    expect(shiftedMetrics.cwSSIM).toBeGreaterThan(noiseMetrics.cwSSIM);
+  });
+});
+

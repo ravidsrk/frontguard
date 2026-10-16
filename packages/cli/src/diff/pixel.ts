@@ -19,8 +19,9 @@
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { compareDiffToThreshold } from './threshold.js';
-import type { ScreenshotResult, DiffResult } from '../core/types.js';
-import { computeSSIM } from './ssim.js';
+import type { ScreenshotResult, DiffResult, DiffCluster } from '../core/types.js';
+import { computeSSIM, computeRegionSimilarity } from './ssim.js';
+import { extractDiffClusters } from './regions.js';
 import { logger } from '../utils/logger.js';
 
 // ---------------------------------------------------------------------------
@@ -187,6 +188,25 @@ export function compareScreenshot(
     result.error = noteMsg;
   }
 
+  // --- Extract connected-component diff clusters -----------------------------
+  let clusters: DiffCluster[] = [];
+  if (numDiffPixels > 0) {
+    const diffMask = new Uint8Array(totalPixels);
+    for (let i = 0; i < totalPixels; i++) {
+      const idx = i << 2;
+      // Count red diff pixels [255, 0, 0], excluding yellow [255, 255, 0] anti-aliasing pixels.
+      if (
+        diffPng.data[idx] === 255 &&
+        diffPng.data[idx + 1] === 0 &&
+        diffPng.data[idx + 2] === 0
+      ) {
+        diffMask[i] = 1;
+      }
+    }
+    clusters = extractDiffClusters(diffMask, width, height);
+    result.clusters = clusters;
+  }
+
   // --- SSIM fallback for borderline diffs -----------------------------------
   const ssimEnabled = ssimOptions?.enabled ?? true;
   const ssimThreshold = ssimOptions?.ssimThreshold ?? 0.98;
@@ -205,7 +225,29 @@ export function compareScreenshot(
           `falling back to pixel-only result: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    if (ssim !== undefined && ssim > ssimThreshold) {
+
+    // Lazily compute region-scoped Chroma/CW-SSIM only on bounded clusters in the borderline zone
+    for (const cluster of clusters) {
+      if (cluster.bbox.width * cluster.bbox.height <= 65536) {
+        const metrics = computeRegionSimilarity(baselinePng, currentPng, cluster.bbox);
+        cluster.chromaSSIM = metrics.chromaSSIM;
+        cluster.cwSSIM = metrics.cwSSIM;
+      }
+    }
+
+    // Localized cluster anti-dilution guard:
+    // Prevent global background whitespace from masking a dense, localized UI mutation
+    // (e.g. a broken button or badge on a large page) whose local chromaSSIM < 0.70.
+    const hasSevereLocalizedChange = clusters.some(
+      (cluster) =>
+        cluster.rawDiffPixels >= 32 &&
+        cluster.density >= 0.5 &&
+        totalPixels >= 10000 &&
+        cluster.chromaSSIM !== undefined &&
+        cluster.chromaSSIM < 0.70,
+    );
+
+    if (ssim !== undefined && ssim > ssimThreshold && !hasSevereLocalizedChange) {
       logger.debug(
         `SSIM override: ${current.route.path} @ ${current.viewport}px — ` +
           `pixel diff ${diffPercentage.toFixed(2)}% but SSIM ${ssim.toFixed(4)} (perceptually identical)`,

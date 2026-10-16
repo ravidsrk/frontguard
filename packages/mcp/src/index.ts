@@ -33,12 +33,21 @@ import {
   getSuggestedFix,
   getSuggestedFixInputSchema,
   getSuggestedFixOutputSchema,
+  inspectDiffClusterDom,
+  inspectDiffClusterDomInputSchema,
+  inspectDiffClusterDomOutputSchema,
   listRegressions,
   listRegressionsInputSchema,
   listRegressionsOutputSchema,
+  promoteBaseline,
+  promoteBaselineInputSchema,
+  promoteBaselineOutputSchema,
   recentRuns,
   recentRunsInputSchema,
   recentRunsOutputSchema,
+  verifyCssPatch,
+  verifyCssPatchInputSchema,
+  verifyCssPatchOutputSchema,
 } from './tools/index.js';
 
 const SERVER_NAME = '@frontguard/mcp';
@@ -54,7 +63,7 @@ export function createServer(): McpServer {
     {
       capabilities: { tools: {} },
       instructions:
-        'Frontguard MCP server. Use `list_regressions` to see what visual regressions a PR has, `get_suggested_fix` to read the AI patch for a specific diff, and `recent_runs` to browse history. `accept_baseline` currently records whole-run approval but does not promote screenshots; use the CLI or composite Action for baseline updates.',
+        'Frontguard MCP server. Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, `promote_baseline` to promote reviewed visual changes, and `recent_runs` to browse history. `accept_baseline` currently records whole-run approval.',
     },
   );
 
@@ -104,6 +113,42 @@ export function createServer(): McpServer {
       outputSchema: recentRunsOutputSchema,
     },
     async (args) => withCloudClient(async (client) => recentRuns(client, args)),
+  );
+
+  server.registerTool(
+    'inspect_diff_cluster_dom',
+    {
+      title: 'Inspect diff cluster and grounded DOM target',
+      description:
+        'Inspect a specific visual regression diff cluster, returning its bounding box, AI classification, suggested fix, and grounded DOM target selector.',
+      inputSchema: inspectDiffClusterDomInputSchema,
+      outputSchema: inspectDiffClusterDomOutputSchema,
+    },
+    async (args) => withCloudClient(async (client) => inspectDiffClusterDom(client, args)),
+  );
+
+  server.registerTool(
+    'verify_css_patch',
+    {
+      title: 'Verify a candidate CSS patch before applying',
+      description:
+        'Validate a candidate CSS patch against a visual regression diff for syntax correctness, target selector alignment, and layout-destroying properties.',
+      inputSchema: verifyCssPatchInputSchema,
+      outputSchema: verifyCssPatchOutputSchema,
+    },
+    async (args) => withCloudClient(async (client) => verifyCssPatch(client, args)),
+  );
+
+  server.registerTool(
+    'promote_baseline',
+    {
+      title: 'Promote reviewed visual baselines',
+      description:
+        'Promote reviewed visual changes to baseline after `confirm_reviewed: true`, optionally scoped to specific routes.',
+      inputSchema: promoteBaselineInputSchema,
+      outputSchema: promoteBaselineOutputSchema,
+    },
+    async (args) => withCloudClient(async (client) => promoteBaseline(client, args)),
   );
 
   return server;

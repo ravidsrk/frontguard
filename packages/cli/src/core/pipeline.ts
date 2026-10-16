@@ -10,6 +10,7 @@
  */
 
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { CLI_VERSION } from '../version.js';
@@ -33,6 +34,18 @@ export { defineConfig } from './config.js';
 export type { UserFrontguardConfig } from './config.js';
 export type * from './types.js';
 export type { PluginContext, FrontguardPlugin } from './plugins.js';
+export {
+  extractDiffClusters,
+  cropClusterComparisonStrip,
+  drawSetOfMarkBoxes,
+  type ClusterExtractionOptions,
+} from '../diff/regions.js';
+export {
+  computeSSIM,
+  computeChromaSSIM,
+  computeRegionSimilarity,
+  type RegionSimilarityMetrics,
+} from '../diff/ssim.js';
 import { discoverRoutes } from '../discovery/crawler.js';
 import { discoverRoutesFromFilesystem } from '../discovery/filesystem.js';
 import { discoverStorybookRoutesForConfig } from '../discovery/storybook.js';
@@ -1049,6 +1062,7 @@ export async function updateBaselines(
           ...new Set([...(existing?.browsers ?? []), shot.browser]),
         ],
         lastUpdated: new Date().toISOString(),
+        sha256: createHash('sha256').update(shot.buffer).digest('hex'),
       };
     }
     manifest.updatedAt = new Date().toISOString();
@@ -1123,6 +1137,7 @@ export async function updateBaselines(
           ...new Set([...(existing?.browsers ?? []), shot.browser]),
         ],
         lastUpdated: new Date().toISOString(),
+        sha256: createHash('sha256').update(shot.buffer).digest('hex'),
       };
     }
     manifest.updatedAt = new Date().toISOString();

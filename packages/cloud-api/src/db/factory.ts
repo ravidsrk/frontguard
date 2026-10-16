@@ -23,6 +23,8 @@ export interface Bindings {
   DB?: D1Database;
   /** Cloudflare R2 bucket for screenshots. */
   SCREENSHOTS?: unknown;
+  /** Cloudflare R2 bucket alias for CAS / screenshot blobs. */
+  SCREENSHOT_BUCKET?: unknown;
   /** GitHub OAuth client id. */
   GITHUB_CLIENT_ID?: string;
   /** GitHub OAuth client secret. */

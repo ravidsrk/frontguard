@@ -50,6 +50,18 @@
     {
       "name": "recent_runs",
       "description": "List the most recent runs the API key has access to. Optional `repo` and `branch` filters narrow the results."
+    },
+    {
+      "name": "inspect_diff_cluster_dom",
+      "description": "Inspect a specific visual regression diff cluster, returning its bounding box, AI classification, suggested fix, and grounded DOM target selector."
+    },
+    {
+      "name": "verify_css_patch",
+      "description": "Validate a candidate CSS patch against a visual regression diff for syntax correctness, target selector alignment, and layout-destroying properties."
+    },
+    {
+      "name": "promote_baseline",
+      "description": "Promote reviewed visual changes to baseline after `confirm_reviewed: true`, optionally scoped to specific routes."
     }
   ]
 }

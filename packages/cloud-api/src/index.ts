@@ -21,6 +21,7 @@ import { hashKey } from "./auth/keys.js";
 import { authRoutes } from "./routes/auth.js";
 import { keyRoutes } from "./routes/keys.js";
 import { screenshotRoutes } from "./routes/screenshots.js";
+import { casRoutes } from "./routes/cas.js";
 import { getScreenshotStore, type R2Bucket } from "./storage/screenshots.js";
 import {
   persistScreenshots,
@@ -35,7 +36,7 @@ import { hasValidSessionSecret } from "./auth/session.js";
 import { teamRoutes } from "./routes/teams.js";
 import { can } from "./db/teams.js";
 import { billingRoutes } from "./routes/billing.js";
-import { getPlan } from "./billing/plans.js";
+import { checkLimit, getPlan } from "./billing/plans.js";
 import {
   MAX_ROUTES,
   MAX_VIEWPORTS,
@@ -265,6 +266,7 @@ app.route("/v1/screenshots", screenshotRoutes);
 app.route("/v1/monitors", monitorRoutes);
 app.route("/v1/dashboard", dashboardRoutes);
 app.route("/v1/teams", teamRoutes);
+app.route("/v1/cas", casRoutes);
 
 // ---------------------------------------------------------------------------
 // POST /v1/run — Submit a visual regression run
@@ -363,6 +365,28 @@ app.post("/v1/run", async (c) => {
   }
   const month = currentMonth();
   const meterTeam = billingTeamId != null && plan.id !== "free";
+
+  // Enforce monthly sandbox compute minutes cap (sandboxMinutesPerMonth) before
+  // allocating a cloud sandbox run.
+  const sandboxLimit = plan.limits.sandboxMinutesPerMonth;
+  if (sandboxLimit !== null) {
+    const existingRuns = await store.listRuns(userId);
+    const usedSandboxMinutes = existingRuns
+      .filter((r) => r.createdAt.startsWith(month) && typeof r.duration === "number" && r.duration > 0)
+      .reduce((acc, r) => acc + Math.max(1, Math.ceil((r.duration ?? 0) / 60_000)), 0);
+    const sandboxCheck = checkLimit(plan, "sandboxMinutesPerMonth", usedSandboxMinutes);
+    if (!sandboxCheck.allowed) {
+      return c.json(
+        {
+          error: `Monthly sandbox compute limit reached (${sandboxLimit} minutes on the ${plan.name} plan).`,
+          limit: sandboxLimit,
+          current: usedSandboxMinutes,
+          upgradeUrl: "https://frontguard.dev/pricing",
+        },
+        402,
+      );
+    }
+  }
 
   // Atomic monthly reservations (CONC-1, COST-1, DM-3): reserve the run and
   // planned screenshot count up front so concurrent submissions cannot overshoot

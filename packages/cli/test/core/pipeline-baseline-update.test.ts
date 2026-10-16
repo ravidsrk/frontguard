@@ -129,7 +129,14 @@ describe('updateBaselines', () => {
     expect(mocks.storageConstructor).toHaveBeenCalledWith(process.cwd(), { mode: 'update' });
     const version = readFileSync(new URL('../../../../VERSION', import.meta.url), 'utf8').trim();
     expect(mocks.writeManifest).toHaveBeenCalledWith(
-      expect.objectContaining({ createdBy: `frontguard@${version}` }),
+      expect.objectContaining({
+        createdBy: `frontguard@${version}`,
+        routes: expect.objectContaining({
+          '/': expect.objectContaining({
+            sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+          }),
+        }),
+      }),
     );
   });
 

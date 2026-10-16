@@ -37,6 +37,9 @@ export default defineConfig([
     sourcemap: true,
     external: EXTERNAL,
     banner: { js: '#!/usr/bin/env node' },
+    esbuildOptions(options) {
+      options.minifyWhitespace = true;
+    },
   },
   // frontguard-render — thin renderer bin (imported by ./bin/frontguard-render
   // and shelled to by sandbox/daytona.ts inside the Daytona snapshot).
@@ -63,5 +66,8 @@ export default defineConfig([
     splitting: false,
     sourcemap: true,
     external: EXTERNAL,
+    esbuildOptions(options) {
+      options.minifyWhitespace = true;
+    },
   },
 ]);
