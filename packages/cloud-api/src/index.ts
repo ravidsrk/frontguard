@@ -21,6 +21,7 @@ import { hashKey } from "./auth/keys.js";
 import { authRoutes } from "./routes/auth.js";
 import { keyRoutes } from "./routes/keys.js";
 import { screenshotRoutes } from "./routes/screenshots.js";
+import { casRoutes } from "./routes/cas.js";
 import { getScreenshotStore, type R2Bucket } from "./storage/screenshots.js";
 import {
   persistScreenshots,
@@ -265,6 +266,7 @@ app.route("/v1/screenshots", screenshotRoutes);
 app.route("/v1/monitors", monitorRoutes);
 app.route("/v1/dashboard", dashboardRoutes);
 app.route("/v1/teams", teamRoutes);
+app.route("/v1/cas", casRoutes);
 
 // ---------------------------------------------------------------------------
 // POST /v1/run — Submit a visual regression run

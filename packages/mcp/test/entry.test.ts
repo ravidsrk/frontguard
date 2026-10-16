@@ -144,8 +144,11 @@ describe('dist bin JSON-RPC stdio (mcp-3, mcp-10)', () => {
       expect(names).toEqual([
         'accept_baseline',
         'get_suggested_fix',
+        'inspect_diff_cluster_dom',
         'list_regressions',
+        'promote_baseline',
         'recent_runs',
+        'verify_css_patch',
       ]);
     },
     15_000,

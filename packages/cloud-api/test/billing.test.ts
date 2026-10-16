@@ -11,9 +11,17 @@ import { app } from '../src/index.js';
 import { resetMemoryStore, getMemoryStore } from '../src/db/factory.js';
 
 describe('plans', () => {
-  it('exposes free/pro/business', () => {
+  it('exposes free/pro/business with rebalanced quotas and CAS/sandbox guardrails', () => {
     expect(Object.keys(PLANS)).toEqual(['free', 'pro', 'business']);
     expect(PLANS.pro.priceCents).toBe(2900);
+    expect(PLANS.pro.limits.runsPerMonth).toBe(500);
+    expect(PLANS.pro.limits.screenshotsPerMonth).toBe(35000);
+    expect(PLANS.free.limits.sandboxMinutesPerMonth).toBe(30);
+    expect(PLANS.pro.limits.sandboxMinutesPerMonth).toBe(500);
+    expect(PLANS.business.limits.sandboxMinutesPerMonth).toBe(3000);
+    expect(PLANS.free.limits.casUnchangedDeduplication).toBe(true);
+    expect(PLANS.pro.limits.casUnchangedDeduplication).toBe(true);
+    expect(PLANS.business.limits.casUnchangedDeduplication).toBe(true);
   });
   it('getPlan defaults unknown ids to free', () => {
     expect(getPlan('nope').id).toBe('free');
@@ -23,10 +31,19 @@ describe('plans', () => {
     expect(checkLimit(PLANS.free, 'runsPerMonth', 49).allowed).toBe(true);
     expect(checkLimit(PLANS.free, 'runsPerMonth', 50).allowed).toBe(false);
     expect(checkLimit(PLANS.business, 'runsPerMonth', 1_000_000).allowed).toBe(true);
+    expect(checkLimit(PLANS.pro, 'screenshotsPerMonth', 34999).allowed).toBe(true);
+    expect(checkLimit(PLANS.pro, 'screenshotsPerMonth', 35000).allowed).toBe(false);
+    expect(checkLimit(PLANS.free, 'sandboxMinutesPerMonth', 29).allowed).toBe(true);
+    expect(checkLimit(PLANS.free, 'sandboxMinutesPerMonth', 30).allowed).toBe(false);
+    expect(checkLimit(PLANS.pro, 'sandboxMinutesPerMonth', 500).allowed).toBe(false);
+    expect(checkLimit(PLANS.business, 'sandboxMinutesPerMonth', 3000).allowed).toBe(false);
   });
-  it('hasFeature reflects plan gates', () => {
+  it('hasFeature reflects plan gates including casUnchangedDeduplication', () => {
     expect(hasFeature(PLANS.free, 'productionMonitoring')).toBe(false);
     expect(hasFeature(PLANS.business, 'productionMonitoring')).toBe(true);
+    expect(hasFeature(PLANS.free, 'casUnchangedDeduplication')).toBe(true);
+    expect(hasFeature(PLANS.pro, 'casUnchangedDeduplication')).toBe(true);
+    expect(hasFeature(PLANS.business, 'casUnchangedDeduplication')).toBe(true);
   });
 });
 

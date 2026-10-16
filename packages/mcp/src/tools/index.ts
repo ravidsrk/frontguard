@@ -39,3 +39,29 @@ export {
   type RecentRunsResult,
   type RecentRunSummary,
 } from './recent-runs.js';
+
+export {
+  inspectDiffClusterDom,
+  inspectDiffClusterDomInputSchema,
+  inspectDiffClusterDomOutputSchema,
+  type InspectDiffClusterDomInput,
+  type InspectDiffClusterDomResult,
+  type DiffClusterInspectionItem,
+} from './inspect-diff-cluster-dom.js';
+
+export {
+  verifyCssPatch,
+  verifyCssPatchInputSchema,
+  verifyCssPatchOutputSchema,
+  type VerifyCssPatchInput,
+  type VerifyCssPatchResult,
+} from './verify-css-patch.js';
+
+export {
+  promoteBaseline,
+  promoteBaselineInputSchema,
+  promoteBaselineOutputSchema,
+  type PromoteBaselineInput,
+  type PromoteBaselineResult,
+} from './promote-baseline.js';
+

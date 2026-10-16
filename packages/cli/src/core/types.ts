@@ -8,6 +8,9 @@
  */
 
 import type { FrontguardPlugin } from './plugins.js';
+import type { BoundingBox, DiffCluster } from '../diff/regions.js';
+
+export type { BoundingBox, DiffCluster };
 
 // ---------------------------------------------------------------------------
 // Scalar Types
@@ -503,6 +506,8 @@ export interface DiffResult {
   suggestedFix?: SuggestedFix;
   /** Sandbox verification result for the suggested fix (Task 4.2). */
   fixVerification?: FixVerification;
+  /** Extracted spatial diff clusters with region-scoped perceptual similarity metrics. */
+  clusters?: DiffCluster[];
 }
 
 /**
@@ -743,7 +748,12 @@ export interface BaselineRouteInfo {
   browsers: BrowserEngine[];
   /** ISO-8601 timestamp of the last baseline update for this route. */
   lastUpdated: string;
+  /** Content-addressable SHA-256 hex digest of the latest baseline PNG buffer. */
+  sha256?: string;
 }
+
+/** Alias for a single entry in the baseline manifest's `routes` map. */
+export type BaselineManifestEntry = BaselineRouteInfo;
 
 // ---------------------------------------------------------------------------
 // Contract Interfaces (Reporters & Storage)

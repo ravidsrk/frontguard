@@ -20,6 +20,16 @@ import type { FrontguardAuth } from '../auth.js';
 // Wire-format types (kept loose — the cloud-api owns the source of truth).
 // ---------------------------------------------------------------------------
 
+export interface CloudDiffCluster {
+  id?: number;
+  bbox?: { x: number; y: number; width: number; height: number };
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  targetSelector?: string;
+}
+
 export interface CloudRunResult {
   route: string;
   viewport: number;
@@ -28,10 +38,12 @@ export interface CloudRunResult {
   status: string;
   diffPercentage: number;
   classification?: string;
+  explanation?: string;
   timestamp: string;
   suggestedFix?: CloudSuggestedFix;
   /** Stable id assigned by the cloud-api when present; we synthesize one otherwise. */
   diffId?: string;
+  clusters?: CloudDiffCluster[];
 }
 
 export interface CloudSuggestedFix {
@@ -41,6 +53,7 @@ export interface CloudSuggestedFix {
   confidence: number;
   explanation: string;
   target?: string;
+  verified?: boolean;
 }
 
 export interface CloudRun {
@@ -79,6 +92,8 @@ export interface CloudListRunsResponse {
 export interface CloudClientOptions {
   /** Override the global `fetch` (used by tests). */
   fetch?: typeof fetch;
+  /** Execution mode of this client instance. */
+  mode?: 'local-report' | 'cloud-api';
 }
 
 export class CloudApiError extends Error {
@@ -95,12 +110,14 @@ export class CloudApiError extends Error {
 
 export class CloudClient {
   private readonly fetchImpl: typeof fetch;
+  public readonly mode: 'local-report' | 'cloud-api';
 
   constructor(
     private readonly auth: FrontguardAuth,
     opts: CloudClientOptions = {},
   ) {
     this.fetchImpl = opts.fetch ?? globalThis.fetch;
+    this.mode = opts.mode ?? 'cloud-api';
     if (!this.fetchImpl) {
       throw new Error('Global fetch is not available — Node 18+ is required');
     }
@@ -122,6 +139,11 @@ export class CloudClient {
       'POST',
       `/v1/baselines/${encodeURIComponent(runId)}/approve`,
     );
+  }
+
+  /** Alias for approveBaseline used by promote_baseline. */
+  async approveRun(runId: string): Promise<{ approved: boolean; runId: string }> {
+    return this.approveBaseline(runId);
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -188,6 +210,18 @@ function normalizeLocalDiffItem(
         ? aiAnalysis.classification
         : undefined;
 
+  const explanation =
+    typeof item.explanation === 'string'
+      ? item.explanation
+      : typeof aiAnalysis?.explanation === 'string'
+        ? aiAnalysis.explanation
+        : undefined;
+  const clusters = Array.isArray(item.clusters)
+    ? (item.clusters as CloudDiffCluster[])
+    : Array.isArray(aiAnalysis?.clusters)
+      ? (aiAnalysis.clusters as CloudDiffCluster[])
+      : undefined;
+
   return {
     route,
     viewport: Number(item.viewport ?? 1440),
@@ -195,9 +229,11 @@ function normalizeLocalDiffItem(
     status: String(item.status ?? 'unchanged'),
     diffPercentage: Number(item.diffPercentage ?? 0),
     ...(classification ? { classification } : {}),
+    ...(explanation ? { explanation } : {}),
     timestamp: String(item.timestamp ?? fallbackTimestamp),
     ...(item.suggestedFix ? { suggestedFix: item.suggestedFix as CloudSuggestedFix } : {}),
     ...(item.diffId ? { diffId: String(item.diffId) } : {}),
+    ...(clusters ? { clusters } : {}),
   };
 }
 
@@ -312,7 +348,10 @@ export function createLocalReportClient(reportPath: string): CloudClient {
     return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 });
   };
 
-  return new CloudClient({ apiKey: 'local', apiUrl: 'http://frontguard.local' }, { fetch: localFetch });
+  return new CloudClient(
+    { apiKey: 'local', apiUrl: 'http://frontguard.local' },
+    { fetch: localFetch, mode: 'local-report' },
+  );
 }
 
 /**
@@ -349,8 +388,9 @@ export function parseDiffId(
   const first = diffId.indexOf(':');
   if (first === -1) return null;
   const runId = diffId.slice(0, first);
-  const rest = diffId.slice(first + 1); // `route…:viewport[:browser]`
-  if (!runId || !rest) return null;
+  const rawRest = diffId.slice(first + 1); // `route…:viewport[:browser]` or `route@viewport[@browser]`
+  if (!runId || !rawRest) return null;
+  const rest = rawRest.includes(':') ? rawRest : rawRest.replace(/@/g, ':');
 
   const lastColon = rest.lastIndexOf(':');
   if (lastColon === -1) return null; // need at least `route:viewport`

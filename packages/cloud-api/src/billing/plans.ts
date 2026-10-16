@@ -14,11 +14,13 @@ export type PlanId = 'free' | 'pro' | 'business';
 export interface PlanLimits {
   runsPerMonth: number | null;
   screenshotsPerMonth: number | null;
+  sandboxMinutesPerMonth: number | null;
   historyRetentionDays: number;
   teamMembers: number | null;
   monitors: number | null;
   productionMonitoring: boolean;
   ssoSaml: boolean;
+  casUnchangedDeduplication: boolean;
 }
 
 /** A plan definition. */
@@ -39,11 +41,13 @@ export const PLANS: Record<PlanId, Plan> = {
     limits: {
       runsPerMonth: 50,
       screenshotsPerMonth: 500,
+      sandboxMinutesPerMonth: 30,
       historyRetentionDays: 7,
       teamMembers: 1,
       monitors: 1,
       productionMonitoring: false,
       ssoSaml: false,
+      casUnchangedDeduplication: true,
     },
   },
   pro: {
@@ -52,12 +56,14 @@ export const PLANS: Record<PlanId, Plan> = {
     priceCents: 2900,
     limits: {
       runsPerMonth: 500,
-      screenshotsPerMonth: 5000,
+      screenshotsPerMonth: 35000,
+      sandboxMinutesPerMonth: 500,
       historyRetentionDays: 30,
       teamMembers: 10,
       monitors: 10,
       productionMonitoring: false,
       ssoSaml: false,
+      casUnchangedDeduplication: true,
     },
   },
   business: {
@@ -67,11 +73,13 @@ export const PLANS: Record<PlanId, Plan> = {
     limits: {
       runsPerMonth: null,
       screenshotsPerMonth: null,
+      sandboxMinutesPerMonth: 3000,
       historyRetentionDays: 90,
       teamMembers: 50,
       monitors: null,
       productionMonitoring: true,
       ssoSaml: true,
+      casUnchangedDeduplication: true,
     },
   },
 };
@@ -95,7 +103,7 @@ export interface LimitCheck {
  */
 export function checkLimit(
   plan: Plan,
-  metric: 'runsPerMonth' | 'screenshotsPerMonth' | 'teamMembers' | 'monitors',
+  metric: 'runsPerMonth' | 'screenshotsPerMonth' | 'teamMembers' | 'monitors' | 'sandboxMinutesPerMonth',
   current: number,
   amount = 1,
 ): LimitCheck {
@@ -105,6 +113,9 @@ export function checkLimit(
 }
 
 /** Whether a plan grants a boolean feature. */
-export function hasFeature(plan: Plan, feature: 'productionMonitoring' | 'ssoSaml'): boolean {
+export function hasFeature(
+  plan: Plan,
+  feature: 'productionMonitoring' | 'ssoSaml' | 'casUnchangedDeduplication',
+): boolean {
   return plan.limits[feature];
 }
