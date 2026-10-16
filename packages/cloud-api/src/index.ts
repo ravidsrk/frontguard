@@ -507,7 +507,7 @@ app.post("/v1/run", async (c) => {
       ? `${run.github.owner}/${run.github.repo}`
       : undefined);
   if (effectiveProjectId && screenshotsBucket) {
-    const baselineRun = await store.getProjectBaseline(effectiveProjectId);
+    const baselineRun = await store.getProjectBaseline(effectiveProjectId, userId);
     if (baselineRun) {
       const baselineShots = selectApprovedBaselineScreenshots(
         await store.listScreenshots(baselineRun.id),

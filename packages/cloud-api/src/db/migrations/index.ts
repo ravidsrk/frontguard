@@ -16,6 +16,7 @@ import { migration002CascadeTeamUsage } from './002-cascade-team-usage.js';
 import { migration003OptimisticConcurrencyInvitationExpiry } from './003-optimistic-concurrency-invitation-expiry.js';
 import { migration004MonitorLease } from './004-monitor-lease.js';
 import { migration005BackgroundFailures } from './005-background-failures.js';
+import { migration006MonitorProjectId } from './006-monitor-project-id.js';
 import type { Migration } from './types.js';
 
 export type { Migration } from './types.js';
@@ -30,4 +31,5 @@ export const MIGRATIONS: readonly Migration[] = [
   migration003OptimisticConcurrencyInvitationExpiry,
   migration004MonitorLease,
   migration005BackgroundFailures,
+  migration006MonitorProjectId,
 ];

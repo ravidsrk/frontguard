@@ -131,7 +131,7 @@ async function resolveMonitorBaseline(
   if (!bucket) return undefined;
 
   if (monitor.projectId) {
-    const baselineRun = await store.getProjectBaseline(monitor.projectId);
+    const baselineRun = await store.getProjectBaseline(monitor.projectId, monitor.userId);
     if (baselineRun) {
       const approvedRefs = buildMonitorScreenshotRefs(
         monitor.routes,

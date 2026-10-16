@@ -92,22 +92,14 @@ function previewCacheKey(owner: string, repo: string, sha: string): string {
 
 function rememberPendingPr(pending: PendingPullRequest): void {
   pendingPrCache.set(previewCacheKey(pending.owner, pending.repo, pending.commitSha), pending);
-  if (pending.branch) {
-    pendingPrCache.set(previewCacheKey(pending.owner, pending.repo, `ref:${pending.branch}`), pending);
-  }
 }
 
-function consumePendingPr(owner: string, repo: string, sha: string, ref?: string): PendingPullRequest | null {
-  const bySha = pendingPrCache.get(previewCacheKey(owner, repo, sha));
-  const byRef = !bySha && ref ? pendingPrCache.get(previewCacheKey(owner, repo, `ref:${ref}`)) : undefined;
-  const found = bySha ?? byRef ?? null;
-  if (found) {
-    pendingPrCache.delete(previewCacheKey(found.owner, found.repo, found.commitSha));
-    if (found.branch) {
-      pendingPrCache.delete(previewCacheKey(found.owner, found.repo, `ref:${found.branch}`));
-    }
-  }
-  return found;
+function peekPendingPr(owner: string, repo: string, sha: string): PendingPullRequest | null {
+  return pendingPrCache.get(previewCacheKey(owner, repo, sha)) ?? null;
+}
+
+function deletePendingPr(owner: string, repo: string, sha: string): void {
+  pendingPrCache.delete(previewCacheKey(owner, repo, sha));
 }
 
 /**
@@ -119,12 +111,8 @@ export function rememberPreviewUrl(
   repo: string,
   sha: string,
   preview: InferredPreviewUrl,
-  ref?: string,
 ): void {
   previewUrlCache.set(previewCacheKey(owner, repo, sha), preview);
-  if (ref) {
-    previewUrlCache.set(previewCacheKey(owner, repo, `ref:${ref}`), preview);
-  }
 }
 
 /** Look up a previously-observed preview URL. */
@@ -132,13 +120,8 @@ export function recallPreviewUrl(
   owner: string,
   repo: string,
   sha: string,
-  ref?: string,
 ): InferredPreviewUrl | null {
-  return (
-    previewUrlCache.get(previewCacheKey(owner, repo, sha)) ??
-    (ref ? previewUrlCache.get(previewCacheKey(owner, repo, `ref:${ref}`)) : undefined) ??
-    null
-  );
+  return previewUrlCache.get(previewCacheKey(owner, repo, sha)) ?? null;
 }
 
 /** Test-only: wipes the cache between runs. */
@@ -239,7 +222,7 @@ export function createGitHubApp() {
         const owner = statusEvent.repository.owner.login;
         const repo = statusEvent.repository.name;
         rememberPreviewUrl(owner, repo, statusEvent.sha, preview);
-        const pending = consumePendingPr(owner, repo, statusEvent.sha);
+        const pending = peekPendingPr(owner, repo, statusEvent.sha);
         if (pending && env.FRONTGUARD_API_URL && env.FRONTGUARD_API_KEY) {
           try {
             const res = await fetch(`${env.FRONTGUARD_API_URL}/v1/run`, {
@@ -263,7 +246,21 @@ export function createGitHubApp() {
                 config: pending.repoConfig,
               }),
             });
-            const data = (await res.json()) as { id?: string };
+            const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+            if (!res.ok || typeof data.id !== 'string' || !data.id) {
+              return c.json(
+                {
+                  handled: true,
+                  cached: true,
+                  triggered: false,
+                  source: preview.source,
+                  url: preview.url,
+                  error: data.error ?? `Cloud API returned HTTP ${res.status}`,
+                },
+                502,
+              );
+            }
+            deletePendingPr(owner, repo, statusEvent.sha);
             return c.json({
               handled: true,
               cached: true,
@@ -308,9 +305,8 @@ export function createGitHubApp() {
         const owner = depEvent.repository.owner.login;
         const repo = depEvent.repository.name;
         const sha = depEvent.deployment.sha;
-        const ref = depEvent.deployment.ref;
-        rememberPreviewUrl(owner, repo, sha, preview, ref);
-        const pending = consumePendingPr(owner, repo, sha, ref);
+        rememberPreviewUrl(owner, repo, sha, preview);
+        const pending = peekPendingPr(owner, repo, sha);
         if (pending && env.FRONTGUARD_API_URL && env.FRONTGUARD_API_KEY) {
           try {
             const res = await fetch(`${env.FRONTGUARD_API_URL}/v1/run`, {
@@ -334,7 +330,21 @@ export function createGitHubApp() {
                 config: pending.repoConfig,
               }),
             });
-            const data = (await res.json()) as { id?: string };
+            const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+            if (!res.ok || typeof data.id !== 'string' || !data.id) {
+              return c.json(
+                {
+                  handled: true,
+                  cached: true,
+                  triggered: false,
+                  source: preview.source,
+                  url: preview.url,
+                  error: data.error ?? `Cloud API returned HTTP ${res.status}`,
+                },
+                502,
+              );
+            }
+            deletePendingPr(owner, repo, sha);
             return c.json({
               handled: true,
               cached: true,
@@ -419,7 +429,6 @@ export function createGitHubApp() {
       decision.owner!,
       decision.repo!,
       decision.commitSha!,
-      payload.pull_request.head.ref,
     );
     const inferred = inferPreviewUrl({
       event: payload,

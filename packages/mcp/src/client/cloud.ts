@@ -12,7 +12,7 @@
  * @module client/cloud
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { FrontguardAuth } from '../auth.js';
 
@@ -166,6 +166,41 @@ export function resolveLocalReportPath(
   return null;
 }
 
+function normalizeLocalDiffItem(
+  item: Record<string, unknown>,
+  fallbackTimestamp: string,
+): CloudRunResult {
+  const rawRoute = item.route;
+  const route =
+    typeof rawRoute === 'string'
+      ? rawRoute
+      : rawRoute && typeof (rawRoute as { path?: unknown }).path === 'string'
+        ? (rawRoute as { path: string }).path
+        : '/';
+  const aiAnalysis =
+    item.aiAnalysis && typeof item.aiAnalysis === 'object'
+      ? (item.aiAnalysis as Record<string, unknown>)
+      : undefined;
+  const classification =
+    typeof item.classification === 'string'
+      ? item.classification
+      : typeof aiAnalysis?.classification === 'string'
+        ? aiAnalysis.classification
+        : undefined;
+
+  return {
+    route,
+    viewport: Number(item.viewport ?? 1440),
+    ...(item.browser ? { browser: String(item.browser) } : {}),
+    status: String(item.status ?? 'unchanged'),
+    diffPercentage: Number(item.diffPercentage ?? 0),
+    ...(classification ? { classification } : {}),
+    timestamp: String(item.timestamp ?? fallbackTimestamp),
+    ...(item.suggestedFix ? { suggestedFix: item.suggestedFix as CloudSuggestedFix } : {}),
+    ...(item.diffId ? { diffId: String(item.diffId) } : {}),
+  };
+}
+
 /** Reads a local `@frontguard/cli` JSON report file and normalizes it into a {@link CloudRun}. */
 export function loadLocalReportAsRun(reportPath: string): CloudRun {
   const rawText = readFileSync(reportPath, 'utf8');
@@ -173,17 +208,9 @@ export function loadLocalReportAsRun(reportPath: string): CloudRun {
   const now = new Date().toISOString();
 
   if (Array.isArray(parsed)) {
-    const results: CloudRunResult[] = parsed.map((item: Record<string, unknown>) => ({
-      route: String(item.route ?? '/'),
-      viewport: Number(item.viewport ?? 1440),
-      ...(item.browser ? { browser: String(item.browser) } : {}),
-      status: String(item.status ?? 'unchanged'),
-      diffPercentage: Number(item.diffPercentage ?? 0),
-      ...(item.classification ? { classification: String(item.classification) } : {}),
-      timestamp: String(item.timestamp ?? now),
-      ...(item.suggestedFix ? { suggestedFix: item.suggestedFix as CloudSuggestedFix } : {}),
-      ...(item.diffId ? { diffId: String(item.diffId) } : {}),
-    }));
+    const results: CloudRunResult[] = parsed.map((item: Record<string, unknown>) =>
+      normalizeLocalDiffItem(item, now),
+    );
     return {
       id: 'run_local',
       status: 'completed',
@@ -195,25 +222,38 @@ export function loadLocalReportAsRun(reportPath: string): CloudRun {
   }
 
   const obj = parsed as Record<string, unknown>;
+  const configObj =
+    obj.config && typeof obj.config === 'object'
+      ? (obj.config as Record<string, unknown>)
+      : undefined;
+  const fallbackTs = String(obj.createdAt ?? obj.timestamp ?? now);
   const rawResults = (
     Array.isArray(obj.results) ? obj.results : Array.isArray(obj.diffs) ? obj.diffs : []
   ) as Array<Record<string, unknown>>;
-  const results: CloudRunResult[] = rawResults.map((item) => ({
-    route: String(item.route ?? '/'),
-    viewport: Number(item.viewport ?? 1440),
-    ...(item.browser ? { browser: String(item.browser) } : {}),
-    status: String(item.status ?? 'unchanged'),
-    diffPercentage: Number(item.diffPercentage ?? 0),
-    ...(item.classification ? { classification: String(item.classification) } : {}),
-    timestamp: String(item.timestamp ?? obj.createdAt ?? obj.timestamp ?? now),
-    ...(item.suggestedFix ? { suggestedFix: item.suggestedFix as CloudSuggestedFix } : {}),
-    ...(item.diffId ? { diffId: String(item.diffId) } : {}),
-  }));
+  const results: CloudRunResult[] = rawResults.map((item) =>
+    normalizeLocalDiffItem(item, fallbackTs),
+  );
+
+  const resolvedUrl =
+    typeof obj.url === 'string'
+      ? obj.url
+      : typeof obj.baseUrl === 'string'
+        ? obj.baseUrl
+        : typeof configObj?.baseUrl === 'string'
+          ? configObj.baseUrl
+          : 'http://localhost';
 
   return {
     id: typeof obj.id === 'string' && obj.id ? obj.id : 'run_local',
     status: 'completed',
-    url: typeof obj.url === 'string' ? obj.url : typeof obj.baseUrl === 'string' ? obj.baseUrl : 'http://localhost',
+    url: resolvedUrl,
+    ...(Array.isArray(configObj?.viewports)
+      ? { viewports: (configObj.viewports as unknown[]).map(Number) }
+      : {}),
+    ...(Array.isArray(configObj?.browsers)
+      ? { browsers: (configObj.browsers as unknown[]).map(String) }
+      : {}),
+    ...(typeof configObj?.threshold === 'number' ? { threshold: configObj.threshold } : {}),
     createdAt:
       typeof obj.createdAt === 'string'
         ? obj.createdAt
@@ -222,16 +262,24 @@ export function loadLocalReportAsRun(reportPath: string): CloudRun {
           : now,
     results,
     reportUrl: typeof obj.reportUrl === 'string' ? obj.reportUrl : reportPath,
+    ...(typeof obj.baselinesApproved === 'boolean'
+      ? { baselinesApproved: obj.baselinesApproved }
+      : {}),
     ...(obj.github ? { github: obj.github as CloudRun['github'] } : {}),
   };
 }
 
 /** Creates a {@link CloudClient}-compatible adapter backed by a local CLI report file. */
 export function createLocalReportClient(reportPath: string): CloudClient {
+  let approvedInMemory = false;
+
   const localFetch: typeof fetch = async (input, init) => {
     const url = new URL(typeof input === 'string' ? input : input.toString());
     const method = (init?.method ?? 'GET').toUpperCase();
     const run = loadLocalReportAsRun(reportPath);
+    if (approvedInMemory) {
+      run.baselinesApproved = true;
+    }
 
     if (method === 'GET' && url.pathname === '/v1/runs') {
       return new Response(JSON.stringify({ runs: [run], total: 1 }), { status: 200 });
@@ -243,7 +291,22 @@ export function createLocalReportClient(reportPath: string): CloudClient {
       }
       return new Response(JSON.stringify({ error: 'Run not found' }), { status: 404 });
     }
-    if (method === 'POST' && /^\/v1\/baselines\/[^/]+\/approve$/.test(url.pathname)) {
+    const approveMatch = url.pathname.match(/^\/v1\/baselines\/([^/]+)\/approve$/);
+    if (method === 'POST' && approveMatch) {
+      const requestedId = decodeURIComponent(approveMatch[1]);
+      if (requestedId !== run.id && requestedId !== 'run_local' && requestedId !== 'local') {
+        return new Response(JSON.stringify({ error: 'Run not found' }), { status: 404 });
+      }
+      approvedInMemory = true;
+      try {
+        const raw = JSON.parse(readFileSync(reportPath, 'utf8')) as unknown;
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+          (raw as Record<string, unknown>).baselinesApproved = true;
+          writeFileSync(reportPath, JSON.stringify(raw, null, 2), 'utf8');
+        }
+      } catch {
+        // Read-only filesystem fallback — approvedInMemory still tracks it for this client instance
+      }
       return new Response(JSON.stringify({ approved: true, runId: run.id }), { status: 200 });
     }
     return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 });

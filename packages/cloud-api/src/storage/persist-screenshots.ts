@@ -60,32 +60,74 @@ export function parseScreenshotName(
 ): ParsedScreenshotName | null {
   const m = name.match(/^(.*)_(\d+)_([a-z]+)_(\d+)_(baseline|current|diff)$/);
   if (!m) return null;
-  const [, rawFragment, viewportStr, browser, , type] = m;
+  const [, rawFragment, viewportStr, browser, diffIdxStr, type] = m;
   if (!KNOWN_BROWSERS.has(browser)) return null;
   const viewport = Number(viewportStr);
   if (!Number.isFinite(viewport)) return null;
 
-  const strippedFragment = rawFragment.replace(/^\d+_/, '');
+  const idxMatch = rawFragment.match(/^(\d+)_(.+)$/);
+  const strippedFragment = idxMatch ? idxMatch[2] : rawFragment;
+  const leadingIdx = idxMatch ? Number(idxMatch[1]) : null;
+  const diffIdx = Number(diffIdxStr);
 
   if (knownRoutes && knownRoutes.length > 0) {
-    for (const candidateRoute of knownRoutes) {
-      const normalized = candidateRoute.startsWith('/') ? candidateRoute : `/${candidateRoute}`;
+    const normalizedKnown = knownRoutes.map((r) => (r.startsWith('/') ? r : `/${r}`));
+    const matches = normalizedKnown.filter((normalized) => {
       const fragments = candidateFragmentsForRoute(normalized);
-      if (fragments.includes(rawFragment) || fragments.includes(strippedFragment)) {
+      return fragments.includes(rawFragment) || fragments.includes(strippedFragment);
+    });
+
+    if (matches.length === 1) {
+      return {
+        route: matches[0],
+        viewport,
+        browser,
+        type: type as ParsedScreenshotName['type'],
+      };
+    }
+
+    if (matches.length > 1) {
+      if (
+        leadingIdx !== null &&
+        leadingIdx >= 0 &&
+        leadingIdx < normalizedKnown.length &&
+        matches.includes(normalizedKnown[leadingIdx])
+      ) {
         return {
-          route: normalized,
+          route: normalizedKnown[leadingIdx],
           viewport,
           browser,
           type: type as ParsedScreenshotName['type'],
         };
       }
+      if (
+        Number.isFinite(diffIdx) &&
+        diffIdx >= 0 &&
+        diffIdx < normalizedKnown.length &&
+        matches.includes(normalizedKnown[diffIdx])
+      ) {
+        return {
+          route: normalizedKnown[diffIdx],
+          viewport,
+          browser,
+          type: type as ParsedScreenshotName['type'],
+        };
+      }
+      // Ambiguous matches without an index mapping: preserve rawFragment so
+      // distinct indexed filenames (e.g. 0_a_b vs 1_a_b) never overwrite each other.
+      return {
+        route: `/${rawFragment}`,
+        viewport,
+        browser,
+        type: type as ParsedScreenshotName['type'],
+      };
     }
   }
 
   // Best-effort route recovery when no knownRoutes match: strip optional
   // leading `${index}_` prefix emitted by the CLI HTML reporter and map root
   // sentinels (`_root`, `index`, `''`) to `/`.
-  const fragment = /^\d+_.+/.test(rawFragment) ? strippedFragment : rawFragment;
+  const fragment = idxMatch ? strippedFragment : rawFragment;
   const route =
     fragment === '_root' || fragment === 'index' || fragment === '' ? '/' : `/${fragment}`;
   return { route, viewport, browser, type: type as ParsedScreenshotName['type'] };

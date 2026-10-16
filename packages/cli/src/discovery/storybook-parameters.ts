@@ -33,7 +33,7 @@ function storyIframePath(storyId: string): string {
 interface AstNode {
   type: string;
   value?: unknown;
-  properties?: Array<{ key?: AstNode; value?: AstNode }>;
+  properties?: Array<{ type?: string; key?: AstNode; value?: AstNode }>;
   elements?: Array<AstNode | null>;
   name?: string;
 }
@@ -103,12 +103,65 @@ export function normalizeFrontguardParams(raw: unknown): StoryFrontguardParamete
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
-async function parseFrontguardFromCsfFile(filePath: string): Promise<Map<string, StoryFrontguardParameters>> {
-  const map = new Map<string, StoryFrontguardParameters>();
+function isAstFullyStatic(node: AstNode | undefined | null): boolean {
+  if (!node) return false;
+  switch (node.type) {
+    case 'StringLiteral':
+    case 'NumericLiteral':
+    case 'BooleanLiteral':
+    case 'Literal':
+      return true;
+    case 'ObjectExpression':
+      return (node.properties ?? []).every(
+        (prop) =>
+          prop.type !== 'SpreadElement' &&
+          (prop.key?.type === 'Identifier' || prop.key?.type === 'StringLiteral') &&
+          isAstFullyStatic(prop.value),
+      );
+    case 'ArrayExpression':
+      return (node.elements ?? []).every((el) => el !== null && isAstFullyStatic(el));
+    default:
+      return false;
+  }
+}
+
+function isParametersNodeStaticallyResolved(node: AstNode | undefined | null): boolean {
+  if (!node) return true;
+  if (node.type !== 'ObjectExpression') return false;
+  for (const prop of node.properties ?? []) {
+    if (prop.type === 'SpreadElement') return false;
+    const key =
+      prop.key?.type === 'Identifier'
+        ? prop.key.name
+        : prop.key?.type === 'StringLiteral'
+          ? String(prop.key.value)
+          : undefined;
+    if (key === 'frontguard') {
+      return isAstFullyStatic(prop.value);
+    }
+  }
+  return true;
+}
+
+async function parseFrontguardFromCsfFile(filePath: string): Promise<{
+  params: Map<string, StoryFrontguardParameters>;
+  staticallyCompleteIds: Set<string>;
+}> {
+  const params = new Map<string, StoryFrontguardParameters>();
+  const staticallyCompleteIds = new Set<string>();
   const code = readFileSync(filePath, 'utf-8');
   const { loadCsf } = await import('@storybook/csf-tools');
   const csf: CsfFile = loadCsf(code, { makeTitle: (userTitle) => userTitle || '' });
   csf.parse();
+
+  const metaAnnotations = (csf as unknown as { _metaAnnotations?: { parameters?: AstNode } })
+    ._metaAnnotations;
+  const metaParamsAst = metaAnnotations?.parameters;
+  const metaResolved = isParametersNodeStaticallyResolved(metaParamsAst);
+  const metaParameters = metaParamsAst
+    ? (extractStaticValue(metaParamsAst) as Record<string, unknown> | undefined)
+    : undefined;
+  const metaFrontguard = normalizeFrontguardParams(metaParameters?.frontguard);
 
   const stories = csf._stories as Record<
     string,
@@ -120,14 +173,24 @@ async function parseFrontguardFromCsfFile(filePath: string): Promise<Map<string,
     const storyId = story.id ?? exportName;
     const annotation = annotations[exportName];
     const parametersAst = annotation?.parameters;
+    const storyResolved = isParametersNodeStaticallyResolved(parametersAst);
     const parameters = parametersAst
       ? (extractStaticValue(parametersAst) as Record<string, unknown> | undefined)
       : undefined;
-    const frontguard = normalizeFrontguardParams(parameters?.frontguard);
-    if (frontguard) map.set(storyId, frontguard);
+    const storyFrontguard = normalizeFrontguardParams(parameters?.frontguard);
+    const merged =
+      metaFrontguard || storyFrontguard
+        ? { ...(metaFrontguard ?? {}), ...(storyFrontguard ?? {}) }
+        : undefined;
+    if (merged && Object.keys(merged).length > 0) {
+      params.set(storyId, merged);
+    }
+    if (metaResolved && storyResolved) {
+      staticallyCompleteIds.add(storyId);
+    }
   }
 
-  return map;
+  return { params, staticallyCompleteIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -302,14 +365,35 @@ export async function resolveStoryFrontguardParameters(
     byFile.set(filePath, ids);
   }
 
-  for (const [filePath, ids] of byFile) {
+  const previewCandidates = [
+    '.storybook/preview.ts',
+    '.storybook/preview.tsx',
+    '.storybook/preview.js',
+    '.storybook/preview.jsx',
+    '.storybook/preview.mjs',
+    '.storybook/preview.cjs',
+  ];
+  const hasGlobalPreviewFrontguard = searchRoots.some((root) =>
+    previewCandidates.some((rel) => {
+      const p = join(root, rel);
+      try {
+        return existsSync(p) && readFileSync(p, 'utf-8').includes('frontguard');
+      } catch {
+        return false;
+      }
+    }),
+  );
+
+  for (const [filePath] of byFile) {
     try {
       const fromCsf = await parseFrontguardFromCsfFile(filePath);
-      for (const [storyId, params] of fromCsf) {
+      for (const [storyId, params] of fromCsf.params) {
         if (!resolved.has(storyId)) resolved.set(storyId, params);
       }
-      for (const id of ids) {
-        staticallyInspectedIds.add(id);
+      if (!hasGlobalPreviewFrontguard) {
+        for (const id of fromCsf.staticallyCompleteIds) {
+          staticallyInspectedIds.add(id);
+        }
       }
     } catch (err) {
       logger.debug(`CSF parameter parse failed for ${filePath}: ${(err as Error).message}`);

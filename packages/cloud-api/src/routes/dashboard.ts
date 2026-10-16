@@ -34,7 +34,7 @@ import {
 } from '../dashboard/render.js';
 import { flakeScore } from '../dashboard/flake.js';
 import { SESSION_COOKIE, sessionSecret, verifySessionCookie } from '../auth/session.js';
-import { isRunAccessibleByUser } from '../auth/run-access.js';
+import { canUserMutateRun, isRunAccessibleByUser } from '../auth/run-access.js';
 import { getScreenshotStore, type R2Bucket } from '../storage/screenshots.js';
 import { promoteRunCurrentScreenshotsToBaseline } from '../storage/persist-screenshots.js';
 import { getPlan } from '../billing/plans.js';
@@ -332,6 +332,7 @@ sessionDashboardRoutes.post('/runs/:runId/diffs/:diffId/accept', async (c) => {
   const store = getStore(c.env);
   const runId = c.req.param('runId');
   if (!(await isRunAccessibleByUser(store, runId, userId))) return c.json({ error: 'Not found' }, 404);
+  if (!(await canUserMutateRun(store, runId, userId))) return c.json({ error: 'Forbidden' }, 403);
   const shots = await store.listScreenshots(runId);
   const diff = shots.find((s) => s.id === c.req.param('diffId') && s.type === 'diff');
   if (!diff) return c.json({ error: 'Diff not found' }, 404);
@@ -353,6 +354,7 @@ sessionDashboardRoutes.post('/runs/:runId/diffs/:diffId/reject', async (c) => {
   const store = getStore(c.env);
   const runId = c.req.param('runId');
   if (!(await isRunAccessibleByUser(store, runId, userId))) return c.json({ error: 'Not found' }, 404);
+  if (!(await canUserMutateRun(store, runId, userId))) return c.json({ error: 'Forbidden' }, 403);
   const shots = await store.listScreenshots(runId);
   const diff = shots.find((s) => s.id === c.req.param('diffId') && s.type === 'diff');
   if (!diff) return c.json({ error: 'Diff not found' }, 404);
@@ -375,6 +377,7 @@ sessionDashboardRoutes.post('/runs/:runId/approve', async (c) => {
   const store = getStore(c.env);
   const runId = c.req.param('runId');
   if (!(await isRunAccessibleByUser(store, runId, userId))) return c.json({ error: 'Run not found' }, 404);
+  if (!(await canUserMutateRun(store, runId, userId))) return c.json({ error: 'Forbidden' }, 403);
 
   const contentType = c.req.header('Content-Type') ?? '';
   let diffIds: string[] = [];

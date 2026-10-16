@@ -949,16 +949,27 @@ export class D1Store implements Store {
     return (res.meta?.changes ?? 0) > 0;
   }
 
-  async listProjectRuns(projectId: string, limit = 50, offset = 0): Promise<Run[]> {
-    const { results } = await this.db
-      .prepare(`SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`)
-      .bind(projectId, limit, offset)
-      .all<RunRow>();
+  async listProjectRuns(projectId: string, limit = 50, offset = 0, userId?: string): Promise<Run[]> {
+    const isRegisteredProject = (await this.getProjectById(projectId)) !== null;
+    const { results } =
+      isRegisteredProject || !userId
+        ? await this.db
+            .prepare(`SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+            .bind(projectId, limit, offset)
+            .all<RunRow>()
+        : await this.db
+            .prepare(
+              `SELECT * FROM runs WHERE project_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+            )
+            .bind(projectId, userId, limit, offset)
+            .all<RunRow>();
     if (results.length > 0) return results.map(rowToRun);
-    const { results: allRows } = await this.db
-      .prepare(`SELECT * FROM runs ORDER BY created_at DESC`)
+    if (!userId) return [];
+    const { results: userRows } = await this.db
+      .prepare(`SELECT * FROM runs WHERE user_id = ? ORDER BY created_at DESC`)
+      .bind(userId)
       .all<RunRow>();
-    return allRows
+    return userRows
       .map(rowToRun)
       .filter(
         (r) =>
@@ -967,16 +978,27 @@ export class D1Store implements Store {
       )
       .slice(offset, offset + limit);
   }
-  async getProjectBaseline(projectId: string): Promise<Run | null> {
-    const row = await this.db
-      .prepare(
-        `SELECT * FROM runs WHERE project_id = ? AND baselines_approved = 1 ORDER BY created_at DESC LIMIT 1`,
-      )
-      .bind(projectId)
-      .first<RunRow>();
+  async getProjectBaseline(projectId: string, userId?: string): Promise<Run | null> {
+    const isRegisteredProject = (await this.getProjectById(projectId)) !== null;
+    const row =
+      isRegisteredProject || !userId
+        ? await this.db
+            .prepare(
+              `SELECT * FROM runs WHERE project_id = ? AND baselines_approved = 1 ORDER BY created_at DESC LIMIT 1`,
+            )
+            .bind(projectId)
+            .first<RunRow>()
+        : await this.db
+            .prepare(
+              `SELECT * FROM runs WHERE project_id = ? AND user_id = ? AND baselines_approved = 1 ORDER BY created_at DESC LIMIT 1`,
+            )
+            .bind(projectId, userId)
+            .first<RunRow>();
     if (row) return rowToRun(row);
+    if (!userId) return null;
     const { results: approvedRows } = await this.db
-      .prepare(`SELECT * FROM runs WHERE baselines_approved = 1 ORDER BY created_at DESC`)
+      .prepare(`SELECT * FROM runs WHERE user_id = ? AND baselines_approved = 1 ORDER BY created_at DESC`)
+      .bind(userId)
       .all<RunRow>();
     for (const candidate of approvedRows) {
       const r = rowToRun(candidate);

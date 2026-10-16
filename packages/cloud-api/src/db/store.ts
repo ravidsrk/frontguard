@@ -711,26 +711,44 @@ export class InMemoryStore implements Store {
     return false;
   }
 
-  async listProjectRuns(projectId: string, limit = 50, offset = 0): Promise<Run[]> {
+  async listProjectRuns(projectId: string, limit = 50, offset = 0, userId?: string): Promise<Run[]> {
+    const isRegisteredProject = (await this.getProjectById(projectId)) !== null;
     return [...this.runs.values()]
-      .map((r) => r.run)
-      .filter(
-        (r) =>
-          r.projectId === projectId ||
-          Boolean(r.github?.owner && r.github?.repo && `${r.github.owner}/${r.github.repo}` === projectId),
-      )
+      .filter((entry) => {
+        const r = entry.run;
+        if (r.projectId === projectId && (isRegisteredProject || !userId || entry.userId === userId)) {
+          return true;
+        }
+        return Boolean(
+          userId &&
+            entry.userId === userId &&
+            r.github?.owner &&
+            r.github?.repo &&
+            `${r.github.owner}/${r.github.repo}` === projectId,
+        );
+      })
+      .map((entry) => entry.run)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(offset, offset + limit);
   }
-  async getProjectBaseline(projectId: string): Promise<Run | null> {
+  async getProjectBaseline(projectId: string, userId?: string): Promise<Run | null> {
+    const isRegisteredProject = (await this.getProjectById(projectId)) !== null;
     const approved = [...this.runs.values()]
-      .map((r) => r.run)
-      .filter(
-        (r) =>
-          (r.projectId === projectId ||
-            Boolean(r.github?.owner && r.github?.repo && `${r.github.owner}/${r.github.repo}` === projectId)) &&
-          r.baselinesApproved,
-      )
+      .filter((entry) => {
+        const r = entry.run;
+        if (!r.baselinesApproved) return false;
+        if (r.projectId === projectId && (isRegisteredProject || !userId || entry.userId === userId)) {
+          return true;
+        }
+        return Boolean(
+          userId &&
+            entry.userId === userId &&
+            r.github?.owner &&
+            r.github?.repo &&
+            `${r.github.owner}/${r.github.repo}` === projectId,
+        );
+      })
+      .map((entry) => entry.run)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return approved[0] ?? null;
   }
