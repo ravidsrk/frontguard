@@ -19,6 +19,30 @@ export type { BoundingBox, DiffCluster };
 /** Browser engine supported by Playwright. */
 export type BrowserEngine = 'chromium' | 'firefox' | 'webkit';
 
+/** Preferred color scheme for browser emulation. */
+export type ColorScheme = 'light' | 'dark';
+
+/** Declarative pre-capture interaction step executed on a route before screenshotting. */
+export type RouteAction =
+  | { type: 'click'; selector: string }
+  | { type: 'hover'; selector: string }
+  | { type: 'fill'; selector: string; value: string }
+  | { type: 'press'; selector?: string; key: string }
+  | { type: 'waitForSelector'; selector: string; state?: 'visible' | 'attached' | 'hidden' }
+  | { type: 'wait'; ms: number };
+
+/** Configuration for two-frame visual stability convergence before capture. */
+export interface StabilityConfig {
+  /** Maximum number of frames to capture while waiting for convergence (default: 4, min: 2). */
+  maxAttempts?: number;
+  /** Delay in milliseconds between consecutive frame captures (default: 120). */
+  intervalMs?: number;
+  /** Per-pixel YIQ color threshold (0–1) passed to pixelmatch (default: 0.1). */
+  pixelThreshold?: number;
+  /** Maximum fraction of pixels (0–1) allowed to differ between two consecutive frames (default: 0.0005). */
+  maxUnstableRatio?: number;
+}
+
 /** Severity of a visual regression. */
 export type Severity = 'critical' | 'warning' | 'info';
 
@@ -228,6 +252,12 @@ export interface RouteConfig {
   viewport?: number[];
   /** Optional human-readable label for reports. */
   label?: string;
+  /** Optional CSS selector to wait for before capturing the screenshot. */
+  waitForSelector?: string;
+  /** Optional color scheme override (`'light'` or `'dark'`) for this route. */
+  colorScheme?: ColorScheme;
+  /** Optional declarative pre-capture interaction steps (click, hover, fill, press, waitForSelector, wait). */
+  actions?: RouteAction[];
 }
 
 /**
@@ -315,6 +345,20 @@ export interface FrontguardConfig {
    * with the renderer awaiting each story's `play()` function before capture.
    */
   storybook?: StorybookIntegrationConfig;
+  /** Global browser color scheme emulation (`'light'` or `'dark'`). */
+  colorScheme?: ColorScheme;
+  /**
+   * Automatically redact sensitive input fields (`input[type="password"]`,
+   * credit-card autocomplete fields, `[data-frontguard-redact]`, plus any
+   * custom selectors) in screenshots and DOM snapshots.
+   */
+  redactSensitive?: boolean | string[];
+  /**
+   * Wait for two consecutive frames to visually converge within tolerance
+   * before accepting a screenshot, and attribute residual motion to spatial
+   * bounding boxes if the page does not settle.
+   */
+  waitForStability?: boolean | StabilityConfig;
 }
 
 /**
@@ -385,6 +429,12 @@ export interface Route {
   ignore?: IgnoreRule[];
   /** Per-route viewport widths. Restricts capture to these widths when set. */
   viewport?: number[];
+  /** Optional CSS selector to wait for before capturing the screenshot. */
+  waitForSelector?: string;
+  /** Optional color scheme override (`'light'` or `'dark'`) for this route. */
+  colorScheme?: ColorScheme;
+  /** Optional declarative pre-capture interaction steps. */
+  actions?: RouteAction[];
 }
 
 /**
@@ -410,6 +460,15 @@ export interface ScreenshotResult {
   timestamp: number;
   /** Capture duration in milliseconds. */
   duration: number;
+  /** Number of sensitive DOM elements redacted prior to capture, when `redactSensitive` is enabled. */
+  redactedCount?: number;
+  /** Frame stability convergence telemetry, when `waitForStability` is enabled. */
+  stability?: {
+    settled: boolean;
+    attempts: number;
+    unstableRatio: number;
+    motionClusters?: DiffCluster[];
+  };
 }
 
 /** Severity/impact level of an accessibility violation (axe-core scale). */

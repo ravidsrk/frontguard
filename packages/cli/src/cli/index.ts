@@ -22,6 +22,7 @@ import {
 } from '../core/plugin-registry.js';
 import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
+import { GUIDE_TOPICS, getGuideTopic, formatGuideIndex } from './guide.js';
 import { maybeRunInDocker } from './run.js';
 import { comparisonExitCode } from './exit-code.js';
 import { parseThresholdRatio } from './threshold.js';
@@ -142,6 +143,18 @@ export async function buildConfig(
     config.fixSandbox = opts.fixSandbox === 'daytona' ? 'daytona' : 'local';
   }
 
+  if (opts.redactSensitive === true) {
+    config.redactSensitive = true;
+  }
+
+  if (opts.waitForStability === true) {
+    config.waitForStability = config.waitForStability ?? true;
+  }
+
+  if (opts.colorScheme === 'light' || opts.colorScheme === 'dark') {
+    config.colorScheme = opts.colorScheme;
+  }
+
   // Validate baseUrl is set
   if (!config.baseUrl) {
     throw new Error(
@@ -254,6 +267,9 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--fix-sandbox <kind>', 'Sandbox for fix verification: local or daytona', 'local')
     .option('--mode <mode>', 'Run mode: compare (baseline diff) or judge (AI design eval, beta)', 'compare')
     .option('--experimental', 'Enable experimental features (required for --mode judge)')
+    .option('--redact-sensitive', 'Mask password/credit-card/sensitive inputs before screenshot capture')
+    .option('--wait-for-stability', 'Wait for consecutive frames to converge before screenshot capture')
+    .option('--color-scheme <scheme>', 'Emulate browser color scheme: light or dark')
     .option(
       '--docker',
       'Run inside the repository-source renderer image (not published; build recipe: https://frontguard.dev/docs/cross-os-rendering)',
@@ -431,6 +447,9 @@ export async function main(argv?: string[]): Promise<number> {
     .option('-u, --url <url>', 'Base URL to test')
     .option('-r, --routes <routes>', 'Comma-separated routes')
     .option('-c, --config <path>', 'Config file path')
+    .option('--redact-sensitive', 'Mask password/credit-card/sensitive inputs before screenshot capture')
+    .option('--wait-for-stability', 'Wait for consecutive frames to converge before screenshot capture')
+    .option('--color-scheme <scheme>', 'Emulate browser color scheme: light or dark')
     .option('--verbose', 'Verbose output')
     .option('--debug', 'Debug output')
     .action(async (opts) => {
@@ -750,6 +769,62 @@ export async function main(argv?: string[]): Promise<number> {
           const ver = p.version ? `@${p.version}` : '';
           const desc = p.description ? ` — ${p.description}` : '';
           logger.info(`  • ${p.shortName} (${p.packageName}${ver})${desc}`);
+        }
+        exitCode = 0;
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
+    });
+
+  // ---------------------------------------------------------------------------
+  // Command: guide — Built-in offline documentation for humans and AI agents
+  // ---------------------------------------------------------------------------
+
+  program
+    .command('guide [topic]')
+    .description(
+      'Print built-in reference guides (topics: setup, diffing, mcp, playwright, ci)',
+    )
+    .option('--json', 'Output structured JSON for automated coding agents')
+    .action(async (topic?: string, opts?: { json?: boolean }) => {
+      try {
+        if (!topic) {
+          if (opts?.json) {
+            process.stdout.write(
+              JSON.stringify(
+                {
+                  topics: GUIDE_TOPICS.map(({ id, title, summary }) => ({
+                    id,
+                    title,
+                    summary,
+                  })),
+                },
+                null,
+                2,
+              ) + '\n',
+            );
+          } else {
+            process.stdout.write(formatGuideIndex() + '\n');
+          }
+          exitCode = 0;
+          return;
+        }
+
+        const entry = getGuideTopic(topic);
+        if (!entry) {
+          const validIds = GUIDE_TOPICS.map((t) => t.id).join(', ');
+          logger.error(
+            `Unknown guide topic "${topic}". Available topics: ${validIds}`,
+          );
+          exitCode = 2;
+          return;
+        }
+
+        if (opts?.json) {
+          process.stdout.write(JSON.stringify(entry, null, 2) + '\n');
+        } else {
+          process.stdout.write(entry.content + '\n');
         }
         exitCode = 0;
       } catch (err) {

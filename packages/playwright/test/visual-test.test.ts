@@ -390,4 +390,61 @@ describe('visualTest', () => {
       })
     ).rejects.toThrow(/Visual regression detected for "expect-visual"/);
   });
+
+  it('captures component-scoped screenshot when selector option is provided', async () => {
+    const pageImg = createPNG(100, 100, [255, 0, 0, 255]);
+    const componentImg = createPNG(40, 20, [0, 255, 0, 255]);
+    const page = createMockPage(pageImg);
+    const locatorScreenshot = vi.fn().mockResolvedValue(componentImg);
+    page.locator = vi.fn().mockReturnValue({
+      first: () => ({ screenshot: locatorScreenshot }),
+    });
+
+    const result = await visualTest(page, 'component-card', {
+      baselineDir: TEST_BASELINE_DIR,
+      selector: '[data-testid="pricing-card"]',
+    });
+
+    expect(result.passed).toBe(true);
+    expect(page.locator).toHaveBeenCalledWith('[data-testid="pricing-card"]');
+    expect(locatorScreenshot).toHaveBeenCalledWith({ type: 'png' });
+    expect(page.screenshot).not.toHaveBeenCalled();
+  });
+
+  it('applies and cleans up sensitive-DOM redaction when redactSensitive is enabled', async () => {
+    const img = createPNG(30, 30, [128, 128, 128, 255]);
+    const page = createMockPage(img);
+
+    await visualTest(page, 'redact-test', {
+      baselineDir: TEST_BASELINE_DIR,
+      redactSensitive: ['[data-secret-token]'],
+    });
+
+    // 1 evaluate call to apply redaction + 1 evaluate call in finally to restore
+    expect(page.evaluate).toHaveBeenCalledTimes(2);
+    const selectorsArg = page.evaluate.mock.calls[0][1] as string[];
+    expect(selectorsArg).toContain('input[type="password"]');
+    expect(selectorsArg).toContain('[data-secret-token]');
+  });
+
+  it('polls consecutive frames until settled when waitForStable is enabled', async () => {
+    const frame1 = createPNG(24, 24, [255, 0, 0, 255]);
+    const frame2 = createPNG(24, 24, [0, 128, 255, 255]);
+    const frame3 = createPNG(24, 24, [0, 128, 255, 255]); // matches frame2 -> settled!
+    const page = createMockPage(frame3);
+    page.screenshot = vi
+      .fn()
+      .mockResolvedValueOnce(frame1)
+      .mockResolvedValueOnce(frame2)
+      .mockResolvedValueOnce(frame3);
+
+    const result = await visualTest(page, 'stable-test', {
+      baselineDir: TEST_BASELINE_DIR,
+      waitForStable: { timeoutMs: 500, intervalMs: 10 },
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.settled).toBe(true);
+    expect(page.screenshot).toHaveBeenCalledTimes(3);
+  });
 });

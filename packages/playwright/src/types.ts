@@ -15,6 +15,12 @@ export interface VisualTestOptions {
   baselineDir?: string;
   /** Update baselines instead of comparing */
   update?: boolean;
+  /** Optional CSS selector to capture a single element/component bounding box instead of the full page */
+  selector?: string;
+  /** Automatically redact password, payment, and [data-frontguard-redact] inputs during capture */
+  redactSensitive?: boolean | string[];
+  /** Wait for two consecutive frames to converge before capturing */
+  waitForStable?: boolean | { maxAttempts?: number; intervalMs?: number };
 }
 
 export interface VisualTestResult {
@@ -30,6 +36,7 @@ export interface VisualTestResult {
   };
   ssim?: number;
   isNewBaseline: boolean;
+  settled?: boolean;
 }
 
 export interface CompareResult {
