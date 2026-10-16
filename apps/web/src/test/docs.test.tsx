@@ -291,4 +291,25 @@ describe("docs routes", () => {
     }
     expect(screen.getByText("ON THIS PAGE")).toBeInTheDocument();
   });
+
+  it("supports sidebar filtering, mobile 37-article picker, interactive TOC links, and code copy buttons", async () => {
+    const { container } = await renderAt(`/docs/cli/commands`);
+    expect(screen.getByRole("link", { name: "Skip to main content" })).toHaveAttribute(
+      "href",
+      "#main-content",
+    );
+    expect(container.querySelector("main#main-content")).toBeInTheDocument();
+    expect(container.querySelector("footer.fg-footer")).toBeInTheDocument();
+    expect(screen.getByText(/All 37 articles/i)).toBeInTheDocument();
+
+    const tocLink = container.querySelector('a.fg-toc[href="#threshold-units"]');
+    expect(tocLink).toBeInTheDocument();
+    expect(container.querySelector("h2#threshold-units")).toBeInTheDocument();
+
+    const copyBtns = screen.getAllByRole("button", { name: "Copy code snippet" });
+    expect(copyBtns.length).toBeGreaterThan(0);
+
+    const filterInput = screen.getByRole("searchbox", { name: "Filter articles" });
+    expect(filterInput).toHaveAttribute("placeholder", "Filter articles...");
+  });
 });

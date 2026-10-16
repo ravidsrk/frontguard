@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { Footer } from '../components/Footer'
 import { Nav } from '../components/Nav'
 import { Shield } from '../components/Shield'
 import { buildSeoHead } from '../lib/seo'
@@ -611,6 +612,7 @@ function Brand() {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   )
 }

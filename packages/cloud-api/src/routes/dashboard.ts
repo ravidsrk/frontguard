@@ -250,8 +250,11 @@ sessionDashboardRoutes.get('/monitors/:id', async (c) => {
   const id = c.req.param('id');
   const m = await store.getMonitor(id);
   if (!m || m.userId !== userId) return c.html(renderLogin(), 404);
-  const runs = await store.listMonitorRuns(id, 50);
-  return c.html(renderMonitorDetail(m, runs));
+  const [runs, alertState] = await Promise.all([
+    store.listMonitorRuns(id, 50),
+    store.getAlertState(id),
+  ]);
+  return c.html(renderMonitorDetail(m, runs, new Date(), alertState));
 });
 
 // GET /dashboard/monitors/:id/history — last 30 runs with filters (Task 15.1).
@@ -280,13 +283,14 @@ sessionDashboardRoutes.get('/runs/:runId', async (c) => {
   if (!(await isRunAccessibleByUser(store, runId, userId))) {
     return c.html(renderLogin(), 404);
   }
-  const [shots, decisions, attachments] = await Promise.all([
+  const [shots, decisions, attachments, run] = await Promise.all([
     store.listScreenshots(runId),
     store.listScreenshotDecisions(runId),
     store.listAttachments(runId),
+    store.getRun(runId),
   ]);
   return c.html(
-    renderScreenshotComparison(runId, shots, { sessioned: true, decisions, attachments }),
+    renderScreenshotComparison(runId, shots, { sessioned: true, decisions, attachments, run }),
   );
 });
 

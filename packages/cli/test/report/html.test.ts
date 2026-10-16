@@ -295,5 +295,98 @@ describe('HTMLReporter', () => {
     expect(html).toContain('/pricing');
     expect(html).toContain('Card overflows horizontally');
   });
-});
 
+  it('renders route search input and keyboard shortcut hints in sidebar', () => {
+    const reporter = new HTMLReporter();
+    const result = makeRunResult([makeDiff({ route: { path: '/checkout' } })]);
+    const html = reporter.generateReport(result);
+
+    expect(html).toContain('id="route-search"');
+    expect(html).toContain('aria-label="Search routes"');
+    expect(html).toContain('data-route="/checkout"');
+    expect(html).toContain('sidebar-shortcuts');
+    expect(html).toContain('<kbd>j</kbd>/<kbd>k</kbd>');
+  });
+
+  it('renders 4-mode interactive comparison switcher with swipe and onion sliders when baseline and current images exist', () => {
+    const png = createTestPng(12, 12, 200, 100, 50);
+    const reporter = new HTMLReporter();
+    const result = makeRunResult([
+      makeDiff({
+        status: 'regression',
+        diffPercentage: 4.2,
+        baselineImage: png,
+        currentImage: png,
+        diffImage: png,
+      }),
+    ]);
+    const html = reporter.generateReport(result);
+
+    expect(html).toContain('view-mode-toolbar');
+    expect(html).toContain('data-view-mode="side-by-side"');
+    expect(html).toContain('data-view-mode="swipe"');
+    expect(html).toContain('data-view-mode="onion"');
+    expect(html).toContain('data-view-mode="diff"');
+    expect(html).toContain('swipe-slider');
+    expect(html).toContain('onion-slider');
+  });
+
+  it('renders diff clusters inspector panel, Chroma SSIM / CW-SSIM metrics, and unsettled frame stability banner', () => {
+    const png = createTestPng(16, 16, 255, 0, 0);
+    const reporter = new HTMLReporter();
+    const result = makeRunResult([
+      makeDiff({
+        status: 'regression',
+        diffPercentage: 3.75,
+        ssim: 0.942,
+        baselineImage: png,
+        currentImage: png,
+        diffImage: png,
+        redactedCount: 2,
+        stability: {
+          settled: false,
+          attempts: 4,
+          unstableRatio: 0.0145,
+          motionClusters: [
+            {
+              id: 1,
+              bbox: { x: 10, y: 20, width: 120, height: 48 },
+              rawDiffPixels: 84,
+              area: 5760,
+              density: 0.0145,
+              centroid: { x: 70, y: 44 },
+            },
+          ],
+        },
+        clusters: [
+          {
+            id: 1,
+            bbox: { x: 40, y: 80, width: 64, height: 32 },
+            rawDiffPixels: 512,
+            area: 2048,
+            density: 0.25,
+            centroid: { x: 72, y: 96 },
+            chromaSSIM: 0.612,
+            cwSSIM: 0.784,
+          },
+        ],
+      }),
+    ]);
+    const html = reporter.generateReport(result);
+
+    expect(html).toContain('1 cluster');
+    expect(html).toContain('SSIM 94.2%');
+    expect(html).toContain('🔒 2 redacted');
+    expect(html).toContain('stability-banner');
+    expect(html).toContain('1.45% unstable pixels');
+    expect(html).toContain('(10, 20, 120×48)');
+    expect(html).toContain('clusters-panel');
+    expect(html).toContain('Chroma SSIM');
+    expect(html).toContain('CW-SSIM');
+    expect(html).toContain('61.2%');
+    expect(html).toContain('78.4%');
+    expect(html).toContain('(40, 80) 64×32px');
+    expect(html).toContain('toggle-bboxes-btn');
+    expect(html).toContain('data-clusters=');
+  });
+});

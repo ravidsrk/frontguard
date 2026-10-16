@@ -417,5 +417,51 @@ describe('ConsoleReporter', () => {
     expect(output).toContain('/pricing');
     expect(output).toContain('CTA button overflows viewport');
   });
-});
 
+  it('prints cluster metrics and unsettled frame warning for regressions and warnings', () => {
+    const reporter = new ConsoleReporter();
+    const result = makeRunResult([
+      makeDiff({
+        route: { path: '/checkout' },
+        viewport: 1440,
+        status: 'regression',
+        diffPercentage: 4.5,
+        ssim: 0.912,
+        clusters: [
+          {
+            id: 1,
+            bbox: { x: 24, y: 48, width: 120, height: 40 },
+            rawDiffPixels: 960,
+            area: 4800,
+            density: 0.2,
+            centroid: { x: 84, y: 68 },
+            chromaSSIM: 0.543,
+            cwSSIM: 0.721,
+          },
+        ],
+        stability: {
+          settled: false,
+          attempts: 4,
+          unstableRatio: 0.0215,
+          motionClusters: [
+            {
+              id: 1,
+              bbox: { x: 100, y: 200, width: 300, height: 80 },
+              rawDiffPixels: 400,
+              area: 24000,
+              density: 0.016,
+              centroid: { x: 250, y: 240 },
+            },
+          ],
+        },
+      }),
+    ]);
+
+    reporter.onComplete(result);
+
+    const output = collectOutput(logSpy);
+    expect(output).toContain('Diff: 4.50% pixels changed');
+    expect(output).toContain('Metrics: SSIM 91.2% · 1 cluster — largest (24, 48) 120×40px [Chroma SSIM 54.3%, CW-SSIM 72.1%]');
+    expect(output).toContain('⚠ Unsettled frame: 2.15% motion variance after 4 attempts — primary motion at (100, 200) 300×80px');
+  });
+});

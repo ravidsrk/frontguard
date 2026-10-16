@@ -567,6 +567,10 @@ export interface DiffResult {
   fixVerification?: FixVerification;
   /** Extracted spatial diff clusters with region-scoped perceptual similarity metrics. */
   clusters?: DiffCluster[];
+  /** Frame stability convergence telemetry from capture, when `waitForStability` is enabled. */
+  stability?: ScreenshotResult['stability'];
+  /** Number of sensitive DOM elements redacted prior to capture, when `redactSensitive` is enabled. */
+  redactedCount?: number;
 }
 
 /**

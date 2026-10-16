@@ -74,6 +74,9 @@ ${renderHeader(result)}
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <h3>Routes</h3>
+      <div class="sidebar-search">
+        <input type="search" id="route-search" class="route-search-input" placeholder="Search routes… (/)" aria-label="Search routes">
+      </div>
       <div class="filter-buttons" id="filters" role="toolbar" aria-label="Filter routes by status">
         <button class="filter-btn active" data-filter="all" aria-label="Show all routes">All (${routes.length})</button>
         <button class="filter-btn" data-filter="regression" aria-label="Show regressions only">✘ Regressions (${result.summary.regressions})</button>
@@ -87,6 +90,9 @@ ${renderHeader(result)}
     </ul>
     <div class="empty-filter-state" id="empty-filter-state" style="display:none" aria-live="polite">
       <p>No routes match this filter</p>
+    </div>
+    <div class="sidebar-shortcuts">
+      <kbd>j</kbd>/<kbd>k</kbd> route · <kbd>1</kbd>-<kbd>4</kbd> view · <kbd>b</kbd> boxes · <kbd>/</kbd> search
     </div>
   </aside>
   <main class="main" id="main">
@@ -262,7 +268,7 @@ function renderHeader(result: RunResult): string {
 }
 
 function renderSidebarItem(path: string, status: string, index: number): string {
-  return `<li class="route-item" data-index="${index}" data-status="${status}">
+  return `<li class="route-item" data-index="${index}" data-status="${status}" data-route="${escapeHtml(path)}">
         ${statusIcon(status)}
         <span class="route-path">${escapeHtml(path)}</span>
       </li>`;
@@ -276,6 +282,117 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
     const baselineSrc = resolveImage(diff.baselineImage, `${prefix}_baseline`);
     const currentSrc = resolveImage(diff.currentImage, `${prefix}_current`);
     const diffSrc = resolveImage(diff.diffImage, `${prefix}_diff`);
+    const hasClusters = Boolean(diff.clusters && diff.clusters.length > 0);
+
+    const pills: string[] = [];
+    if (diff.clusters && diff.clusters.length > 0) {
+      pills.push(`<span class="meta-pill">${diff.clusters.length} cluster${diff.clusters.length !== 1 ? 's' : ''}</span>`);
+    }
+    if (diff.ssim !== undefined) {
+      pills.push(`<span class="meta-pill">SSIM ${(diff.ssim * 100).toFixed(1)}%</span>`);
+    }
+    if (diff.stability) {
+      if (diff.stability.settled) {
+        pills.push(`<span class="meta-pill pill-settled">✓ Settled (${diff.stability.attempts}f)</span>`);
+      } else {
+        pills.push(`<span class="meta-pill pill-unsettled">⚠ Unsettled (${(diff.stability.unstableRatio * 100).toFixed(2)}% motion)</span>`);
+      }
+    }
+    if (diff.redactedCount && diff.redactedCount > 0) {
+      pills.push(`<span class="meta-pill">🔒 ${diff.redactedCount} redacted</span>`);
+    }
+
+    let stabilityBanner = '';
+    if (diff.stability && !diff.stability.settled) {
+      const motionBoxes = (diff.stability.motionClusters ?? [])
+        .map((mc) => `<code>(${mc.bbox.x}, ${mc.bbox.y}, ${mc.bbox.width}×${mc.bbox.height})</code>`)
+        .join(', ');
+      stabilityBanner = `<div class="stability-banner">
+          <strong>⚠ Unsettled frame:</strong> Page did not settle after ${diff.stability.attempts} attempts (${(diff.stability.unstableRatio * 100).toFixed(2)}% unstable pixels)${motionBoxes ? ` — motion clusters at ${motionBoxes}` : ''}.
+        </div>`;
+    }
+
+    let viewToolbar = '';
+    let interactiveStages = '';
+    if (baselineSrc && currentSrc) {
+      const bboxToggleBtn =
+        diff.clusters && diff.clusters.length > 0
+          ? `<button type="button" class="toggle-bboxes-btn active">b · Clusters (${diff.clusters.length})</button>`
+          : '';
+      viewToolbar = `<div class="view-mode-toolbar" role="toolbar" aria-label="Comparison view mode">
+          <button type="button" class="view-mode-btn active" data-view-mode="side-by-side">1 · Side-by-Side</button>
+          <button type="button" class="view-mode-btn" data-view-mode="swipe">2 · Swipe</button>
+          <button type="button" class="view-mode-btn" data-view-mode="onion">3 · Onion Skin</button>
+          <button type="button" class="view-mode-btn" data-view-mode="diff">4 · Diff Focus</button>
+          ${bboxToggleBtn}
+        </div>`;
+
+      interactiveStages = `<div class="swipe-stage" style="display:none">
+          <div class="stage-controls">
+            <label>Baseline ↔ Current</label>
+            <input type="range" class="swipe-slider" min="0" max="100" value="50" aria-label="Swipe comparison slider">
+          </div>
+          <div class="comparison-canvas swipe-canvas">
+            <img src="${currentSrc}" alt="current" class="stage-img stage-current" loading="lazy">
+            <div class="swipe-clip" style="clip-path: inset(0 50% 0 0);">
+              <img src="${baselineSrc}" alt="baseline" class="stage-img stage-baseline" loading="lazy">
+            </div>
+            <div class="swipe-divider" style="left: 50%;"></div>
+            <div class="bbox-overlay"></div>
+          </div>
+        </div>
+        <div class="onion-stage" style="display:none">
+          <div class="stage-controls">
+            <label>Current Opacity</label>
+            <input type="range" class="onion-slider" min="0" max="100" value="50" aria-label="Onion skin opacity slider">
+          </div>
+          <div class="comparison-canvas onion-canvas">
+            <img src="${baselineSrc}" alt="baseline" class="stage-img stage-baseline" loading="lazy">
+            <img src="${currentSrc}" alt="current" class="stage-img stage-current onion-overlay-img" style="opacity: 0.5;" loading="lazy">
+            <div class="bbox-overlay"></div>
+          </div>
+        </div>
+        <div class="diff-stage" style="display:none">
+          <div class="comparison-canvas diff-canvas">
+            <img src="${diffSrc || currentSrc}" alt="diff focus" class="stage-img" loading="lazy">
+            <div class="bbox-overlay"></div>
+          </div>
+        </div>`;
+    }
+
+    let clustersSection = '';
+    if (diff.clusters && diff.clusters.length > 0) {
+      const clusterRows = diff.clusters
+        .map((c) => {
+          const chromaCell =
+            c.chromaSSIM !== undefined ? `${(c.chromaSSIM * 100).toFixed(1)}%` : '—';
+          const cwCell =
+            c.cwSSIM !== undefined ? `${(c.cwSSIM * 100).toFixed(1)}%` : '—';
+          return `<tr class="cluster-row" data-cluster-id="${c.id}">
+              <td><span class="cluster-id">#${c.id}</span></td>
+              <td><code>(${c.bbox.x}, ${c.bbox.y}) ${c.bbox.width}×${c.bbox.height}px</code></td>
+              <td>${c.rawDiffPixels}px</td>
+              <td>${chromaCell}</td>
+              <td>${cwCell}</td>
+            </tr>`;
+        })
+        .join('\n');
+      clustersSection = `<div class="clusters-panel">
+          <h4>🎯 Diff Clusters (${diff.clusters.length})</h4>
+          <table class="clusters-table">
+            <thead>
+              <tr>
+                <th>Cluster</th>
+                <th>Bounding Box</th>
+                <th>Diff Pixels</th>
+                <th>Chroma SSIM</th>
+                <th>CW-SSIM</th>
+              </tr>
+            </thead>
+            <tbody>${clusterRows}</tbody>
+          </table>
+        </div>`;
+    }
 
     let aiSection = '';
     if (diff.aiAnalysis) {
@@ -310,18 +427,41 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
         </div>`;
     }
 
-    return `<div class="diff-card status-${diff.status}">
+    const clustersAttr =
+      diff.clusters && diff.clusters.length > 0
+        ? ` data-clusters="${escapeHtml(
+            JSON.stringify(
+              diff.clusters.map((c) => ({
+                id: c.id,
+                x: c.bbox.x,
+                y: c.bbox.y,
+                width: c.bbox.width,
+                height: c.bbox.height,
+                rawDiffPixels: c.rawDiffPixels,
+                chromaSSIM: c.chromaSSIM,
+                cwSSIM: c.cwSSIM,
+              })),
+            ),
+          )}"`
+        : '';
+
+    return `<div class="diff-card status-${diff.status}${hasClusters ? ' bboxes-visible' : ''}" data-view-mode="side-by-side"${clustersAttr}>
         <div class="diff-header">
           ${statusIcon(diff.status)}
           <span class="diff-label">${diff.viewport}px · ${diff.browser}</span>
+          ${pills.join('\n          ')}
           <span class="diff-percentage">${diff.diffPercentage.toFixed(2)}% changed</span>
         </div>
         ${diff.error ? `<div class="diff-error">${escapeHtml(diff.error)}</div>` : ''}
+        ${stabilityBanner}
+        ${viewToolbar}
         <div class="image-row">
           ${baselineSrc ? `<div class="image-col"><h5>Baseline</h5><img src="${baselineSrc}" alt="baseline" loading="lazy"></div>` : ''}
-          ${currentSrc ? `<div class="image-col"><h5>Current</h5><img src="${currentSrc}" alt="current" loading="lazy"></div>` : ''}
-          ${diffSrc ? `<div class="image-col"><h5>Diff</h5><img src="${diffSrc}" alt="diff" loading="lazy"></div>` : ''}
+          ${currentSrc ? `<div class="image-col"><h5>Current</h5><div class="image-stage-wrap"><img src="${currentSrc}" alt="current" loading="lazy"><div class="bbox-overlay"></div></div></div>` : ''}
+          ${diffSrc ? `<div class="image-col"><h5>Diff</h5><div class="image-stage-wrap"><img src="${diffSrc}" alt="diff" loading="lazy"><div class="bbox-overlay"></div></div></div>` : ''}
         </div>
+        ${interactiveStages}
+        ${clustersSection}
         ${aiSection}
         ${fixSection}
       </div>`;
@@ -630,6 +770,18 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .sidebar-header h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 12px; }
+.sidebar-search { margin-bottom: 10px; }
+.route-search-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 12px;
+  outline: none;
+}
+.route-search-input:focus { border-color: var(--blue); }
 .filter-buttons { display: flex; flex-wrap: wrap; gap: 4px; }
 .filter-btn {
   background: var(--bg-elevated);
@@ -644,8 +796,25 @@ body {
 .filter-btn:hover { border-color: var(--text-muted); color: var(--text); }
 .filter-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
-.route-list { list-style: none; }
+.route-list { list-style: none; flex: 1; overflow-y: auto; }
 .empty-filter-state { padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.sidebar-shortcuts {
+  margin-top: auto;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+}
+.sidebar-shortcuts kbd {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--text);
+}
 .route-item {
   display: flex;
   align-items: center;
@@ -696,12 +865,26 @@ body {
 .diff-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 16px;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
 }
 .diff-label { font-weight: 600; }
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(139, 148, 158, 0.15);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.meta-pill.pill-settled { background: rgba(63, 185, 80, 0.12); color: var(--green); border-color: rgba(63, 185, 80, 0.35); }
+.meta-pill.pill-unsettled { background: rgba(210, 153, 34, 0.15); color: var(--yellow); border-color: rgba(210, 153, 34, 0.4); }
 .diff-percentage { margin-left: auto; color: var(--text-muted); font-size: 13px; }
 .diff-error {
   padding: 8px 16px;
@@ -709,6 +892,43 @@ body {
   color: var(--red);
   font-size: 13px;
 }
+.stability-banner {
+  padding: 10px 16px;
+  background: rgba(210, 153, 34, 0.12);
+  border-bottom: 1px solid rgba(210, 153, 34, 0.35);
+  color: var(--yellow);
+  font-size: 12px;
+}
+.stability-banner code {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text);
+}
+
+/* 4-Mode View Switcher Toolbar */
+.view-mode-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.view-mode-btn, .toggle-bboxes-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.view-mode-btn:hover, .toggle-bboxes-btn:hover { color: var(--text); border-color: var(--text-muted); }
+.view-mode-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.toggle-bboxes-btn { margin-left: auto; }
+.toggle-bboxes-btn.active { background: rgba(248, 81, 73, 0.18); border-color: var(--red); color: #ff7b72; }
 
 .image-row {
   display: grid;
@@ -722,6 +942,112 @@ body {
   border-radius: 4px;
   border: 1px solid var(--border);
   background: #000;
+  display: block;
+}
+.image-stage-wrap, .comparison-canvas {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+.swipe-stage, .onion-stage, .diff-stage {
+  padding: 16px;
+}
+.stage-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.stage-controls input[type="range"] {
+  flex: 1;
+  max-width: 320px;
+  accent-color: var(--blue);
+}
+.stage-img {
+  width: 100%;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: #000;
+  display: block;
+}
+.swipe-clip, .onion-overlay-img {
+  position: absolute;
+  inset: 0;
+}
+.swipe-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--blue);
+  pointer-events: none;
+}
+
+/* Bounding Box Overlay */
+.bbox-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: none;
+}
+.diff-card.bboxes-visible .bbox-overlay {
+  display: block;
+}
+.bbox-overlay-box {
+  position: absolute;
+  border: 2px solid var(--red);
+  background: rgba(248, 81, 73, 0.18);
+  border-radius: 2px;
+}
+.bbox-overlay-label {
+  position: absolute;
+  top: -18px;
+  left: -2px;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+/* Diff Clusters Inspector Panel */
+.clusters-panel {
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(248, 81, 73, 0.04);
+}
+.clusters-panel h4 {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.clusters-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.clusters-table th, .clusters-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.clusters-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.clusters-table code {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+.cluster-id {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--red);
 }
 
 /* AI Analysis */
@@ -821,59 +1147,148 @@ function getJS(): string {
   return `
 (function() {
   const routeList = document.getElementById('route-list');
-  const mainArea = document.getElementById('main');
   const placeholder = document.getElementById('placeholder');
   const filterBtns = document.querySelectorAll('.filter-btn');
   const routeItems = document.querySelectorAll('.route-item');
+  const searchInput = document.getElementById('route-search');
+  var emptyState = document.getElementById('empty-filter-state');
+  var activeFilter = 'all';
 
-  // Route selection
-  routeList.addEventListener('click', function(e) {
-    const item = e.target.closest('.route-item');
+  function selectRouteItem(item) {
     if (!item) return;
-
     const index = item.dataset.index;
-
-    // Update active state in sidebar
     routeItems.forEach(function(el) { el.classList.remove('active'); });
     item.classList.add('active');
-
-    // Show corresponding detail
     document.querySelectorAll('.route-detail').forEach(function(el) { el.style.display = 'none'; });
     if (placeholder) placeholder.style.display = 'none';
-
     var detail = document.getElementById('route-' + index);
-    if (detail) detail.style.display = 'block';
-  });
+    if (detail) {
+      detail.style.display = 'block';
+      detail.querySelectorAll('.diff-card').forEach(renderCardBboxes);
+    }
+  }
+
+  // Route selection
+  if (routeList) {
+    routeList.addEventListener('click', function(e) {
+      const item = e.target.closest('.route-item');
+      if (!item) return;
+      selectRouteItem(item);
+    });
+  }
+
+  function applyRouteFilters() {
+    var query = searchInput ? (searchInput.value || '').trim().toLowerCase() : '';
+    var visibleCount = 0;
+
+    routeItems.forEach(function(item) {
+      var statusMatch = activeFilter === 'all' || item.dataset.status === activeFilter;
+      var routeText = (item.dataset.route || item.textContent || '').toLowerCase();
+      var searchMatch = !query || routeText.indexOf(query) !== -1;
+      var show = statusMatch && searchMatch;
+      item.style.display = show ? '' : 'none';
+      if (show) visibleCount++;
+    });
+
+    if (emptyState) {
+      emptyState.style.display = visibleCount === 0 ? '' : 'none';
+    }
+  }
 
   // Filter buttons
-  var emptyState = document.getElementById('empty-filter-state');
   filterBtns.forEach(function(btn) {
     btn.addEventListener('click', function() {
       filterBtns.forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
-
-      var filter = btn.dataset.filter;
-      var visibleCount = 0;
-
-      routeItems.forEach(function(item) {
-        if (filter === 'all') {
-          item.style.display = '';
-          visibleCount++;
-        } else {
-          var show = item.dataset.status === filter;
-          item.style.display = show ? '' : 'none';
-          if (show) visibleCount++;
-        }
-      });
-
-      if (emptyState) {
-        emptyState.style.display = visibleCount === 0 ? '' : 'none';
-      }
+      activeFilter = btn.dataset.filter || 'all';
+      applyRouteFilters();
     });
   });
 
-  // Copy-fix buttons
+  if (searchInput) {
+    searchInput.addEventListener('input', applyRouteFilters);
+  }
+
+  // View mode switching on a diff-card
+  function setCardViewMode(card, mode) {
+    if (!card) return;
+    card.dataset.viewMode = mode;
+    card.querySelectorAll('.view-mode-btn').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.viewMode === mode);
+    });
+    var imageRow = card.querySelector('.image-row');
+    var swipeStage = card.querySelector('.swipe-stage');
+    var onionStage = card.querySelector('.onion-stage');
+    var diffStage = card.querySelector('.diff-stage');
+    if (imageRow) imageRow.style.display = mode === 'side-by-side' ? '' : 'none';
+    if (swipeStage) swipeStage.style.display = mode === 'swipe' ? '' : 'none';
+    if (onionStage) onionStage.style.display = mode === 'onion' ? '' : 'none';
+    if (diffStage) diffStage.style.display = mode === 'diff' ? '' : 'none';
+  }
+
+  // Render proportional bounding boxes over images when loaded
+  function renderCardBboxes(card) {
+    var raw = card.getAttribute('data-clusters');
+    if (!raw) return;
+    var clusters;
+    try { clusters = JSON.parse(raw); } catch (e) { return; }
+    if (!Array.isArray(clusters) || clusters.length === 0) return;
+
+    var imgs = card.querySelectorAll('img');
+    var refImg = null;
+    imgs.forEach(function(img) {
+      if (!refImg && img.naturalWidth > 0 && img.naturalHeight > 0) refImg = img;
+    });
+    if (!refImg) {
+      imgs.forEach(function(img) {
+        if (!img.dataset.bboxBound) {
+          img.dataset.bboxBound = '1';
+          img.addEventListener('load', function() { renderCardBboxes(card); });
+        }
+      });
+      return;
+    }
+
+    var natW = refImg.naturalWidth;
+    var natH = refImg.naturalHeight;
+    card.querySelectorAll('.bbox-overlay').forEach(function(overlay) {
+      overlay.innerHTML = '';
+      clusters.forEach(function(c) {
+        var box = document.createElement('div');
+        box.className = 'bbox-overlay-box';
+        box.style.left = ((c.x / natW) * 100).toFixed(2) + '%';
+        box.style.top = ((c.y / natH) * 100).toFixed(2) + '%';
+        box.style.width = Math.max(0.5, (c.width / natW) * 100).toFixed(2) + '%';
+        box.style.height = Math.max(0.5, (c.height / natH) * 100).toFixed(2) + '%';
+        var label = document.createElement('span');
+        label.className = 'bbox-overlay-label';
+        label.textContent = '#' + c.id;
+        box.appendChild(label);
+        overlay.appendChild(box);
+      });
+    });
+  }
+
+  // Delegated click & input handlers for view modes, bbox toggles, sliders, and copy-fix
   document.addEventListener('click', function(e) {
+    var modeBtn = e.target.closest && e.target.closest('.view-mode-btn');
+    if (modeBtn) {
+      var card = modeBtn.closest('.diff-card');
+      setCardViewMode(card, modeBtn.dataset.viewMode);
+      return;
+    }
+
+    var bboxBtn = e.target.closest && e.target.closest('.toggle-bboxes-btn');
+    if (bboxBtn) {
+      var bboxCard = bboxBtn.closest('.diff-card');
+      if (bboxCard) {
+        var active = bboxCard.classList.toggle('bboxes-visible');
+        bboxBtn.classList.toggle('active', active);
+        renderCardBboxes(bboxCard);
+      }
+      return;
+    }
+
     var btn = e.target.closest && e.target.closest('.copy-fix-btn');
     if (!btn) return;
     var code = document.getElementById(btn.getAttribute('data-target'));
@@ -892,6 +1307,86 @@ function getJS(): string {
       ta.value = text; document.body.appendChild(ta); ta.select();
       try { document.execCommand('copy'); done(); } catch (err) {}
       document.body.removeChild(ta);
+    }
+  });
+
+  document.addEventListener('input', function(e) {
+    var target = e.target;
+    if (!target || !target.classList) return;
+    if (target.classList.contains('swipe-slider')) {
+      var stage = target.closest('.swipe-stage');
+      if (!stage) return;
+      var val = Number(target.value);
+      var clip = stage.querySelector('.swipe-clip');
+      var divider = stage.querySelector('.swipe-divider');
+      if (clip) clip.style.clipPath = 'inset(0 ' + (100 - val) + '% 0 0)';
+      if (divider) divider.style.left = val + '%';
+    } else if (target.classList.contains('onion-slider')) {
+      var oStage = target.closest('.onion-stage');
+      if (!oStage) return;
+      var overlayImg = oStage.querySelector('.onion-overlay-img');
+      if (overlayImg) overlayImg.style.opacity = String(Number(target.value) / 100);
+    }
+  });
+
+  // Keyboard shortcuts: j/k route, 1-4 view mode, b toggle boxes, / focus search
+  document.addEventListener('keydown', function(e) {
+    var tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+    var isInput = tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable);
+    if (isInput) {
+      if (e.key === 'Escape' && e.target.blur) e.target.blur();
+      return;
+    }
+
+    if (e.key === '/') {
+      if (searchInput) {
+        e.preventDefault();
+        searchInput.focus();
+      }
+      return;
+    }
+
+    if (e.key === 'j' || e.key === 'k') {
+      var visible = Array.prototype.filter.call(routeItems, function(el) {
+        return el.style.display !== 'none';
+      });
+      if (visible.length === 0) return;
+      var currentIdx = -1;
+      visible.forEach(function(el, idx) {
+        if (el.classList.contains('active')) currentIdx = idx;
+      });
+      var nextIdx = e.key === 'j'
+        ? Math.min(visible.length - 1, currentIdx + 1)
+        : Math.max(0, currentIdx <= 0 ? 0 : currentIdx - 1);
+      selectRouteItem(visible[nextIdx]);
+      return;
+    }
+
+    var modeMap = { '1': 'side-by-side', '2': 'swipe', '3': 'onion', '4': 'diff' };
+    if (modeMap[e.key]) {
+      document.querySelectorAll('.route-detail').forEach(function(detail) {
+        if (detail.style.display !== 'none') {
+          detail.querySelectorAll('.diff-card').forEach(function(card) {
+            if (card.querySelector('.view-mode-toolbar')) {
+              setCardViewMode(card, modeMap[e.key]);
+            }
+          });
+        }
+      });
+      return;
+    }
+
+    if (e.key === 'b') {
+      document.querySelectorAll('.route-detail').forEach(function(detail) {
+        if (detail.style.display !== 'none') {
+          detail.querySelectorAll('.diff-card').forEach(function(card) {
+            var active = card.classList.toggle('bboxes-visible');
+            var btn = card.querySelector('.toggle-bboxes-btn');
+            if (btn) btn.classList.toggle('active', active);
+            renderCardBboxes(card);
+          });
+        }
+      });
     }
   });
 

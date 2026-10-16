@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
+  renderDashboard,
+  renderMonitorDetail,
   renderMonitorHistory,
   renderDiffViewer,
   renderMasksSettings,
@@ -123,10 +125,15 @@ describe('renderDiffViewer', () => {
     // Mode toggle.
     expect(html).toContain('Overlay');
     expect(html).toContain('Heatmap');
-    // Keyboard shortcut hints.
+    expect(html).toContain('Swipe');
+    expect(html).toContain('value="swipe"');
+    expect(html).toContain('id="stage-slider"');
+    expect(html).toContain('clip-path: inset(0 0 0');
+    // Keyboard shortcut hints & modifier guard.
     expect(html).toContain('<kbd>A</kbd>');
     expect(html).toContain('<kbd>R</kbd>');
     expect(html).toContain('<kbd>I</kbd>');
+    expect(html).toContain('if (e.metaKey || e.ctrlKey || e.altKey) return;');
     // Nav arrows.
     expect(html).toContain('/dashboard/runs/run1/diffs/d0');
     expect(html).toContain('/dashboard/runs/run1/diffs/d2');
@@ -152,6 +159,39 @@ describe('renderDiffViewer', () => {
     expect(html).toContain('"x":10');
     expect(html).toContain('"width":100');
     expect(html).toContain('clock');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Render: active snooze banner & landmarks
+// ---------------------------------------------------------------------------
+describe('renderMonitorDetail snooze banner & landmarks', () => {
+  const now = new Date('2026-01-01T12:00:00Z');
+
+  it('renders active snooze banner when snoozedUntil is in the future', () => {
+    const html = renderMonitorDetail(makeMonitor(), [], now, {
+      monitorId: 'm1',
+      snoozedUntil: '2026-01-02T00:00:00Z',
+    });
+    expect(html).toContain('<div class="snooze-banner">⏸ Alerts snoozed until 2026-01-02T00:00:00Z</div>');
+    expect(html).toContain('aria-label="Snooze hours"');
+    expect(html).toContain('Skip to main content');
+    expect(html).toContain('id="main-content"');
+  });
+
+  it('omits snooze banner when snoozedUntil has expired', () => {
+    const html = renderMonitorDetail(makeMonitor(), [], now, {
+      monitorId: 'm1',
+      snoozedUntil: '2026-01-01T10:00:00Z',
+    });
+    expect(html).not.toContain('⏸ Alerts snoozed until');
+  });
+
+  it('links recent activity items to run comparison when sessioned', () => {
+    const run = makeRun('run-abc');
+    const html = renderDashboard([], [run], now, true);
+    expect(html).toContain('/dashboard/runs/run-abc');
+    expect(html).toContain('--bg:#0d0c0b');
   });
 });
 
@@ -197,6 +237,30 @@ describe('renderScreenshotComparison sessioned', () => {
     const html = renderScreenshotComparison('r1', shots, { sessioned: true, attachments: [att] });
     expect(html).toContain('/dashboard/runs/r1/attachments');
     expect(html).toContain('1 attachment');
+  });
+
+  it('renders run metadata summary and per-group diff percentage + classification badge', () => {
+    const run: Run = {
+      ...makeRun('r1'),
+      url: 'https://prod.example.com',
+      createdAt: '2026-02-01T15:30:00Z',
+      results: [
+        {
+          route: '/',
+          viewport: 1440,
+          browser: 'chromium',
+          status: 'regression',
+          diffPercentage: 3.456,
+          classification: 'regression',
+          timestamp: '2026-02-01T15:31:00Z',
+        },
+      ],
+    };
+    const html = renderScreenshotComparison('r1', shots, { sessioned: true, run });
+    expect(html).toContain('https://prod.example.com');
+    expect(html).toContain('2026-02-01T15:30:00Z');
+    expect(html).toContain('3.46%');
+    expect(html).toContain('regression');
   });
 });
 

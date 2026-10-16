@@ -17,7 +17,7 @@ export function InfoPage({
   return (
     <div style={s('background: #0d0c0b; color: #b8b0a6; min-height: 100vh;')}>
       <Nav />
-      <main style={s('max-width: 820px; margin: 0 auto; padding: 88px 28px 112px;')}>
+      <main id="main-content" style={s('max-width: 820px; margin: 0 auto; padding: 88px 28px 112px;')}>
         <p style={s("font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #e8862e; letter-spacing: 0.09em; margin: 0 0 16px;")}>
           // {eyebrow}
         </p>

@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { createFileRoute, Link, Outlet, useParams } from '@tanstack/react-router'
 import { s } from '../lib/style'
+import { Footer } from '../components/Footer'
 import { Shield } from '../components/Shield'
-import { articles, navGroups, type Article } from '../lib/docs-content'
+import { articles, navGroups, slugifyHeading, type Article } from '../lib/docs-content'
 import { buildSeoHead, canonicalUrl } from '../lib/seo'
 import {
   FRONTGUARD_ORGANIZATION,
@@ -75,9 +77,29 @@ function DocsLayout() {
   const known = !!slug && articles.some((a) => a.id === slug)
   const active = known ? slug : articles[0]?.id ?? 'index'
   const cur = byId(active)
+  const [filterQuery, setFilterQuery] = useState('')
+  const normalizedFilter = filterQuery.trim().toLowerCase()
+  const filteredGroups = navGroups
+    .map((group) => ({
+      ...group,
+      ids: group.ids.filter((id) => {
+        if (!normalizedFilter) return true
+        const it = byId(id)
+        return (
+          it.label.toLowerCase().includes(normalizedFilter) ||
+          it.section.toLowerCase().includes(normalizedFilter) ||
+          group.label.toLowerCase().includes(normalizedFilter) ||
+          id.toLowerCase().includes(normalizedFilter)
+        )
+      }),
+    }))
+    .filter((group) => group.ids.length > 0)
 
   return (
     <div style={s('background: #0d0c0b; color: #b8b0a6; min-height: 100vh;')}>
+      <a href="#main-content" className="fg-skip-link">
+        Skip to main content
+      </a>
       <header className="fg-docs-header" style={s('position: sticky; top: 0; z-index: 50; background: rgba(13,12,11,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid #211e1b;')}>
         <div className="fg-docs-header-inner" style={s('display: flex; align-items: center; justify-content: space-between; padding: 0 28px; height: 60px;')}>
           <div style={s('display: flex; align-items: center; gap: 26px;')}>
@@ -89,6 +111,9 @@ function DocsLayout() {
           </div>
           <div style={s(`display: flex; align-items: center; gap: 22px; font-family: ${MONO}; font-size: 13px;`)}>
             <Link to="/" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>home</Link>
+            <Link to="/pricing" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>pricing</Link>
+            <Link to="/comparisons" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>compare</Link>
+            <Link to="/changelog" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>changelog</Link>
             <a href="https://github.com/ravidsrk/frontguard" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>github</a>
           </div>
         </div>
@@ -105,35 +130,94 @@ function DocsLayout() {
             {group.label.toLowerCase()}
           </Link>
         ))}
+        <details style={s('flex: 0 0 auto; position: relative;')}>
+          <summary
+            style={s(
+              `cursor: pointer; border: 1px solid #e8862e; padding: 8px 10px; color: #f5f1ea; background: #1a130b; font-family: ${MONO}; font-size: 12px; list-style: none;`,
+            )}
+          >
+            All {articles.length} articles ▾
+          </summary>
+          <div
+            style={s(
+              'margin-top: 8px; padding: 12px; background: #131210; border: 1px solid #2a2622; max-height: 60vh; overflow-y: auto; display: grid; gap: 14px;',
+            )}
+          >
+            {navGroups.map((group) => (
+              <div key={group.label}>
+                <div
+                  style={s(
+                    `font-family: ${MONO}; font-size: 10px; color: #e8862e; letter-spacing: 0.08em; margin-bottom: 6px;`,
+                  )}
+                >
+                  // {group.label.toLowerCase()}
+                </div>
+                <div style={s('display: grid; gap: 4px;')}>
+                  {group.ids.map((id) => {
+                    const it = byId(id)
+                    return (
+                      <Link
+                        key={id}
+                        to="/docs/$"
+                        params={{ _splat: id }}
+                        style={s(
+                          `display: block; font-size: 12.5px; color: ${active === id ? '#e8862e' : '#d8d0c5'}; text-decoration: none; padding: 4px 8px;`,
+                        )}
+                      >
+                        {it.label}
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
       </nav>
 
       <div className="fg-docs-grid" style={s('display: grid; grid-template-columns: 256px minmax(0, 1fr) 224px; max-width: 1400px; margin: 0 auto;')}>
         <aside className="fg-docs-sidebar" style={s('border-right: 1px solid #211e1b; padding: 34px 0 80px;')}>
           <div style={s('position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; padding-right: 4px;')}>
-            {navGroups.map((group) => (
-              <div key={group.label} style={s('margin-bottom: 24px; padding: 0 22px;')}>
-                <div style={s(`font-family: ${MONO}; font-size: 10.5px; color: #564f48; letter-spacing: 0.1em; margin-bottom: 11px;`)}>{group.label}</div>
-                {group.ids.map((id) => {
-                  const it = byId(id)
-                  const isActive = active === id
-                  return (
-                    <Link
-                      key={id}
-                      to="/docs/$"
-                      params={{ _splat: id }}
-                      className="fg-sb-item"
-                      style={s(`display: block; font-size: 13.5px; color: ${isActive ? '#e8862e' : '#8c847a'}; text-decoration: none; padding: 6px 0 6px 12px; border-left: 2px solid ${isActive ? '#e8862e' : '#211e1b'}; margin-bottom: 1px;`)}
-                    >
-                      {it.label}
-                    </Link>
-                  )
-                })}
+            <div style={s('padding: 0 22px 18px;')}>
+              <input
+                type="search"
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+                placeholder="Filter articles..."
+                aria-label="Filter articles"
+                style={s(`width: 100%; background: #131210; border: 1px solid #2a2622; color: #f5f1ea; font-family: ${MONO}; font-size: 12px; padding: 8px 11px;`)}
+              />
+            </div>
+            {filteredGroups.length === 0 ? (
+              <div style={s(`padding: 0 22px; font-family: ${MONO}; font-size: 12px; color: #7c746b;`)}>
+                No matching articles.
               </div>
-            ))}
+            ) : (
+              filteredGroups.map((group) => (
+                <div key={group.label} style={s('margin-bottom: 24px; padding: 0 22px;')}>
+                  <div style={s(`font-family: ${MONO}; font-size: 10.5px; color: #564f48; letter-spacing: 0.1em; margin-bottom: 11px;`)}>{group.label}</div>
+                  {group.ids.map((id) => {
+                    const it = byId(id)
+                    const isActive = active === id
+                    return (
+                      <Link
+                        key={id}
+                        to="/docs/$"
+                        params={{ _splat: id }}
+                        className="fg-sb-item"
+                        style={s(`display: block; font-size: 13.5px; color: ${isActive ? '#e8862e' : '#8c847a'}; text-decoration: none; padding: 6px 0 6px 12px; border-left: 2px solid ${isActive ? '#e8862e' : '#211e1b'}; margin-bottom: 1px;`)}
+                      >
+                        {it.label}
+                      </Link>
+                    )
+                  })}
+                </div>
+              ))
+            )}
           </div>
         </aside>
 
-        <main className="fg-docs-main" style={s('padding: 44px 60px 120px; min-width: 0;')}>
+        <main id="main-content" className="fg-docs-main" style={s('padding: 44px 60px 120px; min-width: 0;')}>
           <Outlet />
         </main>
 
@@ -141,7 +225,14 @@ function DocsLayout() {
           <div style={s('position: sticky; top: 84px;')}>
             <div style={s(`font-family: ${MONO}; font-size: 10.5px; color: #564f48; letter-spacing: 0.1em; margin-bottom: 14px;`)}>ON THIS PAGE</div>
             {cur.toc.map((t) => (
-              <div key={t} className="fg-toc" style={s('font-size: 13px; color: #7c746b; padding: 5px 0; line-height: 1.4; cursor: default;')}>{t}</div>
+              <a
+                key={t}
+                href={`#${slugifyHeading(t)}`}
+                className="fg-toc"
+                style={s('display: block; text-decoration: none; font-size: 13px; color: #7c746b; padding: 5px 0; line-height: 1.4;')}
+              >
+                {t}
+              </a>
             ))}
             <div style={s('margin-top: 26px; border-top: 1px solid #211e1b; padding-top: 20px;')}>
               <a href="https://github.com/ravidsrk/frontguard" className="fg-btn-primary" style={s(`display: block; text-align: center; background: #e8862e; color: #0d0c0b; font-family: ${MONO}; font-weight: 700; font-size: 12px; padding: 10px; text-decoration: none;`)}>★ Star on GitHub</a>
@@ -150,6 +241,7 @@ function DocsLayout() {
           </div>
         </aside>
       </div>
+      <Footer />
     </div>
   )
 }

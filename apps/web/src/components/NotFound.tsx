@@ -12,7 +12,7 @@ export function NotFound() {
         'background: #0d0c0b; color: #b8b0a6; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;',
       )}
     >
-      <main style={s('width: 100%; max-width: 32rem; text-align: center;')}>
+      <main id="main-content" style={s('width: 100%; max-width: 32rem; text-align: center;')}>
         <span style={s('display: inline-block; margin-bottom: 28px;')}>
           <Shield w={47} h={56} />
         </span>

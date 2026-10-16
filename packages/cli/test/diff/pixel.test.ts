@@ -207,5 +207,31 @@ describe('Perceptual Diffing v2: cluster extraction and anti-dilution SSIM guard
     expect(result.clusters![0].rawDiffPixels).toBe(256);
     expect(result.clusters![0].chromaSSIM).toBeLessThan(0.70);
   });
-});
 
+  it('populates cluster chromaSSIM/cwSSIM and propagates stability and redactedCount even when diff exceeds 2x threshold', () => {
+    const red = createTestPng(32, 32, 255, 0, 0);
+    const blue = createTestPng(32, 32, 0, 0, 255);
+    const current = makeScreenshot(red, {
+      redactedCount: 3,
+      stability: {
+        settled: true,
+        attempts: 2,
+        unstableRatio: 0,
+      },
+    });
+
+    const result = compareScreenshot(current, blue, 0.01);
+
+    expect(result.status).toBe('regression');
+    expect(result.redactedCount).toBe(3);
+    expect(result.stability).toEqual({
+      settled: true,
+      attempts: 2,
+      unstableRatio: 0,
+    });
+    expect(result.clusters).toBeDefined();
+    expect(result.clusters!.length).toBe(1);
+    expect(result.clusters![0].chromaSSIM).toBeDefined();
+    expect(result.clusters![0].cwSSIM).toBeDefined();
+  });
+});
