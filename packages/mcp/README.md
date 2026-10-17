@@ -104,6 +104,10 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
 
 ## Tools (7 Tools)
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/closed-loop-ai-fix-sandbox.jpg" alt="Closed-Loop AI CSS Fix and Sandbox Verification Engine" width="840"/>
+</p>
+
 | Tool | Input | Returns |
 |------|-------|---------|
 | `list_regressions` | `pr_id` (number, run id, or `'local'`), optional `repo` | regressions on the PR or local report with stable `diffId`s and cluster counts |

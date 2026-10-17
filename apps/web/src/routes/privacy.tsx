@@ -27,6 +27,25 @@ function PrivacyPage() {
         <code>domSnapshot</code> text/attribute values locally before screenshots are captured or uploaded to an
         AI provider.
       </p>
+      <figure style={{ margin: '24px 0 32px', border: '1px solid #2a2622', background: '#131210', padding: '14px' }}>
+        <img
+          src="/images/docs/migration-and-trust-boundary.jpg"
+          alt="Local-first privacy trust boundary and PII redaction architecture"
+          loading="lazy"
+          style={{ width: '100%', height: 'auto', display: 'block', border: '1px solid #211e1b' }}
+        />
+        <figcaption
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: '11.5px',
+            color: '#8c847a',
+            padding: '10px 4px 2px',
+            lineHeight: 1.5,
+          }}
+        >
+          FIG 01 // Local-first trust boundary and --redact-sensitive DOM/input sanitization pipeline
+        </figcaption>
+      </figure>
       <h2>Telemetry</h2>
       <p>
         CLI usage telemetry is disabled by default (<code>telemetry: false</code>). If you explicitly opt in (via{' '}

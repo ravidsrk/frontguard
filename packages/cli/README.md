@@ -62,6 +62,10 @@ Console and HTML evidence are written → Optional AI assists with changed scree
 
 ## Quick Start
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/quick-start-terminal-loop.jpg" alt="Quick Start Two-Terminal Workflow and Explicit Baseline Gate" width="840"/>
+</p>
+
 **Prerequisites:** Node.js 22+, a git repository, and an `origin` remote if CI should compare against published baselines.
 
 ```bash
@@ -139,6 +143,10 @@ still passes — lower it for stricter pages.
 
 ## Features
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/perceptual-diff-clusters.jpg" alt="Perceptual Diff Engine and Spatial DOM-Cluster Attribution" width="840"/>
+</p>
+
 - **Zero-config route discovery** — Auto-crawls your app to find all pages
 - **Multi-browser** — Chromium, Firefox, WebKit via Playwright
 - **Spatial diff clusters & DOM selector attribution** — Connected-component diff clusters report Chroma-SSIM, CW-SSIM, and `cluster.targetSelector` (the most-specific DOM selector at the cluster center)
@@ -151,6 +159,10 @@ still passes — lower it for stricter pages.
 - **Framework detection** — Next.js, Remix, SvelteKit, Nuxt, Astro out of the box
 - **Security hardened** — Shell injection prevention, path traversal guards, API key redaction
 - **Memory managed** — Streaming buffers, temp file cleanup, bounded concurrency
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/html-workbench-4mode-inspector.jpg" alt="Interactive 4-Mode HTML Visual Diff Workbench" width="840"/>
+</p>
 
 ## Configuration
 
@@ -194,6 +206,10 @@ export default {
 
 ## How It Works
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/closed-loop-ai-fix-sandbox.jpg" alt="Closed-Loop AI CSS Fix and Sandbox Verification Engine" width="840"/>
+</p>
+
 ```
 ROUTE DISCOVERY → PLAYWRIGHT RENDER → PIXEL COMPARISON → CONSOLE / JSON / HTML
                                                 └──────→ OPTIONAL BYOK AI ANALYSIS
@@ -229,6 +245,10 @@ ROUTE DISCOVERY → PLAYWRIGHT RENDER → PIXEL COMPARISON → CONSOLE / JSON / 
 
 ## Plugins
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/plugin-lifecycle-audits.jpg" alt="9-Hook Plugin Architecture and Unified Render Audits" width="840"/>
+</p>
+
 Frontguard ships with a plugin architecture (9 lifecycle hooks) and 5 built-in plugins:
 
 | Plugin                                                         | Description                                                   | Key Features                                                                           |
@@ -252,6 +272,10 @@ export default {
 ```
 
 ## Architecture
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/git-cas-storage.jpg" alt="Zero-Pollution Git Orphan and Cloud CAS Storage" width="840"/>
+</p>
 
 ```
 src/

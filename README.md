@@ -65,6 +65,10 @@ Console and HTML evidence are written → Optional AI assists with changed scree
 
 ## Quick Start
 
+<p align="center">
+  <img src="./apps/web/public/images/docs/quick-start-terminal-loop.jpg" alt="Quick Start Two-Terminal Workflow and Explicit Baseline Gate" width="840"/>
+</p>
+
 **Prerequisites:** [Node.js](https://nodejs.org/) 22+, a git repository, and an `origin` remote if CI should compare against published baselines. Frontguard stores screenshots on the `frontguard-baselines` orphan branch.
 
 ```bash
@@ -144,6 +148,10 @@ still passes — lower it for stricter pages.
 
 ## Features
 
+<p align="center">
+  <img src="./apps/web/public/images/docs/html-workbench-4mode-inspector.jpg" alt="Interactive 4-Mode HTML Visual Diff Workbench" width="840"/>
+</p>
+
 - **Zero-config route discovery** — Auto-crawls your app to find all pages
 - **Multi-browser** — Chromium, Firefox, WebKit via Playwright
 - **Spatial diff clusters & DOM selector attribution** — Connected-component diff clusters report Chroma-SSIM, CW-SSIM, and `cluster.targetSelector` (the most-specific DOM selector at the cluster center)
@@ -156,6 +164,10 @@ still passes — lower it for stricter pages.
 - **Memory managed** — Streaming buffers, temp file cleanup, bounded concurrency
 - **Visual evidence** — Baseline/current/diff images are retained in the HTML report; remote thumbnails require an explicit image-upload backend
 - **Per-route thresholds** — Strict on `/checkout`, relaxed on `/blog` — all in one config
+
+<p align="center">
+  <img src="./apps/web/public/images/docs/mcp-visual-cortex.jpg" alt="Frontguard MCP Agentic Visual Cortex" width="840"/>
+</p>
 
 ## How Frontguard Compares
 
@@ -175,6 +187,10 @@ still passes — lower it for stricter pages.
 
 ## AI Classification Output Shape
 
+<p align="center">
+  <img src="./apps/web/public/images/docs/closed-loop-ai-fix-sandbox.jpg" alt="Closed-Loop AI CSS Fix and Sandbox Verification Engine" width="840"/>
+</p>
+
 Illustrative output only; the published validation run did not measure model accuracy.
 
 ```
@@ -190,6 +206,10 @@ Illustrative output only; the published validation run did not measure model acc
 ```
 
 ## Configuration
+
+<p align="center">
+  <img src="./apps/web/public/images/docs/anti-flake-hermetic-render.jpg" alt="Deterministic Rendering and Anti-Flake Engine" width="840"/>
+</p>
 
 ```typescript
 // frontguard.config.ts
@@ -268,6 +288,10 @@ ROUTE DISCOVERY → PLAYWRIGHT RENDER → PIXEL COMPARISON → CONSOLE / JSON / 
 
 ## Plugins
 
+<p align="center">
+  <img src="./apps/web/public/images/docs/plugin-lifecycle-audits.jpg" alt="9-Hook Plugin Architecture and Unified Render Audits" width="840"/>
+</p>
+
 Frontguard ships with a plugin architecture (9 lifecycle hooks) and 5 built-in plugins:
 
 | Plugin | Description | Key Features |
@@ -292,7 +316,19 @@ export default {
 };
 ```
 
+<p align="center">
+  <img src="./apps/web/public/images/docs/production-monitoring-daemon.jpg" alt="Frontguard Monitor Production Monitoring and Alert Pipeline" width="840"/>
+</p>
+
 ## Architecture
+
+<p align="center">
+  <img src="./apps/web/public/images/docs/git-cas-storage.jpg" alt="Zero-Pollution Git Orphan and Cloud CAS Storage" width="840"/>
+</p>
+
+<p align="center">
+  <img src="./apps/web/public/images/docs/ci-cd-github-actions-flow.jpg" alt="CI/CD and GitHub Actions Two-Lane Baseline Governance" width="840"/>
+</p>
 
 ```
 packages/
