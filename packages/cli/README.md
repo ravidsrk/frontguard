@@ -1,4 +1,4 @@
-# 🛡️ Frontguard
+# 🛡️ @frontguard/cli
 
 [![CI](https://github.com/ravidsrk/frontguard/actions/workflows/ci.yml/badge.svg)](https://github.com/ravidsrk/frontguard/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@frontguard/cli)](https://www.npmjs.com/package/@frontguard/cli)
@@ -26,45 +26,7 @@ Or run it without installing — note `npx` needs the package name (`-p @frontgu
 npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
-## Current CLI Scope
-
-The supported path is the local CLI. Hosted cloud, MCP, GitHub App, and Docker Compose onboarding remain pre-release:
-
-- **Experimental AI fixes** — `--generate-fixes` and `--verify-fixes` are separate opt-ins; unverified suggestions remain labeled for review.
-- **Fix-pattern database** — `accept-fix` / `reject-fix` / `export-patterns` train and share a local pattern store that the pipeline reuses before calling the AI.
-- **`frontguard doctor`** — environment diagnostics for sources of non-determinism (Node, Playwright/Chromium, browsers, config, git).
-- **`frontguard monitor`** — live production-URL monitoring with daemon polling, history, and webhook alerts.
-- **Accessibility + performance-budget plugins** — axe-core WCAG audits and LCP/CLS/TTFB budgets in the same render pass, correlated with the visual diff.
-- **Inspectable artifacts** — HTML reports retain baseline/current/diff images; remote thumbnails require an explicit image-upload backend.
-
-See the [full CHANGELOG](https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md) and the [validation results](https://github.com/ravidsrk/frontguard/tree/main/validation). The published run used AI-disabled local comparisons and is not an AI-accuracy or cross-OS benchmark.
-
-## What It Does
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/pipeline-architecture.jpg" alt="Frontguard 5-Stage Visual Regression Pipeline" width="840"/>
-</p>
-
-```
-Developer runs Frontguard → Pages render → Pixels compare to reviewed baselines →
-Console and HTML evidence are written → Optional AI assists with changed screenshots
-```
-
-(`run --output json` emits the same result as JSON instead of the console report.)
-
-- **Detect** — Pixel comparison finds changes above the configured threshold
-- **Understand** — Optional AI returns a confidence-scored explanation for human review
-- **Fix** — Experimental CSS suggestions and sandbox verification are separate opt-ins
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/anti-flake-hermetic-render.jpg" alt="Deterministic Rendering and Anti-Flake Engine" width="840"/>
-</p>
-
-## Quick Start
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/quick-start-terminal-loop.jpg" alt="Quick Start Two-Terminal Workflow and Explicit Baseline Gate" width="840"/>
-</p>
+## Quick Start (Two-Terminal Workflow)
 
 **Prerequisites:** Node.js 22+, a git repository, and an `origin` remote if CI should compare against published baselines.
 
@@ -86,9 +48,7 @@ npx -p @frontguard/cli frontguard doctor
 git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"
 ```
 
-Check the `routes` in `frontguard.config.ts` before capturing: for
-non-framework apps `init` guesses (`/`, `/about`, `/contact`), and a route
-that does not exist baselines its 404 page without warning.
+Check the `routes` in `frontguard.config.ts` before capturing: for non-framework apps `init` guesses (`/`, `/about`, `/contact`), and a route that does not exist baselines its 404 page without warning.
 
 **App terminal (leave this running):** start your app and wait until the `baseUrl` in `frontguard.config.ts` responds. A static folder works too (`npx serve`):
 
@@ -96,9 +56,7 @@ that does not exist baselines its 404 page without warning.
 npm run dev
 ```
 
-**Frontguard terminal:** review the running app in your browser, capture
-baselines with `update-baselines`, then compare with `run`. Local comparison
-needs no `origin` remote:
+**Frontguard terminal:** review the running app in your browser, capture baselines with `update-baselines`, then compare with `run`. Local comparison needs no `origin` remote:
 
 ```bash
 npx -p @frontguard/cli frontguard update-baselines
@@ -111,60 +69,44 @@ Only CI comparisons need the published orphan branch:
 git push origin frontguard-baselines
 ```
 
-Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on your `PATH` and you can drop the `npx -p @frontguard/cli` prefix (e.g. `frontguard run`). `run` exits 0 when pages match, 1 on a regression or unaccepted new page, and 2 on a tool error.
-The default `threshold` is 0.1 (10% changed pixels), so a small visible change
-still passes — lower it for stricter pages.
+Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on your `PATH` and you can drop the `npx -p @frontguard/cli` prefix (e.g. `frontguard run`). `run` exits `0` when pages match, `1` on a regression or unaccepted new page, and `2` on a tool error. The default `threshold` is `0.1` (10% changed pixels), so a small visible change still passes — lower it for stricter pages.
 
-## Commands
+---
 
-| Command                              | Description                                                              |
-| ------------------------------------ | ------------------------------------------------------------------------ |
-| `frontguard run`                     | Run visual regression tests (default command)                            |
-| `frontguard init [--ci] [--yes]`     | Generate a starter config; `--ci` also writes a GitHub Actions workflow  |
-| `frontguard doctor`                  | Diagnose environment readiness (Node, Playwright, browsers, config, git) |
-| `frontguard guide [topic] [--json]`  | Print offline reference guides (`setup`, `diffing`, `mcp`, `playwright`, `ci`) |
-| `frontguard update-baselines`        | Accept current screenshots as new baselines                              |
-| `frontguard monitor`                 | Monitor live production URLs for visual regressions                      |
-| `frontguard accept-fix <id>`         | Mark a suggested fix as accepted (improves future suggestions)           |
-| `frontguard reject-fix <id>`         | Mark a suggested fix as rejected (negative training signal)              |
-| `frontguard export-patterns`         | Export the local fix-pattern database as JSON                            |
-| `frontguard plugin install <name>`   | Install a Frontguard plugin from npm                                     |
-| `frontguard plugin uninstall <name>` | Uninstall a Frontguard plugin                                            |
-| `frontguard plugin list`             | List installed plugins                                                   |
+## Commands Reference
+
+| Command                              | Description                                                                             |
+| ------------------------------------ | --------------------------------------------------------------------------------------- |
+| `frontguard run`                     | Run visual regression tests (default command)                                           |
+| `frontguard init [--ci] [--yes]`     | Generate a starter config; `--ci` also writes a GitHub Actions workflow                 |
+| `frontguard doctor`                  | Diagnose environment readiness (Node, Playwright, browsers, config, git)                |
+| `frontguard guide [topic] [--json]`  | Print offline reference guides (`setup`, `diffing`, `mcp`, `playwright`, `ci`)          |
+| `frontguard update-baselines`        | Accept current screenshots as new baselines                                             |
+| `frontguard monitor`                 | Monitor live production URLs for visual regressions                                     |
+| `frontguard accept-fix <id>`         | Mark a suggested fix as accepted (improves future suggestions)                          |
+| `frontguard reject-fix <id>`         | Mark a suggested fix as rejected (negative training signal)                             |
+| `frontguard export-patterns`         | Export the local fix-pattern database as JSON                                           |
+| `frontguard plugin install <name>`   | Install a Frontguard plugin from npm                                                    |
+| `frontguard plugin uninstall <name>` | Uninstall a Frontguard plugin                                                           |
+| `frontguard plugin list`             | List installed plugins                                                                  |
 
 ### Key `frontguard run` Flags
 
+- `--url <url>` — Override `baseUrl` from `frontguard.config.ts`
+- `--threshold <ratio>` — Changed-pixel ratio threshold (`0–1` scale; `0.01` = 1%)
 - `--wait-for-stability` — Wait for consecutive animation frames to converge before capturing
 - `--redact-sensitive` — Redact password, payment, and `[data-frontguard-redact]` inputs and scrub DOM snapshots before capture
 - `--color-scheme <scheme>` — Emulate `light` or `dark` `prefers-color-scheme`
 - `--freeze-time [timestamp]` — Freeze `Date.now()` / `new Date()` (boolean default, epoch ms, or ISO 8601 date string)
 - `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
 - `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render
+- `--output <console|json>` — Emit console summary or structured JSON to stdout
 
-## Features
+---
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/perceptual-diff-clusters.jpg" alt="Perceptual Diff Engine and Spatial DOM-Cluster Attribution" width="840"/>
-</p>
+## Practical Configuration Recipes
 
-- **Zero-config route discovery** — Auto-crawls your app to find all pages
-- **Multi-browser** — Chromium, Firefox, WebKit via Playwright
-- **Spatial diff clusters & DOM selector attribution** — Connected-component diff clusters report Chroma-SSIM, CW-SSIM, and `cluster.targetSelector` (the most-specific DOM selector at the cluster center)
-- **Deterministic anti-flake controls** — `waitForStability`, `redactSensitive`, `freezeTime` (epoch ms or ISO string), `seedRandom`, `blockUrls`, and configurable multi-render consensus
-- **Optional AI analysis** — Multi-provider BYOK (`openai`, `anthropic`, `gemini`, plus custom OpenAI-compatible `baseUrl` for OpenRouter / Ollama / vLLM) can classify a pixel change on the default compare path; it does not change pass/fail and has no published accuracy benchmark. Experimental `frontguard run --mode judge --experimental` is a separate opt-in whose verdict is the model, not pixel diff.
-- **Experimental AI fix verification** — Suggested CSS patches are re-rendered only when `verifyFixes` is enabled; reports label the result verified or unverified
-- **Smart rendering** — Dependency graph renders only pages affected by your changes
-- **Preview deployments** — Auto-detects Vercel/Netlify preview URLs
-- **Git-native baselines** — Stored in orphan branch, zero main branch bloat
-- **Framework detection** — Next.js, Remix, SvelteKit, Nuxt, Astro out of the box
-- **Security hardened** — Shell injection prevention, path traversal guards, API key redaction
-- **Memory managed** — Streaming buffers, temp file cleanup, bounded concurrency
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/html-workbench-4mode-inspector.jpg" alt="Interactive 4-Mode HTML Visual Diff Workbench" width="840"/>
-</p>
-
-## Configuration
+### 1. Deterministic Rendering & Per-Route Actions (`frontguard.config.ts`)
 
 ```typescript
 // frontguard.config.ts
@@ -172,15 +114,18 @@ export default {
   version: 1,
   baseUrl: "http://localhost:3000",
 
-  // Auto-discover routes (zero config)
-  discover: {
-    startUrl: "/",
-    maxDepth: 3,
-    exclude: ["/admin/*", "/api/*"],
-  },
-
-  // Or explicit routes
-  // routes: ['/', '/pricing', '/checkout'],
+  // Explicit routes with per-route UI interactions & custom thresholds
+  routes: [
+    "/",
+    {
+      path: "/pricing",
+      threshold: 0.005,
+      actions: [
+        { type: "waitForSelector", selector: "[data-ready]" },
+        { type: "click", selector: "[data-billing='annual']" },
+      ],
+    },
+  ],
 
   viewports: [375, 768, 1440],
   browsers: ["chromium"],
@@ -190,7 +135,7 @@ export default {
   freezeTime: "2026-01-01T00:00:00Z", // boolean | number | ISO date string
   seedRandom: 42,                     // boolean | number
   blockUrls: ["*google-analytics.com*", "*intercom.io*"],
-  threshold: 0.1, // changed-pixel ratio: 0.1 = 10%
+  threshold: 0.01, // changed-pixel ratio: 0.01 = 1%
 
   // AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini', plus optional custom baseUrl)
   ai: {
@@ -204,18 +149,32 @@ export default {
 };
 ```
 
-## How It Works
+### 2. Built-in Plugins (WCAG Accessibility, Performance Budgets & Script Drift)
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/closed-loop-ai-fix-sandbox.jpg" alt="Closed-Loop AI CSS Fix and Sandbox Verification Engine" width="840"/>
-</p>
+Frontguard executes plugins across 9 ordered lifecycle hooks (`setup`, `beforeDiscover`, `afterDiscover`, `beforeRender`, `afterRender`, `afterCompare`, `afterRun`, `onError`, `teardown`):
 
+```typescript
+import {
+  createAccessibilityPlugin,
+  createPerformanceBudgetPlugin,
+  createThirdPartyScriptPlugin,
+} from "@frontguard/cli/plugins";
+
+export default {
+  version: 1,
+  baseUrl: "http://localhost:3000",
+  routes: ["/", "/pricing", "/checkout"],
+  plugins: [
+    createAccessibilityPlugin({ standard: "wcag2aa", failOnImpact: "serious" }),
+    createPerformanceBudgetPlugin({ budgets: { lcpMs: 2500, cls: 0.1 } }),
+    createThirdPartyScriptPlugin(),
+  ],
+};
 ```
-ROUTE DISCOVERY → PLAYWRIGHT RENDER → PIXEL COMPARISON → CONSOLE / JSON / HTML
-                                                └──────→ OPTIONAL BYOK AI ANALYSIS
-```
 
-## CLI Output
+---
+
+## Sample CLI Output
 
 ```
  frontguard v0.2.3
@@ -243,87 +202,19 @@ ROUTE DISCOVERY → PLAYWRIGHT RENDER → PIXEL COMPARISON → CONSOLE / JSON / 
   1 regression · 1 warning · 9 passed · 1 new
 ```
 
-## Plugins
+## Current CLI Scope
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/plugin-lifecycle-audits.jpg" alt="9-Hook Plugin Architecture and Unified Render Audits" width="840"/>
-</p>
+The supported path is the local CLI. Hosted cloud, MCP, GitHub App, and Docker Compose onboarding remain pre-release:
 
-Frontguard ships with a plugin architecture (9 lifecycle hooks) and 5 built-in plugins:
+- **Spatial diff clusters & DOM selector attribution** — Connected-component diff clusters report Chroma-SSIM, CW-SSIM, and `cluster.targetSelector` (the most-specific DOM selector at the cluster center).
+- **Experimental AI fixes** — `--generate-fixes` and `--verify-fixes` are separate opt-ins; unverified suggestions remain labeled for review.
+- **Fix-pattern database** — `accept-fix` / `reject-fix` / `export-patterns` train and share a local pattern store that the pipeline reuses before calling the AI.
+- **`frontguard doctor`** — environment diagnostics for sources of non-determinism (Node, Playwright/Chromium, browsers, config, git).
+- **`frontguard monitor`** — live production-URL monitoring with daemon polling, history, and webhook alerts.
+- **Accessibility + performance-budget plugins** — axe-core WCAG audits and LCP/CLS/TTFB budgets in the same render pass, correlated with the visual diff.
+- **Inspectable artifacts** — HTML reports retain baseline/current/diff images; remote thumbnails require an explicit image-upload backend.
 
-| Plugin                                                         | Description                                                   | Key Features                                                                           |
-| -------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| **Figma** (`src/plugins/figma.ts`)                             | Design-to-code comparison                                     | Figma API integration, design token extraction, component mapping                      |
-| **Performance Budgets** (`src/plugins/perf-budgets.ts`)        | Web Vitals & budgets                                          | LCP/CLS/TTFB thresholds, violations correlated with the visual diff                    |
-| **Accessibility** (`src/plugins/accessibility.ts`)             | axe-core audits                                               | WCAG checks (contrast, alt text, target size, focus, headings) in the same render pass |
-| **Third-Party Scripts** (`src/plugins/third-party-scripts.ts`) | Script drift detection                                        | Flags ad/analytics/widget origins that appear or disappear between runs                |
-| **Monitor** (`src/plugins/monitor.ts`)                         | Production visual monitoring (CLI + optional cloud scheduler) | Live-URL checks, threshold alerting, history tracking                                  |
-
-**Plugin lifecycle hooks:** `setup`, `beforeDiscover`, `afterDiscover`, `beforeRender`, `afterRender`, `afterCompare`, `afterRun`, `onError`, `teardown`
-
-```typescript
-// frontguard.config.ts
-import { createFigmaPlugin } from "@frontguard/cli/plugins";
-
-export default {
-  // ...base config
-  plugins: [createFigmaPlugin({ fileKey: "your-figma-file-key" })],
-};
-```
-
-## Architecture
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/git-cas-storage.jpg" alt="Zero-Pollution Git Orphan and Cloud CAS Storage" width="840"/>
-</p>
-
-```
-src/
-├── cli/              # CLI entry point (Commander.js)
-├── core/             # Pipeline orchestrator, types, config, plugin system
-├── discovery/        # Route discovery (crawler + filesystem)
-├── render/           # Playwright rendering engine
-├── diff/             # Pixel diff + AI vision analysis
-├── storage/          # Git orphan branch baselines
-├── report/           # Console, JSON, HTML, GitHub PR reporters
-├── plugins/          # Figma, perf budgets, accessibility, third-party scripts, monitoring
-└── utils/            # Redaction, logging, retry
-```
-
-Pipeline: `discover → filter → render → diff → analyze → report`
-
-Each stage is independent with error boundaries — one page failing doesn't kill the run.
-
-## Telemetry
-
-Anonymous usage telemetry is **off by default**. Nothing is sent unless you opt in with `FRONTGUARD_TELEMETRY=1` or `telemetry: true` in config.
-
-Opt out with any of `--no-telemetry`, `FRONTGUARD_TELEMETRY=0`, `DO_NOT_TRACK=1`, or `telemetry: false`.
-
-When enabled, the CLI POSTs one JSON event to `https://telemetry.frontguard.dev/v1/events` (override with `FRONTGUARD_TELEMETRY_ENDPOINT`). Fields: `command`, `version`, `routes`, `regressions`, `aiProvider`, `antiFlake`, `ci`, `durationMs`, `errorType`, `ts`. No URLs, paths, screenshots, or keys. The HTTP peer can see the source IP. There is no published retention period for the default collector.
-
-Full schema: [telemetry.md](https://github.com/ravidsrk/frontguard/blob/main/docs/telemetry.md).
-
-## Environment Variables
-
-```bash
-# AI Analysis (optional, BYOK — pick one)
-FRONTGUARD_OPENAI_KEY=sk-...
-FRONTGUARD_ANTHROPIC_KEY=...
-FRONTGUARD_GEMINI_KEY=AIza...
-FRONTGUARD_OPENAI_BASE_URL=https://openrouter.ai/api/v1 # optional OpenAI-compatible endpoint
-
-# Opt-in anonymous usage telemetry (off unless set)
-FRONTGUARD_TELEMETRY=1
-FRONTGUARD_TELEMETRY_ENDPOINT=https://telemetry.frontguard.dev/v1/events
-DO_NOT_TRACK=1
-```
-
-> AI keys are optional. Frontguard works without them using local pixel comparison. AI analysis activates only when configured and sends screenshot evidence directly to the selected provider. Telemetry is also optional and off by default.
-
-## Documentation
-
-Full documentation lives at [frontguard.dev/docs](https://frontguard.dev/docs). Source and issues: [github.com/ravidsrk/frontguard](https://github.com/ravidsrk/frontguard).
+See the [full CHANGELOG](https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md), [interactive documentation](https://frontguard.dev/docs), and [validation results](https://github.com/ravidsrk/frontguard/tree/main/validation). The published run used AI-disabled local comparisons and is not an AI-accuracy or cross-OS benchmark.
 
 ## License
 

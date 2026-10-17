@@ -14,62 +14,33 @@ Frontguard gives frontend teams a local, inspectable screenshot comparison loop 
 > _Current test, source, version, and bundle metrics are derived by [`scripts/stats.ts`](./scripts/stats.ts). See [`scripts/stats.json`](./scripts/stats.json) for the canonical snapshot._
 
 <p align="center">
-  <img src="./apps/web/public/images/docs/og-hero-banner.jpg" alt="Frontguard visual regression testing banner" width="840"/>
-</p>
-
-<p align="center">
   <img src="./demo/frontguard-demo.gif" alt="Frontguard demo: init, doctor, run, AI classification" width="720"/><br/>
   <em>📽️ Demo: <code>frontguard init</code> → <code>doctor</code> → <code>run</code> → AI classification.</em>
 </p>
-
-<!-- To re-render the demo GIF: `vhs demo/frontguard-demo.tape` (requires `brew install vhs`). -->
 
 > ### Published package line: 0.2.2
 >
 > Published packages are listed in [CHANGELOG.md](./CHANGELOG.md). The first validation run is documented in [`validation/results-v0.2.md`](./validation/results-v0.2.md): 39 of 43 route rechecks completed across 2 of 5 fixture repositories on one macOS host, with AI disabled. It is not an AI-accuracy or cross-OS benchmark.
 
-## Built in the open
+---
 
-The MIT-licensed repository contains the CLI, optional AI pipeline, cloud API source, integrations, MCP server, and Docker renderer source. The local CLI is the supported product path. Hosted, MCP, GitHub App, and Docker Compose onboarding remain pre-release; see the [launch audit](./docs/launch-audit-2026-08.md) for the unresolved acceptance work.
+## Choose Your Workflow
 
-AI is optional; without it, the CLI performs local pixel comparison and writes local reports. Cloud source and the [self-host guide](https://frontguard.dev/docs/self-host) are available for evaluation, not as a verified production quick start.
+Frontguard is organized as modular npm packages so you can adopt the exact level of visual testing your project needs:
 
-## Why Frontguard?
+| Workflow | Package | When to Use It | Where Baselines Live |
+| :--- | :--- | :--- | :--- |
+| **1. Full-App & Sitemap CLI** | [`@frontguard/cli`](https://www.npmjs.com/package/@frontguard/cli) | Crawl or list routes in `frontguard.config.ts` (plus Storybook `/index.json`), capture multi-viewport screenshots, and gate PRs in CI. | `frontguard-baselines` git orphan branch (zero `main` branch binary bloat) |
+| **2. In-Test Playwright Helper** | [`@frontguard/playwright`](https://www.npmjs.com/package/@frontguard/playwright) | Call `await visualTest(page, name, options)` directly inside existing `@playwright/test` spec files after login flows, modals, or mocked API responses. | `__visual_baselines__/` directory |
+| **3. AI Coding Agent Loop** | [`@frontguard/mcp`](https://www.npmjs.com/package/@frontguard/mcp) | Let Claude Code, Cursor, or Windsurf inspect visual regressions, spatial DOM diff clusters (`cluster.targetSelector`), and validate CSS patches over stdio. | Reads `./frontguard-report/report.json` locally (zero Cloud API key required) |
 
-- **🧠 Optional model-assisted analysis** — When configured, sends screenshot evidence to your selected OpenAI, Anthropic, or Google Gemini account (or a custom OpenAI-compatible `baseUrl` such as OpenRouter, Ollama, or vLLM) and returns a classification, confidence, and explanation for review.
-- **🎯 Configurable consensus & deterministic anti-flake controls** — Opt into multiple renders per route, `waitForStability`, `redactSensitive`, `freezeTime` (epoch ms or ISO string), `seedRandom`, and `blockUrls` when a project needs protection from transient screenshot variation.
-- **🤖 7-tool MCP interface (local & cloud)** — [`@frontguard/mcp`](https://www.npmjs.com/package/@frontguard/mcp) exposes 7 tools (`list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `promote_baseline`, `accept_baseline`, `recent_runs`) and works in zero-key local report mode (`FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json`) or against a verified Cloud API deployment; there is no live hosted default, and cloud approval does not yet promote screenshots.
-- **🐳 Pinned renderer source** — The renderer is currently repository-source-only and must be built with the documented npm tarball preparation. Cross-host byte equivalence has not yet been validated and no registry image is published.
-- **🔓 Open-source CLI** — CLI-first, free forever. No per-screenshot pricing cliff, no dashboard lock-in, BYO AI key. Cloud components are available in the repository but their hosted and Docker quick starts are still pre-release.
+---
 
-## What It Does
-
-<p align="center">
-  <img src="./apps/web/public/images/docs/pipeline-architecture.jpg" alt="Frontguard 5-Stage Visual Regression Pipeline" width="840"/>
-</p>
-
-```
-Developer runs Frontguard → Pages render → Pixels compare to reviewed baselines →
-Console and HTML evidence are written → Optional AI assists with changed screenshots
-```
-
-(`run --output json` emits the same result as JSON instead of the console report.)
-
-- **Detect** — Pixel comparison finds changes above the configured threshold
-- **Understand** — Optional AI returns a confidence-scored explanation for human review
-- **Fix** — Experimental CSS suggestions and sandbox verification are separate opt-ins
-
-<p align="center">
-  <img src="./apps/web/public/images/docs/perceptual-diff-clusters.jpg" alt="Perceptual Diff Engine and Spatial DOM-Cluster Attribution" width="840"/>
-</p>
-
-## Quick Start
-
-<p align="center">
-  <img src="./apps/web/public/images/docs/quick-start-terminal-loop.jpg" alt="Quick Start Two-Terminal Workflow and Explicit Baseline Gate" width="840"/>
-</p>
+## Quick Start (`@frontguard/cli`)
 
 **Prerequisites:** [Node.js](https://nodejs.org/) 22+, a git repository, and an `origin` remote if CI should compare against published baselines. Frontguard stores screenshots on the `frontguard-baselines` orphan branch.
+
+### Step 1: Install Chromium & Initialize Config
 
 ```bash
 # One-time per machine: install the Chromium browser Frontguard uses to render pages
@@ -89,19 +60,19 @@ npx -p @frontguard/cli frontguard doctor
 git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"
 ```
 
-Check the `routes` in `frontguard.config.ts` before capturing: for
-non-framework apps `init` guesses (`/`, `/about`, `/contact`), and a route
-that does not exist baselines its 404 page without warning.
+Check the `routes` in `frontguard.config.ts` before capturing: for non-framework apps `init` guesses (`/`, `/about`, `/contact`), and a route that does not exist baselines its 404 page without warning.
 
-**App terminal (leave this running):** start your app and wait until the `baseUrl` in `frontguard.config.ts` responds. A static folder works too (`npx serve`):
+### Step 2: Start Your App Server (Terminal A)
+
+Leave your dev server running until the `baseUrl` in `frontguard.config.ts` responds (a static folder via `npx serve` works too):
 
 ```bash
 npm run dev
 ```
 
-**Frontguard terminal:** review the running app in your browser, capture
-baselines with `update-baselines`, then compare with `run`. Local comparison
-needs no `origin` remote:
+### Step 3: Capture Baselines & Run Comparison (Terminal B)
+
+Review the running app in your browser, capture baselines with `update-baselines`, then compare with `run`. Local comparison needs no `origin` remote:
 
 ```bash
 npx -p @frontguard/cli frontguard update-baselines
@@ -114,13 +85,180 @@ Only CI comparisons need the published orphan branch:
 git push origin frontguard-baselines
 ```
 
-`run` exits 0 when pages match, 1 on a regression or unaccepted new page, and 2 on a tool error.
-The default `threshold` is 0.1 (10% changed pixels), so a small visible change
-still passes — lower it for stricter pages.
+`run` exits `0` when pages match, `1` on a regression or unaccepted new page, and `2` on a tool error. The default `threshold` is `0.1` (10% changed pixels), so a small visible change still passes — lower it (e.g. `0.01` = 1%) for stricter pages.
 
-> **Full documentation:** [frontguard.dev/docs](https://frontguard.dev/docs) · internal notes in [`docs/`](./docs/)
+> **Full documentation:** [frontguard.dev/docs](https://frontguard.dev/docs) · [Quick Start](https://frontguard.dev/docs/quick-start) · [CLI Configuration](https://frontguard.dev/docs/cli/configuration) · [Playwright API](https://frontguard.dev/docs/playwright/api) · [MCP Server](https://frontguard.dev/docs/integrations/mcp)
 
-## Commands
+---
+
+## Practical Developer Recipes
+
+### 1. Eliminating Flaky Renders (Clocks, PRNG, Third-Party Widgets & Frame Convergence)
+
+Lock down time-dependent UI, random charts/IDs, and third-party analytics/chat widgets in `frontguard.config.ts`:
+
+```typescript
+// frontguard.config.ts
+export default {
+  version: 1,
+  baseUrl: 'http://localhost:3000',
+  routes: ['/', '/pricing', '/dashboard'],
+  viewports: [375, 768, 1440],
+  browsers: ['chromium'],
+  colorScheme: 'dark',
+
+  // Deterministic stabilization controls:
+  waitForStability: true,               // Poll consecutive frames until pixel variance < 0.05%
+  redactSensitive: true,                // Mask password/email/token inputs & scrub DOM snapshots
+  freezeTime: '2026-01-01T00:00:00Z',   // Lock page.clock and Date.now() (boolean | epoch ms | ISO string)
+  seedRandom: 42,                       // Override Math.random() with deterministic Mulberry32 PRNG
+  blockUrls: [                          // Abort flaky third-party network requests during render
+    '*google-analytics.com*',
+    '*googletagmanager.com*',
+    '*intercom.io*',
+  ],
+
+  // Hide dynamic elements that still vary:
+  ignore: [
+    { selector: '.live-latency-ticker' },
+  ],
+
+  threshold: 0.01, // 0.01 = 1% changed-pixel ratio
+}
+```
+
+### 2. Testing Interactive States (Modals, Tabs & Forms) Before Screenshot Capture
+
+Execute Playwright UI actions per route before Frontguard checks frame stability and captures the PNG:
+
+```typescript
+// frontguard.config.ts
+export default {
+  version: 1,
+  baseUrl: 'http://localhost:3000',
+  routes: [
+    '/',
+    {
+      path: '/pricing',
+      threshold: 0.005, // Stricter 0.5% threshold on pricing
+      actions: [
+        { type: 'waitForSelector', selector: '[data-ready]' },
+        { type: 'click', selector: '[data-billing="annual"]' },
+      ],
+    },
+    {
+      path: '/settings',
+      actions: [
+        { type: 'fill', selector: 'input[name="filter"]', value: 'security' },
+        { type: 'click', selector: '[data-testid="open-token-modal"]' },
+        { type: 'waitForSelector', selector: '[role="dialog"]' },
+      ],
+    },
+  ],
+}
+```
+
+### 3. Component-Scoped Visual Assertions Inside Playwright Tests (`@frontguard/playwright`)
+
+Use `visualTest(page, name, options)` inside your existing `@playwright/test` suites to test specific components, inspect 8-connected spatial diff clusters (`result.clusters` with `targetSelector`), and capture ARIA snapshots:
+
+```typescript
+import { test, expect } from '@playwright/test';
+import { visualTest } from '@frontguard/playwright';
+
+test('pricing tier card remains visually stable', async ({ page }) => {
+  await page.goto('http://localhost:3000/pricing');
+  await page.getByRole('tab', { name: 'Annual' }).click();
+
+  const result = await visualTest(page, 'pricing-annual-card', {
+    selector: '[data-testid="pro-tier-card"]',
+    threshold: 0.01,
+    waitForStable: true,
+    freezeTime: '2026-01-01T00:00:00Z',
+    seedRandom: 42,
+    blockUrls: ['*intercom.io*'],
+    redactSensitive: true,
+    captureAriaSnapshot: true,
+  });
+
+  if (!result.passed && result.clusters?.length) {
+    console.error(
+      'Regressed DOM selectors:',
+      result.clusters.map((c) => `${c.targetSelector} (${c.bbox.width}x${c.bbox.height})`),
+    );
+  }
+
+  expect(result.passed).toBe(true);
+});
+```
+
+### 4. Multi-Provider BYOK Vision Analysis (OpenAI, Anthropic, Gemini & Local Ollama)
+
+AI analysis is optional. When configured, Frontguard sends screenshot evidence to your selected provider and returns an advisory classification (`regression`, `intentional`, `content_update`), confidence score, and explanation:
+
+```typescript
+// frontguard.config.ts
+export default {
+  version: 1,
+  baseUrl: 'http://localhost:3000',
+  redactSensitive: true,
+  ai: {
+    provider: 'openai',
+    model: 'gpt-4o', // Or 'gpt-4.1-mini'
+    // Or provider: 'gemini', model: 'gemini-2.5-flash' (env: FRONTGUARD_GEMINI_KEY)
+    // Or provider: 'anthropic', model: 'claude-sonnet-4-20250514' (env: FRONTGUARD_ANTHROPIC_KEY)
+    // Or point baseUrl at OpenRouter, local Ollama ('http://localhost:11434/v1'), or vLLM
+  },
+}
+```
+
+### 5. Connecting AI Coding Agents via `@frontguard/mcp` (Zero-Key Local Mode)
+
+Add `@frontguard/mcp` to `.mcp.json` (Claude Code, Cursor, or Windsurf). In local report mode, it reads `./frontguard-report/report.json` directly with zero Cloud API setup:
+
+```json
+{
+  "mcpServers": {
+    "frontguard": {
+      "command": "npx",
+      "args": ["-y", "@frontguard/mcp"],
+      "env": {
+        "FRONTGUARD_LOCAL_REPORT": "./frontguard-report/report.json"
+      }
+    }
+  }
+}
+```
+
+Available MCP tools: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `promote_baseline`, `accept_baseline`, and `recent_runs`.
+
+### 6. Single-Pass Accessibility (WCAG), Web Vitals & Script Drift Audits
+
+Frontguard ships a 9-hook plugin pipeline (`setup`, `beforeDiscover`, `afterDiscover`, `beforeRender`, `afterRender`, `afterCompare`, `afterRun`, `onError`, `teardown`) and built-in plugins that inspect the live DOM in the same Chromium render pass:
+
+```typescript
+// frontguard.config.ts
+import {
+  createAccessibilityPlugin,
+  createPerformanceBudgetPlugin,
+  createThirdPartyScriptPlugin,
+} from '@frontguard/cli/plugins';
+
+export default {
+  version: 1,
+  baseUrl: 'http://localhost:3000',
+  routes: ['/', '/pricing', '/checkout'],
+  plugins: [
+    createAccessibilityPlugin({ standard: 'wcag2aa', failOnImpact: 'serious' }),
+    createPerformanceBudgetPlugin({ budgets: { lcpMs: 2500, cls: 0.1 } }),
+    createThirdPartyScriptPlugin(),
+  ],
+};
+```
+
+---
+
+## CLI Commands & Flags Reference
 
 | Command                              | Description                                                                             |
 | ------------------------------------ | --------------------------------------------------------------------------------------- |
@@ -139,126 +277,17 @@ still passes — lower it for stricter pages.
 
 ### Key `frontguard run` Flags
 
+- `--url <url>` — Override `baseUrl` from `frontguard.config.ts` (for preview or staging deployments)
+- `--threshold <ratio>` — Changed-pixel ratio threshold on a `0–1` scale (`0.01` = 1%)
 - `--wait-for-stability` — Wait for consecutive animation frames to converge before capturing
 - `--redact-sensitive` — Redact password, payment, and `[data-frontguard-redact]` inputs and scrub DOM snapshots before capture
 - `--color-scheme <scheme>` — Emulate `light` or `dark` `prefers-color-scheme`
 - `--freeze-time [timestamp]` — Freeze `Date.now()` / `new Date()` (boolean default, epoch ms, or ISO 8601 date string)
 - `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
 - `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render
+- `--output <console|json>` — Emit human-readable console report or structured JSON to stdout
 
-## Features
-
-<p align="center">
-  <img src="./apps/web/public/images/docs/html-workbench-4mode-inspector.jpg" alt="Interactive 4-Mode HTML Visual Diff Workbench" width="840"/>
-</p>
-
-- **Zero-config route discovery** — Auto-crawls your app to find all pages
-- **Multi-browser** — Chromium, Firefox, WebKit via Playwright
-- **Spatial diff clusters & DOM selector attribution** — Connected-component diff clusters report Chroma-SSIM, CW-SSIM, and `cluster.targetSelector` (the most-specific DOM selector at the cluster center)
-- **Optional AI analysis** — Multi-provider BYOK (`openai`, `anthropic`, `gemini`, plus custom OpenAI-compatible `baseUrl` for OpenRouter / Ollama / vLLM) can classify a pixel change; it does not change pass/fail and has no published accuracy benchmark
-- **Smart rendering** — Dependency graph renders only pages affected by your changes
-- **Preview deployments** — Auto-detects Vercel/Netlify preview URLs
-- **Git-native baselines** — Stored in orphan branch, zero main branch bloat
-- **Framework detection** — Next.js, Remix, SvelteKit, Nuxt, Astro out of the box
-- **Security hardened** — Shell injection prevention, path traversal guards, API key redaction
-- **Memory managed** — Streaming buffers, temp file cleanup, bounded concurrency
-- **Visual evidence** — Baseline/current/diff images are retained in the HTML report; remote thumbnails require an explicit image-upload backend
-- **Per-route thresholds** — Strict on `/checkout`, relaxed on `/blog` — all in one config
-
-<p align="center">
-  <img src="./apps/web/public/images/docs/mcp-visual-cortex.jpg" alt="Frontguard MCP Agentic Visual Cortex" width="840"/>
-</p>
-
-## How Frontguard Compares
-
-| | Frontguard | Percy | Chromatic | BackstopJS | Lost Pixel | Argos |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Open source | ✅ MIT | ❌ | ◐ | ✅ | ◐ (read-only) | ✅ MIT |
-| CLI-first | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **AI change classification** | ✅ optional | ◐ | ❌ | ❌ | ❌ | ❌ |
-| AI fix verification | ◐ experimental | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Multi-render consensus | ◐ configurable | ◐ | ◐ | ❌ | ❌ | ◐ |
-| Runs without a hosted service | ✅ | ❌ | ❌ | ✅ | ◐ | ◐ |
-| Free tier | Forever (CLI) | 5k screenshots/mo | 5k snapshots/mo | Free | Sunset | 5k screenshots/mo |
-| Hosted entry | Waitlist | $199/mo | $179/mo | n/a | n/a | $100/mo |
-| Project status | Active | Active | Active | Low activity observed | Sunset; team joined Figma | Active |
-
-> Migrating? See the [BackstopJS](https://frontguard.dev/docs/guides/migrate-from-backstopjs), [Lost Pixel](https://frontguard.dev/docs/guides/migrate-from-lost-pixel), and [Argos](https://frontguard.dev/docs/comparisons/frontguard-vs-argos) guides. Comparisons: [Percy](https://frontguard.dev/docs/comparisons/frontguard-vs-percy) · [Chromatic](https://frontguard.dev/docs/comparisons/frontguard-vs-chromatic) · [Argos](https://frontguard.dev/docs/comparisons/frontguard-vs-argos).
-
-## AI Classification Output Shape
-
-<p align="center">
-  <img src="./apps/web/public/images/docs/closed-loop-ai-fix-sandbox.jpg" alt="Closed-Loop AI CSS Fix and Sandbox Verification Engine" width="840"/>
-</p>
-
-Illustrative output only; the published validation run did not measure model accuracy.
-
-```
-  ✘ /dashboard @ 375px — 2.34% changed
-    🔴 AI Analysis — Regression (94% confidence)
-    "The sidebar overlaps the main content on mobile. Review the responsive
-     layout rules affecting the sidebar and content container."
-    Suggested fix (unverified): restore column stacking at the mobile breakpoint.
-
-  ✓ /pricing @ 1440px — 0.8% changed
-    🟢 AI Analysis — Intentional (91% confidence)
-    "New 'Enterprise' pricing tier added. Layout intact, content expanded."
-```
-
-## Configuration
-
-<p align="center">
-  <img src="./apps/web/public/images/docs/anti-flake-hermetic-render.jpg" alt="Deterministic Rendering and Anti-Flake Engine" width="840"/>
-</p>
-
-```typescript
-// frontguard.config.ts
-export default {
-  version: 1,
-  baseUrl: 'http://localhost:3000',
-
-  // Auto-discover routes (zero config)
-  discover: {
-    startUrl: '/',
-    maxDepth: 3,
-    exclude: ['/admin/*', '/api/*'],
-  },
-
-  // Or explicit routes
-  // routes: ['/', '/pricing', '/checkout'],
-
-  viewports: [375, 768, 1440],
-  browsers: ['chromium'],
-  colorScheme: 'dark',
-  waitForStability: true,
-  redactSensitive: true,
-  freezeTime: '2026-01-01T00:00:00Z', // boolean | number | ISO date string
-  seedRandom: 42,                     // boolean | number
-  blockUrls: ['*google-analytics.com*', '*intercom.io*'],
-  threshold: 0.1, // changed-pixel ratio: 0.1 = 10%
-
-  // AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini', plus optional custom baseUrl)
-  ai: {
-    provider: 'openai',
-    model: 'gpt-4o',
-    // baseUrl: 'https://openrouter.ai/api/v1', // OpenRouter, Ollama, or vLLM
-  },
-
-  // Ignore dynamic content
-  ignore: [
-    { selector: '.dynamic-timestamp' },
-  ],
-};
-```
-
-## How It Works
-
-```
-ROUTE DISCOVERY → PLAYWRIGHT RENDER → PIXEL COMPARISON → CONSOLE / JSON / HTML
-                                                └──────→ OPTIONAL BYOK AI ANALYSIS
-```
-
-## CLI Output
+### Sample CLI Output
 
 ```
  frontguard
@@ -286,113 +315,54 @@ ROUTE DISCOVERY → PLAYWRIGHT RENDER → PIXEL COMPARISON → CONSOLE / JSON / 
   1 regression · 1 warning · 9 passed · 1 new
 ```
 
-## Plugins
+---
 
-<p align="center">
-  <img src="./apps/web/public/images/docs/plugin-lifecycle-audits.jpg" alt="9-Hook Plugin Architecture and Unified Render Audits" width="840"/>
-</p>
+## Built in the Open
 
-Frontguard ships with a plugin architecture (9 lifecycle hooks) and 5 built-in plugins:
+The MIT-licensed repository contains the CLI, optional AI pipeline, cloud API source, integrations, MCP server, and Docker renderer source. The local CLI is the supported product path. Hosted, MCP, GitHub App, and Docker Compose onboarding remain pre-release; see the [launch audit](./docs/launch-audit-2026-08.md) for the unresolved acceptance work.
 
-| Plugin | Description | Key Features |
-|--------|-------------|--------------|
-| **Figma** (`packages/cli/src/plugins/figma.ts`) | Design-to-code comparison | Figma API integration, design token extraction, component mapping |
-| **Performance Budgets** (`packages/cli/src/plugins/perf-budgets.ts`) | Web Vitals & budgets | LCP/CLS/TTFB thresholds, violations correlated with the visual diff |
-| **Accessibility** (`packages/cli/src/plugins/accessibility.ts`) | axe-core audits | WCAG checks (contrast, alt text, target size, focus, headings) in the same render pass |
-| **Third-Party Scripts** (`packages/cli/src/plugins/third-party-scripts.ts`) | Script drift detection | Flags ad/analytics/widget origins that appear or disappear between runs |
-| **Monitor** (`packages/cli/src/plugins/monitor.ts`) | Production visual monitoring (CLI + optional cloud scheduler) | Live-URL checks, threshold alerting, history tracking |
+AI is optional; without it, the CLI performs local pixel comparison and writes local reports. Cloud source and the [self-host guide](https://frontguard.dev/docs/self-host) are available for evaluation, not as a verified production quick start.
 
-**Plugin lifecycle hooks:** `setup`, `beforeDiscover`, `afterDiscover`, `beforeRender`, `afterRender`, `afterCompare`, `afterRun`, `onError`, `teardown`
+## How Frontguard Compares
 
-```typescript
-// frontguard.config.ts
-import { createFigmaPlugin } from '@frontguard/cli/plugins';
+| | Frontguard | Percy | Chromatic | BackstopJS | Lost Pixel | Argos |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Open source | ✅ MIT | ❌ | ◐ | ✅ | ◐ (read-only) | ✅ MIT |
+| CLI-first | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| **AI change classification** | ✅ optional | ◐ | ❌ | ❌ | ❌ | ❌ |
+| AI fix verification | ◐ experimental | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Multi-render consensus | ◐ configurable | ◐ | ◐ | ❌ | ❌ | ◐ |
+| Runs without a hosted service | ✅ | ❌ | ❌ | ✅ | ◐ | ◐ |
+| Free tier | Forever (CLI) | 5k screenshots/mo | 5k snapshots/mo | Free | Sunset | 5k screenshots/mo |
+| Hosted entry | Waitlist | $199/mo | $179/mo | n/a | n/a | $100/mo |
+| Project status | Active | Active | Active | Low activity observed | Sunset; team joined Figma | Active |
 
-export default {
-  // ...base config
-  plugins: [
-    createFigmaPlugin({ fileKey: 'your-figma-file-key' }),
-  ],
-};
-```
+> Migrating? See the [BackstopJS](https://frontguard.dev/docs/guides/migrate-from-backstopjs), [Lost Pixel](https://frontguard.dev/docs/guides/migrate-from-lost-pixel), and [Argos](https://frontguard.dev/docs/comparisons/frontguard-vs-argos) guides. Comparisons: [Percy](https://frontguard.dev/docs/comparisons/frontguard-vs-percy) · [Chromatic](https://frontguard.dev/docs/comparisons/frontguard-vs-chromatic) · [Argos](https://frontguard.dev/docs/comparisons/frontguard-vs-argos).
 
-<p align="center">
-  <img src="./apps/web/public/images/docs/production-monitoring-daemon.jpg" alt="Frontguard Monitor Production Monitoring and Alert Pipeline" width="840"/>
-</p>
+---
 
-## Architecture
-
-<p align="center">
-  <img src="./apps/web/public/images/docs/git-cas-storage.jpg" alt="Zero-Pollution Git Orphan and Cloud CAS Storage" width="840"/>
-</p>
-
-<p align="center">
-  <img src="./apps/web/public/images/docs/ci-cd-github-actions-flow.jpg" alt="CI/CD and GitHub Actions Two-Lane Baseline Governance" width="840"/>
-</p>
+## Repository Architecture
 
 ```
 packages/
 ├── cli/src/          # @frontguard/cli — discover → render → diff → report
-│   ├── cli/          # Commander entry
-│   ├── core/         # Pipeline orchestrator, types, config, plugin system
-│   ├── discovery/    # Route discovery (crawler + filesystem)
-│   ├── render/       # Playwright rendering engine
-│   ├── diff/         # Pixel diff + AI vision analysis
-│   ├── storage/      # Git orphan branch baselines
-│   ├── report/       # Console, JSON, HTML, GitHub PR reporters
-│   ├── plugins/      # Figma, perf budgets, a11y, third-party, monitor
+│   ├── cli/          # Commander entry (run, init, update-baselines, doctor, guide, monitor)
+│   ├── core/         # Pipeline orchestrator, types, config, 9-hook plugin system
+│   ├── discovery/    # Route discovery (crawler + filesystem + Storybook /index.json)
+│   ├── render/       # Playwright rendering engine + deterministic anti-flake gates
+│   ├── diff/         # Pixelmatch + SSIM / Chroma-SSIM / CW-SSIM + DOM cluster attribution
+│   ├── storage/      # Git orphan branch baselines (frontguard-baselines)
+│   ├── report/       # Console, JSON, 4-mode HTML workbench, GitHub PR reporters
+│   ├── plugins/      # Accessibility, perf budgets, third-party scripts, Figma, monitor
 │   └── utils/        # Redaction, logging, retry
-├── playwright/       # @frontguard/playwright
-├── mcp/              # @frontguard/mcp
-├── cloud-api/        # Cloudflare Workers + D1 + R2
+├── playwright/       # @frontguard/playwright — in-test visualTest() assertion helper
+├── mcp/              # @frontguard/mcp — 7-tool MCP server (local report + Cloud API)
+├── cloud-api/        # Cloudflare Workers + D1 + R2 (/v1/runs, /v1/baselines, /v1/cas)
 └── create-frontguard-plugin/
 apps/
-├── web/              # docs site
-└── demo/
-integrations/
-├── github-app/
-├── vercel/
-├── netlify/
-└── slack-app/
+├── web/              # Documentation & product site (frontguard.dev)
+└── demo/             # Next.js regression fixture app
 ```
-
-Pipeline: `discover → filter → render → diff → analyze → report`
-
-Each stage is independent with error boundaries — one page failing doesn't kill the run.
-
-## Documentation
-
-See [`docs/`](./docs/) for:
-- [Product deep-dive](./docs/PRODUCT.md) — Architecture decisions and design rationale
-- [Launch readiness (v0.2.0)](./docs/launch-readiness.md) — Go/no-go for the 2026-06-17 release, 20-PR punch list, residual risks
-- [Adversarial review](./docs/adversarial-review.md) — The audit we held v0.2.0 to
-- [Product-completion plan](./docs/product-completion-plan.md) — The frozen IN / ROADMAP / FIX boundary
-- [Research](./docs/research.md) — Mid-2026 competitive landscape (16 competitors fetched live)
-- [Validation results](./validation/results-v0.2.md) — Real harness run, real numbers
-
-## Roadmap
-
-See [ROADMAP.md](./docs/ROADMAP.md) for the full milestone history and upcoming plans.
-
-## Releasing
-
-The release flow is documented and reproducible — no hidden steps.
-
-1. Tag a version: `git tag -a v0.X.Y -m "..."` and `git push origin v0.X.Y`.
-2. [`.github/workflows/release.yml`](./.github/workflows/release.yml) runs on the tag push: `scripts/release.sh --dry-run` first as a sanity check, then real publish with `NPM_TOKEN` from repo secrets (provenance signing in CI). Marketplace submissions emit as a workflow summary.
-3. [`scripts/release.sh`](./scripts/release.sh) is the single source of truth. Run it locally with `--dry-run` for any audit — `npm pack --dry-run` per package, manifest checks, no state mutated.
-
-Idempotent: already-published versions are skipped automatically. Scoped packages are forced `public` after publish so org defaults can't silently restrict them.
-
-## Telemetry
-
-Anonymous usage telemetry is **off by default**. Nothing is sent unless you opt in with `FRONTGUARD_TELEMETRY=1` or `telemetry: true` in config.
-
-Opt out with any of `--no-telemetry`, `FRONTGUARD_TELEMETRY=0`, `DO_NOT_TRACK=1`, or `telemetry: false`.
-
-When enabled, the CLI POSTs one JSON event to `https://telemetry.frontguard.dev/v1/events` (override with `FRONTGUARD_TELEMETRY_ENDPOINT`). Fields: `command`, `version`, `routes`, `regressions`, `aiProvider`, `antiFlake`, `ci`, `durationMs`, `errorType`, `ts`. No URLs, paths, screenshots, or keys. The HTTP peer can see the source IP. There is no published retention period for the default collector.
-
-Full schema: [docs/telemetry.md](./docs/telemetry.md).
 
 ## Environment Variables
 
@@ -406,18 +376,19 @@ FRONTGUARD_OPENAI_BASE_URL=https://openrouter.ai/api/v1 # optional OpenAI-compat
 # Local Report Mode for @frontguard/mcp (optional, auto-detects ./frontguard-report/report.json)
 FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json
 
-# Opt-in anonymous usage telemetry (off unless set)
+# Opt-in anonymous usage telemetry (off by default unless set)
 FRONTGUARD_TELEMETRY=1
-FRONTGUARD_TELEMETRY_ENDPOINT=https://telemetry.frontguard.dev/v1/events
 DO_NOT_TRACK=1
 ```
 
-> **Note:** AI keys are optional. Frontguard works without them using local pixel comparison. AI analysis activates only when you configure a provider and sends screenshot evidence directly to that provider. Telemetry is also optional and off by default.
+## Documentation & Internal References
 
-## Contributing
+- **Interactive Developer Docs:** [frontguard.dev/docs](https://frontguard.dev/docs)
+- [Product deep-dive](./docs/PRODUCT.md) — Architecture decisions and design rationale
+- [Research](./docs/research.md) — Competitive landscape and pricing citations
+- [Validation results](./validation/results-v0.2.md) — Recorded local harness run
+- [Telemetry schema](./docs/telemetry.md) — Opt-in anonymous event contract
 
-Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines, development setup, and how to submit PRs.
+## Contributing & License
 
-## License
-
-MIT
+Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and guidelines. Released under the [MIT License](./LICENSE).
