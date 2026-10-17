@@ -1,634 +1,650 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { s } from "../../lib/style";
-import { MONO, STAGES } from "./home-data";
-
-type InspectorTabId = "side-by-side" | "cluster-ssim" | "mcp-cortex";
-
-const INSPECTOR_TABS: ReadonlyArray<{ id: InspectorTabId; label: string }> = [
-  { id: "side-by-side", label: "Side-by-Side" },
-  { id: "cluster-ssim", label: "Cluster + Chroma SSIM" },
-  { id: "mcp-cortex", label: "MCP Agent Cortex" },
-];
+import {
+  DIFF_MODES,
+  MONO,
+  PIPELINE_PHASES,
+   type DiffModeId,
+} from "./home-data";
 
 export function PipelineAndInspector() {
-  const [inspectorTab, setInspectorTab] =
-    useState<InspectorTabId>("cluster-ssim");
-  const [redactEnabled, setRedactEnabled] = useState(true);
-  const [stabilityEnabled, setStabilityEnabled] = useState(true);
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [activeDiffMode, setActiveDiffMode] =
+    useState<DiffModeId>("cluster-ssim");
+  const [inspectorCurtain, setInspectorCurtain] = useState<number>(50);
+  const [onionOpacity, setOnionOpacity] = useState<number>(55);
+  const [stabilitySettled, setStabilitySettled] = useState<boolean>(true);
+  const diffTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const onTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const currentIndex = INSPECTOR_TABS.findIndex(
-      (t) => t.id === inspectorTab,
-    );
+  const onDiffTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const currentIndex = DIFF_MODES.findIndex((m) => m.id === activeDiffMode);
     if (currentIndex === -1) return;
     let nextIndex: number;
     if (event.key === "ArrowRight") {
-      nextIndex = (currentIndex + 1) % INSPECTOR_TABS.length;
+      nextIndex = (currentIndex + 1) % DIFF_MODES.length;
     } else if (event.key === "ArrowLeft") {
-      nextIndex =
-        (currentIndex - 1 + INSPECTOR_TABS.length) % INSPECTOR_TABS.length;
+      nextIndex = (currentIndex - 1 + DIFF_MODES.length) % DIFF_MODES.length;
     } else if (event.key === "Home") {
       nextIndex = 0;
     } else if (event.key === "End") {
-      nextIndex = INSPECTOR_TABS.length - 1;
+      nextIndex = DIFF_MODES.length - 1;
     } else {
       return;
     }
     event.preventDefault();
-    const nextTab = INSPECTOR_TABS[nextIndex];
-    setInspectorTab(nextTab.id);
-    tabRefs.current[nextIndex]?.focus();
+    const nextMode = DIFF_MODES[nextIndex];
+    setActiveDiffMode(nextMode.id);
+    diffTabRefs.current[nextIndex]?.focus();
   };
 
   return (
-    <section
-      id="how"
-      style={s("border-bottom: 1px solid #1f1c19; background: #0d0c0b;")}
-    >
-      <div
-        className="fg-shell"
-        style={s("padding-top: 96px; padding-bottom: 96px;")}
-      >
-        <div
-          style={s(
-            "display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 48px; gap: 32px; flex-wrap: wrap;",
-          )}
-        >
-          <div>
-            <div className="fg-eyebrow" style={s("margin-bottom: 14px;")}>
-              // HOW IT WORKS · SIX STAGES, ONE COMMAND
-            </div>
-            <h2 className="fg-h2" style={s("max-width: 680px;")}>
-              From <code style={{ fontFamily: MONO, color: "#e8862e" }}>frontguard run</code>{" "}
-              to a verified visual diff in six deterministic stages.
+    <>
+      {/* Section 4: How It Works (6 stages grouped into 3 connected phases + merged 3 pillars) */}
+      <section className="fg-section">
+        <div className="fg-shell">
+          <div style={s("max-width: 720px; margin-bottom: 56px;")}>
+            <div className="fg-eyebrow">HOW FRONTGUARD WORKS</div>
+            <h2 className="fg-h2">
+              Three connected phases from route discovery to verified report.
             </h2>
+            <p className="fg-lead">
+              Six pipeline stages grouped into three architectural phases—running
+              local pixel and perceptual similarity checks before optional model
+              analysis.
+            </p>
           </div>
-          <p className="fg-lead" style={s("max-width: 400px;")}>
-            Run the full pipeline or stop at any stage. Disable AI for a pure
-            local pixel + perceptual SSIM gate.
-          </p>
-        </div>
 
-        {/* 6-Stage Pipeline Track */}
-        <div className="fg-pipeline-track">
-          {STAGES.map((st, i) => {
-            const isHighlighted =
-              (st.num === "04" && inspectorTab === "cluster-ssim") ||
-              (st.num === "05" && inspectorTab === "mcp-cortex") ||
-              (st.num === "03" && inspectorTab === "side-by-side");
-            return (
+          <div className="fg-phases-flow">
+            {PIPELINE_PHASES.map((p, idx) => (
               <div
-                key={st.num}
+                key={p.phase}
+                className="fg-surface-card"
                 style={s(
-                  `background: ${
-                    isHighlighted ? "#171411" : "#131210"
-                  }; padding: 24px 20px; position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 204px;`,
+                  "display: flex; flex-direction: column; justify-content: space-between; gap: 24px; position: relative;",
                 )}
               >
                 <div>
                   <div
                     style={s(
-                      "display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;",
+                      "display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px;",
                     )}
                   >
                     <span
                       style={{
                         fontFamily: MONO,
                         ...s(
-                          `font-size: 12px; color: ${
-                            i === 3 || i === 4 || isHighlighted
-                              ? "#e8862e"
-                              : "#a89f94"
-                          }; letter-spacing: 0.06em; font-weight: 600;`,
+                          "font-size: 11px; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600;",
                         ),
                       }}
                     >
-                      {st.num}
+                      {p.phase} · {p.name.toUpperCase()}
                     </span>
                     <span
                       style={{
                         fontFamily: MONO,
                         ...s(
-                          "font-size: 12px; color: #a89f94; background: #1a1815; border: 1px solid #26221e; padding: 2px 7px; border-radius: 3px;",
+                          "font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); color: var(--text-secondary); background: var(--bg);",
                         ),
                       }}
                     >
-                      {st.artifact}
+                      {idx < 2 ? `Phase ${idx + 1} →` : "Phase 3 · Final"}
                     </span>
                   </div>
+
+                  <h3
+                    className="fg-h3"
+                    style={s("font-size: 22px; margin-bottom: 12px;")}
+                  >
+                    {p.outcome}
+                  </h3>
+
+                  {/* Connected Stage Pills inside this Phase */}
                   <div
                     style={s(
-                      "font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 8px; color: #f5f1ea;",
+                      "display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;",
                     )}
                   >
-                    {st.title}
+                    {p.stages.map((st) => (
+                      <div
+                        key={st.n}
+                        style={{
+                          fontFamily: MONO,
+                          ...s(
+                            "font-size: 11px; padding: 4px 9px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); display: inline-flex; align-items: center; gap: 6px;",
+                          ),
+                        }}
+                      >
+                        <span style={s("color: var(--text-muted);")}>
+                          {st.n}
+                        </span>
+                        <span style={s("font-weight: 600;")}>{st.name}</span>
+                      </div>
+                    ))}
                   </div>
+
+                  <p className="fg-body" style={s("font-size: 15px;")}>
+                    {p.desc}
+                  </p>
                 </div>
+
                 <div
                   style={s(
-                    "font-size: 14px; color: #c8c0b6; line-height: 1.55;",
+                    "padding-top: 14px; border-top: 1px solid var(--border); display: grid; gap: 6px;",
                   )}
                 >
-                  {st.desc}
+                  {p.specs.map((specItem) => (
+                    <div
+                      key={specItem}
+                      style={{
+                        fontFamily: MONO,
+                        ...s(
+                          "font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;",
+                        ),
+                      }}
+                    >
+                      <span style={s("color: var(--text-muted);")}>›</span>
+                      <span>{specItem}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
+      </section>
 
-        {/* Interactive Visual Diff Inspector Workbench */}
-        <div
-          data-testid="visual-diff-inspector"
-          style={s(
-            "margin-top: 32px; background: #131210; border: 1px solid #2a2622; border-radius: 10px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.45);",
-          )}
-        >
-          {/* Inspector Top Chrome + WAI-ARIA Tablist + Interactive Layer Toggles */}
+      {/* Section 5: Product Proof — Full-Width Before/After Diff Visual on --surface-raised */}
+      <section className="fg-section-raised">
+        <div className="fg-shell">
           <div
             style={s(
-              "display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 20px; background: #181613; border-bottom: 1px solid #26221e; flex-wrap: wrap;",
+              "display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; margin-bottom: 40px; flex-wrap: wrap;",
             )}
           >
-            <div
-              style={s(
-                "display: flex; align-items: center; gap: 10px; flex-wrap: wrap;",
-              )}
-            >
-              <span
-                style={s(
-                  "display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: #e5484d;",
-                )}
-              />
-              <span
-                style={{
-                  fontFamily: MONO,
-                  ...s("font-size: 12px; color: #f5f1ea; font-weight: 600;"),
-                }}
-              >
-                /dashboard @ 1440px · chromium
-              </span>
-              <span
-                style={{
-                  fontFamily: MONO,
-                  ...s(
-                    "font-size: 12px; color: #e8862e; background: rgba(232,134,46,0.12); border: 1px solid rgba(232,134,46,0.35); padding: 2px 8px; border-radius: 4px;",
-                  ),
-                }}
-              >
-                1 cluster · 1.84% diff
-              </span>
+            <div>
+              <h2 className="fg-h2">
+                See what Frontguard flags—and what it ignores.
+              </h2>
+              <p className="fg-lead">
+                Instead of averaging changed pixels across a 1440×900 canvas,
+                Frontguard extracts 8-connected bounding boxes and scores each
+                cluster with local Chroma SSIM and wavelet CW-SSIM.
+              </p>
             </div>
+            <div className="fg-todo-note">
+              TODO: pair interactive inspector with high-res production screenshot capture
+            </div>
+          </div>
 
-            {/* Layer Toggles + View Mode Tablist */}
+          <div
+            data-testid="visual-diff-inspector"
+            style={s(
+              "background: var(--bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: 0 20px 56px rgba(0,0,0,0.45);",
+            )}
+          >
+            {/* Workbench Header + Accessible Tablist */}
             <div
               style={s(
-                "display: flex; align-items: center; gap: 10px; flex-wrap: wrap;",
+                "display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap;",
               )}
             >
-              <div
-                role="group"
-                aria-label="Capture pipeline guards"
-                style={s("display: flex; align-items: center; gap: 6px;")}
-              >
-                <button
-                  type="button"
-                  onClick={() => setStabilityEnabled((prev) => !prev)}
-                  aria-pressed={stabilityEnabled}
-                  style={{
-                    fontFamily: MONO,
-                    ...s(
-                      `padding: 6px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; border: 1px solid ${
-                        stabilityEnabled ? "rgba(79,180,119,0.45)" : "#2a2622"
-                      }; background: ${
-                        stabilityEnabled ? "rgba(79,180,119,0.1)" : "#131210"
-                      }; color: ${stabilityEnabled ? "#4fb477" : "#a89f94"};`,
-                    ),
-                  }}
-                >
-                  {stabilityEnabled ? "✓" : "○"} waitForStability
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRedactEnabled((prev) => !prev)}
-                  aria-pressed={redactEnabled}
-                  style={{
-                    fontFamily: MONO,
-                    ...s(
-                      `padding: 6px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; border: 1px solid ${
-                        redactEnabled ? "rgba(232,134,46,0.45)" : "#2a2622"
-                      }; background: ${
-                        redactEnabled ? "rgba(232,134,46,0.1)" : "#131210"
-                      }; color: ${redactEnabled ? "#e8862e" : "#a89f94"};`,
-                    ),
-                  }}
-                >
-                  {redactEnabled ? "🔒" : "○"} redactSensitive
-                </button>
-              </div>
-
               <div
                 role="tablist"
                 aria-label="Visual diff inspection view"
-                onKeyDown={onTabKeyDown}
+                onKeyDown={onDiffTabKeyDown}
                 style={s(
-                  "display: inline-flex; background: #100f0d; border: 1px solid #2a2622; border-radius: 6px; padding: 3px; gap: 4px; flex-wrap: wrap;",
+                  "display: flex; gap: 4px; background: var(--bg); border: 1px solid var(--border); padding: 4px; border-radius: 6px; flex-wrap: wrap;",
                 )}
               >
-                {INSPECTOR_TABS.map((tab, idx) => {
-                  const active = inspectorTab === tab.id;
+                {DIFF_MODES.map((m, index) => {
+                  const active = activeDiffMode === m.id;
                   return (
                     <button
-                      key={tab.id}
+                      key={m.id}
                       ref={(el) => {
-                        tabRefs.current[idx] = el;
+                        diffTabRefs.current[index] = el;
                       }}
-                      id={`diff-tab-${tab.id}`}
+                      id={`diff-tab-${m.id}`}
                       type="button"
                       role="tab"
                       aria-selected={active}
-                      aria-controls={`diff-panel-${tab.id}`}
+                      aria-controls={`diff-panel-${m.id}`}
                       tabIndex={active ? 0 : -1}
-                      onClick={() => setInspectorTab(tab.id)}
+                      onClick={() => setActiveDiffMode(m.id)}
                       style={{
                         fontFamily: MONO,
                         ...s(
-                          `padding: 6px 12px; font-size: 12px; border-radius: 4px; border: none; cursor: pointer; background: ${
-                            active ? "#26221e" : "transparent"
+                          `padding: 7px 12px; border-radius: 4px; border: 1px solid ${
+                            active ? "var(--accent)" : "transparent"
+                          }; background: ${
+                            active ? "var(--accent-subtle)" : "transparent"
                           }; color: ${
-                            active ? "#f5f1ea" : "#a89f94"
-                          }; font-weight: ${active ? "600" : "400"};`,
+                            active ? "var(--text-primary)" : "var(--text-muted)"
+                          }; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;`,
                         ),
                       }}
                     >
-                      {tab.label}
+                      <span style={s("color: var(--text-muted);")}>
+                        [{m.keyHint}]
+                      </span>
+                      <span>{m.label}</span>
                     </button>
                   );
                 })}
               </div>
-            </div>
-          </div>
 
-          {/* Active Inspection Tabpanel */}
-          <div
-            role="tabpanel"
-            id={`diff-panel-${inspectorTab}`}
-            aria-labelledby={`diff-tab-${inspectorTab}`}
-          >
-            {inspectorTab === "side-by-side" && (
-              <div
-                className="fg-split-2"
-                style={s("gap: 1px; background: #26221e;")}
-              >
-                <div style={s("background: #131210; padding: 24px;")}>
-                  <div
-                    style={{
-                      fontFamily: MONO,
-                      ...s(
-                        "font-size: 12px; color: #4fb477; margin-bottom: 14px; display: flex; justify-content: space-between;",
-                      ),
-                    }}
-                  >
-                    <span>BASELINE · frontguard-baselines</span>
-                    <span style={s("color: #a89f94;")}>sha256: 9f84c2…e10b</span>
-                  </div>
-                  <div
-                    style={s(
-                      "background: #0d0c0b; border: 1px solid #26221e; padding: 18px; display: flex; gap: 14px;",
-                    )}
-                  >
-                    <div
-                      style={s(
-                        "width: 124px; background: #181613; border: 1px solid #2a2622; padding: 10px;",
-                      )}
-                    >
-                      <div
-                        style={s(
-                          "height: 8px; width: 65%; background: #3b3531; border-radius: 2px; margin-bottom: 8px;",
-                        )}
-                      />
-                      <div
-                        style={s(
-                          "height: 8px; width: 80%; background: #2a2622; border-radius: 2px; margin-bottom: 14px;",
-                        )}
-                      />
-                      <div
-                        style={s(
-                          "padding: 7px 8px; background: #e8862e; color: #0d0c0b; border-radius: 4px; font-size: 12px; font-weight: 700; text-align: center;",
-                        )}
-                      >
-                        Upgrade Plan
-                      </div>
-                    </div>
-                    <div style={s("flex: 1; display: grid; gap: 10px;")}>
-                      <div
-                        style={s(
-                          "min-height: 28px; background: #181613; border: 1px solid #26221e; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding: 4px 10px;",
-                        )}
-                      >
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            ...s("font-size: 12px; color: #a89f94;"),
-                          }}
-                        >
-                          {redactEnabled
-                            ? "api_key: ████████████"
-                            : "api_key: fg_live_98a2"}
-                        </span>
-                      </div>
-                      <div
-                        style={s(
-                          "height: 54px; background: #181613; border: 1px solid #26221e; border-radius: 4px;",
-                        )}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div style={s("background: #131210; padding: 24px;")}>
-                  <div
-                    style={{
-                      fontFamily: MONO,
-                      ...s(
-                        "font-size: 12px; color: #ff8b8e; margin-bottom: 14px; display: flex; justify-content: space-between;",
-                      ),
-                    }}
-                  >
-                    <span>CURRENT · PR branch render</span>
-                    <span style={s("color: #a89f94;")}>
-                      .sidebar-cta height: 0px
-                    </span>
-                  </div>
-                  <div
-                    style={s(
-                      "background: #0d0c0b; border: 1px solid #26221e; padding: 18px; display: flex; gap: 14px;",
-                    )}
-                  >
-                    <div
-                      style={s(
-                        "width: 124px; background: #181613; border: 1px solid rgba(229,72,77,0.5); padding: 10px;",
-                      )}
-                    >
-                      <div
-                        style={s(
-                          "height: 8px; width: 65%; background: #3b3531; border-radius: 2px; margin-bottom: 8px;",
-                        )}
-                      />
-                      <div
-                        style={s(
-                          "height: 8px; width: 80%; background: #2a2622; border-radius: 2px; margin-bottom: 14px;",
-                        )}
-                      />
-                      <div
-                        style={s(
-                          "min-height: 28px; padding: 4px 6px; border: 1px dashed #e5484d; background: rgba(229,72,77,0.12); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #ff8b8e;",
-                        )}
-                      >
-                        collapsed (0px)
-                      </div>
-                    </div>
-                    <div style={s("flex: 1; display: grid; gap: 10px;")}>
-                      <div
-                        style={s(
-                          "min-height: 28px; background: #181613; border: 1px solid #26221e; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding: 4px 10px;",
-                        )}
-                      >
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            ...s("font-size: 12px; color: #a89f94;"),
-                          }}
-                        >
-                          {redactEnabled
-                            ? "api_key: ████████████"
-                            : "api_key: fg_live_98a2"}
-                        </span>
-                      </div>
-                      <div
-                        style={s(
-                          "height: 54px; background: #181613; border: 1px solid #26221e; border-radius: 4px;",
-                        )}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {inspectorTab === "cluster-ssim" && (
-              <div
-                className="fg-split-asym-right"
-                style={s("gap: 1px; background: #26221e;")}
-              >
-                <div style={s("background: #131210; padding: 24px;")}>
-                  <div
-                    style={{
-                      fontFamily: MONO,
-                      ...s(
-                        "font-size: 12px; color: #e8862e; margin-bottom: 14px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;",
-                      ),
-                    }}
-                  >
-                    <span>
-                      CONNECTED-COMPONENT CLUSTER OVERLAY · SET-OF-MARK [1]
-                    </span>
-                    <span style={s("color: #a89f94;")}>
-                      bbox: (x: 48, y: 224, 148×164px)
-                    </span>
-                  </div>
-                  <div
-                    style={s(
-                      "background: #0d0c0b; border: 1px solid #26221e; padding: 18px; display: flex; gap: 14px; position: relative;",
-                    )}
-                  >
-                    <div
-                      style={s(
-                        "width: 132px; background: #181613; border: 2px solid #e5484d; padding: 10px; position: relative;",
-                      )}
-                    >
-                      <span
-                        style={{
-                          fontFamily: MONO,
-                          ...s(
-                            "position: absolute; top: -12px; left: -10px; background: #e5484d; color: #0d0c0b; font-size: 12px; font-weight: 700; padding: 2px 6px; border-radius: 3px;",
-                          ),
-                        }}
-                      >
-                        [1]
-                      </span>
-                      <div
-                        style={s(
-                          "height: 8px; width: 65%; background: #3b3531; border-radius: 2px; margin-bottom: 8px;",
-                        )}
-                      />
-                      <div
-                        style={s(
-                          "height: 8px; width: 80%; background: #2a2622; border-radius: 2px; margin-bottom: 14px;",
-                        )}
-                      />
-                      <div
-                        style={s(
-                          "padding: 7px 8px; background: rgba(229,72,77,0.22); border: 1px solid #e5484d; color: #ff8b8e; font-size: 12px; font-weight: 600; text-align: center;",
-                        )}
-                      >
-                        Δ 2,418 px
-                      </div>
-                    </div>
-                    <div
-                      style={s(
-                        "flex: 1; display: grid; gap: 10px; opacity: 0.65;",
-                      )}
-                    >
-                      <div
-                        style={s(
-                          "min-height: 28px; background: #181613; border: 1px solid #26221e; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; padding: 4px 10px;",
-                        )}
-                      >
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            ...s("font-size: 12px; color: #4fb477;"),
-                          }}
-                        >
-                          {stabilityEnabled
-                            ? "✓ Unchanged region (CW-SSIM 0.998)"
-                            : "⚠ Unsettled motion (+0.42%)"}
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            ...s("font-size: 12px; color: #a89f94;"),
-                          }}
-                        >
-                          {redactEnabled ? "🔒 1 redacted" : "0 redacted"}
-                        </span>
-                      </div>
-                      <div
-                        style={s(
-                          "height: 54px; background: #181613; border: 1px solid #26221e; border-radius: 4px;",
-                        )}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    fontFamily: MONO,
-                    ...s(
-                      "background: #100f0d; padding: 24px; font-size: 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px;",
-                    ),
-                  }}
-                >
-                  <div
-                    style={s(
-                      "color: #a89f94; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;",
-                    )}
-                  >
-                    REGION SIMILARITY TELEMETRY
-                  </div>
-                  <div style={s("display: grid; gap: 8px;")}>
-                    <div
-                      style={s(
-                        "display: flex; justify-content: space-between; border-bottom: 1px solid #1f1c19; padding-bottom: 6px;",
-                      )}
-                    >
-                      <span style={s("color: #c8c0b6;")}>Global SSIM</span>
-                      <span style={s("color: #c8c0b6;")}>
-                        0.984 (whitespace diluted)
-                      </span>
-                    </div>
-                    <div
-                      style={s(
-                        "display: flex; justify-content: space-between; border-bottom: 1px solid #1f1c19; padding-bottom: 6px;",
-                      )}
-                    >
-                      <span style={s("color: #c8c0b6;")}>
-                        Cluster [1] Chroma SSIM (YCbCr)
-                      </span>
-                      <span style={s("color: #ff8b8e; font-weight: 600;")}>
-                        0.614 (regression)
-                      </span>
-                    </div>
-                    <div
-                      style={s(
-                        "display: flex; justify-content: space-between; border-bottom: 1px solid #1f1c19; padding-bottom: 6px;",
-                      )}
-                    >
-                      <span style={s("color: #c8c0b6;")}>
-                        Cluster [1] CW-SSIM (Phase)
-                      </span>
-                      <span style={s("color: #e8862e;")}>
-                        0.589 (structural shift)
-                      </span>
-                    </div>
-                    <div
-                      style={s("display: flex; justify-content: space-between;")}
-                    >
-                      <span style={s("color: #c8c0b6;")}>Frame stability</span>
-                      <span
-                        style={s(
-                          `color: ${stabilityEnabled ? "#4fb477" : "#e8862e"};`,
-                        )}
-                      >
-                        {stabilityEnabled
-                          ? "✓ Settled (2 RAF frames)"
-                          : "Unchecked"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {inspectorTab === "mcp-cortex" && (
-              <div
+              <button
+                type="button"
+                onClick={() => setStabilitySettled((prev) => !prev)}
+                aria-pressed={stabilitySettled}
                 style={{
                   fontFamily: MONO,
                   ...s(
-                    "background: #100f0d; padding: 24px; font-size: 13px; line-height: 1.7; color: #d8d0c5;",
+                    `padding: 7px 12px; border-radius: 5px; border: 1px solid ${
+                      stabilitySettled
+                        ? "rgba(79,180,119,0.45)"
+                        : "var(--border)"
+                    }; background: ${
+                      stabilitySettled
+                        ? "rgba(79,180,119,0.1)"
+                        : "var(--surface)"
+                    }; color: ${
+                      stabilitySettled
+                        ? "var(--success)"
+                        : "var(--text-secondary)"
+                    }; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;`,
                   ),
                 }}
               >
-                <div style={s("color: #a89f94; margin-bottom: 8px;")}>
-                  // @frontguard/mcp · inspect_diff_cluster_dom → verify_css_patch
+                <span>●</span>
+                <span>
+                  waitForStability:{" "}
+                  {stabilitySettled ? "ON (settled in 3 frames)" : "OFF"}
+                </span>
+              </button>
+            </div>
+
+            {/* Active Mode Stage */}
+            <div
+              id={`diff-panel-${activeDiffMode}`}
+              role="tabpanel"
+              aria-labelledby={`diff-tab-${activeDiffMode}`}
+              className="fg-dot-canvas"
+              style={s("padding: 28px; min-height: 320px;")}
+            >
+              {activeDiffMode === "side-by-side" && (
+                <div className="fg-split-2" style={s("gap: 20px;")}>
+                  <MockFrame
+                    title="BASELINE · frontguard-baselines"
+                    badge="COMMIT 8f4c21a"
+                    badgeColor="var(--success)"
+                    regressed={false}
+                    showClusters={false}
+                  />
+                  <MockFrame
+                    title="CURRENT · PR branch render"
+                    badge="✘ 1.84% DIFF"
+                    badgeColor="var(--danger)"
+                    regressed={true}
+                    showClusters={true}
+                  />
                 </div>
+              )}
+
+              {activeDiffMode === "swipe" && (
                 <div>
-                  <span style={s("color: #e8862e;")}>→ tool:</span>{" "}
-                  inspect_diff_cluster_dom({"{"} diff_id:{" "}
-                  <span style={s("color: #98c379;")}>
-                    "local-run:/dashboard@1440@chromium"
-                  </span>
-                  , cluster_id: <span style={s("color: #e8862e;")}>1</span>{" "}
-                  {"}"})
+                  <div
+                    style={s(
+                      "position: relative; height: 260px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface);",
+                    )}
+                  >
+                    <div style={s("position: absolute; inset: 0; padding: 16px;")}>
+                      <MockFrame
+                        title="BASELINE"
+                        badge="LEFT"
+                        badgeColor="var(--success)"
+                        regressed={false}
+                        showClusters={false}
+                      />
+                    </div>
+                    <div
+                      style={s(
+                        `position: absolute; inset: 0; padding: 16px; background: var(--surface); clip-path: inset(0 0 0 ${inspectorCurtain}%);`,
+                      )}
+                    >
+                      <MockFrame
+                        title="CURRENT CANDIDATE"
+                        badge="RIGHT · REGRESSION"
+                        badgeColor="var(--danger)"
+                        regressed={true}
+                        showClusters={true}
+                      />
+                    </div>
+                    <div
+                      style={s(
+                        `position: absolute; top: 0; bottom: 0; left: ${inspectorCurtain}%; width: 2px; background: var(--text-primary); pointer-events: none;`,
+                      )}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: MONO,
+                      ...s(
+                        "margin-top: 14px; display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text-secondary);",
+                      ),
+                    }}
+                  >
+                    <span>SWIPE POSITION</span>
+                    <input
+                      type="range"
+                      min={5}
+                      max={95}
+                      value={inspectorCurtain}
+                      onChange={(e) =>
+                        setInspectorCurtain(Number(e.target.value))
+                      }
+                      aria-label="Inspector swipe curtain position"
+                      className="fg-range-slider"
+                      style={s("max-width: 280px;")}
+                    />
+                    <span style={s("color: var(--text-primary);")}>
+                      {inspectorCurtain}%
+                    </span>
+                  </div>
                 </div>
-                <div style={s("color: #c8c0b6; padding-left: 14px;")}>
-                  targetSelector:{" "}
-                  <span style={s("color: #f5f1ea;")}>"aside .sidebar-cta"</span>{" "}
-                  · classification:{" "}
-                  <span style={s("color: #ff8b8e;")}>"layout-shift"</span> ·
-                  confidence: <span style={s("color: #4fb477;")}>0.92</span>
+              )}
+
+              {activeDiffMode === "onion" && (
+                <div>
+                  <div
+                    style={s(
+                      "position: relative; height: 260px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); padding: 16px;",
+                    )}
+                  >
+                    <div style={s("position: absolute; inset: 16px;")}>
+                      <MockFrame
+                        title="ONION SKIN COMPOSITE"
+                        badge="inspect_diff_cluster_dom → verify_css_patch"
+                        badgeColor="var(--text-primary)"
+                        regressed={false}
+                        showClusters={false}
+                      />
+                    </div>
+                    <div
+                      style={s(
+                        `position: absolute; inset: 16px; opacity: ${
+                          onionOpacity / 100
+                        };`,
+                      )}
+                    >
+                      <MockFrame
+                        title="ONION SKIN COMPOSITE"
+                        badge={`ALPHA ${onionOpacity}%`}
+                        badgeColor="var(--danger)"
+                        regressed={true}
+                        showClusters={true}
+                      />
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: MONO,
+                      ...s(
+                        "margin-top: 14px; display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text-secondary);",
+                      ),
+                    }}
+                  >
+                    <span>CANDIDATE OPACITY</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={onionOpacity}
+                      onChange={(e) => setOnionOpacity(Number(e.target.value))}
+                      aria-label="Onion skin opacity"
+                      className="fg-range-slider"
+                      style={s("max-width: 280px;")}
+                    />
+                    <span style={s("color: var(--text-primary);")}>
+                      {onionOpacity}%
+                    </span>
+                  </div>
                 </div>
-                <div style={s("margin-top: 8px;")}>
-                  <span style={s("color: #5b8def;")}>→ tool:</span>{" "}
-                  verify_css_patch({"{"} target_selector:{" "}
-                  <span style={s("color: #98c379;")}>"aside .sidebar-cta"</span>
-                  , css_patch:{" "}
-                  <span style={s("color: #98c379;")}>
-                    "aside .sidebar-cta {"{ min-height: 36px; display: flex; }"}"
-                  </span>{" "}
-                  {"}"})
+              )}
+
+              {activeDiffMode === "cluster-ssim" && (
+                <div className="fg-split-2" style={s("gap: 24px; align-items: stretch;")}>
+                  <MockFrame
+                    title="CONNECTED-COMPONENT CLUSTER OVERLAY"
+                    badge="2 REGIONS SCORED"
+                    badgeColor="var(--danger)"
+                    regressed={true}
+                    showClusters={true}
+                  />
+                  <div
+                    style={s(
+                      "display: flex; flex-direction: column; justify-content: space-between; gap: 14px;",
+                    )}
+                  >
+                    {/* Flagged Cluster Card */}
+                    <div
+                      style={s(
+                        "padding: 18px; background: var(--surface); border: 1px solid rgba(229,72,77,0.45); border-radius: 8px;",
+                      )}
+                    >
+                      <div
+                        style={{
+                          fontFamily: MONO,
+                          ...s(
+                            "display: flex; justify-content: space-between; font-size: 12px; color: var(--danger); font-weight: 600; margin-bottom: 8px;",
+                          ),
+                        }}
+                      >
+                        <span>✘ FLAGGED · CLUSTER #1 (aside .sidebar-cta)</span>
+                        <span>Chroma SSIM (YCbCr): 0.614</span>
+                      </div>
+                      <p className="fg-small" style={s("margin: 0;")}>
+                        Primary sidebar CTA collapsed from{" "}
+                        <code style={{ fontFamily: MONO, color: "var(--text-primary)" }}>
+                          36px
+                        </code>{" "}
+                        to{" "}
+                        <code style={{ fontFamily: MONO, color: "var(--text-primary)" }}>
+                          0px
+                        </code>{" "}
+                        height inside bounding box{" "}
+                        <code style={{ fontFamily: MONO, color: "var(--text-primary)" }}>
+                          148×164px @ (48, 224)
+                        </code>
+                        .
+                      </p>
+                    </div>
+
+                    {/* Ignored Noise Card */}
+                    <div
+                      style={s(
+                        "padding: 18px; background: var(--surface); border: 1px solid rgba(79,180,119,0.4); border-radius: 8px;",
+                      )}
+                    >
+                      <div
+                        style={{
+                          fontFamily: MONO,
+                          ...s(
+                            "display: flex; justify-content: space-between; font-size: 12px; color: var(--success); font-weight: 600; margin-bottom: 8px;",
+                          ),
+                        }}
+                      >
+                        <span>✓ IGNORED NOISE · REGION #2 (h1.page-title)</span>
+                        <span>CW-SSIM: 0.994</span>
+                      </div>
+                      <p className="fg-small" style={s("margin: 0;")}>
+                        1px sub-pixel font anti-aliasing shift along glyph stems.
+                        Complex wavelet phase consistency exceeds{" "}
+                        <code style={{ fontFamily: MONO, color: "var(--text-primary)" }}>
+                          0.985
+                        </code>
+                        , so Frontguard suppresses the false alarm.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div style={s("color: #4fb477; padding-left: 14px;")}>
-                  ✓ validSyntax: true · selectorMatchedTarget: true ·
-                  recommendation: "apply"
-                </div>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Caption explaining what Frontguard flagged and what noise it ignored */}
+            <div
+              style={s(
+                "padding: 16px 24px; background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;",
+              )}
+            >
+              <p className="fg-small" style={s("margin: 0;")}>
+                <strong style={s("color: var(--text-primary);")}>
+                  Why this matters:
+                </strong>{" "}
+                Frontguard flagged the collapsed{" "}
+                <code style={{ fontFamily: MONO, color: "var(--text-primary)" }}>
+                  aside .sidebar-cta
+                </code>{" "}
+                button (<code style={{ fontFamily: MONO }}>Chroma SSIM 0.614</code>)
+                while automatically suppressing 1px sub-pixel glyph hinting on the
+                header (<code style={{ fontFamily: MONO }}>CW-SSIM 0.994</code>).
+              </p>
+              <span
+                style={{
+                  fontFamily: MONO,
+                  ...s("font-size: 12px; color: var(--text-muted);"),
+                }}
+              >
+                🔒 redactSensitive: 2 inputs masked
+              </span>
+            </div>
           </div>
         </div>
+      </section>
+    </>
+  );
+}
+
+function MockFrame({
+  title,
+  badge,
+  badgeColor,
+  regressed,
+  showClusters,
+}: {
+  title: string;
+  badge: string;
+  badgeColor: string;
+  regressed: boolean;
+  showClusters: boolean;
+}) {
+  return (
+    <div
+      style={s(
+        "background: #141210; border: 1px solid var(--border); border-radius: 6px; padding: 14px; height: 224px; display: flex; flex-direction: column; justify-content: space-between; position: relative;",
+      )}
+    >
+      <div
+        style={{
+          fontFamily: MONO,
+          ...s(
+            "display: flex; align-items: center; justify-content: space-between; font-size: 11px; padding-bottom: 10px; border-bottom: 1px solid var(--border);",
+          ),
+        }}
+      >
+        <span style={s("color: var(--text-secondary);")}>{title}</span>
+        <span style={s(`color: ${badgeColor}; font-weight: 600;`)}>{badge}</span>
       </div>
-    </section>
+
+      <div
+        style={s(
+          "display: grid; grid-template-columns: 92px 1fr; gap: 12px; flex: 1; padding-top: 10px;",
+        )}
+      >
+        <div
+          style={s(
+            "background: #191714; border: 1px solid var(--border); border-radius: 4px; padding: 8px; display: flex; flex-direction: column; justify-content: space-between; position: relative;",
+          )}
+        >
+          <div style={s("display: grid; gap: 5px;")}>
+            <div
+              style={s("height: 6px; width: 70%; background: #2f2a25;")}
+            />
+            <div
+              style={s("height: 6px; width: 85%; background: #25211d;")}
+            />
+          </div>
+          {regressed ? (
+            <div
+              style={s(
+                "height: 8px; background: rgba(229,72,77,0.35); border: 1px dashed var(--danger); border-radius: 2px;",
+              )}
+            />
+          ) : (
+            <div
+              style={s(
+                "height: 30px; background: var(--success); border-radius: 3px; display: flex; align-items: center; justify-content: center;",
+              )}
+            >
+              <span
+                style={{
+                  fontFamily: MONO,
+                  ...s("font-size: 9px; font-weight: 700; color: var(--bg);"),
+                }}
+              >
+                CTA
+              </span>
+            </div>
+          )}
+
+          {showClusters && (
+            <div
+              style={s(
+                "position: absolute; left: 4px; right: 4px; bottom: 4px; height: 42px; border: 2px solid var(--danger); background: rgba(229,72,77,0.14); border-radius: 3px;",
+              )}
+            />
+          )}
+        </div>
+
+        <div
+          style={s(
+            "display: flex; flex-direction: column; justify-content: space-between; position: relative;",
+          )}
+        >
+          <div
+            style={s(
+              "height: 14px; width: 62%; background: #332e29; border-radius: 2px;",
+            )}
+          />
+          {showClusters && (
+            <div
+              style={s(
+                "position: absolute; top: -2px; left: -2px; width: 66%; height: 18px; border: 1px dashed var(--success); background: rgba(79,180,119,0.08); border-radius: 3px;",
+              )}
+            />
+          )}
+          <div
+            style={s(
+              "display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;",
+            )}
+          >
+            <div
+              style={s(
+                "height: 54px; background: #191714; border: 1px solid var(--border); border-radius: 3px;",
+              )}
+            />
+            <div
+              style={s(
+                "height: 54px; background: #191714; border: 1px solid var(--border); border-radius: 3px;",
+              )}
+            />
+          </div>
+          <div
+            style={s(
+              "height: 44px; background: #191714; border: 1px solid var(--border); border-radius: 3px;",
+            )}
+          />
+        </div>
+      </div>
+    </div>
   );
 }

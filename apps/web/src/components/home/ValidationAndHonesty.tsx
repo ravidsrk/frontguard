@@ -1,306 +1,184 @@
 import { s } from "../../lib/style";
 import {
   VALIDATION,
-  VALIDATION_GATE,
   VALIDATION_METHODOLOGY_URL,
   VALIDATION_RESULTS_URL,
   formatPercent,
   partitionRepos,
 } from "../../lib/validation-data";
-import { HONEST_CARDS, MONO } from "./home-data";
+import { MONO } from "./home-data";
 
 export function ValidationAndHonesty() {
   const { booted, skipped } = partitionRepos();
   const { aggregate } = VALIDATION;
-  const fpWithinTarget =
-    aggregate.pixelFalsePositiveRate <= VALIDATION_GATE.maxFalsePositiveRate;
-  const fpColor = fpWithinTarget ? "#4fb477" : "#e8862e";
-
-  const kpis = [
-    {
-      label: "REPOS BOOTED",
-      value: `${aggregate.reposBooted} / ${aggregate.reposAttempted}`,
-      sub: `${aggregate.reposSkipped} skipped: boot failures documented below`,
-      color: "#f5f1ea",
-    },
-    {
-      label: "ROUTE RECHECKS",
-      value: `${aggregate.recheckMeasuredRouteCount} / 43`,
-      sub: `${aggregate.recheckRouteCount} passed · 4 route errors across booted repos`,
-      color: "#f5f1ea",
-    },
-    {
-      label: "PIXEL FALSE-POSITIVE RATE",
-      value: formatPercent(aggregate.pixelFalsePositiveRate),
-      sub: `${aggregate.recheckPositiveCount} FP across ${aggregate.recheckMeasuredRouteCount} no-change rechecks (gate ≤ ${formatPercent(VALIDATION_GATE.maxFalsePositiveRate)})`,
-      color: fpColor,
-    },
-    {
-      label: "AI CALLS IN HARNESS",
-      value: VALIDATION.aiEnabled ? "ON" : "AI OFF",
-      sub: "AI disabled; classifier accuracy was not measured in that run",
-      color: "#e8862e",
-    },
-  ];
 
   return (
-    <section
-      id="validation"
-      style={s("border-bottom: 1px solid #1f1c19; background: #0d0c0b;")}
-    >
-      <div
-        className="fg-shell"
-        style={s("padding-top: 96px; padding-bottom: 96px;")}
-      >
-        {/* Part 1: Architectural Honesty Principles */}
-        <div style={s("max-width: 720px; margin-bottom: 40px;")}>
-          <div className="fg-eyebrow" style={s("margin-bottom: 14px;")}>
-            // RADICAL HONESTY · VISIBLE LIMITS
-          </div>
-          <h2 className="fg-h2" style={s("margin-bottom: 12px;")}>
+    <section id="validation" className="fg-section">
+      <div className="fg-shell">
+        {/* Merged Header: Trust + Real Harness Methodology */}
+        <div style={s("max-width: 740px; margin-bottom: 48px;")}>
+          <div className="fg-eyebrow">OPEN-SOURCE PROOF &amp; TRUST</div>
+          <h2 className="fg-h2">
             Built for engineers who read the source before they trust the badge.
           </h2>
           <p className="fg-lead">
             Visual testing only works when teams trust its signal. We separate
             deterministic pixel math from optional model inference and publish
-            every benchmark failure.
+            every benchmark script, result artifact, and boot failure.
           </p>
         </div>
 
-        <div className="fg-grid-3" style={s("margin-bottom: 72px;")}>
-          {HONEST_CARDS.map((h) => (
-            <div
-              key={h.label}
-              style={s(
-                "background: #131210; border: 1px solid #26221e; border-radius: 8px; padding: 26px;",
-              )}
-            >
+        {/* 2-Column Split: 3-Point Harness Methodology Summary + Transparent Skipped Repos */}
+        <div className="fg-split-2" style={s("margin-bottom: 40px;")}>
+          {/* Left Card: 3-Point Harness Methodology Summary */}
+          <div
+            className="fg-surface-card"
+            style={s(
+              "display: flex; flex-direction: column; justify-content: space-between; gap: 24px;",
+            )}
+          >
+            <div>
               <div
-                style={{
-                  fontFamily: MONO,
-                  ...s(
-                    `font-size: 12px; color: ${h.color}; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;`,
-                  ),
-                }}
+                style={s(
+                  "display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;",
+                )}
               >
+                <h3 className="fg-h3" style={s("margin: 0;")}>
+                  Numbers from a real harness, not a slide.
+                </h3>
                 <span
-                  style={s(
-                    `width: 7px; height: 7px; border-radius: 999px; background: ${h.color};`,
-                  )}
-                />
-                <span>{h.label}</span>
+                  style={{
+                    fontFamily: MONO,
+                    ...s(
+                      "font-size: 11px; color: var(--accent); background: var(--accent-subtle); border: 1px solid var(--accent); padding: 2px 8px; border-radius: 4px; font-weight: 600;",
+                    ),
+                  }}
+                >
+                  {formatPercent(aggregate.pixelFalsePositiveRate)} FP RATE
+                </span>
               </div>
-              <p
-                style={s(
-                  "margin: 0; font-size: 14px; color: #c8c0b6; line-height: 1.65;",
-                )}
-              >
-                {h.body}
-              </p>
-            </div>
-          ))}
-        </div>
 
-        {/* Part 2: Real Validation Harness Numbers */}
-        <div
-          style={s(
-            "display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 36px; gap: 32px; flex-wrap: wrap; padding-top: 48px; border-top: 1px solid #1f1c19;",
-          )}
-        >
-          <div>
-            <div className="fg-eyebrow" style={s("margin-bottom: 14px;")}>
-              // VALIDATION HARNESS · REAL-WORLD BENCHMARKS
-            </div>
-            <h2 className="fg-h2" style={s("max-width: 680px;")}>
-              Numbers from a real harness, not a slide.
-            </h2>
-          </div>
-          <div
-            style={s(
-              "display: flex; flex-direction: column; align-items: flex-start; gap: 8px;",
-            )}
-          >
-            <div
-              style={{
-                fontFamily: MONO,
-                ...s(
-                  `display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(79,180,119,0.08); border: 1px solid ${fpColor}; border-radius: 4px; font-size: 12px; color: ${fpColor}; letter-spacing: 0.06em; text-transform: uppercase;`,
-                ),
-              }}
-            >
-              <span>●</span>
-              <span>
-                METHODOLOGY:{" "}
-                {aggregate.methodologyValidated ? "VALIDATED" : "PENDING"}
-              </span>
-            </div>
-            <div
-              style={{
-                fontFamily: MONO,
-                ...s("font-size: 12px; color: #a89f94;"),
-              }}
-            >
-              CLI v{VALIDATION.cliVersion} · {VALIDATION.runDate}
-            </div>
-          </div>
-        </div>
-
-        {/* 4 KPI Cards */}
-        <div className="fg-hairline-grid-4" style={s("margin-bottom: 32px;")}>
-          {kpis.map((k) => (
-            <div
-              key={k.label}
-              style={s(
-                "background: #131210; padding: 24px 22px; display: flex; flex-direction: column; justify-content: space-between; min-height: 136px;",
-              )}
-            >
-              <div
-                style={{
-                  fontFamily: MONO,
-                  ...s(
-                    "font-size: 12px; color: #a89f94; letter-spacing: 0.06em; text-transform: uppercase;",
-                  ),
-                }}
-              >
-                {k.label}
-              </div>
-              <div
-                style={{
-                  fontFamily: MONO,
-                  ...s(
-                    `font-size: 32px; font-weight: 700; color: ${k.color}; letter-spacing: -0.02em; margin: 8px 0; font-variant-numeric: tabular-nums;`,
-                  ),
-                }}
-              >
-                {k.value}
-              </div>
-              <div
-                style={s(
-                  "font-size: 13px; color: #c8c0b6; line-height: 1.5;",
-                )}
-              >
-                {k.sub}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Booted vs Skipped Split */}
-        <div className="fg-split-2" style={s("gap: 24px;")}>
-          <div
-            style={s(
-              "background: #131210; border: 1px solid #26221e; border-radius: 8px; padding: 26px;",
-            )}
-          >
-            <div
-              style={{
-                fontFamily: MONO,
-                ...s(
-                  "font-size: 12px; color: #4fb477; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 14px;",
-                ),
-              }}
-            >
-              ✓ BOOTED &amp; MEASURED ({booted.length})
-            </div>
-            <div
-              style={s("display: flex; flex-direction: column; gap: 14px;")}
-            >
-              {booted.map((r) => (
+              <div style={s("display: grid; gap: 14px;")}>
                 <div
-                  key={r.name}
                   style={s(
-                    "padding: 14px 16px; background: #0d0c0b; border: 1px solid #1f1c19; border-radius: 6px;",
+                    "padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;",
                   )}
                 >
                   <div
                     style={s(
-                      "display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; flex-wrap: wrap;",
+                      "font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;",
                     )}
                   >
-                    <span
-                      style={s(
-                        "font-size: 15px; font-weight: 600; color: #f5f1ea;",
-                      )}
-                    >
-                      {r.name}
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: MONO,
-                        ...s("font-size: 12px; color: #a89f94;"),
-                      }}
-                    >
-                      {r.category}
-                    </span>
+                    1. Zero-change recheck gate
                   </div>
-                  <div
-                    style={{
-                      fontFamily: MONO,
-                      ...s(
-                        "font-size: 12px; color: #c8c0b6; display: flex; flex-wrap: wrap; gap: 12px;",
-                      ),
-                    }}
-                  >
-                    <span>{r.recheckPass} routes passed</span>
-                    <span>·</span>
-                    <span>
-                      FP:{" "}
-                      <strong
-                        style={s(
-                          `color: ${
-                            r.recheckFalsePositive === 0
-                              ? "#4fb477"
-                              : "#e8862e"
-                          }; font-weight: 600;`,
-                        )}
-                      >
-                        {r.recheckFalsePositive} (
-                        {formatPercent(r.pixelFalsePositiveRate)})
-                      </strong>
-                    </span>
-                    <span>·</span>
-                    <span style={s("color: #a89f94;")}>
-                      {r.recheckError} error{r.recheckError !== 1 ? "s" : ""}
-                    </span>
-                  </div>
+                  <p className="fg-small" style={s("margin: 0;")}>
+                    Booted{" "}
+                    {booted.map((b) => b.name).join(" and ")} locally and
+                    re-ran{" "}
+                    <code style={{ fontFamily: MONO, color: "var(--text-primary)" }}>
+                      {aggregate.recheckMeasuredRouteCount}
+                    </code>{" "}
+                    routes with zero code changes—recording{" "}
+                    <code style={{ fontFamily: MONO, color: "var(--success)" }}>
+                      {aggregate.recheckPositiveCount}
+                    </code>{" "}
+                    pixel false positives.
+                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          <div
-            style={s(
-              "background: #131210; border: 1px solid #26221e; border-radius: 8px; padding: 26px;",
-            )}
-          >
+                <div
+                  style={s(
+                    "padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;",
+                  )}
+                >
+                  <div
+                    style={s(
+                      "font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;",
+                    )}
+                  >
+                    2. Deterministic offline baseline
+                  </div>
+                  <p className="fg-small" style={s("margin: 0;")}>
+                    Executed on CLI v{VALIDATION.cliVersion} ({VALIDATION.runDate})
+                    with AI disabled so every pass/fail decision reflects pure
+                    pixel and perceptual SSIM thresholds.
+                  </p>
+                </div>
+
+                <div
+                  style={s(
+                    "padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;",
+                  )}
+                >
+                  <div
+                    style={s(
+                      "font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;",
+                    )}
+                  >
+                    3. Reproducible open-source script
+                  </div>
+                  <p className="fg-small" style={s("margin: 0;")}>
+                    Every fixture repository, route list, and raw JSON output is
+                    checked into the repository for independent verification.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "font-size: 12px; color: #e8862e; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;",
+                  "padding-top: 14px; border-top: 1px solid var(--border); display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px;",
                 ),
               }}
             >
-              ⊘ SKIPPED IN THIS RUN ({skipped.length}) · HONEST REPORTING
+              <a
+                href={VALIDATION_RESULTS_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="fg-link"
+                style={s("color: var(--text-primary); text-decoration: none;")}
+              >
+                Published results JSON →
+              </a>
+              <a
+                href={VALIDATION_METHODOLOGY_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="fg-link"
+                style={s("color: var(--text-secondary); text-decoration: none;")}
+              >
+                Reproduction script (validate-v020.mjs) →
+              </a>
             </div>
-            <p
-              style={s(
-                "margin: 0 0 14px 0; font-size: 14px; color: #c8c0b6; line-height: 1.55;",
-              )}
-            >
-              These repositories failed to boot in the headless harness before
-              Frontguard ran. We list them rather than quietly dropping them
-              from the denominator.
-            </p>
+          </div>
+
+          {/* Right Card: Transparent Reporting of Skipped Fixture Repos */}
+          <div className="fg-surface-card">
             <div
-              style={s("display: flex; flex-direction: column; gap: 10px;")}
+              style={{
+                fontFamily: MONO,
+                ...s(
+                  "font-size: 11px; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; font-weight: 600;",
+                ),
+              }}
             >
+              UNEDITED DENOMINATOR · {skipped.length} REPOS SKIPPED ON BOOT
+            </div>
+            <p className="fg-small" style={s("margin: 0 0 16px 0;")}>
+              These fixture repositories failed headless environment boot before
+              Frontguard ran. We publish them alongside booted repos rather than
+              quietly dropping them from the denominator.
+            </p>
+
+            <div style={s("display: grid; gap: 10px;")}>
               {skipped.map((r) => (
                 <div
                   key={r.name}
                   data-testid="skipped-repo"
                   style={s(
-                    "padding: 12px 14px; background: #0d0c0b; border: 1px solid #1f1c19; border-radius: 6px;",
+                    "padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;",
                   )}
                 >
                   <div
@@ -310,7 +188,7 @@ export function ValidationAndHonesty() {
                   >
                     <span
                       style={s(
-                        "font-size: 14px; font-weight: 600; color: #d8d0c5;",
+                        "font-size: 14px; font-weight: 600; color: var(--text-primary);",
                       )}
                     >
                       {r.name}
@@ -318,7 +196,7 @@ export function ValidationAndHonesty() {
                     <span
                       style={{
                         fontFamily: MONO,
-                        ...s("font-size: 12px; color: #a89f94;"),
+                        ...s("font-size: 11px; color: var(--text-muted);"),
                       }}
                     >
                       {r.category}
@@ -329,7 +207,7 @@ export function ValidationAndHonesty() {
                       style={{
                         fontFamily: MONO,
                         ...s(
-                          "font-size: 12px; color: #c8c0b6; line-height: 1.5;",
+                          "font-size: 11.5px; color: var(--text-secondary); line-height: 1.5;",
                         ),
                       }}
                     >
@@ -342,36 +220,29 @@ export function ValidationAndHonesty() {
           </div>
         </div>
 
-        {/* Methodology Footer Bar */}
+        {/* External Social Proof Placeholders (Unfabricated TODOs per spec) */}
         <div
-          style={{
-            fontFamily: MONO,
-            ...s(
-              "margin-top: 20px; padding: 14px 18px; background: #131210; border: 1px solid #26221e; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 12px; color: #a89f94;",
-            ),
-          }}
+          style={s(
+            "padding: 20px 24px; background: var(--surface); border: 1px dashed var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;",
+          )}
         >
-          <div>
-            Run date: {VALIDATION.runDate} · CLI v{VALIDATION.cliVersion} · AI
-            mode: {VALIDATION.aiEnabled ? "enabled" : "disabled"}
+          <div className="fg-small">
+            <strong style={s("color: var(--text-primary);")}>
+              External adoption &amp; community proof:
+            </strong>{" "}
+            Insert verified community metrics and adopter feedback here once
+            approved.
           </div>
-          <div style={s("display: flex; gap: 18px; flex-wrap: wrap;")}>
-            <a
-              href={VALIDATION_RESULTS_URL}
-              target="_blank"
-              rel="noreferrer"
-              style={s("color: #e8862e; text-decoration: none;")}
-            >
-              Published results →
-            </a>
-            <a
-              href={VALIDATION_METHODOLOGY_URL}
-              target="_blank"
-              rel="noreferrer"
-              style={s("color: #c8c0b6; text-decoration: none;")}
-            >
-              Methodology &amp; reproduction script →
-            </a>
+          <div style={s("display: flex; gap: 10px; flex-wrap: wrap;")}>
+            <span className="fg-todo-note">
+              TODO: insert verified GitHub star count
+            </span>
+            <span className="fg-todo-note">
+              TODO: insert approved user / team logos
+            </span>
+            <span className="fg-todo-note">
+              TODO: insert verified engineer quote
+            </span>
           </div>
         </div>
       </div>
