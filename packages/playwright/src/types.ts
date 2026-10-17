@@ -1,3 +1,10 @@
+export interface PlaywrightDiffCluster {
+  id: number;
+  bbox: { x: number; y: number; width: number; height: number };
+  rawDiffPixels: number;
+  targetSelector?: string;
+}
+
 export interface VisualTestOptions {
   /** Max pixel diff as fraction 0-1 (default: 0.01 = 1%) */
   threshold?: number;
@@ -8,9 +15,15 @@ export interface VisualTestOptions {
   /** Mask regions by coordinates */
   maskRegions?: Array<{ x: number; y: number; width: number; height: number }>;
   /** Enable AI analysis of visual diffs */
-  ai?: boolean | { provider: 'openai' | 'anthropic'; model?: string };
-  /** Freeze Date.now() during screenshot */
-  freezeTime?: boolean | number;
+  ai?: boolean | { provider: 'openai' | 'anthropic' | 'gemini'; model?: string; baseUrl?: string };
+  /** Freeze Date.now() during screenshot (boolean, epoch ms, or ISO date string) */
+  freezeTime?: boolean | number | string;
+  /** Seed Math.random() with a deterministic Mulberry32 PRNG before capture */
+  seedRandom?: boolean | number;
+  /** Block matching network URLs (e.g. analytics, ads) during capture */
+  blockUrls?: string[];
+  /** Capture a Playwright ARIA / accessibility tree snapshot alongside the visual test */
+  captureAriaSnapshot?: boolean;
   /** Custom baseline directory (default: __visual_baselines__) */
   baselineDir?: string;
   /** Update baselines instead of comparing */
@@ -37,6 +50,9 @@ export interface VisualTestResult {
   ssim?: number;
   isNewBaseline: boolean;
   settled?: boolean;
+  clusters?: PlaywrightDiffCluster[];
+  blockedRequestsCount?: number;
+  ariaSnapshot?: string;
 }
 
 export interface CompareResult {
@@ -44,7 +60,10 @@ export interface CompareResult {
   diffPercentage: number;
   diffBuffer: Buffer | null;
   ssim: number;
+  clusters?: PlaywrightDiffCluster[];
 }
+
+export type DiffOutput = CompareResult;
 
 export interface AIAnalysisResult {
   classification: string;

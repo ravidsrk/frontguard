@@ -750,7 +750,7 @@ app.get("/v1/usage", async (c) => {
     runs: usage.runsCount,
     screenshots: usage.screenshotsCount,
     period: "current_month",
-    limits: { runs: 500, screenshots: 5000 },
+    limits: { runs: 500, screenshots: 35000 },
   });
 });
 

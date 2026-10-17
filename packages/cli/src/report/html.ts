@@ -368,8 +368,11 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
             c.chromaSSIM !== undefined ? `${(c.chromaSSIM * 100).toFixed(1)}%` : '—';
           const cwCell =
             c.cwSSIM !== undefined ? `${(c.cwSSIM * 100).toFixed(1)}%` : '—';
+          const selectorHtml = c.targetSelector
+            ? ` <code class="cluster-selector">${escapeHtml(c.targetSelector)}</code>`
+            : '';
           return `<tr class="cluster-row" data-cluster-id="${c.id}">
-              <td><span class="cluster-id">#${c.id}</span></td>
+              <td><span class="cluster-id">#${c.id}</span>${selectorHtml}</td>
               <td><code>(${c.bbox.x}, ${c.bbox.y}) ${c.bbox.width}×${c.bbox.height}px</code></td>
               <td>${c.rawDiffPixels}px</td>
               <td>${chromaCell}</td>
@@ -440,6 +443,7 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
                 rawDiffPixels: c.rawDiffPixels,
                 chromaSSIM: c.chromaSSIM,
                 cwSSIM: c.cwSSIM,
+                ...(c.targetSelector ? { targetSelector: c.targetSelector } : {}),
               })),
             ),
           )}"`

@@ -316,6 +316,9 @@ export class ConsoleReporter implements Reporter {
     if (diff.clusters && diff.clusters.length > 0) {
       const largest = diff.clusters[0];
       let clusterDesc = `${diff.clusters.length} cluster${diff.clusters.length !== 1 ? 's' : ''} — largest (${largest.bbox.x}, ${largest.bbox.y}) ${largest.bbox.width}×${largest.bbox.height}px`;
+      if (largest.targetSelector) {
+        clusterDesc += ` → ${largest.targetSelector}`;
+      }
       const simParts: string[] = [];
       if (largest.chromaSSIM !== undefined) {
         simParts.push(`Chroma SSIM ${(largest.chromaSSIM * 100).toFixed(1)}%`);

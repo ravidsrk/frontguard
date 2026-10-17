@@ -18,12 +18,14 @@
 
 import type {
   AIConfig,
+  AIProvider,
   JudgeResult,
   JudgeIssue,
   JudgeIssueCategory,
   Severity,
   ScreenshotResult,
 } from '../core/types.js';
+import { DEFAULT_AI_MODELS } from '../core/config.js';
 import { downscaleForAI, getApiKey } from './ai-vision.js';
 import { retry } from '../utils/retry.js';
 import { logger } from '../utils/logger.js';
@@ -183,6 +185,7 @@ async function callOpenAIJudge(
   contextText: string,
   systemPrompt: string,
   fetchImpl: typeof fetch = fetch,
+  baseUrl?: string,
 ): Promise<string> {
   const imageMessages = images.map((b64) => ({
     type: 'image_url' as const,
@@ -196,8 +199,14 @@ async function callOpenAIJudge(
       { role: 'user', content: [{ type: 'text', text: contextText }, ...imageMessages] },
     ],
   };
+  const rawBase = baseUrl || process.env.FRONTGUARD_OPENAI_BASE_URL;
+  const endpoint = rawBase
+    ? rawBase.replace(/\/+$/, '').endsWith('/chat/completions')
+      ? rawBase.replace(/\/+$/, '')
+      : `${rawBase.replace(/\/+$/, '')}/chat/completions`
+    : 'https://api.openai.com/v1/chat/completions';
   const res = await withTimeout((signal) =>
-    fetchImpl('https://api.openai.com/v1/chat/completions', {
+    fetchImpl(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify(body),
@@ -222,6 +231,7 @@ async function callAnthropicJudge(
   contextText: string,
   systemPrompt: string,
   fetchImpl: typeof fetch = fetch,
+  baseUrl?: string,
 ): Promise<string> {
   const imageBlocks = images.map((b64) => ({
     type: 'image' as const,
@@ -233,8 +243,14 @@ async function callAnthropicJudge(
     system: systemPrompt,
     messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: contextText }] }],
   };
+  const rawBase = baseUrl || process.env.FRONTGUARD_ANTHROPIC_BASE_URL;
+  const endpoint = rawBase
+    ? rawBase.replace(/\/+$/, '').endsWith('/messages')
+      ? rawBase.replace(/\/+$/, '')
+      : `${rawBase.replace(/\/+$/, '')}/messages`
+    : 'https://api.anthropic.com/v1/messages';
   const res = await withTimeout((signal) =>
-    fetchImpl('https://api.anthropic.com/v1/messages', {
+    fetchImpl(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -252,6 +268,57 @@ async function callAnthropicJudge(
   const data = (await res.json()) as { content?: Array<{ text?: string }> };
   const content = data.content?.[0]?.text;
   if (!content) throw new JudgeError('Anthropic judge returned an empty response', 'anthropic');
+  return content;
+}
+
+/** Calls Google Gemini's vision API with 1–2 images and a judge prompt. */
+async function callGeminiJudge(
+  apiKey: string,
+  model: string,
+  images: string[],
+  contextText: string,
+  systemPrompt: string,
+  fetchImpl: typeof fetch = fetch,
+  baseUrl?: string,
+): Promise<string> {
+  const cleanModel = model.replace(/^models\//, '');
+  const base = (
+    baseUrl ||
+    process.env.FRONTGUARD_GEMINI_BASE_URL ||
+    'https://generativelanguage.googleapis.com/v1beta/models'
+  ).replace(/\/+$/, '');
+  const endpoint = `${base}/${encodeURIComponent(cleanModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const parts = [
+    ...images.map((data) => ({
+      inlineData: { mimeType: 'image/png' as const, data },
+    })),
+    { text: `${systemPrompt}\n\n${contextText}` },
+  ];
+  const body = {
+    contents: [{ role: 'user', parts }],
+    generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+  };
+  const res = await withTimeout((signal) =>
+    fetchImpl(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    }),
+  );
+  if (!res.ok) {
+    const errorBody = await res.text().catch(() => '');
+    throw new JudgeError(`Gemini judge request failed: ${res.status} ${errorBody.slice(0, 120)}`, 'gemini');
+  }
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const content = data.candidates?.[0]?.content?.parts
+    ?.map((p) => p.text ?? '')
+    .join('')
+    .trim();
+  if (!content) throw new JudgeError('Gemini judge returned an empty response', 'gemini');
   return content;
 }
 
@@ -275,7 +342,7 @@ export interface JudgeOptions {
   /** Injectable fetch (tests). */
   fetchImpl?: typeof fetch;
   /** Injectable API key resolver (tests). */
-  apiKeyResolver?: (provider: 'openai' | 'anthropic') => string;
+  apiKeyResolver?: (provider: AIProvider) => string;
 }
 
 /**
@@ -298,6 +365,7 @@ export async function judgeScreenshot(
 
   try {
     const apiKey = (options.apiKeyResolver ?? getApiKey)(ai.provider);
+    const model = ai.model ?? DEFAULT_AI_MODELS[ai.provider];
 
     // Build images: [figma?, screenshot] for compliance, [screenshot] for heuristic.
     const screenshotB64 = downscaleForAI(screenshot.buffer).toString('base64');
@@ -313,10 +381,15 @@ export async function judgeScreenshot(
     logger.debug(`Judging ${screenshot.route.path} @ ${screenshot.viewport}px (figma=${withDesignReference})`);
 
     const raw = await retry(
-      () =>
-        ai.provider === 'openai'
-          ? callOpenAIJudge(apiKey, ai.model, images, contextText, systemPrompt, fetchImpl)
-          : callAnthropicJudge(apiKey, ai.model, images, contextText, systemPrompt, fetchImpl),
+      () => {
+        if (ai.provider === 'openai') {
+          return callOpenAIJudge(apiKey, model, images, contextText, systemPrompt, fetchImpl, ai.baseUrl);
+        }
+        if (ai.provider === 'gemini') {
+          return callGeminiJudge(apiKey, model, images, contextText, systemPrompt, fetchImpl, ai.baseUrl);
+        }
+        return callAnthropicJudge(apiKey, model, images, contextText, systemPrompt, fetchImpl, ai.baseUrl);
+      },
       { retries: 2, backoff: 1000 },
     );
 

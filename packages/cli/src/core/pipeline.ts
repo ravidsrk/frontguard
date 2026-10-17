@@ -30,16 +30,18 @@ import type { JudgeResult } from './types.js';
 
 // Re-exports for consumers of the published library entry (`@frontguard/cli`).
 // Keep these alongside the pipeline so they survive bundling as the public API.
-export { defineConfig } from './config.js';
+export { defineConfig, DEFAULT_AI_MODELS } from './config.js';
 export type { UserFrontguardConfig } from './config.js';
 export type * from './types.js';
 export type { PluginContext, FrontguardPlugin } from './plugins.js';
 export {
   extractDiffClusters,
+  attributeClustersToDom,
   cropClusterComparisonStrip,
   drawSetOfMarkBoxes,
   type ClusterExtractionOptions,
 } from '../diff/regions.js';
+export { extractDomElementBoxes } from '../render/dom-elements.js';
 export {
   computeSSIM,
   computeChromaSSIM,
@@ -244,6 +246,9 @@ export function toRouteObjects(entries: RouteEntry[]): Route[] {
       waitForSelector: entry.waitForSelector,
       colorScheme: entry.colorScheme,
       actions: entry.actions,
+      freezeTime: entry.freezeTime,
+      seedRandom: entry.seedRandom,
+      blockUrls: entry.blockUrls,
     };
   });
 }
@@ -1071,6 +1076,9 @@ export async function updateBaselines(
     };
     for (const shot of screenshots) {
       const existing = manifest.routes[shot.route.path];
+      const now = new Date().toISOString();
+      const sha256 = createHash('sha256').update(shot.buffer).digest('hex');
+      const snapshotKey = `${shot.viewport}/${shot.browser}`;
       manifest.routes[shot.route.path] = {
         viewports: [
           ...new Set([...(existing?.viewports ?? []), shot.viewport]),
@@ -1078,8 +1086,12 @@ export async function updateBaselines(
         browsers: [
           ...new Set([...(existing?.browsers ?? []), shot.browser]),
         ],
-        lastUpdated: new Date().toISOString(),
-        sha256: createHash('sha256').update(shot.buffer).digest('hex'),
+        lastUpdated: now,
+        sha256,
+        snapshots: {
+          ...(existing?.snapshots ?? {}),
+          [snapshotKey]: { sha256, updatedAt: now },
+        },
       };
     }
     manifest.updatedAt = new Date().toISOString();
@@ -1146,6 +1158,9 @@ export async function updateBaselines(
 
     for (const shot of writtenScreenshots) {
       const existing = manifest.routes[shot.route.path];
+      const now = new Date().toISOString();
+      const sha256 = createHash('sha256').update(shot.buffer).digest('hex');
+      const snapshotKey = `${shot.viewport}/${shot.browser}`;
       manifest.routes[shot.route.path] = {
         viewports: [
           ...new Set([...(existing?.viewports ?? []), shot.viewport]),
@@ -1153,8 +1168,12 @@ export async function updateBaselines(
         browsers: [
           ...new Set([...(existing?.browsers ?? []), shot.browser]),
         ],
-        lastUpdated: new Date().toISOString(),
-        sha256: createHash('sha256').update(shot.buffer).digest('hex'),
+        lastUpdated: now,
+        sha256,
+        snapshots: {
+          ...(existing?.snapshots ?? {}),
+          [snapshotKey]: { sha256, updatedAt: now },
+        },
       };
     }
     manifest.updatedAt = new Date().toISOString();

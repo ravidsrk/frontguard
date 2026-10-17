@@ -32,9 +32,9 @@ AI is optional; without it, the CLI performs local pixel comparison and writes l
 
 ## Why Frontguard?
 
-- **🧠 Optional model-assisted analysis** — When configured, sends screenshot evidence to your selected OpenAI or Anthropic account and returns a classification, confidence, and explanation for review.
-- **🎯 Configurable consensus** — Opt into multiple renders per route when a project needs protection from transient screenshot variation.
-- **🤖 Pre-release MCP interface** — [`@frontguard/mcp`](https://www.npmjs.com/package/@frontguard/mcp) can query a verified API deployment; there is no live hosted default, and cloud approval does not yet promote screenshots.
+- **🧠 Optional model-assisted analysis** — When configured, sends screenshot evidence to your selected OpenAI, Anthropic, or Google Gemini account (or a custom OpenAI-compatible `baseUrl` such as OpenRouter, Ollama, or vLLM) and returns a classification, confidence, and explanation for review.
+- **🎯 Configurable consensus & deterministic anti-flake controls** — Opt into multiple renders per route, `waitForStability`, `redactSensitive`, `freezeTime` (epoch ms or ISO string), `seedRandom`, and `blockUrls` when a project needs protection from transient screenshot variation.
+- **🤖 7-tool MCP interface (local & cloud)** — [`@frontguard/mcp`](https://www.npmjs.com/package/@frontguard/mcp) exposes 7 tools (`list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `promote_baseline`, `accept_baseline`, `recent_runs`) and works in zero-key local report mode (`FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json`) or against a verified Cloud API deployment; there is no live hosted default, and cloud approval does not yet promote screenshots.
 - **🐳 Pinned renderer source** — The renderer is currently repository-source-only and must be built with the documented npm tarball preparation. Cross-host byte equivalence has not yet been validated and no registry image is published.
 - **🔓 Open-source CLI** — CLI-first, free forever. No per-screenshot pricing cliff, no dashboard lock-in, BYO AI key. Cloud components are available in the repository but their hosted and Docker quick starts are still pre-release.
 
@@ -104,11 +104,38 @@ still passes — lower it for stricter pages.
 
 > **Full documentation:** [frontguard.dev/docs](https://frontguard.dev/docs) · internal notes in [`docs/`](./docs/)
 
+## Commands
+
+| Command                              | Description                                                                             |
+| ------------------------------------ | --------------------------------------------------------------------------------------- |
+| `frontguard run`                     | Run visual regression tests (default command)                                           |
+| `frontguard init [--ci] [--yes]`     | Generate a starter config; `--ci` also writes a GitHub Actions workflow                 |
+| `frontguard doctor`                  | Diagnose environment readiness (Node, Playwright, browsers, config, git)                |
+| `frontguard guide [topic] [--json]`  | Print offline reference guides (`setup`, `diffing`, `mcp`, `playwright`, `ci`)          |
+| `frontguard update-baselines`        | Accept current screenshots as new baselines                                             |
+| `frontguard monitor`                 | Monitor live production URLs for visual regressions                                     |
+| `frontguard accept-fix <id>`         | Mark a suggested fix as accepted (improves future suggestions)                          |
+| `frontguard reject-fix <id>`         | Mark a suggested fix as rejected (negative training signal)                             |
+| `frontguard export-patterns`         | Export the local fix-pattern database as JSON                                           |
+| `frontguard plugin install <name>`   | Install a Frontguard plugin from npm                                                    |
+| `frontguard plugin uninstall <name>` | Uninstall a Frontguard plugin                                                           |
+| `frontguard plugin list`             | List installed plugins                                                                  |
+
+### Key `frontguard run` Flags
+
+- `--wait-for-stability` — Wait for consecutive animation frames to converge before capturing
+- `--redact-sensitive` — Redact password, payment, and `[data-frontguard-redact]` inputs and scrub DOM snapshots before capture
+- `--color-scheme <scheme>` — Emulate `light` or `dark` `prefers-color-scheme`
+- `--freeze-time [timestamp]` — Freeze `Date.now()` / `new Date()` (boolean default, epoch ms, or ISO 8601 date string)
+- `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
+- `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render
+
 ## Features
 
 - **Zero-config route discovery** — Auto-crawls your app to find all pages
 - **Multi-browser** — Chromium, Firefox, WebKit via Playwright
-- **Optional AI analysis** — BYOK (OpenAI/Anthropic) can classify a pixel change; it does not change pass/fail and has no published accuracy benchmark
+- **Spatial diff clusters & DOM selector attribution** — Connected-component diff clusters report Chroma-SSIM, CW-SSIM, and `cluster.targetSelector` (the most-specific DOM selector at the cluster center)
+- **Optional AI analysis** — Multi-provider BYOK (`openai`, `anthropic`, `gemini`, plus custom OpenAI-compatible `baseUrl` for OpenRouter / Ollama / vLLM) can classify a pixel change; it does not change pass/fail and has no published accuracy benchmark
 - **Smart rendering** — Dependency graph renders only pages affected by your changes
 - **Preview deployments** — Auto-detects Vercel/Netlify preview URLs
 - **Git-native baselines** — Stored in orphan branch, zero main branch bloat
@@ -170,12 +197,19 @@ export default {
 
   viewports: [375, 768, 1440],
   browsers: ['chromium'],
+  colorScheme: 'dark',
+  waitForStability: true,
+  redactSensitive: true,
+  freezeTime: '2026-01-01T00:00:00Z', // boolean | number | ISO date string
+  seedRandom: 42,                     // boolean | number
+  blockUrls: ['*google-analytics.com*', '*intercom.io*'],
   threshold: 0.1, // changed-pixel ratio: 0.1 = 10%
 
-  // AI analysis (optional, BYOK)
+  // AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini', plus optional custom baseUrl)
   ai: {
     provider: 'openai',
     model: 'gpt-4o',
+    // baseUrl: 'https://openrouter.ai/api/v1', // OpenRouter, Ollama, or vLLM
   },
 
   // Ignore dynamic content
@@ -318,6 +352,11 @@ Full schema: [docs/telemetry.md](./docs/telemetry.md).
 # AI Analysis (optional, BYOK — bring your own key, pick one)
 FRONTGUARD_OPENAI_KEY=sk-...
 FRONTGUARD_ANTHROPIC_KEY=...
+FRONTGUARD_GEMINI_KEY=AIza...
+FRONTGUARD_OPENAI_BASE_URL=https://openrouter.ai/api/v1 # optional OpenAI-compatible endpoint
+
+# Local Report Mode for @frontguard/mcp (optional, auto-detects ./frontguard-report/report.json)
+FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json
 
 # Opt-in anonymous usage telemetry (off unless set)
 FRONTGUARD_TELEMETRY=1

@@ -20,12 +20,15 @@ import type {
   FixCategory,
   FixType,
 } from '../core/types.js';
+import { DEFAULT_AI_MODELS } from '../core/config.js';
 import {
   getApiKey,
   callOpenAI,
   callAnthropic,
+  callGemini,
   downscaleForAI,
   wrapUntrusted,
+  buildDomClusterContext,
 } from './ai-vision.js';
 import { retry } from '../utils/retry.js';
 import { logger } from '../utils/logger.js';
@@ -177,6 +180,7 @@ export async function generateFix(
   }
 
   const apiKey = getApiKey(config.provider);
+  const model = config.model ?? DEFAULT_AI_MODELS[config.provider];
   const baselineB64 = downscaleForAI(diff.baselineImage).toString('base64');
   const currentB64 = downscaleForAI(diff.currentImage).toString('base64');
   const diffB64 = diff.diffImage ? downscaleForAI(diff.diffImage).toString('base64') : undefined;
@@ -185,6 +189,10 @@ export async function generateFix(
     `Route: ${wrapUntrusted('route_path', diff.route.path)} (viewport: ${diff.viewport}px, browser: ${diff.browser})`,
     `Pixel diff: ${diff.diffPercentage.toFixed(2)}%`,
   ];
+  const domClusterContext = buildDomClusterContext(diff.clusters);
+  if (domClusterContext) {
+    contextLines.push(wrapUntrusted('DOM Cluster Attribution (untrusted)', domClusterContext));
+  }
   if (diff.aiAnalysis?.explanation) {
     contextLines.push(`Regression description: ${diff.aiAnalysis.explanation}`);
   }
@@ -198,10 +206,39 @@ export async function generateFix(
   logger.debug(`Generating fix for ${diff.route.path} @ ${diff.viewport}px with ${config.provider}`);
 
   const raw = await retry(
-    () =>
-      config.provider === 'openai'
-        ? callOpenAI(apiKey, config.model, baselineB64, currentB64, diffB64, contextText, FIX_SYSTEM_PROMPT)
-        : callAnthropic(apiKey, config.model, baselineB64, currentB64, diffB64, contextText, FIX_SYSTEM_PROMPT),
+    () => {
+      if (config.provider === 'openai') {
+        return callOpenAI(
+          apiKey,
+          model,
+          baselineB64,
+          currentB64,
+          diffB64,
+          contextText,
+          FIX_SYSTEM_PROMPT,
+          config.baseUrl,
+        );
+      }
+      if (config.provider === 'gemini') {
+        const images: Array<{ data: string; label: string }> = [
+          { data: baselineB64, label: 'baseline' },
+          { data: currentB64, label: 'current' },
+        ];
+        if (diffB64) images.push({ data: diffB64, label: 'diff' });
+        const userText = `Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.\n\nContext:\n${contextText}`;
+        return callGemini(apiKey, model, images, userText, config.baseUrl, FIX_SYSTEM_PROMPT);
+      }
+      return callAnthropic(
+        apiKey,
+        model,
+        baselineB64,
+        currentB64,
+        diffB64,
+        contextText,
+        FIX_SYSTEM_PROMPT,
+        config.baseUrl,
+      );
+    },
     {
       retries: 2,
       backoff: 2000,

@@ -14,7 +14,7 @@ describe('MCP publish surface — no false hosted API default', () => {
   });
 
   it('describes accept_baseline as approval rather than screenshot promotion', () => {
-    expect(readme).toMatch(/records approval.*screenshot promotion is not implemented/i);
+    expect(readme).toMatch(/records(?: cloud)? approval.*screenshot promotion is not implemented/i);
     expect(readme).not.toMatch(/promotes the.*run.*baseline/i);
   });
 

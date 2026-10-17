@@ -440,11 +440,139 @@ describe('visualTest', () => {
 
     const result = await visualTest(page, 'stable-test', {
       baselineDir: TEST_BASELINE_DIR,
-      waitForStable: { timeoutMs: 500, intervalMs: 10 },
+      waitForStable: { maxAttempts: 3, intervalMs: 10 },
     });
 
     expect(result.passed).toBe(true);
     expect(result.settled).toBe(true);
     expect(page.screenshot).toHaveBeenCalledTimes(3);
+  });
+
+  it('supports ISO date string in freezeTime', async () => {
+    const img = createPNG(30, 30, [128, 128, 128, 255]);
+    const page = createMockPage(img);
+    const iso = '2026-06-15T12:30:00.000Z';
+    const expectedTs = Date.parse(iso);
+
+    await visualTest(page, 'freeze-iso', {
+      baselineDir: TEST_BASELINE_DIR,
+      freezeTime: iso,
+    });
+
+    expect(page.clock.setFixedTime).toHaveBeenCalledWith(expectedTs);
+    expect(page.evaluate).toHaveBeenCalledWith(expect.any(Function), expectedTs);
+  });
+
+  it('injects deterministic Mulberry32 PRNG when seedRandom is set', async () => {
+    const img = createPNG(30, 30, [128, 128, 128, 255]);
+    const page1 = createMockPage(img);
+    await visualTest(page1, 'seed-default', {
+      baselineDir: TEST_BASELINE_DIR,
+      seedRandom: true,
+    });
+    expect(page1.evaluate).toHaveBeenCalledWith(expect.any(Function), 42);
+
+    const page2 = createMockPage(img);
+    await visualTest(page2, 'seed-custom', {
+      baselineDir: TEST_BASELINE_DIR,
+      seedRandom: 1337,
+    });
+    expect(page2.evaluate).toHaveBeenCalledWith(expect.any(Function), 1337);
+  });
+
+  it('intercepts and aborts matched URLs when blockUrls is provided and cleans up in finally', async () => {
+    const img = createPNG(30, 30, [128, 128, 128, 255]);
+    const page = createMockPage(img);
+    const abortSpy = vi.fn().mockResolvedValue(undefined);
+    const continueSpy = vi.fn().mockResolvedValue(undefined);
+
+    page.route = vi.fn(async (_pattern: string, handler: (route: any) => Promise<void>) => {
+      await handler({
+        request: () => ({ url: () => 'https://www.google-analytics.com/collect' }),
+        abort: abortSpy,
+        continue: continueSpy,
+      });
+      await handler({
+        request: () => ({ url: () => 'https://ads.example.com/banner.js' }),
+        abort: abortSpy,
+        continue: continueSpy,
+      });
+      await handler({
+        request: () => ({ url: () => 'https://app.example.com/main.css' }),
+        abort: abortSpy,
+        continue: continueSpy,
+      });
+    });
+    page.unroute = vi.fn().mockResolvedValue(undefined);
+
+    const result = await visualTest(page, 'block-urls-test', {
+      baselineDir: TEST_BASELINE_DIR,
+      blockUrls: ['*google-analytics.com*', 'https://ads.example.com/*'],
+    });
+
+    expect(result.blockedRequestsCount).toBe(2);
+    expect(abortSpy).toHaveBeenCalledTimes(2);
+    expect(continueSpy).toHaveBeenCalledTimes(1);
+    expect(page.unroute).toHaveBeenCalledTimes(1);
+  });
+
+  it('captures ariaSnapshot when captureAriaSnapshot is true', async () => {
+    const img = createPNG(30, 30, [128, 128, 128, 255]);
+    const page = createMockPage(img);
+    page.locator = vi.fn().mockReturnValue({
+      ariaSnapshot: vi.fn().mockResolvedValue('- main:\n  - button "Checkout"'),
+    });
+
+    const result = await visualTest(page, 'aria-snapshot-test', {
+      baselineDir: TEST_BASELINE_DIR,
+      captureAriaSnapshot: true,
+    });
+
+    expect(page.locator).toHaveBeenCalledWith('body');
+    expect(result.ariaSnapshot).toBe('- main:\n  - button "Checkout"');
+  });
+
+  it('attributes spatial diff clusters to the highest-overlap specific DOM selector', async () => {
+    const baseImg = createPNG(100, 100, [128, 128, 128, 255]);
+    const modPng = PNG.sync.read(baseImg);
+    // Mutate a 10x10 region at (20, 30)
+    for (let y = 30; y < 40; y++) {
+      for (let x = 20; x < 30; x++) {
+        const idx = (y * 100 + x) * 4;
+        modPng.data[idx] = 255;
+        modPng.data[idx + 1] = 0;
+        modPng.data[idx + 2] = 0;
+      }
+    }
+    const currentImg = PNG.sync.write(modPng);
+
+    // First run saves baseline
+    await visualTest(createMockPage(baseImg), 'cluster-dom-test', {
+      baselineDir: TEST_BASELINE_DIR,
+    });
+
+    // Second run detects diff cluster and attributes it via page.evaluate
+    const page2 = createMockPage(currentImg);
+    page2.evaluate = vi.fn().mockResolvedValue([
+      { selector: 'main.page', x: 0, y: 0, width: 100, height: 100 },
+      { selector: 'section.pricing', x: 10, y: 10, width: 80, height: 80 },
+      { selector: '[data-testid="buy-button"]', x: 18, y: 28, width: 14, height: 14 },
+      { selector: 'footer.site-footer', x: 0, y: 85, width: 100, height: 15 },
+    ]);
+
+    const result = await visualTest(page2, 'cluster-dom-test', {
+      baselineDir: TEST_BASELINE_DIR,
+      threshold: 0.001,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.clusters).toBeDefined();
+    expect(result.clusters).toHaveLength(1);
+    expect(result.clusters![0]).toEqual({
+      id: 1,
+      bbox: { x: 20, y: 30, width: 10, height: 10 },
+      rawDiffPixels: 100,
+      targetSelector: '[data-testid="buy-button"]',
+    });
   });
 });

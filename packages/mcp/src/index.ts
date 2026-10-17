@@ -1,9 +1,11 @@
 /**
  * Frontguard MCP server — stdio entry.
  *
- * Registers four tools (`list_regressions`, `get_suggested_fix`,
+ * Registers seven tools (`list_regressions`, `inspect_diff_cluster_dom`,
+ * `get_suggested_fix`, `verify_css_patch`, `promote_baseline`,
  * `accept_baseline`, `recent_runs`) and connects them to a stdio transport
  * so editor agents (Claude Code, Cursor, Copilot) can call them in-loop.
+ * Supports both Cloud API mode and local CLI report mode (`FRONTGUARD_LOCAL_REPORT`).
  *
  * The server starts even without `FRONTGUARD_API_KEY` set — the SDK lists
  * the tool catalog first; auth is enforced on each tool call. Missing-key

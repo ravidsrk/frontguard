@@ -62,9 +62,10 @@ Frontguard terminal (uses the generated config):
 
 ```bash
 npx -p @frontguard/cli frontguard doctor
+npx -p @frontguard/cli frontguard guide [topic] [--json]
 npx -p @frontguard/cli frontguard update-baselines
 git push origin frontguard-baselines # before CI comparisons
-npx -p @frontguard/cli frontguard run
+npx -p @frontguard/cli frontguard run --wait-for-stability --redact-sensitive --color-scheme dark --freeze-time 2026-01-01T00:00:00Z --seed-random 42 --block-urls "*google-analytics.com*"
 ```
 
 ### Playwright plugin
@@ -111,7 +112,8 @@ export default defineConfig({
 
 ### Environment variables
 
-- `FRONTGUARD_OPENAI_KEY` / `FRONTGUARD_ANTHROPIC_KEY` — AI provider key. The Playwright plugin also accepts unprefixed `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` when present. `frontguard doctor` reads exactly the same names the runtime reads.
+- `FRONTGUARD_OPENAI_KEY` / `FRONTGUARD_ANTHROPIC_KEY` / `FRONTGUARD_GEMINI_KEY` — AI provider key (`FRONTGUARD_OPENAI_BASE_URL` for custom OpenAI-compatible endpoints). The Playwright plugin also accepts unprefixed `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` when present. `frontguard doctor` reads exactly the same names the runtime reads.
+- `FRONTGUARD_LOCAL_REPORT` — local JSON report path (defaults to `./frontguard-report/report.json`) for `@frontguard/mcp` local mode.
 - `FRONTGUARD_API_URL` / `FRONTGUARD_API_KEY` — a verified self-hosted or future hosted cloud endpoint.
 
 ---
@@ -153,7 +155,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
-        with: { node-version: 20 }
+        with: { node-version: 22 }
       - run: npm ci
       - run: npx playwright install --with-deps
       - run: npm run build
@@ -186,15 +188,18 @@ visual:
 
 ## MCP server
 
-`@frontguard/mcp` exposes the following pre-release tools to in-IDE agents (Claude Code, Cursor, Cline, Copilot). There is no live default hosted endpoint, and `accept_baseline` currently records approval without promoting screenshots:
+`@frontguard/mcp` exposes 7 tools to in-IDE agents (Claude Code, Cursor, Cline, Copilot) across local report mode (`FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json` or automatic fallback when `./frontguard-report/report.json` is present) and a verified Cloud API deployment (`FRONTGUARD_API_URL` + `FRONTGUARD_API_KEY`). There is no live default hosted endpoint, and `accept_baseline` currently records cloud approval without promoting screenshots:
 
-- `list_regressions(pr_id)`
+- `list_regressions(pr_id, repo?)`
+- `inspect_diff_cluster_dom(diff_id, cluster_id?)`
 - `get_suggested_fix(diff_id)`
-- `accept_baseline(run_id, confirm_all_regressions_reviewed: true)` — run-scoped, not per-diff
-- `recent_runs(repo, branch)`
+- `verify_css_patch(diff_id, css_patch, target_selector?)`
+- `promote_baseline(diff_id, confirm_reviewed: true)` — promotes a verified local screenshot into the local baseline store
+- `accept_baseline(run_id, confirm_all_regressions_reviewed: true)` — run-scoped cloud approval metadata, not per-diff
+- `recent_runs(repo?, branch?, limit?)`
 
 ```bash
-npx -y @frontguard/mcp
+FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json npx -y @frontguard/mcp
 ```
 
 Drop into `mcp.json` per the docs at https://frontguard.dev/docs/integrations/mcp.
@@ -223,7 +228,7 @@ The cloud source is MIT-licensed, but the Compose onboarding path is pre-release
 
 ### What env vars does Frontguard read?
 
-`FRONTGUARD_OPENAI_KEY` / `FRONTGUARD_ANTHROPIC_KEY` for AI. `FRONTGUARD_API_URL` / `FRONTGUARD_API_KEY` for the cloud.
+`FRONTGUARD_OPENAI_KEY` / `FRONTGUARD_ANTHROPIC_KEY` / `FRONTGUARD_GEMINI_KEY` (and `FRONTGUARD_OPENAI_BASE_URL`) for AI. `FRONTGUARD_LOCAL_REPORT` for local MCP mode. `FRONTGUARD_API_URL` / `FRONTGUARD_API_KEY` for the cloud.
 
 ### Does Frontguard work with Storybook?
 
@@ -231,7 +236,7 @@ Yes. `frontguard init` detects `.storybook/main.ts` and scaffolds a Storybook-aw
 
 ### Is there an MCP server?
 
-`@frontguard/mcp` exposes `list_regressions`, `get_suggested_fix`, `accept_baseline`, `recent_runs`.
+`@frontguard/mcp` exposes 7 tools (`list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `promote_baseline`, `accept_baseline`, `recent_runs`) and supports local report mode via `FRONTGUARD_LOCAL_REPORT`.
 
 ### Data retention?
 

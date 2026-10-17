@@ -274,5 +274,46 @@ describe('judge config and mergeConfigs', () => {
       figmaPages: { '/': '1:2' },
     });
   });
+
+  it('resolves default AI models for openai, anthropic, and gemini when model is omitted', () => {
+    const openaiCfg = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      ai: { provider: 'openai' },
+    });
+    expect(openaiCfg.ai?.model).toBe('gpt-4.1-mini');
+
+    const anthropicCfg = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      ai: { provider: 'anthropic' },
+    });
+    expect(anthropicCfg.ai?.model).toBe('claude-sonnet-4-20250514');
+
+    const geminiCfg = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      ai: { provider: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models' },
+    });
+    expect(geminiCfg.ai?.model).toBe('gemini-2.5-flash');
+    expect(geminiCfg.ai?.baseUrl).toBe('https://generativelanguage.googleapis.com/v1beta/models');
+  });
+
+  it('validates ISO string freezeTime, seedRandom, and blockUrls', () => {
+    const cfg = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      freezeTime: '2026-01-15T12:00:00Z',
+      seedRandom: 42,
+      blockUrls: ['*.doubleclick.net/*', 'https://www.google-analytics.com/*'],
+    });
+    expect(cfg.freezeTime).toBe('2026-01-15T12:00:00Z');
+    expect(cfg.seedRandom).toBe(42);
+    expect(cfg.blockUrls).toHaveLength(2);
+
+    expect(() =>
+      configSchema.parse({
+        baseUrl: 'http://localhost:3000',
+        freezeTime: 'not-a-valid-date',
+      }),
+    ).toThrow(ZodError);
+  });
 });
+
 

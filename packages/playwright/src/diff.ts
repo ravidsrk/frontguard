@@ -1,6 +1,120 @@
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
-import type { CompareResult } from './types.js';
+import type { CompareResult, PlaywrightDiffCluster } from './types.js';
+
+/**
+ * Extract connected-component spatial clusters from a binary diff mask using
+ * 8-connected box/grid clustering and proximity merging.
+ */
+export function extractDiffClusters(
+  diffMask: Uint8Array,
+  width: number,
+  height: number,
+  mergeRadius = 2
+): PlaywrightDiffCluster[] {
+  if (width <= 0 || height <= 0 || diffMask.length < width * height) {
+    return [];
+  }
+
+  const total = width * height;
+  const visited = new Uint8Array(total);
+  const rawAccum: Array<{
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+    rawDiffPixels: number;
+  }> = [];
+
+  const queue = new Int32Array(total);
+
+  for (let startIdx = 0; startIdx < total; startIdx++) {
+    if (diffMask[startIdx] === 0 || visited[startIdx] !== 0) continue;
+
+    visited[startIdx] = 1;
+    let head = 0;
+    let tail = 0;
+    queue[tail++] = startIdx;
+
+    let minX = startIdx % width;
+    let maxX = minX;
+    let minY = (startIdx / width) | 0;
+    let maxY = minY;
+    let rawDiffPixels = 0;
+
+    while (head < tail) {
+      const curr = queue[head++];
+      const cx = curr % width;
+      const cy = (curr / width) | 0;
+      rawDiffPixels++;
+
+      if (cx < minX) minX = cx;
+      if (cx > maxX) maxX = cx;
+      if (cy < minY) minY = cy;
+      if (cy > maxY) maxY = cy;
+
+      const y0 = Math.max(0, cy - 1);
+      const y1 = Math.min(height - 1, cy + 1);
+      const x0 = Math.max(0, cx - 1);
+      const x1 = Math.min(width - 1, cx + 1);
+
+      for (let ny = y0; ny <= y1; ny++) {
+        const rowOffset = ny * width;
+        for (let nx = x0; nx <= x1; nx++) {
+          const nIdx = rowOffset + nx;
+          if (diffMask[nIdx] !== 0 && visited[nIdx] === 0) {
+            visited[nIdx] = 1;
+            queue[tail++] = nIdx;
+          }
+        }
+      }
+    }
+
+    rawAccum.push({ minX, minY, maxX, maxY, rawDiffPixels });
+  }
+
+  // Merge proximate or overlapping bounding boxes within mergeRadius
+  let merged = true;
+  while (merged && rawAccum.length > 1) {
+    merged = false;
+    for (let i = 0; i < rawAccum.length; i++) {
+      for (let j = i + 1; j < rawAccum.length; j++) {
+        const a = rawAccum[i];
+        const b = rawAccum[j];
+        const overlapsX = a.minX - mergeRadius <= b.maxX && a.maxX + mergeRadius >= b.minX;
+        const overlapsY = a.minY - mergeRadius <= b.maxY && a.maxY + mergeRadius >= b.minY;
+        if (overlapsX && overlapsY) {
+          a.minX = Math.min(a.minX, b.minX);
+          a.minY = Math.min(a.minY, b.minY);
+          a.maxX = Math.max(a.maxX, b.maxX);
+          a.maxY = Math.max(a.maxY, b.maxY);
+          a.rawDiffPixels += b.rawDiffPixels;
+          rawAccum.splice(j, 1);
+          merged = true;
+          break;
+        }
+      }
+      if (merged) break;
+    }
+  }
+
+  rawAccum.sort((a, b) => {
+    if (b.rawDiffPixels !== a.rawDiffPixels) return b.rawDiffPixels - a.rawDiffPixels;
+    if (a.minY !== b.minY) return a.minY - b.minY;
+    return a.minX - b.minX;
+  });
+
+  return rawAccum.map((c, idx) => ({
+    id: idx + 1,
+    bbox: {
+      x: c.minX,
+      y: c.minY,
+      width: c.maxX - c.minX + 1,
+      height: c.maxY - c.minY + 1,
+    },
+    rawDiffPixels: c.rawDiffPixels,
+  }));
+}
 
 /**
  * Compare two PNG buffers and return diff results.
@@ -38,13 +152,31 @@ export function compareImages(
   // Compute SSIM
   const ssim = computeSSIM(baselineData, currentData, width, height);
 
-  const diffBuffer = mismatchCount > 0 ? PNG.sync.write(diff) : null;
+  let diffBuffer: Buffer | null = null;
+  let clusters: PlaywrightDiffCluster[] = [];
+
+  if (mismatchCount > 0) {
+    diffBuffer = PNG.sync.write(diff);
+    const diffMask = new Uint8Array(totalPixels);
+    for (let i = 0; i < totalPixels; i++) {
+      const idx = i * 4;
+      if (
+        diff.data[idx] === 255 &&
+        diff.data[idx + 1] === 0 &&
+        diff.data[idx + 2] === 0
+      ) {
+        diffMask[i] = 1;
+      }
+    }
+    clusters = extractDiffClusters(diffMask, width, height);
+  }
 
   return {
     passed,
     diffPercentage,
     diffBuffer,
     ssim,
+    clusters,
   };
 }
 

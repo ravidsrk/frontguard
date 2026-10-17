@@ -30,7 +30,7 @@ export interface TelemetryEvent {
   /** Number of regressions found (run only). */
   regressions?: number;
   /** AI provider used. */
-  aiProvider?: 'openai' | 'anthropic' | 'none';
+  aiProvider?: 'openai' | 'anthropic' | 'gemini' | 'none';
   /** Whether anti-flake rendering was enabled. */
   antiFlake?: boolean;
   /** Detected CI environment. */

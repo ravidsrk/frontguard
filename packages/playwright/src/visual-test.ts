@@ -66,15 +66,17 @@ export async function visualTest(
   const storage = new BaselineStorage(opts.baselineDir);
 
   // Freeze time if requested.
-  // The page is typically already navigated by the caller, so an init script
-  // (which only runs on the NEXT navigation) would be a no-op here. Prefer the
-  // page.clock API which freezes time on the live page; fall back to injecting
-  // an init script and reloading on older Playwright versions.
-  if (opts.freezeTime !== false) {
-    const ts = opts.freezeTime === true ? 0 : (opts.freezeTime ?? 0);
+  if (opts.freezeTime !== false && opts.freezeTime !== undefined) {
+    const rawTs =
+      typeof opts.freezeTime === 'string'
+        ? Date.parse(opts.freezeTime)
+        : opts.freezeTime === true
+          ? 0
+          : (opts.freezeTime ?? 0);
+    const ts = Number.isFinite(rawTs) ? rawTs : 0;
     const clock = (page as { clock?: { setFixedTime?: (t: number) => Promise<void> } }).clock;
     if (clock?.setFixedTime) {
-      await clock.setFixedTime(ts);
+      await clock.setFixedTime(ts).catch(() => {});
     } else {
       await page.addInitScript(`{
         const __ts = ${ts};
@@ -87,6 +89,76 @@ export async function visualTest(
       }`);
       await page.reload();
     }
+    await page
+      .evaluate((fixedTs: number) => {
+        const OrigDate = window.Date;
+        const FrozenDate = class extends OrigDate {
+          constructor(...args: unknown[]) {
+            if (args.length === 0) {
+              super(fixedTs);
+            } else {
+              // @ts-expect-error spread into Date constructor
+              super(...args);
+            }
+          }
+          static now() {
+            return fixedTs;
+          }
+        };
+        window.Date = FrozenDate as DateConstructor;
+      }, ts)
+      .catch(() => {});
+  }
+
+  // Seed Math.random with deterministic Mulberry32 PRNG if requested.
+  if (opts.seedRandom) {
+    const seed = typeof opts.seedRandom === 'number' ? opts.seedRandom : 42;
+    await page
+      .evaluate((initialSeed: number) => {
+        let state = initialSeed >>> 0;
+        Math.random = () => {
+          state = (state + 0x6d2b79f5) >>> 0;
+          let t = Math.imul(state ^ (state >>> 15), 1 | state);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }, seed)
+      .catch(() => {});
+  }
+
+  // Block matching network URLs if requested.
+  let blockedRequestsCount: number | undefined;
+  let routeInterceptor: ((route: any) => Promise<void>) | undefined;
+  const pageWithRoutes = page as unknown as {
+    route?: (url: string, handler: (route: any) => Promise<void>) => Promise<void>;
+    unroute?: (url: string, handler?: (route: any) => Promise<void>) => Promise<void>;
+  };
+
+  if (opts.blockUrls && opts.blockUrls.length > 0 && typeof pageWithRoutes.route === 'function') {
+    blockedRequestsCount = 0;
+    const patterns = opts.blockUrls;
+    const matchesBlockedPattern = (url: string): boolean => {
+      for (const pat of patterns) {
+        if (url.includes(pat)) return true;
+        const regexStr = pat.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*+/g, '.*');
+        if (new RegExp(regexStr, 'i').test(url)) return true;
+      }
+      return false;
+    };
+
+    routeInterceptor = async (route: any) => {
+      const reqUrl =
+        typeof route?.request === 'function'
+          ? (route.request()?.url?.() ?? '')
+          : (route?.url ?? '');
+      if (!reqUrl || matchesBlockedPattern(reqUrl)) {
+        blockedRequestsCount = (blockedRequestsCount ?? 0) + 1;
+        await route?.abort?.();
+      } else {
+        await route?.continue?.();
+      }
+    };
+    await pageWithRoutes.route('**/*', routeInterceptor);
   }
 
   const defaultSensitiveSelectors = [
@@ -109,6 +181,7 @@ export async function visualTest(
   );
   let currentBuffer: Buffer;
   let settled: boolean | undefined;
+  let ariaSnapshot: string | undefined;
   try {
     // Mask elements
     if (opts.mask?.length) {
@@ -190,6 +263,57 @@ export async function visualTest(
     } else {
       currentBuffer = await takeCapture();
     }
+
+    if (opts.captureAriaSnapshot) {
+      const rootSelector = opts.selector || 'body';
+      if (typeof (page as unknown as { locator?: unknown }).locator === 'function') {
+        try {
+          const rawLoc = (
+            page as unknown as {
+              locator: (s: string) => {
+                ariaSnapshot?: () => Promise<string>;
+                first?: () => { ariaSnapshot?: () => Promise<string> };
+              };
+            }
+          ).locator(rootSelector);
+          if (typeof rawLoc?.ariaSnapshot === 'function') {
+            ariaSnapshot = await rawLoc.ariaSnapshot();
+          } else if (typeof rawLoc?.first === 'function') {
+            const firstLoc = rawLoc.first();
+            if (typeof firstLoc?.ariaSnapshot === 'function') {
+              ariaSnapshot = await firstLoc.ariaSnapshot();
+            }
+          }
+        } catch {
+          // Fall back to evaluate tree below
+        }
+      }
+      if (ariaSnapshot === undefined) {
+        try {
+          const evaluated = await page.evaluate((sel: string) => {
+            const root = document.querySelector(sel) || document.body;
+            if (!root) return '';
+            const lines: string[] = [];
+            const walk = (el: Element, depth: number) => {
+              const role = el.getAttribute('role') || el.tagName.toLowerCase();
+              const label =
+                el.getAttribute('aria-label') ||
+                (el as HTMLElement).innerText?.trim()?.slice(0, 50) ||
+                '';
+              lines.push(`${'  '.repeat(depth)}- ${role}${label ? ` "${label}"` : ''}`);
+              for (const child of Array.from(el.children)) {
+                walk(child, depth + 1);
+              }
+            };
+            walk(root, 0);
+            return lines.join('\n');
+          }, rootSelector);
+          ariaSnapshot = typeof evaluated === 'string' ? evaluated : '';
+        } catch {
+          ariaSnapshot = '';
+        }
+      }
+    }
   } finally {
     if (hasMasks) {
       await page.evaluate(() => {
@@ -206,6 +330,9 @@ export async function visualTest(
           el.remove();
         });
       });
+    }
+    if (routeInterceptor && typeof pageWithRoutes.unroute === 'function') {
+      await pageWithRoutes.unroute('**/*', routeInterceptor).catch(() => {});
     }
   }
   const current = Buffer.from(currentBuffer);
@@ -225,11 +352,106 @@ export async function visualTest(
       currentPath: storage.getPath(baselineKey, 'current'),
       isNewBaseline: true,
       ...(settled !== undefined ? { settled } : {}),
+      ...(blockedRequestsCount !== undefined ? { blockedRequestsCount } : {}),
+      ...(ariaSnapshot !== undefined ? { ariaSnapshot } : {}),
     };
   }
 
   // Compare
   const diff = compareImages(baseline, current, opts.threshold);
+
+  // Attribute clusters to specific DOM selectors when clusters exist
+  if (diff.clusters && diff.clusters.length > 0) {
+    try {
+      const domBoxes = await page.evaluate(() => {
+        const elements = Array.from(document.querySelectorAll('*'));
+        const results: Array<{
+          selector: string;
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+        }> = [];
+        for (const el of elements) {
+          const tag = el.tagName.toLowerCase();
+          if (tag === 'html' || tag === 'body' || tag === 'head' || tag === 'script' || tag === 'style') {
+            continue;
+          }
+          const rect = el.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) continue;
+          const testId = el.getAttribute('data-testid');
+          let selector = tag;
+          if (testId) {
+            selector = `[data-testid="${testId}"]`;
+          } else if (el.id) {
+            selector = `#${el.id}`;
+          } else if (typeof el.className === 'string' && el.className.trim()) {
+            const cls = el.className.trim().split(/\s+/).slice(0, 2).join('.');
+            selector = `${tag}.${cls}`;
+          }
+          results.push({
+            selector,
+            x: rect.left + window.scrollX,
+            y: rect.top + window.scrollY,
+            width: rect.width,
+            height: rect.height,
+          });
+        }
+        return results;
+      });
+
+      if (Array.isArray(domBoxes) && domBoxes.length > 0) {
+        for (const cluster of diff.clusters) {
+          const cb = cluster.bbox;
+          const clusterArea = Math.max(1, cb.width * cb.height);
+          let bestSelector: string | undefined;
+          let bestOverlap = 0;
+          let bestIoU = 0;
+
+          for (const item of domBoxes as Array<{
+            selector?: string;
+            bbox?: { x: number; y: number; width: number; height: number };
+            x?: number;
+            y?: number;
+            width?: number;
+            height?: number;
+          }>) {
+            if (!item || typeof item.selector !== 'string' || !item.selector.trim()) continue;
+            const eb = item.bbox ?? {
+              x: item.x ?? 0,
+              y: item.y ?? 0,
+              width: item.width ?? 0,
+              height: item.height ?? 0,
+            };
+            if (eb.width <= 0 || eb.height <= 0) continue;
+
+            const ix = Math.max(0, Math.min(cb.x + cb.width, eb.x + eb.width) - Math.max(cb.x, eb.x));
+            const iy = Math.max(0, Math.min(cb.y + cb.height, eb.y + eb.height) - Math.max(cb.y, eb.y));
+            const overlap = ix * iy;
+            if (overlap <= 0) continue;
+
+            const elArea = eb.width * eb.height;
+            const iou = overlap / (clusterArea + elArea - overlap);
+
+            if (
+              overlap > bestOverlap ||
+              (overlap === bestOverlap && iou > bestIoU)
+            ) {
+              bestOverlap = overlap;
+              bestIoU = iou;
+              bestSelector = item.selector.trim();
+            }
+          }
+
+          if (bestSelector) {
+            cluster.targetSelector = bestSelector;
+          }
+        }
+      }
+    } catch {
+      // Best-effort DOM attribution
+    }
+  }
 
   // Save current for debugging
   storage.writeFile(baselineKey, 'current', current);
@@ -246,6 +468,9 @@ export async function visualTest(
     ssim: diff.ssim,
     isNewBaseline: false,
     ...(settled !== undefined ? { settled } : {}),
+    ...(diff.clusters && diff.clusters.length > 0 ? { clusters: diff.clusters } : {}),
+    ...(blockedRequestsCount !== undefined ? { blockedRequestsCount } : {}),
+    ...(ariaSnapshot !== undefined ? { ariaSnapshot } : {}),
   };
 
   // AI analysis if enabled and diff detected

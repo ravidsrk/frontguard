@@ -2,11 +2,12 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Frontguard Cloud API",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "description": "OpenAPI contract for the agent and CI-facing pre-release Frontguard Cloud API surface. No default hosted endpoint is live. This document is derived from packages/cloud-api/src/index.ts and the mounted route modules under packages/cloud-api/src/routes, and intentionally excludes browser session, OAuth, Stripe billing, and API-key bootstrap routes.",
     "x-generated-from": [
       "packages/cloud-api/src/index.ts",
       "packages/cloud-api/src/routes/screenshots.ts",
+      "packages/cloud-api/src/routes/cas.ts",
       "packages/cloud-api/src/routes/monitors.ts",
       "packages/cloud-api/src/routes/dashboard.ts",
       "packages/cloud-api/src/routes/teams.ts"
@@ -596,6 +597,225 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/cas/check": {
+      "post": {
+        "operationId": "checkCasBlobs",
+        "tags": ["Screenshots"],
+        "summary": "Batch check which SHA-256 PNG blobs already exist in CAS",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TeamIdQuery"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CasCheckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Categorized existing and missing SHA-256 blob digests.",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/XRateLimitLimit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/XRateLimitRemaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/XRateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CasCheckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/cas/blobs/{sha256}": {
+      "get": {
+        "operationId": "getCasBlob",
+        "tags": ["Screenshots"],
+        "summary": "Fetch a cached PNG blob by SHA-256 digest",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sha256",
+            "in": "path",
+            "required": true,
+            "description": "64-character hex SHA-256 digest of the PNG blob.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{64}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TeamIdQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cached PNG blob bytes with immutable Cache-Control.",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/XRateLimitLimit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/XRateLimitRemaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/XRateLimitReset"
+              },
+              "Cache-Control": {
+                "description": "Immutable browser cache header for content-addressed PNG blob.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "private, max-age=31536000, immutable"
+              }
+            },
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putCasBlob",
+        "tags": ["Screenshots"],
+        "summary": "Upload a SHA-256-verified PNG blob to CAS",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sha256",
+            "in": "path",
+            "required": true,
+            "description": "64-character lowercase hex SHA-256 digest of the PNG blob.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TeamIdQuery"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "PNG blob verified and stored in CAS.",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/XRateLimitLimit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/XRateLimitRemaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/XRateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CasBlobUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequiredError"
+          },
+          "413": {
+            "description": "Blob payload exceeds maximum size of 25 MB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "429": {
             "$ref": "#/components/responses/RateLimitError"
@@ -3008,10 +3228,73 @@
               },
               "screenshots": {
                 "type": "integer",
-                "example": 5000
+                "example": 35000
               }
             },
             "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "CasCheckRequest": {
+        "type": "object",
+        "required": ["hashes"],
+        "properties": {
+          "hashes": {
+            "type": "array",
+            "maxItems": 1000,
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "description": "Lowercase hex SHA-256 digests of PNG blobs to check."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CasCheckResponse": {
+        "type": "object",
+        "required": ["existing", "missing", "totalRequested", "deduplicatedCount"],
+        "properties": {
+          "existing": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "totalRequested": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "deduplicatedCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "CasBlobUploadResponse": {
+        "type": "object",
+        "required": ["sha256", "sizeBytes", "key"],
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "key": {
+            "type": "string"
           }
         },
         "additionalProperties": false

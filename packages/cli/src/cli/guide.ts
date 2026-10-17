@@ -59,9 +59,10 @@ export default defineConfig({
 - **Crawler discovery**: Set \`discover: { startUrl: 'http://localhost:3000', maxDepth: 3, maxRoutes: 50, exclude: ['/admin/*'] }\`.
 - **Storybook 7/8/9**: Set \`storybook: { url: 'http://localhost:6006', stories: ['Components/*'] }\` to enumerate stories from \`/index.json\` and await each story's \`play()\` function before capture.
 
-## 3. Sensitive-DOM Redaction & Frame Convergence
+## 3. Sensitive-DOM Redaction, Frame Convergence & Deterministic Anti-Flake Controls
 - \`redactSensitive: true\` (or an array of custom CSS selectors) masks \`input[type="password"]\`, credit-card \`autocomplete="cc-*"\` fields, one-time codes, and \`[data-frontguard-redact]\` elements in both screenshots and serialized \`domSnapshot\` HTML while preserving exact box geometry.
-- \`waitForStability: true\` polls consecutive frames until two frames in a row converge within subpixel tolerance, and reports spatial bounding boxes (\`motionClusters\`) for any region that fails to settle.`,
+- \`waitForStability: true\` polls consecutive frames until two frames in a row converge within subpixel tolerance, and reports spatial bounding boxes (\`motionClusters\`) for any region that fails to settle.
+- \`freezeTime: true | number | string\` (\`--freeze-time [timestamp]\`), \`seedRandom: true | number\` (\`--seed-random [seed]\`), and \`blockUrls: string[]\` (\`--block-urls <patterns...>\`) freeze the browser clock, seed \`Math.random()\` with a deterministic Mulberry32 PRNG, and block noisy third-party ad/analytics domains before capture.`,
   },
   {
     id: 'diffing',
@@ -72,7 +73,7 @@ export default defineConfig({
 
 ## 1. Three-Stage Perceptual Diff Engine
 1. **Pixel-level YIQ pass (\`pixelmatch\`)**: Fast byte-equality short-circuit followed by YIQ color-space diffing with anti-aliasing detection.
-2. **8-Connected Component Diff Clustering (\`extractDiffClusters\`)**: Separable box dilation + Union-Find connected-component labeling groups changed pixels into discrete \`DiffCluster[]\` bounding boxes (\`{ id, bbox, rawDiffPixels, density, perimeterRatio }\`).
+2. **8-Connected Component Diff Clustering (\`extractDiffClusters\`) & Spatial DOM Attribution (\`attributeClustersToDom\`)**: Separable box dilation + Union-Find connected-component labeling groups changed pixels into discrete \`DiffCluster[]\` bounding boxes (\`{ id, bbox, rawDiffPixels, density, perimeterRatio, targetSelector, affectedElements }\`), attributing each cluster to the deepest intersecting DOM element selector.
 3. **Region-Scoped Perceptual Similarity (\`computeRegionSimilarity\`)**:
    - \`chromaSSIM\`: ITU-R BT.709 YCbCr weighted SSIM (\`0.8*Y + 0.1*Cb + 0.1*Cr\`) evaluated strictly inside each cluster's bounding box, preventing background whitespace dilution and catching isoluminant color regressions.
    - \`cwSSIM\`: Complex Wavelet / Quadrature Gabor Phase SSIM across 4 orientations, invariant to 1–3px subpixel font-hinting shifts across OS renderers while dropping sharply on genuine layout breaks.
@@ -82,7 +83,7 @@ export default defineConfig({
   \`\`\`bash
   npx @frontguard/cli update-baselines
   \`\`\`
-- Baselines are committed in a single batched worktree transaction to the \`frontguard-baselines\` Git orphan branch alongside \`manifest.json\` (which records SHA-256 digests for every route × viewport × browser PNG). Your working tree stays 100% free of binary PNG clutter.`,
+- Baselines are committed in a single batched worktree transaction to the \`frontguard-baselines\` Git orphan branch alongside \`manifest.json\` (which records SHA-256 digests and \`snapshots\` per viewport/browser). Byte-identical PNG blobs are skipped during writes to deduplicate Git object storage, and your working tree stays 100% free of binary PNG clutter.`,
   },
   {
     id: 'mcp',

@@ -9,12 +9,15 @@
 
 import type {
   DiffResult,
+  DiffCluster,
   AIAnalysis,
   AIConfig,
+  AIProvider,
   ChangeClassification,
   Severity,
   AccessibilityViolation,
 } from '../core/types.js';
+import { DEFAULT_AI_MODELS } from '../core/config.js';
 import { retry } from '../utils/retry.js';
 import { logger } from '../utils/logger.js';
 import { PNG } from 'pngjs';
@@ -47,6 +50,22 @@ export function buildAccessibilityContext(violations: AccessibilityViolation[]):
     `Known accessibility issues on this page (axe-core): ${summary.join(', ')}. ` +
     `If the visual change relates to any of these, note the connection in your explanation.`
   );
+}
+
+/**
+ * Builds a concise DOM cluster attribution summary for the AI vision prompt
+ * when diff clusters have been mapped to DOM selectors.
+ */
+export function buildDomClusterContext(clusters?: DiffCluster[]): string {
+  if (!clusters || clusters.length === 0) return '';
+  const attributed = clusters.filter((c) => c.targetSelector);
+  if (attributed.length === 0) return '';
+  const lines = attributed.slice(0, 5).map((c, idx) => {
+    const top = c.affectedElements?.[0];
+    const textHint = top?.textPreview ? ` (text: "${top.textPreview.slice(0, 40)}")` : '';
+    return `Cluster #${idx + 1} (${c.bbox.x},${c.bbox.y} ${c.bbox.width}x${c.bbox.height}, ${c.rawDiffPixels}px): ${c.targetSelector}${textHint}`;
+  });
+  return `Spatial DOM-Cluster Attribution:\n${lines.join('\n')}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +191,7 @@ export async function analyzeWithAI(
   context?: AnalyzeContext,
 ): Promise<AIAnalysis> {
   const apiKey = getApiKey(config.provider);
+  const model = config.model ?? DEFAULT_AI_MODELS[config.provider];
 
   if (!diff.baselineImage || !diff.currentImage) {
     throw new AIAnalysisError(
@@ -194,6 +214,10 @@ export async function analyzeWithAI(
     `Pixel diff: ${diff.diffPercentage.toFixed(2)}% of pixels changed`,
   ];
   if (diff.status) contextLines.push(`Status: ${diff.status}`);
+  const domClusterContext = buildDomClusterContext(diff.clusters);
+  if (domClusterContext) {
+    contextLines.push(wrapUntrusted('DOM Cluster Attribution (untrusted)', domClusterContext));
+  }
   // Fuse accessibility findings so the model can correlate a visual change with
   // a known a11y issue on the same page. Those findings are crawled-page data.
   if (context?.accessibility && context.accessibility.length > 0) {
@@ -202,12 +226,44 @@ export async function analyzeWithAI(
   }
   const contextText = contextLines.join('\n');
 
-  logger.debug(`Analyzing ${diff.route.path} @ ${diff.viewport}px with ${config.provider}/${config.model}`);
+  logger.debug(`Analyzing ${diff.route.path} @ ${diff.viewport}px with ${config.provider}/${model}`);
 
   const rawResponse = await retry(
-    () => config.provider === 'openai'
-      ? callOpenAI(apiKey, config.model, baselineB64, currentB64, diffB64, contextText)
-      : callAnthropic(apiKey, config.model, baselineB64, currentB64, diffB64, contextText),
+    () => {
+      if (config.provider === 'openai') {
+        return callOpenAI(
+          apiKey,
+          model,
+          baselineB64,
+          currentB64,
+          diffB64,
+          contextText,
+          SYSTEM_PROMPT,
+          config.baseUrl,
+        );
+      }
+      if (config.provider === 'gemini') {
+        const images: Array<{ data: string; label: string }> = [
+          { data: baselineB64, label: 'baseline' },
+          { data: currentB64, label: 'current' },
+        ];
+        if (diffB64) images.push({ data: diffB64, label: 'diff' });
+        const userText = contextText
+          ? `Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.\n\nContext:\n${contextText}`
+          : 'Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.';
+        return callGemini(apiKey, model, images, userText, config.baseUrl, SYSTEM_PROMPT);
+      }
+      return callAnthropic(
+        apiKey,
+        model,
+        baselineB64,
+        currentB64,
+        diffB64,
+        contextText,
+        SYSTEM_PROMPT,
+        config.baseUrl,
+      );
+    },
     {
       retries: 3,
       backoff: 2000,
@@ -227,17 +283,30 @@ export async function analyzeWithAI(
   return parseAIResponse(rawResponse, config.provider);
 }
 
+export const analyzePair = analyzeWithAI;
+
 // ---------------------------------------------------------------------------
 // API Key Resolution
 // ---------------------------------------------------------------------------
 
-export function getApiKey(provider: 'openai' | 'anthropic'): string {
-  const envVar = provider === 'openai' ? 'FRONTGUARD_OPENAI_KEY' : 'FRONTGUARD_ANTHROPIC_KEY';
-  const key = process.env[envVar];
+export function getApiKey(provider: AIProvider): string {
+  const primaryEnvVar =
+    provider === 'openai'
+      ? 'FRONTGUARD_OPENAI_KEY'
+      : provider === 'gemini'
+        ? 'FRONTGUARD_GEMINI_KEY'
+        : 'FRONTGUARD_ANTHROPIC_KEY';
+  const fallbackEnvVar =
+    provider === 'openai'
+      ? 'OPENAI_API_KEY'
+      : provider === 'gemini'
+        ? 'GEMINI_API_KEY'
+        : 'ANTHROPIC_API_KEY';
+  const key = process.env[primaryEnvVar] || process.env[fallbackEnvVar];
 
   if (!key || key.trim() === '') {
     throw new AIAnalysisError(
-      `No API key found. Set the ${envVar} environment variable to enable AI analysis with ${provider}.`,
+      `No API key found. Set the ${primaryEnvVar} environment variable to enable AI analysis with ${provider}.`,
       undefined,
       provider,
     );
@@ -258,6 +327,7 @@ export async function callOpenAI(
   diffB64?: string,
   contextText?: string,
   systemPrompt: string = SYSTEM_PROMPT,
+  baseUrl?: string,
 ): Promise<string> {
   const imageMessages: Array<{type: 'image_url'; image_url: {url: string; detail: string}}> = [
     {
@@ -296,11 +366,18 @@ export async function callOpenAI(
     ],
   };
 
+  const rawBase = baseUrl || process.env.FRONTGUARD_OPENAI_BASE_URL;
+  const endpoint = rawBase
+    ? rawBase.replace(/\/+$/, '').endsWith('/chat/completions')
+      ? rawBase.replace(/\/+$/, '')
+      : `${rawBase.replace(/\/+$/, '')}/chat/completions`
+    : 'https://api.openai.com/v1/chat/completions';
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -369,6 +446,7 @@ export async function callAnthropic(
   diffB64?: string,
   contextText?: string,
   systemPrompt: string = SYSTEM_PROMPT,
+  baseUrl?: string,
 ): Promise<string> {
   const imageBlocks: Array<{type: 'image'; source: {type: 'base64'; media_type: string; data: string}}> = [
     {
@@ -407,11 +485,18 @@ export async function callAnthropic(
     ],
   };
 
+  const rawBase = baseUrl || process.env.FRONTGUARD_ANTHROPIC_BASE_URL;
+  const endpoint = rawBase
+    ? rawBase.replace(/\/+$/, '').endsWith('/messages')
+      ? rawBase.replace(/\/+$/, '')
+      : `${rawBase.replace(/\/+$/, '')}/messages`
+    : 'https://api.anthropic.com/v1/messages';
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -463,6 +548,117 @@ export async function callAnthropic(
       `Anthropic request failed: ${err instanceof Error ? err.message : String(err)}`,
       undefined,
       'anthropic',
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Google Gemini Vision API
+// ---------------------------------------------------------------------------
+
+export async function callGemini(
+  apiKey: string,
+  model: string,
+  images: Array<{ data: string; label?: string }>,
+  prompt: string,
+  baseUrl?: string,
+  systemPrompt: string = SYSTEM_PROMPT,
+): Promise<string> {
+  const cleanModel = model.replace(/^models\//, '');
+  const base = (
+    baseUrl ||
+    process.env.FRONTGUARD_GEMINI_BASE_URL ||
+    'https://generativelanguage.googleapis.com/v1beta/models'
+  ).replace(/\/+$/, '');
+  const endpoint = `${base}/${encodeURIComponent(cleanModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const parts: Array<
+    | { inlineData: { mimeType: 'image/png'; data: string } }
+    | { text: string }
+  > = [
+    ...images.map((img) => ({
+      inlineData: {
+        mimeType: 'image/png' as const,
+        data: img.data,
+      },
+    })),
+    {
+      text: systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt,
+    },
+  ];
+
+  const body = {
+    contents: [
+      {
+        role: 'user',
+        parts,
+      },
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: 'application/json',
+    },
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      handleHTTPError(response.status, errorBody, 'gemini', cleanModel);
+    }
+
+    const data = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      error?: { message?: string };
+    };
+
+    if (data.error) {
+      throw new AIAnalysisError(
+        `Gemini API error: ${data.error.message ?? 'Unknown error'}`,
+        undefined,
+        'gemini',
+      );
+    }
+
+    const text = data.candidates?.[0]?.content?.parts
+      ?.map((p) => p.text ?? '')
+      .join('')
+      .trim();
+    if (!text) {
+      throw new AIAnalysisError(
+        'Gemini returned an empty response — no text in candidates[0].content.parts',
+        undefined,
+        'gemini',
+      );
+    }
+
+    return text;
+  } catch (err) {
+    if (err instanceof AIAnalysisError) throw err;
+    if ((err as Error).name === 'AbortError') {
+      throw new AIAnalysisError(
+        `Gemini request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`,
+        408,
+        'gemini',
+      );
+    }
+    throw new AIAnalysisError(
+      `Gemini request failed: ${err instanceof Error ? err.message : String(err)}`,
+      undefined,
+      'gemini',
     );
   } finally {
     clearTimeout(timeout);
@@ -566,13 +762,17 @@ function handleHTTPError(
   model: string,
 ): never {
   let message: string;
+  const envVar =
+    provider === 'openai'
+      ? 'FRONTGUARD_OPENAI_KEY'
+      : provider === 'gemini'
+        ? 'FRONTGUARD_GEMINI_KEY'
+        : 'FRONTGUARD_ANTHROPIC_KEY';
 
   switch (status) {
     case 401:
     case 403:
-      message = `Authentication failed for ${provider}. Check your ${
-        provider === 'openai' ? 'FRONTGUARD_OPENAI_KEY' : 'FRONTGUARD_ANTHROPIC_KEY'
-      } environment variable — the API key may be invalid or expired.`;
+      message = `Authentication failed for ${provider}. Check your ${envVar} environment variable — the API key may be invalid or expired.`;
       break;
     case 404:
       message = `Model "${model}" not found on ${provider}. Check the model name in your Frontguard config.`;

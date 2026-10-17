@@ -244,7 +244,7 @@ describe('GET /v1/usage', () => {
     expect(body.period).toBe('current_month');
     expect(body.limits).toBeDefined();
     expect(body.limits.runs).toBe(500);
-    expect(body.limits.screenshots).toBe(5000);
+    expect(body.limits.screenshots).toBe(35000);
   });
 });
 

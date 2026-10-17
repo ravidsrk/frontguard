@@ -9,6 +9,7 @@
  */
 
 import type { Reporter, PipelineStage, RunResult, DiffResult, DiffCluster } from '../core/types.js';
+import { DEFAULT_AI_MODELS } from '../core/config.js';
 
 // ---------------------------------------------------------------------------
 // JSON Reporter
@@ -126,7 +127,12 @@ function serializeRunResult(result: RunResult): SerializedRunResult {
       browsers: [...result.config.browsers],
       threshold: result.config.threshold,
       outputDir: result.config.outputDir,
-      ai: result.config.ai ? { provider: result.config.ai.provider, model: result.config.ai.model } : undefined,
+      ai: result.config.ai
+        ? {
+            provider: result.config.ai.provider,
+            model: result.config.ai.model ?? DEFAULT_AI_MODELS[result.config.ai.provider],
+          }
+        : undefined,
     },
   };
 }

@@ -80,7 +80,7 @@ $ npx -p @frontguard/cli frontguard run`)}${h2('Baseline contract')}${p('Ordinar
     'Installation',
     'Getting started',
     ['CLI', 'Playwright package', 'Prerequisites'],
-    `${localCliNotice}${p('Use Node.js 20 or newer. Install the package that matches the workflow you intend to run.')}${code('terminal', `$ npm install -D @frontguard/cli
+    `${localCliNotice}${p('Use Node.js 22 or newer. Install the package that matches the workflow you intend to run.')}${code('terminal', `$ npm install -D @frontguard/cli
 $ npm install -D @frontguard/playwright
 $ npx -p @frontguard/cli frontguard doctor`)}${p('The CLI and Playwright package use different baseline stores and acceptance behavior; do not treat them as interchangeable.')}`,
   ),
@@ -106,12 +106,12 @@ $ npx -p @frontguard/cli frontguard run`)}${p('Exit code 0 means comparisons pas
     'CLI Commands',
     'Reference',
     ['Commands', 'Threshold units', 'Exit codes', 'Monitoring'],
-    `${h2('Commands')}${p('The supported command surface includes run, init, update-baselines, doctor, guide, monitor, fix-pattern commands, and plugin subcommands.')}${code('terminal', `$ frontguard run --url http://localhost:3000 --threshold 0.01 --wait-for-stability --redact-sensitive --color-scheme dark
+    `${h2('Commands')}${p('The supported command surface includes run, init, update-baselines, doctor, guide, monitor, fix-pattern commands, and plugin subcommands.')}${code('terminal', `$ frontguard run --url http://localhost:3000 --threshold 0.01 --wait-for-stability --redact-sensitive --color-scheme dark --freeze-time [timestamp] --seed-random [seed] --block-urls &lt;patterns...&gt;
 $ frontguard update-baselines --url http://localhost:3000
 $ frontguard doctor
 $ frontguard guide [topic] --json
 $ frontguard monitor --url https://example.com --threshold 0.05
-$ frontguard monitor --history`)}${p('Use frontguard guide [topic] (topics: setup, diffing, mcp, playwright, ci) with --json for offline CLI and coding-agent reference output. Capture flags include --wait-for-stability for multi-frame render convergence, --redact-sensitive to mask sensitive inputs and scrub DOM snapshots before capture, and --color-scheme &lt;scheme&gt; (light or dark) to emulate prefers-color-scheme.')}${h2('Threshold units')}${p('Changed-pixel ratio (0-1; 0.01 = 1%). Legacy values over 1 are deprecated. The monitor alert threshold uses the same ratio convention: 0.05 = 5%.')}${h2('Exit codes')}${list(['0: comparisons passed or produced warnings only.', '1: regressions or unaccepted new screenshots.', '2: no comparisons or any tool error; errors take precedence over regressions.'])}${h2('Monitoring')}${p('The local monitor command records run history under .frontguard/monitor-history by default. Webhook delivery is best-effort; no managed cloud scheduler is generally available.')}`,
+$ frontguard monitor --history`)}${p('Use frontguard guide [topic] (topics: setup, diffing, mcp, playwright, ci) with --json for offline CLI and coding-agent reference output. Capture and anti-flake flags include --wait-for-stability for multi-frame render convergence, --redact-sensitive to mask sensitive inputs and scrub DOM snapshots before capture, --color-scheme &lt;scheme&gt; (light or dark) to emulate prefers-color-scheme, --freeze-time [timestamp] (epoch ms or ISO 8601 date string), --seed-random [seed] for deterministic Math.random() seeding, and --block-urls &lt;patterns...&gt; to abort third-party analytics or ad requests.')}${h2('Threshold units')}${p('Changed-pixel ratio (0-1; 0.01 = 1%). Legacy values over 1 are deprecated. The monitor alert threshold uses the same ratio convention: 0.05 = 5%.')}${h2('Exit codes')}${list(['0: comparisons passed or produced warnings only.', '1: regressions or unaccepted new screenshots.', '2: no comparisons or any tool error; errors take precedence over regressions.'])}${h2('Monitoring')}${p('The local monitor command records run history under .frontguard/monitor-history by default. Webhook delivery is best-effort; no managed cloud scheduler is generally available.')}`,
   ),
   makeArticle(
     'cli/configuration',
@@ -136,14 +136,23 @@ $ frontguard monitor --history`)}${p('Use frontguard guide [topic] (topics: setu
   colorScheme: 'dark',
   waitForStability: true,
   redactSensitive: true,
+  freezeTime: '2026-01-01T00:00:00Z',
+  seedRandom: 42,
+  blockUrls: ['*google-analytics.com*', '*intercom.io*'],
   threshold: 0.01,
+  ai: {
+    provider: 'gemini',
+    model: 'gemini-2.5-flash',
+    // Or provider: 'openai' ('gpt-4.1-mini', 'gpt-4o') with optional baseUrl for OpenRouter / Ollama / vLLM,
+    // or provider: 'anthropic' ('claude-sonnet-4-20250514')
+  },
   ignore: [],
   smartRender: true,
   workers: 4,
   pageTimeout: 30000,
   maxHeight: 5000,
   outputDir: '.frontguard/results',
-}`)}${h2('Optional controls')}${p('Optional controls include colorScheme (light or dark), waitForStability for multi-frame layout convergence, redactSensitive for masking password/email/token fields and scrubbing DOM snapshots, per-route actions (click, hover, fill, press, waitForSelector, wait), masks, region-scoped Chroma-SSIM (YCbCr) and CW-SSIM cluster similarity, time freezing, configurable multi-render consensus, telemetry opt-in, and BYOK analysis. Verify an option against the installed package version before adding it.')}`,
+}`)}${h2('Optional controls')}${p('Optional controls include colorScheme (light or dark), waitForStability for multi-frame layout convergence, redactSensitive for masking password/email/token fields and scrubbing DOM snapshots, freezeTime (boolean, epoch ms number, or ISO 8601 date string), seedRandom (boolean or numeric PRNG seed), blockUrls (URL glob or substring patterns to abort before rendering), per-route actions (click, hover, fill, press, waitForSelector, wait), masks, region-scoped Chroma-SSIM (YCbCr) and CW-SSIM cluster similarity with spatial cluster.targetSelector DOM attribution, configurable multi-render consensus, telemetry opt-in, and multi-provider BYOK analysis (openai, anthropic, gemini, or custom baseUrl / FRONTGUARD_OPENAI_BASE_URL). Verify an option against the installed package version before adding it.')}`,
   ),
   makeArticle(
     'playwright/index',
@@ -175,7 +184,7 @@ test('home', async ({ page }) =&gt; {
   page: Page,
   name: string,
   options?: VisualTestOptions,
-): Promise&lt;VisualTestResult&gt;`)}${h2('Options')}${p('Options include threshold, selector (component-scoped locator capture), fullPage, mask, maskRegions, redactSensitive, waitForStable, optional AI, freezeTime, baselineDir, and update. Threshold is the fraction of pixels that may differ (0-1).')}${h2('Result')}${p('The result includes passed, diffPercentage, paths, settled (frame convergence metadata from waitForStable), optional AI output, SSIM, and isNewBaseline. Compare the returned result in your test; the function does not call a Playwright assertion for you.')}`,
+): Promise&lt;VisualTestResult&gt;`)}${h2('Options')}${p('Options include threshold, selector (component-scoped locator capture), fullPage, mask, maskRegions, redactSensitive, waitForStable, freezeTime (boolean, epoch ms number, or ISO 8601 date string), seedRandom (boolean or numeric PRNG seed), blockUrls (URL patterns to block during capture), captureAriaSnapshot (captures Playwright ARIA tree snapshot), optional AI (openai, anthropic, gemini, or custom baseUrl), baselineDir, and update. Threshold is the fraction of pixels that may differ (0-1).')}${h2('Result')}${p('The result includes passed, diffPercentage, paths, settled (frame convergence metadata from waitForStable), result.clusters (connected-component spatial diff clusters with bbox, pixelCount, and targetSelector DOM attribution), result.ariaSnapshot (when captureAriaSnapshot is enabled), optional AI output, SSIM, and isNewBaseline. Compare the returned result in your test; the function does not call a Playwright assertion for you.')}`,
   ),
   makeArticle(
     'ci-cd/index',
@@ -196,7 +205,14 @@ test('home', async ({ page }) =&gt; {
     'AI Analysis',
     'Guides',
     ['Scope', 'Providers', 'Evidence limits'],
-    `${note('OPTIONAL BYOK.', 'Model-assisted analysis is not required for local pixel comparison. Screenshot evidence is sent directly to the provider account you configure.')}${p('Changed screenshots can be classified as regression, intentional, or content_update with a confidence score and explanation. AI analysis runs on every diff above threshold to explain visual changes, classify severity, and suggest candidate CSS fixes. AI annotations are advisory and never silently override pass/fail exit codes.')}${p('Frontguard has not published a model precision/recall benchmark. The current validation run had AI disabled, so it cannot support an accuracy claim.')}`,
+    `${note('OPTIONAL BYOK.', 'Model-assisted analysis is not required for local pixel comparison. Screenshot evidence is sent directly to the provider account you configure.')}${p('Changed screenshots can be classified as regression, intentional, or content_update with a confidence score and explanation. AI analysis runs on every diff above threshold to explain visual changes, classify severity, and suggest candidate CSS fixes. AI annotations are advisory and never silently override pass/fail exit codes.')}${h2('Providers')}${p("Supported providers include OpenAI (provider: 'openai', models such as 'gpt-4.1-mini' or 'gpt-4o', env FRONTGUARD_OPENAI_KEY), Anthropic (provider: 'anthropic', model 'claude-sonnet-4-20250514', env FRONTGUARD_ANTHROPIC_KEY), Google Gemini (provider: 'gemini', model 'gemini-2.5-flash', env FRONTGUARD_GEMINI_KEY), and OpenAI-compatible custom endpoints via baseUrl or FRONTGUARD_OPENAI_BASE_URL for OpenRouter, Ollama, and vLLM.")}${code('frontguard.config.ts', `export default {
+  ai: {
+    provider: 'gemini',
+    model: 'gemini-2.5-flash',
+    // Or provider: 'openai', model: 'gpt-4.1-mini' | 'gpt-4o', baseUrl: 'https://openrouter.ai/api/v1'
+    // Or provider: 'anthropic', model: 'claude-sonnet-4-20250514'
+  },
+}`)}${p('Frontguard has not published a model precision/recall benchmark. The current validation run had AI disabled, so it cannot support an accuracy claim.')}`,
   ),
   makeArticle(
     'guides/ai-fixes',

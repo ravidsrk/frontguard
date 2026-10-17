@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { describe, expect, it } from 'vitest'
 import { compileErrors, validate } from '@readme/openapi-parser'
 import type { OpenAPIV3_1 } from 'openapi-types'
 
@@ -25,11 +26,14 @@ type OpenApiDocument = OpenAPIV3_1.Document & {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const OPENAPI_PATH = path.resolve(__dirname, '../../public/openapi.json')
+const CLOUD_OPENAPI_PATH = path.resolve(__dirname, '../../../../packages/cloud-api/src/openapi.json')
 const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'])
 
 const EXPECTED_PATHS = [
   '/health',
   '/v1/baselines/{runId}/approve',
+  '/v1/cas/blobs/{sha256}',
+  '/v1/cas/check',
   '/v1/dashboard',
   '/v1/monitors',
   '/v1/monitors/{id}',
@@ -62,6 +66,8 @@ const EXPECTED_PATHS = [
 const EXPECTED_METHODS: Record<string, string[]> = {
   '/health': ['get'],
   '/v1/baselines/{runId}/approve': ['post'],
+  '/v1/cas/blobs/{sha256}': ['get', 'put'],
+  '/v1/cas/check': ['post'],
   '/v1/dashboard': ['get'],
   '/v1/monitors': ['get', 'post'],
   '/v1/monitors/{id}': ['delete', 'get', 'patch'],
@@ -108,6 +114,12 @@ describe('public OpenAPI contract', () => {
       throw new Error(compileErrors(result))
     }
     expect(result.specification).toBe('OpenAPI')
+  })
+
+  it('stays byte-identical between apps/web/public/openapi.json and packages/cloud-api/src/openapi.json', () => {
+    const webSpec = fs.readFileSync(OPENAPI_PATH, 'utf8')
+    const cloudSpec = fs.readFileSync(CLOUD_OPENAPI_PATH, 'utf8')
+    expect(cloudSpec).toBe(webSpec)
   })
 
   it('declares bearerAuth and applies it to every /v1 operation only', () => {

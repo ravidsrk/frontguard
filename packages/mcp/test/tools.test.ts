@@ -424,6 +424,56 @@ describe('inspect_diff_cluster_dom', () => {
       }),
     ).rejects.toThrow(/Cluster #99 not found/);
   });
+
+  it('preserves per-cluster targetSelector from report JSON before falling back to suggestedFix.target', async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'fg-mcp-clusters-'));
+    const reportPath = join(tmpDir, 'report.json');
+    writeFileSync(
+      reportPath,
+      JSON.stringify({
+        id: 'run_local',
+        results: [
+          {
+            route: '/pricing',
+            viewport: 1280,
+            status: 'regression',
+            diffPercentage: 0.04,
+            classification: 'regression',
+            suggestedFix: {
+              fixType: 'css',
+              category: 'layout-fix',
+              patch: '.pricing-section { gap: 16px; }',
+              confidence: 0.88,
+              explanation: 'Section layout shifted',
+              target: '.pricing-section',
+            },
+            clusters: [
+              {
+                id: 1,
+                bbox: { x: 10, y: 20, width: 100, height: 40 },
+                targetSelector: '[data-testid="pro-badge"]',
+              },
+              {
+                id: 2,
+                bbox: { x: 200, y: 80, width: 140, height: 50 },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    try {
+      const localClient = createLocalReportClient(reportPath);
+      const out = await inspectDiffClusterDom(localClient, {
+        diff_id: 'run_local:/pricing:1280',
+      });
+      expect(out.clusters).toHaveLength(2);
+      expect(out.clusters[0].targetSelector).toBe('[data-testid="pro-badge"]');
+      expect(out.clusters[1].targetSelector).toBe('.pricing-section');
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('verify_css_patch', () => {

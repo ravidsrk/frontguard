@@ -141,11 +141,11 @@ const faqs = [
   },
   {
     q: 'What environment variables does Frontguard read?',
-    a: 'For AI: FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY. The Playwright plugin also accepts unprefixed OPENAI_API_KEY / ANTHROPIC_API_KEY when present. MCP and cloud-development tools require an explicit FRONTGUARD_API_URL and FRONTGUARD_API_KEY; there is no live hosted default. frontguard doctor reads the same AI names as the runtime.',
+    a: 'For AI: FRONTGUARD_OPENAI_KEY, FRONTGUARD_ANTHROPIC_KEY, or FRONTGUARD_GEMINI_KEY (plus FRONTGUARD_OPENAI_BASE_URL for custom OpenAI-compatible endpoints). The Playwright plugin also accepts unprefixed OPENAI_API_KEY / ANTHROPIC_API_KEY / GEMINI_API_KEY when present. MCP and cloud-development tools support local report mode via FRONTGUARD_LOCAL_REPORT or require an explicit FRONTGUARD_API_URL and FRONTGUARD_API_KEY; there is no live hosted default. frontguard doctor reads the same AI names as the runtime.',
   },
   {
     q: 'OpenAI or Anthropic — which should I use?',
-    a: 'Choose the provider and model explicitly in frontguard.config.ts. When AI is enabled, Frontguard sends screenshot evidence, basic route metadata, and optional accessibility findings directly to that provider; it does not send a DOM snapshot or console log.',
+    a: 'Choose the provider and model explicitly in frontguard.config.ts — OpenAI (gpt-4.1-mini, gpt-4o), Anthropic (claude-sonnet-4-20250514), Google Gemini (gemini-2.5-flash / gemini-2.5-pro), and custom OpenAI-compatible baseUrl endpoints (OpenRouter, Ollama, vLLM) are all supported. When AI is enabled, Frontguard sends screenshot evidence, basic route metadata, and optional accessibility findings directly to that provider; it does not send a DOM snapshot or console log.',
   },
   {
     q: 'Does Frontguard work with Storybook?',

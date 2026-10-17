@@ -110,16 +110,18 @@ export function ArchitecturalPillars() {
               )}
             >
               Traditional visual tools report raw pixel counts. When you
-              configure an OpenAI or Anthropic key, Frontguard crops around each
-              connected-component diff cluster and asks your model to classify
-              severity, explain the visual shift, and optionally verify a
-              candidate CSS patch in a Playwright sandbox.
+              configure an OpenAI, Anthropic, or Google Gemini key (or a custom
+              OpenAI-compatible baseUrl), Frontguard crops around each
+              connected-component diff cluster with spatial targetSelector DOM
+              attribution and asks your model to classify severity, explain the
+              visual shift, and optionally verify a candidate CSS patch in a
+              Playwright sandbox.
             </p>
             <div style={s("display: grid; gap: 10px;")}>
               {[
                 [
                   "Pixel diff + cluster SSIM",
-                  "Runs locally on every screenshot before any model call",
+                  "Runs locally on every screenshot with targetSelector DOM attribution",
                 ],
                 [
                   "Advisory AI classification",
@@ -186,6 +188,7 @@ export function ArchitecturalPillars() {
     {
       "id": 1,
       "bbox": { "x": 48, "y": 224, "width": 148, "height": 164 },
+      "targetSelector": "aside .sidebar-cta",
       "chromaSSIM": 0.614,
       "cwSSIM": 0.589
     }
@@ -210,7 +213,7 @@ export function ArchitecturalPillars() {
                 ),
               }}
             >
-              <span>BYOK provider: direct to OpenAI / Anthropic</span>
+              <span>BYOK: OpenAI · Anthropic · Gemini · custom baseUrl</span>
               <span style={s("color: #e8862e;")}>
                 Baselines never auto-overwritten
               </span>
