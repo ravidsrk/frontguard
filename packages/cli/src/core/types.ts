@@ -9,8 +9,9 @@
 
 import type { FrontguardPlugin } from './plugins.js';
 import type { BoundingBox, DiffCluster } from '../diff/regions.js';
+import type { DOMElementBox, ClusteredDOMElement } from '../render/dom-elements.js';
 
-export type { BoundingBox, DiffCluster };
+export type { BoundingBox, DiffCluster, DOMElementBox, ClusteredDOMElement };
 
 // ---------------------------------------------------------------------------
 // Scalar Types
@@ -156,18 +157,23 @@ export interface DiscoverOptions {
   exclude: string[];
 }
 
+/** Supported AI vision providers. */
+export type AIProvider = 'openai' | 'anthropic' | 'gemini';
+
 /**
  * AI provider configuration (Bring Your Own Key).
  *
  * API keys should be supplied via environment variables
- * (`FRONTGUARD_OPENAI_KEY` / `FRONTGUARD_ANTHROPIC_KEY`), **not**
- * hard-coded in the config file.
+ * (`FRONTGUARD_OPENAI_KEY` / `FRONTGUARD_ANTHROPIC_KEY` / `FRONTGUARD_GEMINI_KEY`),
+ * **not** hard-coded in the config file.
  */
 export interface AIConfig {
   /** AI provider to use for diff analysis. */
-  provider: 'openai' | 'anthropic';
-  /** Model identifier (e.g. `'gpt-4o'`, `'claude-sonnet-4-20250514'`). */
-  model: string;
+  provider: AIProvider;
+  /** Model identifier (e.g. `'gpt-4.1-mini'`, `'claude-sonnet-4-20250514'`, `'gemini-2.5-flash'`). */
+  model?: string;
+  /** Optional custom API base URL (e.g. OpenRouter, LiteLLM, vLLM, or custom Gemini proxy). */
+  baseUrl?: string;
 }
 
 /**
@@ -258,6 +264,12 @@ export interface RouteConfig {
   colorScheme?: ColorScheme;
   /** Optional declarative pre-capture interaction steps (click, hover, fill, press, waitForSelector, wait). */
   actions?: RouteAction[];
+  /** Per-route Date/clock freeze override (`true`, unix timestamp ms, or ISO-8601 date string). */
+  freezeTime?: boolean | number | string;
+  /** Per-route deterministic PRNG seed override (`true` defaults to seed 42, or an explicit numeric seed). */
+  seedRandom?: boolean | number;
+  /** Per-route URL substring or wildcard patterns (`*`) to abort before capture. */
+  blockUrls?: string[];
 }
 
 /**
@@ -322,8 +334,12 @@ export interface FrontguardConfig {
   ssimThreshold?: number;
   /** Number of renders per page for anti-flake (default: 1, recommended: 2-3) */
   antiFlakeRenders?: number;
-  /** Freeze Date.now() and new Date() to a fixed timestamp during render */
-  freezeTime?: boolean | number;
+  /** Freeze Date.now(), new Date(), and page.clock to a fixed timestamp (`true`, ms, or ISO date string) during render */
+  freezeTime?: boolean | number | string;
+  /** Seed Math.random() with a deterministic Mulberry32 PRNG (`true` -> 42, or numeric seed) during render */
+  seedRandom?: boolean | number;
+  /** URL substrings or wildcard patterns (`*`) to block via context.route before capture */
+  blockUrls?: string[];
   /** Per-page render retry count on failure (default: 0) */
   renderRetries?: number;
   /** Screenshot image-upload configuration (for PR comment thumbnails). */
@@ -435,6 +451,12 @@ export interface Route {
   colorScheme?: ColorScheme;
   /** Optional declarative pre-capture interaction steps. */
   actions?: RouteAction[];
+  /** Per-route Date/clock freeze override (`true`, unix timestamp ms, or ISO-8601 date string). */
+  freezeTime?: boolean | number | string;
+  /** Per-route deterministic PRNG seed override (`true` defaults to seed 42, or an explicit numeric seed). */
+  seedRandom?: boolean | number;
+  /** Per-route URL substring or wildcard patterns (`*`) to abort before capture. */
+  blockUrls?: string[];
 }
 
 /**
@@ -469,6 +491,10 @@ export interface ScreenshotResult {
     unstableRatio: number;
     motionClusters?: DiffCluster[];
   };
+  /** Visible DOM element bounding boxes and computed styles extracted from the page. */
+  domElements?: DOMElementBox[];
+  /** Number of network requests aborted via `blockUrls` rules during capture. */
+  blockedRequestsCount?: number;
 }
 
 /** Severity/impact level of an accessibility violation (axe-core scale). */
@@ -571,6 +597,8 @@ export interface DiffResult {
   stability?: ScreenshotResult['stability'];
   /** Number of sensitive DOM elements redacted prior to capture, when `redactSensitive` is enabled. */
   redactedCount?: number;
+  /** Number of network requests aborted via `blockUrls` rules during capture. */
+  blockedRequestsCount?: number;
 }
 
 /**
@@ -797,6 +825,10 @@ export interface BaselineManifest {
   createdBy: string;
   /** ISO-8601 timestamp of the last manifest update. */
   updatedAt: string;
+  /** Source commit SHA when baselines were captured. */
+  sourceCommitSha?: string;
+  /** Source branch name when baselines were captured. */
+  sourceBranch?: string;
   /** Route-keyed map of baseline metadata. */
   routes: Record<string, BaselineRouteInfo>;
 }
@@ -813,6 +845,8 @@ export interface BaselineRouteInfo {
   lastUpdated: string;
   /** Content-addressable SHA-256 hex digest of the latest baseline PNG buffer. */
   sha256?: string;
+  /** Per-combination (`<viewport>/<browser>`) SHA-256 and timestamp map. */
+  snapshots?: Record<string, { sha256: string; updatedAt: string }>;
 }
 
 /** Alias for a single entry in the baseline manifest's `routes` map. */

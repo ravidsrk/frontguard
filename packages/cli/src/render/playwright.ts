@@ -31,6 +31,52 @@ import {
   redactSensitiveDomHtml,
   resolveRedactSelectors,
 } from './redaction.js';
+import { extractDomElementBoxes } from './dom-elements.js';
+
+// ---------------------------------------------------------------------------
+// Deterministic rendering helpers (clock freeze & network request blocking)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve `freezeTime` config (`true`, epoch ms number, or ISO 8601 string)
+ * to a numeric epoch millisecond timestamp, or `null` when disabled.
+ */
+export function resolveFreezeTimestamp(
+  freezeTime: boolean | number | string | undefined,
+): number | null {
+  if (freezeTime === undefined || freezeTime === false) return null;
+  if (freezeTime === true) return 1704067200000; // 2024-01-01T00:00:00.000Z
+  if (typeof freezeTime === 'number') return freezeTime;
+  if (typeof freezeTime === 'string') {
+    const parsed = Date.parse(freezeTime);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+/**
+ * Check whether a request URL matches any configured `blockUrls` pattern.
+ * Supports `*` wildcards as well as case-insensitive substring matching.
+ */
+export function matchesBlockedUrl(url: string, patterns: string[]): boolean {
+  const lowerUrl = url.toLowerCase();
+  for (const rawPattern of patterns) {
+    const pattern = rawPattern.trim();
+    if (!pattern) continue;
+    const lowerPattern = pattern.toLowerCase();
+    if (lowerPattern.includes('*')) {
+      const escaped = lowerPattern
+        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*');
+      if (new RegExp(`^${escaped}$`, 'i').test(url) || new RegExp(escaped, 'i').test(url)) {
+        return true;
+      }
+    } else if (lowerUrl.includes(lowerPattern)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // Browser engine map
@@ -229,6 +275,24 @@ export async function executeTask(
   let page: Page | undefined;
 
   try {
+    // --- Block noisy third-party URLs if configured --------------------------
+    const blockUrls = [...(config.blockUrls ?? []), ...(task.route.blockUrls ?? [])];
+    let blockedRequestsCount = 0;
+    if (
+      blockUrls.length > 0 &&
+      typeof (context as { route?: unknown }).route === 'function'
+    ) {
+      await context.route('**/*', async (route) => {
+        const reqUrl = route.request().url();
+        if (matchesBlockedUrl(reqUrl, blockUrls)) {
+          blockedRequestsCount++;
+          await route.abort('blockedbyclient');
+        } else {
+          await route.continue();
+        }
+      });
+    }
+
     page = await context.newPage();
 
     // --- Collect console errors ------------------------------------------------
@@ -239,17 +303,43 @@ export async function executeTask(
     });
 
     // --- Freeze Date/time if configured (must be before navigation) -----------
-    if (config.freezeTime !== undefined && config.freezeTime !== false) {
-      const timestamp = config.freezeTime === true ? 0 : config.freezeTime;
-      await page.addInitScript(`{
-        const __fg_frozen = ${timestamp};
-        const __fg_OrigDate = Date;
-        Date = class extends __fg_OrigDate {
-          constructor(...args) { if (args.length === 0) return new __fg_OrigDate(__fg_frozen); return new __fg_OrigDate(...args); }
-          static now() { return __fg_frozen; }
-        };
-        Date.prototype = __fg_OrigDate.prototype;
-      }`);
+    const effectiveFreezeTime = task.route.freezeTime ?? config.freezeTime;
+    const frozenTimestamp = resolveFreezeTimestamp(effectiveFreezeTime);
+    if (frozenTimestamp !== null) {
+      const pageWithClock = page as {
+        clock?: { setFixedTime?: (time: number) => Promise<void> };
+      };
+      if (typeof pageWithClock.clock?.setFixedTime === 'function') {
+        await pageWithClock.clock.setFixedTime(frozenTimestamp).catch(() => {});
+      }
+      if (typeof (page as { addInitScript?: unknown }).addInitScript === 'function') {
+        await page.addInitScript(`{
+          const __fg_frozen = ${frozenTimestamp};
+          const __fg_OrigDate = Date;
+          Date = class extends __fg_OrigDate {
+            constructor(...args) { if (args.length === 0) return new __fg_OrigDate(__fg_frozen); return new __fg_OrigDate(...args); }
+            static now() { return __fg_frozen; }
+          };
+          Date.prototype = __fg_OrigDate.prototype;
+        }`);
+      }
+    }
+
+    // --- Seed Math.random if configured (must be before navigation) -----------
+    const effectiveSeedRandom = task.route.seedRandom ?? config.seedRandom;
+    if (effectiveSeedRandom !== undefined && effectiveSeedRandom !== false) {
+      const seedVal = effectiveSeedRandom === true ? 42 : effectiveSeedRandom;
+      if (typeof (page as { addInitScript?: unknown }).addInitScript === 'function') {
+        await page.addInitScript(`{
+          let __fg_seed = (${Number(seedVal)} >>> 0) || 42;
+          Math.random = function() {
+            let t = (__fg_seed += 0x6D2B79F5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }`);
+      }
     }
 
     // --- Navigate --------------------------------------------------------------
@@ -416,6 +506,9 @@ export async function executeTask(
     const domSnapshot =
       redactSelectors.length > 0 ? redactSensitiveDomHtml(rawDomSnapshot) : rawDomSnapshot;
 
+    // --- Extract spatial DOM element bounding boxes for diff attribution ------
+    const domElements = await extractDomElementBoxes(page);
+
     const duration = Date.now() - startTime;
     logger.debug(`Captured ${task.route.path} [${task.browser} ${task.viewport}px] in ${duration}ms`);
 
@@ -430,6 +523,8 @@ export async function executeTask(
       duration,
       ...(redactedCount !== undefined ? { redactedCount } : {}),
       ...(stabilityMetadata !== undefined ? { stability: stabilityMetadata } : {}),
+      ...(domElements.length > 0 ? { domElements } : {}),
+      ...(blockUrls.length > 0 || blockedRequestsCount > 0 ? { blockedRequestsCount } : {}),
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

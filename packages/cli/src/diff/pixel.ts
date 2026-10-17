@@ -21,7 +21,7 @@ import { PNG } from 'pngjs';
 import { compareDiffToThreshold } from './threshold.js';
 import type { ScreenshotResult, DiffResult, DiffCluster } from '../core/types.js';
 import { computeSSIM, computeRegionSimilarity } from './ssim.js';
-import { extractDiffClusters } from './regions.js';
+import { extractDiffClusters, attributeClustersToDom } from './regions.js';
 import { logger } from '../utils/logger.js';
 
 // ---------------------------------------------------------------------------
@@ -87,6 +87,7 @@ export function compareScreenshot(
       comparedAgainstBaseline,
       ...(current.stability ? { stability: current.stability } : {}),
       ...(current.redactedCount !== undefined ? { redactedCount: current.redactedCount } : {}),
+      ...(current.blockedRequestsCount !== undefined ? { blockedRequestsCount: current.blockedRequestsCount } : {}),
     };
   }
 
@@ -186,6 +187,7 @@ export function compareScreenshot(
     comparedAgainstBaseline,
     ...(current.stability ? { stability: current.stability } : {}),
     ...(current.redactedCount !== undefined ? { redactedCount: current.redactedCount } : {}),
+    ...(current.blockedRequestsCount !== undefined ? { blockedRequestsCount: current.blockedRequestsCount } : {}),
   };
 
   if (noteMsg) {
@@ -211,6 +213,7 @@ export function compareScreenshot(
       }
     }
     clusters = extractDiffClusters(diffMask, width, height);
+    attributeClustersToDom(clusters, current.domElements);
     if (ssimEnabled) {
       for (const cluster of clusters) {
         if (cluster.bbox.width * cluster.bbox.height <= 65536) {
@@ -284,6 +287,7 @@ export function createNewPageResult(current: ScreenshotResult): DiffResult {
     currentImage: current.buffer,
     ...(current.stability ? { stability: current.stability } : {}),
     ...(current.redactedCount !== undefined ? { redactedCount: current.redactedCount } : {}),
+    ...(current.blockedRequestsCount !== undefined ? { blockedRequestsCount: current.blockedRequestsCount } : {}),
   };
 }
 
@@ -307,6 +311,7 @@ function errorResult(current: ScreenshotResult, message: string): DiffResult {
     error: message,
     ...(current.stability ? { stability: current.stability } : {}),
     ...(current.redactedCount !== undefined ? { redactedCount: current.redactedCount } : {}),
+    ...(current.blockedRequestsCount !== undefined ? { blockedRequestsCount: current.blockedRequestsCount } : {}),
   };
 }
 

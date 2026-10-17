@@ -126,6 +126,10 @@ describe('analyzeWithAI', () => {
   beforeEach(() => {
     process.env.FRONTGUARD_OPENAI_KEY = 'test-openai-key';
     process.env.FRONTGUARD_ANTHROPIC_KEY = 'test-anthropic-key';
+    process.env.FRONTGUARD_GEMINI_KEY = 'test-gemini-key';
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.GEMINI_API_KEY;
   });
 
   afterEach(() => {
@@ -133,6 +137,10 @@ describe('analyzeWithAI', () => {
     // Restore env
     process.env.FRONTGUARD_OPENAI_KEY = originalEnv.FRONTGUARD_OPENAI_KEY;
     process.env.FRONTGUARD_ANTHROPIC_KEY = originalEnv.FRONTGUARD_ANTHROPIC_KEY;
+    process.env.FRONTGUARD_GEMINI_KEY = originalEnv.FRONTGUARD_GEMINI_KEY;
+    process.env.OPENAI_API_KEY = originalEnv.OPENAI_API_KEY;
+    process.env.ANTHROPIC_API_KEY = originalEnv.ANTHROPIC_API_KEY;
+    process.env.GEMINI_API_KEY = originalEnv.GEMINI_API_KEY;
   });
 
   // -----------------------------------------------------------------------
@@ -249,6 +257,77 @@ describe('analyzeWithAI', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url] = fetchSpy.mock.calls[0];
     expect(url).toBe('https://api.anthropic.com/v1/messages');
+  });
+
+  // -----------------------------------------------------------------------
+  // Happy path — Google Gemini & custom baseUrl
+  // -----------------------------------------------------------------------
+
+  it('returns valid AIAnalysis from Gemini response and strips models/ prefix', async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: validAIJson() }],
+            },
+          },
+        ],
+      }),
+      text: async () => '',
+    } as unknown as Response);
+
+    const result = await analyzeWithAI(makeDiff(), {
+      provider: 'gemini',
+      model: 'models/gemini-2.5-flash',
+    });
+
+    expect(result.classification).toBe('regression');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=test-gemini-key',
+    );
+  });
+
+  it('supports custom baseUrl and DOM cluster attribution context in analyzeWithAI', async () => {
+    fetchSpy.mockResolvedValueOnce(openAIResponse(validAIJson()) as Response);
+
+    const diff = makeDiff({
+      clusters: [
+        {
+          id: 1,
+          bbox: { x: 10, y: 20, width: 100, height: 40 },
+          rawDiffPixels: 500,
+          density: 0.8,
+          perimeterRatio: 0.2,
+          targetSelector: 'button[data-testid="buy-now"]',
+          affectedElements: [
+            {
+              selector: 'button[data-testid="buy-now"]',
+              tagName: 'button',
+              coverage: 0.9,
+              iou: 0.85,
+              text: 'Buy Now',
+            },
+          ],
+        },
+      ],
+    });
+
+    await analyzeWithAI(diff, {
+      provider: 'openai',
+      model: 'gpt-4.1-mini',
+      baseUrl: 'https://openrouter.ai/api/v1',
+    });
+
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
+    const body = String(init?.body ?? '');
+    expect(body).toContain('DOM Cluster Attribution (untrusted)');
+    expect(body).toContain('button[data-testid=\\"buy-now\\"]');
   });
 
   // -----------------------------------------------------------------------
@@ -574,4 +653,68 @@ describe('buildAccessibilityContext', () => {
     ]);
     expect(ctx.match(/color-contrast/g)).toHaveLength(1);
   });
+
+  it('supports Gemini vision provider and custom baseUrl', async () => {
+    process.env.FRONTGUARD_GEMINI_KEY = 'test-gemini-key';
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    classification: 'regression',
+                    explanation: 'Header button shifted right by 16px',
+                    severity: 'warning',
+                    confidence: 0.91,
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    } as Response);
+
+    const diff: DiffResult = {
+      route: { path: '/pricing', discoveredVia: 'config' },
+      viewport: 1440,
+      browser: 'chromium',
+      status: 'regression',
+      diffPercentage: 0.025,
+      baselineImage: createTestPng(40, 40, 255, 255, 255),
+      currentImage: createTestPng(40, 40, 0, 0, 0),
+      diffImage: createTestPng(40, 40, 255, 0, 0),
+      clusters: [
+        {
+          id: 1,
+          bbox: { x: 10, y: 10, width: 20, height: 15 },
+          rawDiffPixels: 300,
+          density: 1,
+          perimeterRatio: 0.2,
+          targetSelector: '[data-testid="upgrade-btn"]',
+        },
+      ],
+    };
+
+    const result = await analyzeWithAI(diff, {
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      baseUrl: 'https://custom-gemini.example.com/v1beta/models',
+    });
+
+    expect(result.classification).toBe('regression');
+    expect(result.confidence).toBe(0.91);
+    const [calledUrl, init] = fetchSpy.mock.calls[0];
+    expect(String(calledUrl)).toContain(
+      'https://custom-gemini.example.com/v1beta/models/gemini-2.5-flash:generateContent?key=test-gemini-key',
+    );
+    expect(String(init?.body ?? '')).toContain('[data-testid=\\"upgrade-btn\\"]');
+    fetchSpy.mockRestore();
+    delete process.env.FRONTGUARD_GEMINI_KEY;
+  });
 });
+

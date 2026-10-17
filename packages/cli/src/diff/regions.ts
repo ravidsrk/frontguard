@@ -10,6 +10,9 @@
  */
 
 import { PNG } from 'pngjs';
+import type { DOMElementBox, ClusteredDOMElement } from '../render/dom-elements.js';
+
+export type { DOMElementBox, ClusteredDOMElement };
 
 // ---------------------------------------------------------------------------
 // Public Types
@@ -43,6 +46,10 @@ export interface DiffCluster {
   chromaSSIM?: number;
   /** Region-scoped Complex Wavelet / Quadrature Gabor Phase SSIM (0–1), if computed. */
   cwSSIM?: number;
+  /** Primary CSS selector of the DOM element most closely overlapping this cluster. */
+  targetSelector?: string;
+  /** Top overlapping DOM elements attributed to this diff cluster. */
+  affectedElements?: ClusteredDOMElement[];
 }
 
 /** Options controlling connected-component diff cluster extraction. */
@@ -509,3 +516,116 @@ export function drawSetOfMarkBoxes(
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// DOM-Aware Spatial Cluster Attribution
+// ---------------------------------------------------------------------------
+
+const GENERIC_ROOT_TAGS = new Set(['html', 'body', 'main']);
+const GENERIC_ROOT_SELECTORS = new Set([
+  'html',
+  'body',
+  'main',
+  '#root',
+  '#app',
+  '#__next',
+  'div#root',
+  'div#app',
+  'div#__next',
+]);
+
+function isGenericRootElement(el: DOMElementBox): boolean {
+  const tag = el.tagName?.toLowerCase() ?? '';
+  const sel = el.selector?.toLowerCase() ?? '';
+  return GENERIC_ROOT_TAGS.has(tag) || GENERIC_ROOT_SELECTORS.has(sel);
+}
+
+/**
+ * Attribute spatial diff clusters to overlapping DOM element bounding boxes.
+ *
+ * Computes AABB intersection, cluster coverage (`intersectionArea / clusterArea`),
+ * and Intersection-over-Union (`intersectionArea / unionArea`). Penalizes generic
+ * root wrappers (`html`, `body`, `main`, `#root`, `#app`, `#__next`) so specific
+ * descendant components win attribution.
+ *
+ * @param clusters      - Extracted diff clusters to annotate
+ * @param domElements   - Visible DOM element bounding boxes from the page
+ * @param maxPerCluster - Maximum overlapping DOM elements to retain per cluster (default: 3)
+ * @returns The annotated `clusters` array (mutated in place and returned)
+ */
+export function attributeClustersToDom(
+  clusters: DiffCluster[],
+  domElements?: DOMElementBox[],
+  maxPerCluster = 3,
+): DiffCluster[] {
+  if (!domElements || domElements.length === 0 || clusters.length === 0) {
+    return clusters;
+  }
+
+  const limit = Math.max(1, Math.floor(maxPerCluster));
+
+  for (const cluster of clusters) {
+    const cb = cluster.bbox;
+    const clusterArea = Math.max(1, cb.width * cb.height);
+    const scored: Array<{
+      element: ClusteredDOMElement;
+      score: number;
+      elArea: number;
+    }> = [];
+
+    for (const el of domElements) {
+      const eb = el.bbox;
+      if (!eb || eb.width <= 0 || eb.height <= 0) continue;
+
+      const ix0 = Math.max(cb.x, eb.x);
+      const iy0 = Math.max(cb.y, eb.y);
+      const ix1 = Math.min(cb.x + cb.width, eb.x + eb.width);
+      const iy1 = Math.min(cb.y + cb.height, eb.y + eb.height);
+
+      const iw = ix1 - ix0;
+      const ih = iy1 - iy0;
+      if (iw <= 0 || ih <= 0) continue;
+
+      const intersectionArea = iw * ih;
+      const elArea = Math.max(1, eb.width * eb.height);
+      const unionArea = Math.max(1, clusterArea + elArea - intersectionArea);
+
+      const coverage = Math.min(1, intersectionArea / clusterArea);
+      const iou = Math.min(1, intersectionArea / unionArea);
+
+      let score = coverage * 0.55 + iou * 0.45;
+      if (isGenericRootElement(el)) {
+        score *= 0.25;
+      }
+
+      scored.push({
+        element: {
+          ...el,
+          iou: Number(iou.toFixed(4)),
+          coverage: Number(coverage.toFixed(4)),
+        },
+        score,
+        elArea,
+      });
+    }
+
+    if (scored.length > 0) {
+      scored.sort((a, b) => {
+        if (Math.abs(b.score - a.score) > 1e-6) {
+          return b.score - a.score;
+        }
+        if (Math.abs(b.element.iou - a.element.iou) > 1e-6) {
+          return b.element.iou - a.element.iou;
+        }
+        return a.elArea - b.elArea;
+      });
+
+      const affectedElements = scored.slice(0, limit).map((s) => s.element);
+      cluster.affectedElements = affectedElements;
+      cluster.targetSelector = affectedElements[0]?.selector;
+    }
+  }
+
+  return clusters;
+}
+

@@ -155,6 +155,38 @@ export async function buildConfig(
     config.colorScheme = opts.colorScheme;
   }
 
+  if (opts.freezeTime !== undefined && opts.freezeTime !== false) {
+    if (opts.freezeTime === true || typeof opts.freezeTime === 'number') {
+      config.freezeTime = opts.freezeTime;
+    } else if (typeof opts.freezeTime === 'string') {
+      const trimmed = opts.freezeTime.trim();
+      config.freezeTime = /^\d+$/.test(trimmed) ? Number(trimmed) : trimmed;
+    }
+  }
+
+  if (opts.seedRandom !== undefined && opts.seedRandom !== false) {
+    if (opts.seedRandom === true || typeof opts.seedRandom === 'number') {
+      config.seedRandom = opts.seedRandom;
+    } else if (typeof opts.seedRandom === 'string') {
+      const num = Number(opts.seedRandom.trim());
+      config.seedRandom = Number.isNaN(num) ? true : num;
+    }
+  }
+
+  if (opts.blockUrls !== undefined) {
+    if (Array.isArray(opts.blockUrls)) {
+      config.blockUrls = (opts.blockUrls as string[])
+        .flatMap((s) => String(s).split(','))
+        .map((s) => s.trim())
+        .filter(Boolean);
+    } else if (typeof opts.blockUrls === 'string') {
+      config.blockUrls = opts.blockUrls
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+  }
+
   // Validate baseUrl is set
   if (!config.baseUrl) {
     throw new Error(
@@ -270,6 +302,9 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--redact-sensitive', 'Mask password/credit-card/sensitive inputs before screenshot capture')
     .option('--wait-for-stability', 'Wait for consecutive frames to converge before screenshot capture')
     .option('--color-scheme <scheme>', 'Emulate browser color scheme: light or dark')
+    .option('--freeze-time [timestamp]', 'Freeze browser clock (Date/Date.now) to a fixed timestamp or ISO date')
+    .option('--seed-random [seed]', 'Seed Math.random() with a deterministic PRNG (default seed: 42)')
+    .option('--block-urls <patterns...>', 'Block noisy third-party URLs (glob or substring patterns)')
     .option(
       '--docker',
       'Run inside the repository-source renderer image (not published; build recipe: https://frontguard.dev/docs/cross-os-rendering)',
@@ -450,6 +485,9 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--redact-sensitive', 'Mask password/credit-card/sensitive inputs before screenshot capture')
     .option('--wait-for-stability', 'Wait for consecutive frames to converge before screenshot capture')
     .option('--color-scheme <scheme>', 'Emulate browser color scheme: light or dark')
+    .option('--freeze-time [timestamp]', 'Freeze browser clock (Date/Date.now) to a fixed timestamp or ISO date')
+    .option('--seed-random [seed]', 'Seed Math.random() with a deterministic PRNG (default seed: 42)')
+    .option('--block-urls <patterns...>', 'Block noisy third-party URLs (glob or substring patterns)')
     .option('--verbose', 'Verbose output')
     .option('--debug', 'Debug output')
     .action(async (opts) => {

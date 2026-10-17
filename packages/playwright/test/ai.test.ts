@@ -8,6 +8,8 @@ const AI_ENV = [
   'OPENAI_API_KEY',
   'FRONTGUARD_ANTHROPIC_KEY',
   'ANTHROPIC_API_KEY',
+  'FRONTGUARD_GEMINI_KEY',
+  'GEMINI_API_KEY',
 ];
 
 const saved: Record<string, string | undefined> = {};
@@ -39,13 +41,41 @@ describe('analyzeWithAI — OpenAI', () => {
     expect(res).toBeUndefined();
   });
 
-  it('parses a valid JSON response', async () => {
+  it('parses a valid JSON response and defaults to gpt-4.1-mini', async () => {
     process.env.OPENAI_API_KEY = 'sk-test';
-    globalThis.fetch = vi.fn(async () =>
+    const spy = vi.fn(async () =>
       new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(validResult) } }] }), { status: 200 }),
-    ) as typeof fetch;
-    const res = await analyzeWithAI(img, img, { provider: 'openai', model: 'gpt-4o' });
+    );
+    globalThis.fetch = spy as unknown as typeof fetch;
+    const res = await analyzeWithAI(img, img, { provider: 'openai' });
     expect(res).toEqual(validResult);
+    expect(spy).toHaveBeenCalledWith(
+      'https://api.openai.com/v1/chat/completions',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"model":"gpt-4.1-mini"'),
+      }),
+    );
+  });
+
+  it('supports custom baseUrl and model for OpenAI', async () => {
+    process.env.FRONTGUARD_OPENAI_KEY = 'sk-custom';
+    const spy = vi.fn(async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(validResult) } }] }), { status: 200 }),
+    );
+    globalThis.fetch = spy as unknown as typeof fetch;
+    const res = await analyzeWithAI(img, img, {
+      provider: 'openai',
+      model: 'gpt-4o',
+      baseUrl: 'https://proxy.example.com/v1/',
+    });
+    expect(res).toEqual(validResult);
+    expect(spy).toHaveBeenCalledWith(
+      'https://proxy.example.com/v1/chat/completions',
+      expect.objectContaining({
+        body: expect.stringContaining('"model":"gpt-4o"'),
+      }),
+    );
   });
 
   it('returns undefined on a non-ok response', async () => {
@@ -74,16 +104,24 @@ describe('analyzeWithAI — Anthropic', () => {
     expect(await analyzeWithAI(img, img, { provider: 'anthropic' })).toBeUndefined();
   });
 
-  it('extracts JSON embedded in the text response', async () => {
+  it('extracts JSON embedded in the text response and supports custom baseUrl', async () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant';
-    globalThis.fetch = vi.fn(async () =>
+    const spy = vi.fn(async () =>
       new Response(
         JSON.stringify({ content: [{ type: 'text', text: `Here: ${JSON.stringify(validResult)}` }] }),
         { status: 200 },
       ),
-    ) as typeof fetch;
-    const res = await analyzeWithAI(img, img, { provider: 'anthropic' });
+    );
+    globalThis.fetch = spy as unknown as typeof fetch;
+    const res = await analyzeWithAI(img, img, {
+      provider: 'anthropic',
+      baseUrl: 'https://anthropic-proxy.example.com/v1',
+    });
     expect(res).toEqual(validResult);
+    expect(spy).toHaveBeenCalledWith(
+      'https://anthropic-proxy.example.com/v1/messages',
+      expect.any(Object),
+    );
   });
 
   it('returns undefined when no JSON is present in the text', async () => {
@@ -98,5 +136,69 @@ describe('analyzeWithAI — Anthropic', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant';
     globalThis.fetch = vi.fn(async () => new Response('err', { status: 429 })) as typeof fetch;
     expect(await analyzeWithAI(img, img, { provider: 'anthropic' })).toBeUndefined();
+  });
+});
+
+describe('analyzeWithAI — Gemini', () => {
+  it('returns undefined when no Gemini API key is set', async () => {
+    expect(await analyzeWithAI(img, img, { provider: 'gemini' })).toBeUndefined();
+  });
+
+  it('calls Gemini 2.5 Flash by default and parses JSON response', async () => {
+    process.env.FRONTGUARD_GEMINI_KEY = 'gm-key-123';
+    const spy = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: JSON.stringify(validResult) }],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    globalThis.fetch = spy as unknown as typeof fetch;
+
+    const res = await analyzeWithAI(img, img, { provider: 'gemini' });
+    expect(res).toEqual(validResult);
+    expect(spy).toHaveBeenCalledWith(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=gm-key-123',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+  });
+
+  it('supports GEMINI_API_KEY fallback and custom baseUrl + model', async () => {
+    process.env.GEMINI_API_KEY = 'gm-fallback';
+    const spy = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: `\`\`\`json\n${JSON.stringify(validResult)}\n\`\`\`` }],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    globalThis.fetch = spy as unknown as typeof fetch;
+
+    const res = await analyzeWithAI(img, img, {
+      provider: 'gemini',
+      model: 'gemini-2.5-pro',
+      baseUrl: 'https://gemini-gateway.example.com/v1beta/',
+    });
+    expect(res).toEqual(validResult);
+    expect(spy).toHaveBeenCalledWith(
+      'https://gemini-gateway.example.com/v1beta/models/gemini-2.5-pro:generateContent?key=gm-fallback',
+      expect.any(Object),
+    );
   });
 });

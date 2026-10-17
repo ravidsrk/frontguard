@@ -126,22 +126,22 @@ export const PILLARS: PillarItem[] = [
     n: "01 / DETECT",
     c: "#4fb477",
     h: "Find what changed",
-    p: "Pixel comparison across configured viewports and browsers, with connected-component diff clustering, chroma/CW-SSIM perceptual scoring, masks, and optional multi-render consensus.",
+    p: "Pixel comparison across configured viewports and browsers, with connected-component diff clustering, spatial targetSelector DOM attribution, chroma/CW-SSIM perceptual scoring, masks, and optional multi-render consensus.",
     spec: [
-      "8-connected Union-Find cluster bounding boxes",
+      "8-connected Union-Find cluster bounding boxes + targetSelector",
       "ITU-R BT.709 YCbCr Chroma SSIM + CW-SSIM",
-      "waitForStability dual-frame RAF settlement",
+      "waitForStability · freezeTime · seedRandom · blockUrls",
     ],
   },
   {
     n: "02 / UNDERSTAND",
     c: "#e8862e",
     h: "Explain why it broke",
-    p: "When configured, model-assisted analysis classifies changed screenshots and returns a confidence-scored explanation for human review.",
+    p: "When configured, model-assisted analysis classifies changed screenshots and returns a confidence-scored explanation for human review across OpenAI, Anthropic, Google Gemini, or a custom OpenAI-compatible baseUrl.",
     spec: [
       "Advisory severity: critical · warning · info · noise",
       "Set-of-Mark [1] cropped diff strips",
-      "Direct BYOK to OpenAI or Anthropic",
+      "Direct BYOK to OpenAI, Anthropic, Gemini, or custom baseUrl",
     ],
   },
   {
@@ -179,12 +179,12 @@ export const BENTO_FEATURES: BentoFeature[] = [
   },
   {
     tag: "STABILITY & PRIVACY",
-    title: "Frame convergence & PII redaction",
-    desc: "Consecutive animation-frame luminance convergence waits for hydration and WebGL to settle, while redactSensitive masks password, token, and [data-fg-redact] nodes before capture.",
+    title: "Frame convergence, anti-flake & PII redaction",
+    desc: "Consecutive animation-frame luminance convergence, deterministic freezeTime / seedRandom / blockUrls controls, and redactSensitive DOM masking before capture.",
     span: 6,
     accent: "#e8862e",
-    badge: "waitForStability · redactSensitive",
-    detail: "RAF × 2 convergence (<0.1% variance) + DOM scrub",
+    badge: "waitForStability · freezeTime · seedRandom",
+    detail: "RAF × 2 convergence + blockUrls + DOM scrub",
   },
   {
     tag: "DISCOVERY",
@@ -215,11 +215,11 @@ export const BENTO_FEATURES: BentoFeature[] = [
   },
   {
     tag: "CONFIG",
-    title: "Per-route thresholds",
-    desc: "Strict 0.1% pixel tolerance on /checkout, relaxed tolerance on content-heavy /blog routes — all in one typed config.",
+    title: "Per-route thresholds & DOM attribution",
+    desc: "Strict 0.1% pixel tolerance on /checkout, relaxed tolerance on /blog routes, plus spatial cluster.targetSelector DOM attribution.",
     span: 4,
     accent: "#f5f1ea",
-    badge: "threshold: 0.001",
+    badge: "threshold · targetSelector",
     detail: "Route-scoped masks, selectors, and consensus count",
   },
   {
@@ -357,7 +357,7 @@ export const HONEST_CARDS: HonestCard[] = [
   {
     label: "YOU BRING THE KEY",
     color: "#e8862e",
-    body: "AI is optional and uses your selected OpenAI or Anthropic account. Changed screenshots go directly to that provider, not through a Frontguard proxy; leave AI disabled for a fully local run.",
+    body: "AI is optional and uses your selected OpenAI, Anthropic, or Google Gemini account (or a custom OpenAI-compatible baseUrl). Changed screenshots go directly to that provider, not through a Frontguard proxy; leave AI disabled for a fully local run.",
   },
   {
     label: "YOU STAY IN THE LOOP",
@@ -417,9 +417,12 @@ export const CONFIG_CODE = `export default {
   colorScheme: 'dark',
   waitForStability: true,
   redactSensitive: true,
+  freezeTime: '2026-01-01T00:00:00Z',
+  seedRandom: 42,
+  blockUrls: ['*google-analytics.com*'],
   threshold: 0.01,
 
-  // AI analysis (optional, BYOK)
+  // AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini' | custom baseUrl)
   ai: { provider: 'openai', model: 'gpt-4o' },
 };`;
 
@@ -447,8 +450,11 @@ export const CONFIG_HTML = `<span style="color: #c678dd;">export default</span> 
   colorScheme: <span style="color: #98c379;">'dark'</span>,
   waitForStability: <span style="color: #56b6c2;">true</span>,
   redactSensitive: <span style="color: #56b6c2;">true</span>,
+  freezeTime: <span style="color: #98c379;">'2026-01-01T00:00:00Z'</span>,
+  seedRandom: <span style="color: #e8862e;">42</span>,
+  blockUrls: [<span style="color: #98c379;">'*google-analytics.com*'</span>],
   threshold: <span style="color: #e8862e;">0.01</span>,
 
-  <span style="color: #564f48;">// AI analysis (optional, BYOK)</span>
+  <span style="color: #564f48;">// AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini' | custom baseUrl)</span>
   ai: { provider: <span style="color: #98c379;">'openai'</span>, model: <span style="color: #98c379;">'gpt-4o'</span> },
 };`;

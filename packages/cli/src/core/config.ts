@@ -43,11 +43,25 @@ const discoverSchema = z.object({
   exclude: z.array(z.string()).default([]),
 });
 
+/** Default AI model identifiers per provider when omitted in configuration. */
+export const DEFAULT_AI_MODELS: Record<"openai" | "anthropic" | "gemini", string> = {
+  openai: "gpt-4.1-mini",
+  anthropic: "claude-sonnet-4-20250514",
+  gemini: "gemini-2.5-flash",
+};
+
 /** Zod schema for AI configuration. */
-const aiConfigSchema = z.object({
-  provider: z.enum(["openai", "anthropic"]),
-  model: z.string().min(1, "ai.model must not be empty"),
-});
+const aiConfigSchema = z
+  .object({
+    provider: z.enum(["openai", "anthropic", "gemini"]),
+    model: z.string().min(1, "AI model must not be empty").optional(),
+    baseUrl: z.string().url().optional(),
+  })
+  .transform((val) => ({
+    provider: val.provider,
+    model: val.model ?? DEFAULT_AI_MODELS[val.provider],
+    ...(val.baseUrl !== undefined ? { baseUrl: val.baseUrl } : {}),
+  }));
 
 /** Zod schema for an ignore rule. */
 const ignoreRuleSchema = z
@@ -142,6 +156,18 @@ const stabilityConfigSchema = z.object({
   maxUnstableRatio: z.number().min(0).max(1).optional(),
 });
 
+/** Freeze time schema accepting boolean, numeric timestamp, or valid ISO date string. */
+const freezeTimeSchema = z.union([
+  z.boolean(),
+  z.number(),
+  z
+    .string()
+    .min(1)
+    .refine((val) => !Number.isNaN(Date.parse(val)), {
+      message: "Invalid ISO date string for freezeTime",
+    }),
+]);
+
 /**
  * Zod schema for a per-route configuration object.
  * Allows overriding threshold / ignore / viewport / actions / colorScheme per route.
@@ -159,6 +185,9 @@ const routeConfigSchema = z.object({
   waitForSelector: z.string().min(1).optional(),
   colorScheme: colorSchemeSchema.optional(),
   actions: z.array(routeActionSchema).optional(),
+  freezeTime: freezeTimeSchema.optional(),
+  seedRandom: z.union([z.boolean(), z.number()]).optional(),
+  blockUrls: z.array(z.string().min(1)).optional(),
 });
 
 /** A route entry — either a plain string path or a {@link routeConfigSchema}. */
@@ -291,8 +320,14 @@ export const configSchema = z.object({
   /** Number of renders per page for anti-flake (default: 1, recommended: 2-3). */
   antiFlakeRenders: z.number().int().min(1).max(5).optional(),
 
-  /** Freeze Date.now() and new Date() to a fixed timestamp during render. */
-  freezeTime: z.union([z.boolean(), z.number()]).optional(),
+  /** Freeze Date.now(), new Date(), and page.clock to a fixed timestamp during render. */
+  freezeTime: freezeTimeSchema.optional(),
+
+  /** Seed Math.random() with a deterministic Mulberry32 PRNG during render. */
+  seedRandom: z.union([z.boolean(), z.number()]).optional(),
+
+  /** URL substrings or wildcard patterns (*) to block before capture. */
+  blockUrls: z.array(z.string().min(1)).optional(),
 
   /** Per-page render retry count on failure (default: 0). */
   renderRetries: z.number().int().min(0).max(3).optional(),

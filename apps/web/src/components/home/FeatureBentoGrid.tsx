@@ -148,12 +148,29 @@ export function FeatureBentoGrid() {
               , enable{" "}
               <code style={{ fontFamily: MONO, color: "#f5f1ea" }}>
                 waitForStability
-              </code>{" "}
-              and{" "}
+              </code>
+              ,{" "}
               <code style={{ fontFamily: MONO, color: "#f5f1ea" }}>
                 redactSensitive
               </code>
-              , and opt into BYOK model analysis in a single file.
+              ,{" "}
+              <code style={{ fontFamily: MONO, color: "#f5f1ea" }}>
+                freezeTime
+              </code>
+              ,{" "}
+              <code style={{ fontFamily: MONO, color: "#f5f1ea" }}>
+                seedRandom
+              </code>
+              , and{" "}
+              <code style={{ fontFamily: MONO, color: "#f5f1ea" }}>
+                blockUrls
+              </code>
+              , and opt into multi-provider BYOK model analysis (OpenAI,
+              Anthropic, Gemini, or custom{" "}
+              <code style={{ fontFamily: MONO, color: "#f5f1ea" }}>
+                baseUrl
+              </code>
+              ) in a single file.
             </p>
             <div
               style={{
@@ -169,6 +186,9 @@ export function FeatureBentoGrid() {
                 "colorScheme: 'dark'",
                 "waitForStability: true",
                 "redactSensitive: true",
+                "freezeTime",
+                "seedRandom",
+                "blockUrls",
               ].map((pill) => (
                 <span
                   key={pill}

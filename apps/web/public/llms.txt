@@ -21,12 +21,12 @@ Frontguard is an open-source CLI with pre-release cloud components. The CLI is M
 
 - [Agent task routing](https://frontguard.dev/agents.md) — Start here for MCP tools, cloud API routes, auth, limits, and safe task ordering
 - [OpenAPI contract](https://frontguard.dev/openapi.json) — Machine-readable contract for the pre-release cloud API; there is no live default hosted endpoint yet
-- [MCP discovery manifest](https://frontguard.dev/.well-known/mcp.json) — Discovery for `@frontguard/mcp`; point `FRONTGUARD_API_URL` at a verified deployment
+- [MCP discovery manifest](https://frontguard.dev/.well-known/mcp.json) — Discovery for `@frontguard/mcp` (7 tools: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `promote_baseline`, `accept_baseline`, `recent_runs`); supports local report fallback (`FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json`) or a verified deployment via `FRONTGUARD_API_URL`
 
 ## What Frontguard Does
 
 - Configurable consensus — projects can opt into multiple captures per route; pixel comparison uses SSIM as a fallback
-- Optional AI classification — screenshot evidence, basic route metadata, and optional accessibility findings go directly to the configured OpenAI or Anthropic provider
+- Optional AI classification — screenshot evidence, basic route metadata, and optional accessibility findings go directly to the configured OpenAI, Anthropic, or Gemini provider (or a custom OpenAI-compatible `baseUrl`)
 - Experimental fixes — CSS suggestions and sandbox verification are separate opt-ins; unverified suggestions remain labeled
 - Plugin architecture — nine lifecycle hooks; built-ins for accessibility (axe-core), Figma compare, perf budgets, monitor, third-party-script drift
 - CI-ready — generated workflows preserve JSON and HTML artifacts; source PR reporting remains pending external release validation
@@ -45,10 +45,11 @@ App terminal (leave running; use your project's command, such as the example bel
 npm run dev
 ```
 
-Frontguard terminal (uses the generated config):
+Frontguard terminal (uses the generated config; commands include `init`, `doctor`, `guide`, `update-baselines`, `run`, `monitor`, and `plugin`):
 
 ```bash
 npx -p @frontguard/cli frontguard doctor
+npx -p @frontguard/cli frontguard guide [topic] --json
 npx -p @frontguard/cli frontguard update-baselines
 git push origin frontguard-baselines # before CI comparisons
 npx -p @frontguard/cli frontguard run

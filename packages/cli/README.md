@@ -110,6 +110,7 @@ still passes — lower it for stricter pages.
 | `frontguard run`                     | Run visual regression tests (default command)                            |
 | `frontguard init [--ci] [--yes]`     | Generate a starter config; `--ci` also writes a GitHub Actions workflow  |
 | `frontguard doctor`                  | Diagnose environment readiness (Node, Playwright, browsers, config, git) |
+| `frontguard guide [topic] [--json]`  | Print offline reference guides (`setup`, `diffing`, `mcp`, `playwright`, `ci`) |
 | `frontguard update-baselines`        | Accept current screenshots as new baselines                              |
 | `frontguard monitor`                 | Monitor live production URLs for visual regressions                      |
 | `frontguard accept-fix <id>`         | Mark a suggested fix as accepted (improves future suggestions)           |
@@ -119,11 +120,22 @@ still passes — lower it for stricter pages.
 | `frontguard plugin uninstall <name>` | Uninstall a Frontguard plugin                                            |
 | `frontguard plugin list`             | List installed plugins                                                   |
 
+### Key `frontguard run` Flags
+
+- `--wait-for-stability` — Wait for consecutive animation frames to converge before capturing
+- `--redact-sensitive` — Redact password, payment, and `[data-frontguard-redact]` inputs and scrub DOM snapshots before capture
+- `--color-scheme <scheme>` — Emulate `light` or `dark` `prefers-color-scheme`
+- `--freeze-time [timestamp]` — Freeze `Date.now()` / `new Date()` (boolean default, epoch ms, or ISO 8601 date string)
+- `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
+- `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render
+
 ## Features
 
 - **Zero-config route discovery** — Auto-crawls your app to find all pages
 - **Multi-browser** — Chromium, Firefox, WebKit via Playwright
-- **Optional AI analysis** — BYOK (OpenAI/Anthropic) can classify a pixel change on the default compare path; it does not change pass/fail and has no published accuracy benchmark. Experimental `frontguard run --mode judge --experimental` is a separate opt-in whose verdict is the model, not pixel diff.
+- **Spatial diff clusters & DOM selector attribution** — Connected-component diff clusters report Chroma-SSIM, CW-SSIM, and `cluster.targetSelector` (the most-specific DOM selector at the cluster center)
+- **Deterministic anti-flake controls** — `waitForStability`, `redactSensitive`, `freezeTime` (epoch ms or ISO string), `seedRandom`, `blockUrls`, and configurable multi-render consensus
+- **Optional AI analysis** — Multi-provider BYOK (`openai`, `anthropic`, `gemini`, plus custom OpenAI-compatible `baseUrl` for OpenRouter / Ollama / vLLM) can classify a pixel change on the default compare path; it does not change pass/fail and has no published accuracy benchmark. Experimental `frontguard run --mode judge --experimental` is a separate opt-in whose verdict is the model, not pixel diff.
 - **Experimental AI fix verification** — Suggested CSS patches are re-rendered only when `verifyFixes` is enabled; reports label the result verified or unverified
 - **Smart rendering** — Dependency graph renders only pages affected by your changes
 - **Preview deployments** — Auto-detects Vercel/Netlify preview URLs
@@ -152,12 +164,19 @@ export default {
 
   viewports: [375, 768, 1440],
   browsers: ["chromium"],
+  colorScheme: "dark",
+  waitForStability: true,
+  redactSensitive: true,
+  freezeTime: "2026-01-01T00:00:00Z", // boolean | number | ISO date string
+  seedRandom: 42,                     // boolean | number
+  blockUrls: ["*google-analytics.com*", "*intercom.io*"],
   threshold: 0.1, // changed-pixel ratio: 0.1 = 10%
 
-  // AI analysis (optional, BYOK)
+  // AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini', plus optional custom baseUrl)
   ai: {
     provider: "openai",
     model: "gpt-4o",
+    // baseUrl: "https://openrouter.ai/api/v1", // OpenRouter, Ollama, or vLLM
   },
 
   // Ignore dynamic content
@@ -259,6 +278,8 @@ Full schema: [telemetry.md](https://github.com/ravidsrk/frontguard/blob/main/doc
 # AI Analysis (optional, BYOK — pick one)
 FRONTGUARD_OPENAI_KEY=sk-...
 FRONTGUARD_ANTHROPIC_KEY=...
+FRONTGUARD_GEMINI_KEY=AIza...
+FRONTGUARD_OPENAI_BASE_URL=https://openrouter.ai/api/v1 # optional OpenAI-compatible endpoint
 
 # Opt-in anonymous usage telemetry (off unless set)
 FRONTGUARD_TELEMETRY=1

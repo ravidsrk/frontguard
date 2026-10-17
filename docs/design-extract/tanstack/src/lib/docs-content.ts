@@ -77,7 +77,7 @@ ${h1('Introduction')}
     <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #b8b0a6;">Optional model-assisted analysis classifies changed screenshots and returns an explanation for human review.</p>
   </div>
 </div>
-${callout('PREREQUISITES', 'Node.js 20+ and npm 9+. AI analysis is optional; pixel comparison runs locally without a key.')}
+${callout('PREREQUISITES', 'Node.js 22+ and npm 9+. AI analysis is optional; pixel comparison runs locally without a key.')}
 ${h2('The pipeline')}
 <p style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 22px;">Frontguard runs a six-stage pipeline. One page failing does not stop the remaining comparisons. AI runs only for changed screenshots when a provider is configured.</p>
 <div style="display: grid; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 40px;">
@@ -92,7 +92,7 @@ ${h2('The pipeline')}
 /* ---------------- INSTALLATION ---------------- */
 const installHtml = `
 ${h1('Installation')}
-${lead(`Install the CLI from npm, then initialize a config. The ${ic('--ci')} flag also scaffolds a GitHub Actions workflow.`)}
+${lead(`Use Node.js 22 or newer. Install the CLI from npm, then initialize a config. The ${ic('--ci')} flag also scaffolds a GitHub Actions workflow.`)}
 ${h2b('Install the CLI')}
 ${code(
   'terminal',
@@ -119,6 +119,8 @@ ${h2b('Environment variables')}
 ${table2([
   ['FRONTGUARD_OPENAI_KEY', 'OpenAI API key for AI analysis (optional).'],
   ['FRONTGUARD_ANTHROPIC_KEY', 'Anthropic API key for AI analysis (alternative).'],
+  ['FRONTGUARD_GEMINI_KEY', 'Google Gemini API key for AI analysis (alternative).'],
+  ['FRONTGUARD_OPENAI_BASE_URL', 'Custom OpenAI-compatible baseUrl (OpenRouter, Ollama, vLLM).'],
   ['GITHUB_TOKEN', 'Used by the source PR reporter; public Action behavior still needs external validation.'],
   ['FRONTGUARD_DEBUG', 'Set to 1 for full stack traces on errors.'],
 ])}`
@@ -177,12 +179,13 @@ const flagRow = (flag: string, desc: string, def: string) =>
   </div>`
 const cliHtml = `
 ${h1('CLI Commands')}
-${lead(`Frontguard provides ${ic('run')}, ${ic('init')}, ${ic('doctor')}, ${ic('monitor')}, ${ic('update-baselines')}, the fix-pattern commands, and the ${ic('plugin')} subcommands.`)}
+${lead(`Frontguard provides ${ic('run')}, ${ic('init')}, ${ic('doctor')}, ${ic('guide')}, ${ic('monitor')}, ${ic('update-baselines')}, the fix-pattern commands, and the ${ic('plugin')} subcommands.`)}
 <div style="border: 1px solid #2a2622; margin-bottom: 36px;">
   ${[
     ['frontguard run', 'Run the visual regression pipeline (default command).'],
     ['frontguard init [--ci]', 'Detect framework and scaffold config (and a GitHub Action).'],
     ['frontguard doctor', 'Diagnose environment readiness before a run.'],
+    ['frontguard guide [topic] [--json]', 'Print offline reference guides (setup, diffing, mcp, playwright, ci).'],
     ['frontguard monitor', 'Run visual checks against live production URLs.'],
     ['frontguard update-baselines', 'Accept the current screenshots as new baselines.'],
     ['frontguard plugin &lt;cmd&gt;', 'install · uninstall · list plugins from npm.'],
@@ -207,6 +210,12 @@ ${p('The default command. Runs the full discover → render → diff → analyze
   ${flagRow('-b, --browsers', 'chromium, firefox, webkit', 'chromium')}
   ${flagRow('-o, --output', 'Output format: console, json', 'console')}
   ${flagRow('-t, --threshold &lt;ratio&gt;', 'Changed-pixel ratio (0–1; 0.01 = 1%)', '0.1')}
+  ${flagRow('--wait-for-stability', 'Wait for consecutive animation frames to converge', 'false')}
+  ${flagRow('--redact-sensitive', 'Mask sensitive inputs and scrub DOM snapshots', 'false')}
+  ${flagRow('--color-scheme &lt;scheme&gt;', 'Emulate light or dark prefers-color-scheme', 'light')}
+  ${flagRow('--freeze-time [timestamp]', 'Freeze Date.now() (boolean, epoch ms, or ISO date string)', 'false')}
+  ${flagRow('--seed-random [seed]', 'Seed Math.random() with a deterministic PRNG', 'false')}
+  ${flagRow('--block-urls &lt;patterns...&gt;', 'Abort matching analytics / ad URLs during render', '[]')}
 </div>
 <h3 style="font-size: 17px; font-weight: 600; color: #f5f1ea; margin: 28px 0 12px;">Exit codes</h3>
 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 36px;">
@@ -242,12 +251,14 @@ ${lead(`Frontguard is configured via ${ic('frontguard.config.ts')} in your proje
   browsers: [<span style="color: ${C.g};">'chromium'</span>],
   threshold: <span style="color: ${C.n};">0.1</span>, <span style="color: ${C.cm};">// 10% changed pixels</span>
 
-  <span style="color: ${C.cm};">// AI analysis (optional, BYOK)</span>
+  <span style="color: ${C.cm};">// AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini', plus optional baseUrl)</span>
   ai: { provider: <span style="color: ${C.g};">'openai'</span>, model: <span style="color: ${C.g};">'gpt-4o'</span> },
 
   <span style="color: ${C.cm};">// anti-flake</span>
   antiFlakeRenders: <span style="color: ${C.n};">2</span>,
-  freezeTime: <span style="color: ${C.k};">true</span>,
+  freezeTime: <span style="color: ${C.g};">'2026-01-01T00:00:00Z'</span>,
+  seedRandom: <span style="color: ${C.n};">42</span>,
+  blockUrls: [<span style="color: ${C.g};">'*google-analytics.com*'</span>],
 
   ignore: [{ selector: <span style="color: ${C.g};">'.dynamic-timestamp'</span> }],
 };</pre>
@@ -282,10 +293,13 @@ ${p(`Different pages need different sensitivity. Any entry in ${ic('routes')} ca
   { path: <span style="color: ${C.g};">'/gallery'</span>, viewport: [<span style="color: ${C.n};">1440</span>] },       <span style="color: ${C.cm};">// desktop only</span>
 ]</pre>
 </div>
-${h2b('Anti-flake options')}
+${h2b('Anti-flake &amp; spatial cluster options')}
 ${table2([
   ['antiFlakeRenders', 'Renders per page for flake detection (recommended: 2–3).'],
-  ['freezeTime', 'Freeze Date.now() during render to stabilize timestamps.'],
+  ['freezeTime', 'Freeze Date.now() during render (boolean, epoch ms number, or ISO 8601 date string).'],
+  ['seedRandom', 'Seed Math.random() with a deterministic PRNG (boolean or numeric seed).'],
+  ['blockUrls', 'URL glob or substring patterns to abort before rendering.'],
+  ['cluster.targetSelector', 'Spatial diff cluster DOM selector attribution reported at each cluster center.'],
   ['ssimFallback', 'Use SSIM perceptual diff for borderline results.'],
   ['renderRetries', 'Per-page retry count on render failure.'],
 ])}
@@ -304,13 +318,17 @@ test(<span style="color: ${C.g};">'checkout page'</span>, <span style="color: ${
 
   <span style="color: ${C.cm};">// capture + diff against baseline, with AI analysis</span>
   <span style="color: ${C.k};">const</span> result = <span style="color: ${C.k};">await</span> visualTest(page, <span style="color: ${C.g};">'checkout'</span>, {
+    freezeTime: <span style="color: ${C.g};">'2026-01-01T00:00:00Z'</span>,
+    seedRandom: <span style="color: ${C.n};">42</span>,
+    blockUrls: [<span style="color: ${C.g};">'*google-analytics.com*'</span>],
+    captureAriaSnapshot: <span style="color: ${C.k};">true</span>,
     ai: { provider: <span style="color: ${C.g};">'openai'</span>, model: <span style="color: ${C.g};">'gpt-4o'</span> },
   });
 
   expect(result.passed).toBe(<span style="color: ${C.k};">true</span>);
 });`,
 )}
-${p(`Or enable AI with defaults — ${ic('ai: true')} uses OpenAI. Update baselines by setting ${ic('FRONTGUARD_UPDATE=1')}.`)}
+${p(`Options include ${ic('freezeTime')} (boolean, epoch ms, or ISO date string), ${ic('seedRandom')}, ${ic('blockUrls')}, ${ic('captureAriaSnapshot')}, and ${ic('ai')} (${ic('openai')}, ${ic('anthropic')}, ${ic('gemini')}, or custom ${ic('baseUrl')}). Results include ${ic('result.clusters')} (with ${ic('targetSelector')} DOM attribution) and ${ic('result.ariaSnapshot')}. Update baselines by setting ${ic('FRONTGUARD_UPDATE=1')}.`)}
 ${callout('', "The plugin reuses your test's already-rendered page — no second browser launch — so it adds visual coverage with almost no extra runtime.")}`
 
 /* ---------------- GITHUB ACTIONS ---------------- */
@@ -362,7 +380,7 @@ ${h2b('Action inputs')}
 ${h2b('What the action does')}
 <div style="display: grid; gap: 1px; background: #211e1b; border: 1px solid #211e1b; margin-bottom: 40px;">
   ${[
-    ['1', 'Setup Node.js 20.'],
+    ['1', 'Setup Node.js 22.'],
     ['2', 'Install the exact Frontguard CLI version bundled by the Action.'],
     ['3', 'Install browsers through the exact CLI package version bundled by the Action.'],
     ['4', 'Detect preview URL from Vercel, Netlify, Cloudflare, Railway, Render.'],
@@ -392,21 +410,21 @@ ${p('AI analysis runs on every diff above threshold to explain visual changes, c
 ${h2b('Supported providers')}
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 32px;">
   <div style="border: 1px solid #2a2622; background: #131210; padding: 20px 22px;">
-    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #f5f1ea; margin-bottom: 12px;">OpenAI</div>
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #f5f1ea; margin-bottom: 12px;">OpenAI &amp; Custom Endpoints</div>
     <code style="display: block; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #d8d0c5; margin-bottom: 14px;"><span style="color: #7c746b;">export </span>FRONTGUARD_OPENAI_KEY=sk-…</code>
-    <div style="font-size: 13px; color: #8c847a; line-height: 1.7;">Select the model explicitly in configuration; Frontguard has not published a comparative accuracy benchmark.</div>
+    <div style="font-size: 13px; color: #8c847a; line-height: 1.7;">Models such as gpt-4.1-mini or gpt-4o, plus custom baseUrl / FRONTGUARD_OPENAI_BASE_URL for OpenRouter, Ollama, and vLLM.</div>
   </div>
   <div style="border: 1px solid #2a2622; background: #131210; padding: 20px 22px;">
-    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #f5f1ea; margin-bottom: 12px;">Anthropic</div>
-    <code style="display: block; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #d8d0c5; margin-bottom: 14px;"><span style="color: #7c746b;">export </span>FRONTGUARD_ANTHROPIC_KEY=sk-ant-…</code>
-    <div style="font-size: 13px; color: #8c847a; line-height: 1.7;">Select the model explicitly in configuration; Frontguard has not published a comparative accuracy benchmark.</div>
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #f5f1ea; margin-bottom: 12px;">Anthropic &amp; Google Gemini</div>
+    <code style="display: block; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #d8d0c5; margin-bottom: 14px;"><span style="color: #7c746b;">export </span>FRONTGUARD_ANTHROPIC_KEY=sk-ant-… / FRONTGUARD_GEMINI_KEY=AIza…</code>
+    <div style="font-size: 13px; color: #8c847a; line-height: 1.7;">Use provider: 'anthropic' (claude-sonnet-4-20250514) or provider: 'gemini' (gemini-2.5-flash). Frontguard has not published a comparative accuracy benchmark.</div>
   </div>
 </div>
 ${h2b('Cost controls')}
 ${p('AI is optional and runs only on detected changes. Frontguard has not published a measured percentage of pages that avoid the provider call.')}
 <ul style="list-style: none; padding: 0; margin: 0 0 32px; display: grid; gap: 12px;">
   ${[
-    'Use a cheap model (gpt-4o-mini / haiku) for triage, full models for PR-blocking checks',
+    'Use a cheap model (gpt-4.1-mini / gemini-2.5-flash / haiku) for triage, full models for PR-blocking checks',
     'Limit AI to the primary viewport if cost is a concern',
     'Screenshots are downscaled to ≤800px before the API call',
   ]

@@ -47,7 +47,7 @@ The agent-facing `/v1` reads and writes documented above require a Bearer API ke
 
 For "on PR N, what regressed and how do we fix it?":
 
-1. Call `list_regressions` with `pr_id: N` and, when needed, `repo: "owner/name"` (or run `frontguard guide --json` for local CLI workflow reference).
+1. Call `list_regressions` with `pr_id: N` and, when needed, `repo: "owner/name"` (or run `frontguard guide --json` for local CLI workflow reference, including deterministic render flags `--freeze-time`, `--seed-random`, `--block-urls`, `--wait-for-stability`, `--redact-sensitive`, and multi-provider BYOK via `openai`, `anthropic`, `gemini`, or a custom OpenAI-compatible `baseUrl`).
 2. For each returned `diffId`, call `inspect_diff_cluster_dom` and `get_suggested_fix`, then validate candidate CSS patches with `verify_css_patch`.
 3. Review the route, viewport, browser, classification, report URL, and suggested patch before editing code.
 4. For local runs, use `promote_baseline` or `frontguard update-baselines` after human review. Do not use `accept_baseline` to update production baselines until screenshot promotion is implemented; use the CLI or composite Action baseline workflow instead.

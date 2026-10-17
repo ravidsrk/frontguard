@@ -131,6 +131,44 @@ describe('compareImages', () => {
 
     expect(result.passed).toBe(true);
   });
+
+  it('extracts spatial connected-component diff clusters sorted by rawDiffPixels', () => {
+    const base = createPNG(100, 100, [128, 128, 128, 255]);
+    const png = PNG.sync.read(base);
+    // Region 1: 4x4 at (10, 10) -> 16 pixels
+    for (let y = 10; y < 14; y++) {
+      for (let x = 10; x < 14; x++) {
+        const idx = (y * 100 + x) * 4;
+        png.data[idx] = 255;
+        png.data[idx + 1] = 0;
+        png.data[idx + 2] = 0;
+      }
+    }
+    // Region 2: 8x6 at (50, 60) -> 48 pixels
+    for (let y = 60; y < 66; y++) {
+      for (let x = 50; x < 58; x++) {
+        const idx = (y * 100 + x) * 4;
+        png.data[idx] = 0;
+        png.data[idx + 1] = 0;
+        png.data[idx + 2] = 255;
+      }
+    }
+    const current = PNG.sync.write(png);
+
+    const result = compareImages(base, current, 0.001);
+    expect(result.clusters).toBeDefined();
+    expect(result.clusters).toHaveLength(2);
+    expect(result.clusters![0]).toEqual({
+      id: 1,
+      bbox: { x: 50, y: 60, width: 8, height: 6 },
+      rawDiffPixels: 48,
+    });
+    expect(result.clusters![1]).toEqual({
+      id: 2,
+      bbox: { x: 10, y: 10, width: 4, height: 4 },
+      rawDiffPixels: 16,
+    });
+  });
 });
 
 describe('computeSSIM', () => {

@@ -66,9 +66,9 @@ export const RELEASES: Release[] = [
               ' — Perf Budgets DOM script injection, Figma buffer cleanup, batch Git orphan baseline commits, D1 schema/migration sync, and webhook/SSRF guards.',
           },
           {
-            term: 'Perceptual diffing v2 & connected-component clustering',
+            term: 'Perceptual diffing v2 & spatial DOM-cluster attribution',
             detail:
-              ' — connected-component diff bounding boxes, region-scoped chroma YCbCr SSIM + 4-orientation CW-SSIM, localized anti-dilution guard, and Set-of-Mark cropping.',
+              ' — connected-component diff bounding boxes, spatial cluster targetSelector DOM attribution, region-scoped chroma YCbCr SSIM + 4-orientation CW-SSIM, localized anti-dilution guard, and Set-of-Mark cropping.',
           },
           {
             term: 'Visual Cortex MCP tools & Cloud CAS deduplication',
@@ -76,9 +76,9 @@ export const RELEASES: Release[] = [
               ' — adds inspect_diff_cluster_dom, verify_css_patch, and promote_baseline to @frontguard/mcp with local report fallback, plus SHA-256 Git CAS manifest tracking and Cloud CAS endpoints.',
           },
           {
-            term: 'CLI agent guide, render convergence & sensitive DOM redaction',
+            term: 'CLI agent guide, anti-flake controls & multi-provider AI',
             detail:
-              ' — adds frontguard guide [topic] (--json), waitForStability multi-frame convergence, redactSensitive DOM/HTML input masking, and pre-capture route actions with colorScheme emulation.',
+              ' — adds frontguard guide [topic] (--json), waitForStability multi-frame convergence, redactSensitive DOM/HTML input masking, freezeTime ISO / seedRandom / blockUrls anti-flake controls, pre-capture route actions with colorScheme emulation, and Google Gemini + custom baseUrl AI provider support.',
           },
         ],
       },

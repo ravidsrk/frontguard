@@ -8,7 +8,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Route, FrontguardConfig, BrowserEngine, ScreenshotResult } from '../../src/core/types.js';
 import { STORYBOOK_READY_SCRIPT } from '../../src/discovery/storybook.js';
-import { executeTask, executeRouteActions } from '../../src/render/playwright.js';
+import {
+  executeTask,
+  executeRouteActions,
+  resolveFreezeTimestamp,
+  matchesBlockedUrl,
+} from '../../src/render/playwright.js';
 import { logger } from '../../src/utils/logger.js';
 
 /** Replicate the internal RenderTask structure */
@@ -411,5 +416,94 @@ describe('executeTask', () => {
     );
     expect(mockPage.waitForTimeout).toHaveBeenCalledWith(30_000);
   });
+
+  it('resolves freezeTime timestamps and matches blocked URLs with wildcards and substrings', () => {
+    expect(resolveFreezeTimestamp(undefined)).toBeNull();
+    expect(resolveFreezeTimestamp(false)).toBeNull();
+    expect(resolveFreezeTimestamp(true)).toBe(1704067200000);
+    expect(resolveFreezeTimestamp(1710000000000)).toBe(1710000000000);
+    expect(resolveFreezeTimestamp('2024-01-01T00:00:00.000Z')).toBe(1704067200000);
+
+    const patterns = ['*://*.google-analytics.com/*', 'intercom.io'];
+    expect(matchesBlockedUrl('https://www.google-analytics.com/collect', patterns)).toBe(true);
+    expect(matchesBlockedUrl('https://widget.intercom.io/widget/abc', patterns)).toBe(true);
+    expect(matchesBlockedUrl('http://localhost:3000/api/data', patterns)).toBe(false);
+  });
+
+  it('applies ISO string freezeTime, seedRandom PRNG, and blockUrls during executeTask', async () => {
+    const initScripts: string[] = [];
+    let routeInterceptor: ((route: any) => Promise<void>) | undefined;
+    const setFixedTime = vi.fn().mockResolvedValue(undefined);
+
+    const mockPage = {
+      on: vi.fn(),
+      clock: { setFixedTime },
+      addInitScript: vi.fn(async (script: string) => {
+        initScripts.push(script);
+      }),
+      goto: vi.fn().mockResolvedValue({ status: () => 200 }),
+      waitForSelector: vi.fn().mockResolvedValue(undefined),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([0x89, 0x50, 0x4e, 0x47])),
+      content: vi.fn().mockResolvedValue('<html><body><button data-testid="cta">Go</button></body></html>'),
+      evaluate: vi.fn().mockResolvedValue([
+        {
+          selector: '[data-testid="cta"]',
+          tagName: 'button',
+          bbox: { x: 10, y: 20, width: 100, height: 36 },
+        },
+      ]),
+    };
+
+    const mockContext = {
+      route: vi.fn(async (_pattern: string, handler: (r: any) => Promise<void>) => {
+        routeInterceptor = handler;
+      }),
+      newPage: vi.fn().mockResolvedValue(mockPage),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const mockBrowser = {
+      newContext: vi.fn().mockResolvedValue(mockContext),
+    };
+
+    const config: FrontguardConfig = {
+      version: 1,
+      baseUrl: 'http://localhost:3000',
+      viewports: [1440],
+      browsers: ['chromium'],
+      threshold: 0.1,
+      ignore: [],
+      smartRender: false,
+      workers: 1,
+      pageTimeout: 5000,
+      maxHeight: 0,
+      outputDir: './report',
+      freezeTime: '2026-01-15T12:00:00Z',
+      seedRandom: 1337,
+      blockUrls: ['*.doubleclick.net/*', 'analytics.example.com'],
+    };
+
+    const route: Route = { path: '/', discoveredVia: 'config' };
+
+    const resultPromise = executeTask(
+      { route, viewport: 1440, browser: 'chromium' },
+      config,
+      new Map([['chromium', mockBrowser as any]]),
+    );
+
+    const result = await resultPromise;
+    expect(setFixedTime).toHaveBeenCalledWith(Date.parse('2026-01-15T12:00:00Z'));
+    expect(initScripts.some((s) => s.includes('Math.random'))).toBe(true);
+    expect(mockContext.route).toHaveBeenCalledTimes(1);
+    expect(routeInterceptor).toBeDefined();
+    expect(result.domElements).toEqual([
+      {
+        selector: '[data-testid="cta"]',
+        tagName: 'button',
+        bbox: { x: 10, y: 20, width: 100, height: 36 },
+      },
+    ]);
+  });
 });
+
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { PNG } from 'pngjs';
 import {
   extractDiffClusters,
+  attributeClustersToDom,
   cropClusterComparisonStrip,
   drawSetOfMarkBoxes,
 } from '../../src/diff/regions.js';
@@ -161,3 +162,43 @@ describe('drawSetOfMarkBoxes', () => {
     expect(png.data[borderIdx + 2]).toBe(85);
   });
 });
+
+describe('attributeClustersToDom', () => {
+  it('attributes clusters to specific overlapping child elements over giant root wrappers', () => {
+    const clusters = [
+      {
+        id: 1,
+        bbox: { x: 100, y: 200, width: 120, height: 40 },
+        rawDiffPixels: 4800,
+        density: 1,
+        perimeterRatio: 0.1,
+      },
+    ];
+    const domElements = [
+      {
+        selector: 'body',
+        tagName: 'body',
+        bbox: { x: 0, y: 0, width: 1440, height: 900 },
+      },
+      {
+        selector: 'main',
+        tagName: 'main',
+        bbox: { x: 0, y: 60, width: 1440, height: 800 },
+      },
+      {
+        selector: '[data-testid="cta-btn"]',
+        tagName: 'button',
+        testId: 'cta-btn',
+        textPreview: 'Start Free Trial',
+        bbox: { x: 98, y: 198, width: 124, height: 44 },
+      },
+    ];
+
+    const attributed = attributeClustersToDom(clusters, domElements);
+    expect(attributed[0].targetSelector).toBe('[data-testid="cta-btn"]');
+    expect(attributed[0].affectedElements).toBeDefined();
+    expect(attributed[0].affectedElements?.[0]?.selector).toBe('[data-testid="cta-btn"]');
+    expect(attributed[0].affectedElements?.[0]?.coverage).toBeCloseTo(1, 2);
+  });
+});
+

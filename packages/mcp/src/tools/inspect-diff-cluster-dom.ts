@@ -91,6 +91,59 @@ export const inspectDiffClusterDomOutputSchema = z.object({
   ),
 });
 
+export interface RawCluster {
+  id?: unknown;
+  bbox?: {
+    x?: unknown;
+    y?: unknown;
+    width?: unknown;
+    height?: unknown;
+  };
+  x?: unknown;
+  y?: unknown;
+  width?: unknown;
+  height?: unknown;
+  targetSelector?: unknown;
+}
+
+export function normalizeClusters(
+  rawClusters: RawCluster[] | undefined,
+  fallbackTarget: string,
+): DiffClusterInspectionItem[] {
+  if (!rawClusters || rawClusters.length === 0) return [];
+  return rawClusters
+    .map((raw, idx) => {
+      const bbox =
+        raw.bbox &&
+        typeof raw.bbox.x === 'number' &&
+        typeof raw.bbox.y === 'number' &&
+        typeof raw.bbox.width === 'number' &&
+        typeof raw.bbox.height === 'number'
+          ? {
+              x: raw.bbox.x,
+              y: raw.bbox.y,
+              width: raw.bbox.width,
+              height: raw.bbox.height,
+            }
+          : typeof raw.x === 'number' &&
+              typeof raw.y === 'number' &&
+              typeof raw.width === 'number' &&
+              typeof raw.height === 'number'
+            ? { x: raw.x, y: raw.y, width: raw.width, height: raw.height }
+            : null;
+      if (!bbox) return null;
+      return {
+        id: typeof raw.id === 'number' ? raw.id : idx + 1,
+        bbox,
+        targetSelector:
+          typeof raw.targetSelector === 'string' && raw.targetSelector.trim().length > 0
+            ? raw.targetSelector.trim()
+            : fallbackTarget,
+      };
+    })
+    .filter((c): c is DiffClusterInspectionItem => c !== null);
+}
+
 function inferTargetSelector(result: CloudRunResult): string {
   if (result.suggestedFix?.target && result.suggestedFix.target.trim()) {
     return result.suggestedFix.target.trim();
@@ -132,28 +185,7 @@ export async function inspectDiffClusterDom(
   }
 
   const defaultTarget = inferTargetSelector(match);
-  const rawClusters = match.clusters && match.clusters.length > 0 ? match.clusters : [];
-
-  let clusters: DiffClusterInspectionItem[] = rawClusters
-    .map((c, idx) => {
-      const bbox = c.bbox ??
-        (typeof c.x === 'number' &&
-        typeof c.y === 'number' &&
-        typeof c.width === 'number' &&
-        typeof c.height === 'number'
-          ? { x: c.x, y: c.y, width: c.width, height: c.height }
-          : null);
-      if (!bbox) return null;
-      return {
-        id: typeof c.id === 'number' ? c.id : idx + 1,
-        bbox,
-        targetSelector:
-          typeof c.targetSelector === 'string' && c.targetSelector.trim()
-            ? c.targetSelector.trim()
-            : defaultTarget,
-      };
-    })
-    .filter((c): c is DiffClusterInspectionItem => c !== null);
+  let clusters = normalizeClusters(match.clusters as RawCluster[] | undefined, defaultTarget);
 
   if (input.cluster_id !== undefined) {
     const filtered = clusters.filter((c) => c.id === input.cluster_id);

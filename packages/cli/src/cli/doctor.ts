@@ -250,6 +250,7 @@ export function checkAiKeys(env: NodeJS.ProcessEnv = process.env): CheckResult {
   const present: string[] = [];
   if (env.FRONTGUARD_OPENAI_KEY) present.push('OpenAI');
   if (env.FRONTGUARD_ANTHROPIC_KEY) present.push('Anthropic');
+  if (env.FRONTGUARD_GEMINI_KEY || env.GEMINI_API_KEY) present.push('Gemini');
 
   if (present.length > 0) {
     return {
@@ -264,7 +265,7 @@ export function checkAiKeys(env: NodeJS.ProcessEnv = process.env): CheckResult {
     name: 'AI provider keys',
     status: 'warn',
     message: 'no AI keys found (AI classification disabled)',
-    fix: 'Set FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY to enable AI analysis.',
+    fix: 'Set FRONTGUARD_OPENAI_KEY, FRONTGUARD_ANTHROPIC_KEY, or FRONTGUARD_GEMINI_KEY to enable AI analysis.',
     critical: false,
   };
 }

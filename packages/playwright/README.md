@@ -119,22 +119,30 @@ test('checkout flow', async ({ page }) => {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `threshold` | `number` | `0.01` | Max pixel diff as fraction (0-1). 0.01 = 1% |
+| `selector` | `string` | `undefined` | Optional CSS selector to capture a single element/component bounding box instead of the full page |
 | `fullPage` | `boolean` | `true` | Capture full page vs viewport only |
 | `mask` | `string[]` | `[]` | CSS selectors to hide before screenshot |
 | `maskRegions` | `Rect[]` | `[]` | Coordinate regions to mask with gray overlay |
-| `ai` | `boolean \| object` | `false` | Enable AI analysis of visual diffs |
-| `freezeTime` | `boolean \| number` | `false` | Freeze `Date.now()` to a timestamp |
+| `redactSensitive` | `boolean \| string[]` | `false` | Automatically redact password, payment, and `[data-frontguard-redact]` inputs (plus optional custom selectors) before capture |
+| `waitForStable` | `boolean \| { maxAttempts?: number; intervalMs?: number }` | `false` | Wait for two consecutive animation frames to converge before capturing |
+| `freezeTime` | `boolean \| number \| string` | `false` | Freeze `Date.now()` / `new Date()` to a boolean default, epoch ms number, or ISO date string (e.g. `'2026-01-01T00:00:00Z'`) |
+| `seedRandom` | `boolean \| number` | `false` | Seed `Math.random()` with a deterministic PRNG (`true` uses default seed, or pass a numeric seed) |
+| `blockUrls` | `string[]` | `[]` | URL glob or substring patterns to abort before rendering (e.g. analytics, ads, live chat widgets) |
+| `captureAriaSnapshot` | `boolean` | `false` | Capture a Playwright ARIA accessibility tree snapshot alongside the screenshot |
+| `ai` | `boolean \| { provider: 'openai' \| 'anthropic' \| 'gemini'; model?: string; baseUrl?: string }` | `false` | Enable AI analysis of visual diffs (`openai`, `anthropic`, `gemini`, or custom OpenAI-compatible `baseUrl`) |
 | `baselineDir` | `string` | `__visual_baselines__` | Directory for baseline images |
 | `update` | `boolean` | `false` | Update baselines instead of comparing |
 
 ## AI Analysis
 
-Set your API key and enable AI:
+Set your API key and enable AI (`openai`, `anthropic`, `gemini`, or a custom OpenAI-compatible `baseUrl` for OpenRouter / Ollama / vLLM):
 
 ```bash
 export FRONTGUARD_OPENAI_KEY=sk-...
 # or
 export FRONTGUARD_ANTHROPIC_KEY=sk-ant-...
+# or
+export FRONTGUARD_GEMINI_KEY=AIza...
 ```
 
 ```typescript
@@ -190,6 +198,14 @@ interface VisualTestResult {
   diffPath?: string;         // Path to diff image (if any diff)
   ssim?: number;             // Structural similarity (0-1, 1=identical)
   isNewBaseline: boolean;    // True on first run
+  settled?: boolean;         // True when waitForStable frame convergence succeeded
+  clusters?: Array<{         // Connected-component spatial diff clusters
+    id: number;
+    bbox: { x: number; y: number; width: number; height: number };
+    pixelCount: number;
+    targetSelector?: string; // Most-specific DOM selector at cluster center
+  }>;
+  ariaSnapshot?: string;     // Captured ARIA tree when captureAriaSnapshot is enabled
   ai?: {                     // Present if AI analysis enabled
     classification: string;
     severity: string;

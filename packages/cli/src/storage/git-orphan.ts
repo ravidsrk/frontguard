@@ -9,7 +9,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { BaselineStorage, BaselineManifest, BrowserEngine } from '../core/types.js';
@@ -342,6 +342,15 @@ export class GitOrphanStorage implements BaselineStorage {
     await this.writeToOrphanBranch(
       (worktreeDir) => {
         const fullPath = join(worktreeDir, path);
+        if (existsSync(fullPath)) {
+          try {
+            if (readFileSync(fullPath).equals(buffer)) {
+              return;
+            }
+          } catch {
+            // Proceed with write on read failure
+          }
+        }
         mkdirSync(dirname(fullPath), { recursive: true });
         writeFileSync(fullPath, buffer);
       },
@@ -372,6 +381,15 @@ export class GitOrphanStorage implements BaselineStorage {
           const browser = entry.browser ?? 'chromium';
           const path = baselinePath(entry.route, entry.viewport, browser);
           const fullPath = join(worktreeDir, path);
+          if (existsSync(fullPath)) {
+            try {
+              if (readFileSync(fullPath).equals(entry.buffer)) {
+                continue;
+              }
+            } catch {
+              // Proceed with write on read failure
+            }
+          }
           mkdirSync(dirname(fullPath), { recursive: true });
           writeFileSync(fullPath, entry.buffer);
         }
