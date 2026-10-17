@@ -253,7 +253,7 @@ export function FeatureBentoGrid() {
 
             <Link
               to="/docs/$"
-              params={{ _splat: "plugins/overview" }}
+              params={{ _splat: "guides/custom-plugins" }}
               className="fg-link"
               style={{
                 fontFamily: MONO,

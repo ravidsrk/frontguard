@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export const MONO = "'JetBrains Mono', monospace";
 export const SANS = "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif";
@@ -260,10 +260,7 @@ export default defineConfig({
       ],
     },
   ],
-  viewports: [
-    { name: 'desktop', width: 1440, height: 900 },
-    { name: 'mobile',  width: 375,  height: 812 },
-  ],
+  viewports: [1440, 375],
   colorScheme: 'dark',
   waitForStability: true,
   redactSensitive: true,
@@ -290,10 +287,7 @@ export const CONFIG_HTML = `<span style="color:#e8862e">import</span> { defineCo
       ],
     },
   ],
-  viewports: [
-    { name: <span style="color:#4fb477">'desktop'</span>, width: <span style="color:#f5f1ea">1440</span>, height: <span style="color:#f5f1ea">900</span> },
-    { name: <span style="color:#4fb477">'mobile'</span>,  width: <span style="color:#f5f1ea">375</span>,  height: <span style="color:#f5f1ea">812</span> },
-  ],
+  viewports: [<span style="color:#f5f1ea">1440</span>, <span style="color:#f5f1ea">375</span>],
   colorScheme: <span style="color:#4fb477">'dark'</span>,
   waitForStability: <span style="color:#e8862e">true</span>,
   redactSensitive: <span style="color:#e8862e">true</span>,
@@ -331,7 +325,7 @@ chromaSSIM: 0.614 (flagged) · cwSSIM: 0.994 (font AA ignored)`,
 
 export const CHECKLIST_FEATURES = [
   {
-    title: "Auto route discovery",
+    title: "Auto route & Storybook discovery",
     desc: "Crawls live links and parses Next.js, Remix, Astro, Nuxt, SvelteKit, and Storybook 8 index trees.",
   },
   {
@@ -425,29 +419,29 @@ export const COMPARISON_ROWS = [
 
 export const PLUGINS = [
   {
-    name: "wcag",
-    tag: "BUILT-IN · A11Y",
-    desc: "Runs axe-core WCAG 2.1 AA checks on every captured route.",
+    name: "Figma",
+    tag: "DESIGN JUDGE",
+    desc: "Design-to-code comparison & token extraction.",
   },
   {
-    name: "perf-budget",
-    tag: "BUILT-IN · CWV",
-    desc: "Asserts LCP, CLS, FCP, TTFB, and transfer size budgets.",
+    name: "Perf Budgets",
+    tag: "WEB VITALS",
+    desc: "LCP / CLS / TTFB thresholds tied to the diff.",
   },
   {
-    name: "script-guard",
-    tag: "BUILT-IN · SECURITY",
-    desc: "Inventories external scripts and flags unexpected third-party domains.",
+    name: "Accessibility",
+    tag: "WCAG AUDIT",
+    desc: "axe-core WCAG audits in the same render pass.",
   },
   {
-    name: "storybook",
-    tag: "BUILT-IN · STORIES",
-    desc: "Discovers stories from Storybook index.json and captures isolated states.",
+    name: "3rd-Party Scripts",
+    tag: "DRIFT GUARD",
+    desc: "Flags ad / analytics / widget drift between runs.",
   },
   {
-    name: "git-baselines",
-    tag: "BUILT-IN · STORAGE",
-    desc: "Manages baselines on the frontguard-baselines git orphan branch.",
+    name: "Monitor",
+    tag: "HISTORY",
+    desc: "Production visual monitoring & alerting.",
   },
 ] as const;
 
@@ -456,6 +450,16 @@ export const LIFECYCLE_HOOKS_TEXT =
 
 export function useCopy(): [boolean, (text: string) => void] {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
   const copy = (text: string) => {
     try {
       navigator.clipboard?.writeText(text);
@@ -463,7 +467,13 @@ export function useCopy(): [boolean, (text: string) => void] {
       /* ignore clipboard errors in headless environments */
     }
     setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+    }
+    timerRef.current = setTimeout(() => {
+      setCopied(false);
+      timerRef.current = null;
+    }, 1800);
   };
   return [copied, copy];
 }
