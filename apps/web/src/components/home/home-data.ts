@@ -1,322 +1,423 @@
 import { useEffect, useRef, useState } from "react";
 
 export const MONO = "'JetBrains Mono', monospace";
+export const SANS = "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif";
 
-export function useCopy(): [boolean, (text: string) => void] {
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+export type ViewportId = "1440" | "768" | "375";
+export type DiffModeId = "side-by-side" | "swipe" | "onion" | "cluster-ssim";
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, []);
-
-  const trigger = (text: string) => {
-    try {
-      navigator.clipboard?.writeText(text);
-    } catch {
-      // ignore clipboard errors in restricted contexts
-    }
-    setCopied(true);
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current);
-    }
-    timerRef.current = setTimeout(() => {
-      setCopied(false);
-      timerRef.current = null;
-    }, 1800);
-  };
-
-  return [copied, trigger];
+export interface ViewportScenario {
+  id: ViewportId;
+  label: string;
+  device: string;
+  route: string;
+  diffPct: string;
+  chromaSsim: string;
+  cwSsim: string;
+  settledFrames: number;
+  redactedCount: number;
+  clusterBox: { x: number; y: number; w: number; h: number; label: string };
+  noiseBox: { x: number; y: number; w: number; h: number; label: string };
+  patchRule: string;
 }
 
-export interface PipelineStage {
-  num: string;
-  title: string;
-  artifact: string;
-  desc: string;
-}
+export const VIEWPORT_SCENARIOS: Record<ViewportId, ViewportScenario> = {
+  "1440": {
+    id: "1440",
+    label: "1440px",
+    device: "Desktop · 1440×900",
+    route: "/dashboard",
+    diffPct: "1.84%",
+    chromaSsim: "0.614",
+    cwSsim: "0.589",
+    settledFrames: 3,
+    redactedCount: 2,
+    clusterBox: {
+      x: 8,
+      y: 52,
+      w: 22,
+      h: 26,
+      label: "CLUSTER #1 · 148×164px · aside .sidebar-cta",
+    },
+    noiseBox: {
+      x: 36,
+      y: 12,
+      w: 44,
+      h: 12,
+      label: "IGNORED · 1px font hinting (CW-SSIM 0.994)",
+    },
+    patchRule: "aside .sidebar-cta { min-height: 36px; display: flex; }",
+  },
+  "768": {
+    id: "768",
+    label: "768px",
+    device: "Tablet · 768×1024",
+    route: "/pricing",
+    diffPct: "2.41%",
+    chromaSsim: "0.542",
+    cwSsim: "0.518",
+    settledFrames: 4,
+    redactedCount: 1,
+    clusterBox: {
+      x: 52,
+      y: 44,
+      w: 40,
+      h: 32,
+      label: "CLUSTER #1 · 210×96px · .tier-card-pro",
+    },
+    noiseBox: {
+      x: 10,
+      y: 14,
+      w: 50,
+      h: 10,
+      label: "IGNORED · sub-pixel kerning (CW-SSIM 0.991)",
+    },
+    patchRule: ".tier-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }",
+  },
+  "375": {
+    id: "375",
+    label: "375px",
+    device: "Mobile · 375×812",
+    route: "/checkout",
+    diffPct: "3.12%",
+    chromaSsim: "0.488",
+    cwSsim: "0.462",
+    settledFrames: 3,
+    redactedCount: 3,
+    clusterBox: {
+      x: 12,
+      y: 64,
+      w: 76,
+      h: 22,
+      label: "CLUSTER #1 · 284×54px · [data-testid='pay-btn']",
+    },
+    noiseBox: {
+      x: 12,
+      y: 16,
+      w: 64,
+      h: 10,
+      label: "IGNORED · 1px AA drift (CW-SSIM 0.996)",
+    },
+    patchRule:
+      ".checkout-footer { padding-bottom: env(safe-area-inset-bottom, 16px); }",
+  },
+};
 
-export const STAGES: PipelineStage[] = [
-  {
-    num: "01",
-    title: "Discover",
-    artifact: "routes[]",
-    desc: "Crawl, filesystem scan, Storybook index, or config — finds every route automatically.",
-  },
-  {
-    num: "02",
-    title: "Filter",
-    artifact: "affected[]",
-    desc: "Dependency graph renders only pages affected by your changes.",
-  },
-  {
-    num: "03",
-    title: "Render",
-    artifact: "PNG + DOM",
-    desc: "Playwright × viewports × browsers, with frame stability convergence, redaction, and optional multi-render consensus.",
-  },
-  {
-    num: "04",
-    title: "Diff",
-    artifact: "DiffCluster[]",
-    desc: "Pixel comparison with connected-component diff clustering, chroma YCbCr SSIM, and CW-SSIM.",
-  },
-  {
-    num: "05",
-    title: "Analyze",
-    artifact: "AI / MCP",
-    desc: "Optional BYOK analysis classifies, explains, and scores confidence without overriding exit codes.",
-  },
-  {
-    num: "06",
-    title: "Report",
-    artifact: "HTML + JSON",
-    desc: "Console, JSON, and an interactive HTML workbench with swipe, onion-skin, and cluster overlays.",
-  },
-];
-
-export interface TelemetryStat {
-  v: string;
-  c: string;
-  tag: string;
-  d: string;
-}
-
-export const TELEMETRY_STATS: TelemetryStat[] = [
-  {
-    v: "39 / 43",
-    c: "#e8862e",
-    tag: "HARNESS RECHECKS",
-    d: "route rechecks completed in the published local harness",
-  },
-  {
-    v: "2 / 5",
-    c: "#f5f1ea",
-    tag: "FIXTURE BOOT",
-    d: "fixture repositories booted successfully",
-  },
-  {
-    v: "AI OFF",
-    c: "#f5f1ea",
-    tag: "DETERMINISTIC MODE",
-    d: "classifier accuracy was not measured in that run",
-  },
-  {
-    v: "1 HOST",
-    c: "#f5f1ea",
-    tag: "ENVIRONMENT SCOPE",
-    d: "macOS only; cross-OS equivalence remains unproven",
-  },
-];
-
-export interface PillarItem {
-  n: string;
-  c: string;
-  h: string;
-  p: string;
-  spec: string[];
-}
-
-export const PILLARS: PillarItem[] = [
-  {
-    n: "DETECT",
-    c: "#4fb477",
-    h: "Find what changed",
-    p: "Pixel comparison across configured viewports and browsers, with connected-component diff clustering, spatial targetSelector DOM attribution, chroma/CW-SSIM perceptual scoring, masks, and optional multi-render consensus.",
-    spec: [
-      "8-connected Union-Find cluster bounding boxes + targetSelector",
-      "ITU-R BT.709 YCbCr Chroma SSIM + CW-SSIM",
-      "waitForStability · freezeTime · seedRandom · blockUrls",
-    ],
-  },
-  {
-    n: "UNDERSTAND",
-    c: "#e8862e",
-    h: "Explain why it broke",
-    p: "When configured, model-assisted analysis classifies changed screenshots and returns a confidence-scored explanation for human review across OpenAI, Anthropic, Google Gemini, or a custom OpenAI-compatible baseUrl.",
-    spec: [
-      "Advisory severity: critical · warning · info · noise",
-      "Set-of-Mark [1] cropped diff strips",
-      "Direct BYOK to OpenAI, Anthropic, Gemini, or custom baseUrl",
-    ],
-  },
-  {
-    n: "FIX",
-    c: "#5b8def",
-    h: "Verified, not guessed",
-    p: "Experimental CSS suggestions can be generated and, with a separate verification opt-in, applied in a sandbox and re-rendered. Unverified suggestions remain labeled as such.",
-    spec: [
-      "Opt-in sandbox style injection & re-render",
-      "MCP verify_css_patch safety checks",
-      "Never mutates source files or baselines silently",
-    ],
-  },
-];
-
-export interface BentoFeature {
-  tag: string;
-  title: string;
-  desc: string;
-  span: 4 | 6;
-  accent: string;
+export const DIFF_MODES: ReadonlyArray<{
+  id: DiffModeId;
+  keyHint: string;
+  label: string;
   badge: string;
-  detail: string;
-}
-
-export const BENTO_FEATURES: BentoFeature[] = [
+  desc: string;
+}> = [
   {
-    tag: "STORAGE",
-    title: "Git-native baselines",
-    desc: "Stored in an orphan branch with SHA-256 manifest tracking and single-commit batching. Keep binary PNG bloat out of your working history.",
-    span: 6,
-    accent: "#4fb477",
-    badge: "frontguard-baselines",
-    detail: "manifest.json → sha256 digest + single-worktree commit",
+    id: "side-by-side",
+    keyHint: "1",
+    label: "Side-by-Side",
+    badge: "DUAL FRAME",
+    desc: "Synchronized baseline (git orphan branch) and current candidate renders.",
   },
   {
-    tag: "STABILITY & PRIVACY",
-    title: "Frame convergence, anti-flake & PII redaction",
-    desc: "Consecutive animation-frame luminance convergence, deterministic freezeTime / seedRandom / blockUrls controls, and redactSensitive DOM masking before capture.",
-    span: 6,
-    accent: "#e8862e",
-    badge: "waitForStability · freezeTime · seedRandom",
-    detail: "RAF × 2 convergence + blockUrls + DOM scrub",
+    id: "cluster-ssim",
+    keyHint: "2",
+    label: "Cluster SSIM Map",
+    badge: "SPATIAL REGION",
+    desc: "8-connected bounding boxes scored by local Chroma SSIM (YCbCr) and CW-SSIM.",
   },
   {
-    tag: "DISCOVERY",
-    title: "Zero-config routes",
-    desc: "Auto-crawls your app or scans Next.js App Router, Remix, SvelteKit, Nuxt, Astro, and Storybook indexes.",
-    span: 4,
-    accent: "#4fb477",
-    badge: "6 frameworks + crawler",
-    detail: "Handles route groups, parallel slots & dynamic segments",
+    id: "swipe",
+    keyHint: "3",
+    label: "Swipe Curtain",
+    badge: "OPTICAL SPLIT",
+    desc: "Drag the optical loupe across any coordinate to verify structural alignment.",
   },
   {
-    tag: "RENDER",
-    title: "Multi-browser & color schemes",
-    desc: "Chromium, Firefox, and WebKit via Playwright with light/dark colorScheme and pre-capture route actions.",
-    span: 4,
-    accent: "#5b8def",
-    badge: "375 · 768 · 1440px",
-    detail: "click · hover · fill · press · waitForSelector",
-  },
-  {
-    tag: "SPEED",
-    title: "Smart rendering",
-    desc: "Static import dependency graph maps changed source files to routes and renders only what your PR affects.",
-    span: 4,
-    accent: "#e8862e",
-    badge: "--affected",
-    detail: "Skips untouched routes in monorepos and large apps",
-  },
-  {
-    tag: "CONFIG",
-    title: "Per-route thresholds & DOM attribution",
-    desc: "Strict 0.1% pixel tolerance on /checkout, relaxed tolerance on /blog routes, plus spatial cluster.targetSelector DOM attribution.",
-    span: 4,
-    accent: "#f5f1ea",
-    badge: "threshold · targetSelector",
-    detail: "Route-scoped masks, selectors, and consensus count",
-  },
-  {
-    tag: "SECURITY",
-    title: "Security hardened",
-    desc: "Shell-injection prevention, path-traversal guards, SSRF target checks, and untrusted DOM prompt wrapping.",
-    span: 4,
-    accent: "#4fb477",
-    badge: "SSRF + key redaction",
-    detail: "Local-first execution with strict secret scrubbing",
-  },
-  {
-    tag: "REPORT",
-    title: "Inspectable reports",
-    desc: "Interactive local HTML workbench with Side-by-Side, Swipe, Onion Skin, Diff Focus, and keyboard navigation.",
-    span: 4,
-    accent: "#5b8def",
-    badge: "j/k · 1-4 · b · /",
-    detail: "Baseline, current, and diff PNGs stay on disk",
+    id: "onion",
+    keyHint: "4",
+    label: "Onion Skin & Patch",
+    badge: "50% BLEND",
+    desc: "Alpha-composited overlay exposing 1px padding shifts and flex-wrap breaks.",
   },
 ];
 
-export interface ComparisonRow {
-  cap: string;
-  fg: string;
-  percy: string;
-  chromatic: string;
-  backstop: string;
-  lostpixel: string;
-}
+export const PIPELINE_PHASES = [
+  {
+    phase: "PHASE 01",
+    name: "Capture",
+    outcome: "Find what changed",
+    stages: [
+      { n: "01", name: "Discover", tag: "routes + stories" },
+      { n: "02", name: "Filter", tag: "changed routes" },
+      { n: "03", name: "Render", tag: "hermetic Playwright" },
+    ],
+    desc: "Crawls live routes or Storybook stories, narrows to git-affected paths when configured, and renders deterministic multi-viewport snapshots with frozen clocks, seeded PRNG, and frame convergence.",
+    specs: [
+      "waitForStability + freezeTime + seedRandom",
+      "redactSensitive masks PII before disk write",
+    ],
+  },
+  {
+    phase: "PHASE 02",
+    name: "Compare",
+    outcome: "Explain why it broke",
+    stages: [
+      { n: "04", name: "Diff", tag: "pixel + cluster SSIM" },
+      { n: "05", name: "Analyze", tag: "opt-in BYOK AI" },
+    ],
+    desc: "Extracts 8-connected spatial diff clusters, computes local Chroma SSIM (YCbCr) and wavelet CW-SSIM to ignore sub-pixel font drift, and attributes each cluster to its highest-overlap DOM targetSelector.",
+    specs: [
+      "Connected-component cluster bounding boxes",
+      "Optional BYOK severity & root-cause triage",
+    ],
+  },
+  {
+    phase: "PHASE 03",
+    name: "Report",
+    outcome: "Verified, not guessed",
+    stages: [{ n: "06", name: "Report", tag: "HTML + JSON + CI" }],
+    desc: "Emits deterministic exit codes (0 pass, 1 regression, 2 error), a self-contained 4-mode HTML diff workbench, and optional sandbox-verified CSS patch suggestions without ever auto-overwriting baselines.",
+    specs: [
+      "frontguard-baselines git orphan branch",
+      "Candidate CSS re-rendered in Playwright sandbox",
+    ],
+  },
+] as const;
 
-export const COMPARISON_ROWS: ComparisonRow[] = [
+export const CLI_CODE = `# Terminal 1: keep your app server running
+npm run dev
+
+# Terminal 2: initialize config & run visual check
+npx -p @frontguard/cli frontguard init --ci
+npx -p @frontguard/cli frontguard run`;
+
+export const CLI_HTML = `<span style="color:#a89f94"># Terminal 1: keep your app server running</span>
+<span style="color:#f5f1ea">npm run dev</span>
+
+<span style="color:#a89f94"># Terminal 2: initialize config &amp; run visual check</span>
+<span style="color:#f5f1ea">npx -p @frontguard/cli frontguard init --ci</span>
+<span style="color:#f5f1ea">npx -p @frontguard/cli frontguard run</span>`;
+
+export const PW_CODE = `import { test, expect } from '@playwright/test'
+import { visualTest } from '@frontguard/playwright'
+
+test('dashboard layout remains stable', async ({ page }) => {
+  await page.goto('/dashboard')
+  const res = await visualTest(page, 'dashboard', {
+    selector: '[data-testid="Usage-panel"]',
+    waitForStable: true,
+    redactSensitive: true,
+  })
+  expect(res.passed).toBe(true)
+})`;
+
+export const PW_HTML = `<span style="color:#e8862e">import</span> { test, expect } <span style="color:#e8862e">from</span> <span style="color:#4fb477">'@playwright/test'</span>
+<span style="color:#e8862e">import</span> { visualTest } <span style="color:#e8862e">from</span> <span style="color:#4fb477">'@frontguard/playwright'</span>
+
+test(<span style="color:#4fb477">'dashboard layout remains stable'</span>, <span style="color:#e8862e">async</span> ({ page }) =&gt; {
+  <span style="color:#e8862e">await</span> page.goto(<span style="color:#4fb477">'/dashboard'</span>)
+  <span style="color:#e8862e">const</span> res = <span style="color:#e8862e">await</span> visualTest(page, <span style="color:#4fb477">'dashboard'</span>, {
+    selector: <span style="color:#4fb477">'[data-testid="Usage-panel"]'</span>,
+    waitForStable: <span style="color:#e8862e">true</span>,
+    redactSensitive: <span style="color:#e8862e">true</span>,
+  })
+  expect(res.passed).toBe(<span style="color:#e8862e">true</span>)
+})`;
+
+export const MCP_CODE = `# Machine-readable workflow guide for coding agents
+npx -p @frontguard/cli frontguard guide --json
+
+# Zero-cloud local report mode via @frontguard/mcp
+FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json \\
+  npx @frontguard/mcp
+
+# 7 MCP tools: list_regressions · inspect_diff_cluster_dom
+# get_suggested_fix · verify_css_patch · promote_baseline
+# accept_baseline · recent_runs`;
+
+export const MCP_HTML = `<span style="color:#a89f94"># Machine-readable workflow guide for coding agents</span>
+<span style="color:#f5f1ea">npx -p @frontguard/cli frontguard guide --json</span>
+
+<span style="color:#a89f94"># Zero-cloud local report mode via @frontguard/mcp</span>
+<span style="color:#f5f1ea">FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json \\</span>
+  <span style="color:#f5f1ea">npx @frontguard/mcp</span>
+
+<span style="color:#a89f94"># 7 MCP tools: list_regressions · inspect_diff_cluster_dom</span>
+<span style="color:#a89f94"># get_suggested_fix · verify_css_patch · promote_baseline</span>
+<span style="color:#a89f94"># accept_baseline · recent_runs</span>`;
+
+export const CONFIG_CODE = `import { defineConfig } from '@frontguard/cli'
+
+export default defineConfig({
+  baseUrl: 'http://localhost:3000',
+  routes: [
+    '/',
+    '/pricing',
+    {
+      path: '/dashboard',
+      actions: [
+        { type: 'waitForSelector', selector: '[data-ready]' },
+        { type: 'click', selector: '[data-tab="overview"]' },
+      ],
+    },
+  ],
+  viewports: [1440, 375],
+  colorScheme: 'dark',
+  waitForStability: true,
+  redactSensitive: true,
+  freezeTime: '2026-01-01T00:00:00.000Z',
+  seedRandom: 42,
+  blockUrls: ['*://*.google-analytics.com/*'],
+  threshold: 0.01,
+  // Optional BYOK: 'openai' | 'anthropic' | 'gemini' ( + custom baseUrl )
+  ai: { provider: 'gemini', model: 'gemini-2.5-flash' },
+})`;
+
+export const CONFIG_HTML = `<span style="color:#e8862e">import</span> { defineConfig } <span style="color:#e8862e">from</span> <span style="color:#4fb477">'@frontguard/cli'</span>
+
+<span style="color:#e8862e">export default</span> defineConfig({
+  baseUrl: <span style="color:#4fb477">'http://localhost:3000'</span>,
+  routes: [
+    <span style="color:#4fb477">'/'</span>,
+    <span style="color:#4fb477">'/pricing'</span>,
+    {
+      path: <span style="color:#4fb477">'/dashboard'</span>,
+      actions: [
+        { type: <span style="color:#4fb477">'waitForSelector'</span>, selector: <span style="color:#4fb477">'[data-ready]'</span> },
+        { type: <span style="color:#4fb477">'click'</span>, selector: <span style="color:#4fb477">'[data-tab="overview"]'</span> },
+      ],
+    },
+  ],
+  viewports: [<span style="color:#f5f1ea">1440</span>, <span style="color:#f5f1ea">375</span>],
+  colorScheme: <span style="color:#4fb477">'dark'</span>,
+  waitForStability: <span style="color:#e8862e">true</span>,
+  redactSensitive: <span style="color:#e8862e">true</span>,
+  freezeTime: <span style="color:#4fb477">'2026-01-01T00:00:00.000Z'</span>,
+  seedRandom: <span style="color:#f5f1ea">42</span>,
+  blockUrls: [<span style="color:#4fb477">'*://*.google-analytics.com/*'</span>],
+  threshold: <span style="color:#f5f1ea">0.01</span>,
+  <span style="color:#a89f94">// Optional BYOK: 'openai' | 'anthropic' | 'gemini' ( + custom baseUrl )</span>
+  ai: { provider: <span style="color:#4fb477">'gemini'</span>, model: <span style="color:#4fb477">'gemini-2.5-flash'</span> },
+})`;
+
+export const TOP_THREE_FEATURES = [
   {
-    cap: "Open source (MIT)",
-    fg: "✓",
-    percy: "✕",
-    chromatic: "◐",
-    backstop: "✓",
-    lostpixel: "◐",
+    tag: "GIT-NATIVE STORAGE",
+    title: "Git-native baselines",
+    desc: "Stores baseline PNGs in a dedicated frontguard-baselines orphan branch with SHA-256 content-addressable deduplication so your main branch stays free of binary bloat.",
+    snippet: `$ git fetch origin frontguard-baselines
+manifest.json · sha256: 8f3a9c... (0 MB added to main)`,
   },
   {
-    cap: "CLI-first",
-    fg: "✓",
+    tag: "DETERMINISTIC CAPTURE",
+    title: "Frame convergence & anti-flake",
+    desc: "Polls consecutive screenshots until layout variance settles below 0.05%, freezes Date/clock timestamps, seeds Math.random(), and aborts third-party ad or analytics trackers.",
+    snippet: `waitForStability: true · settled in 3 frames (< 0.05%)
+freezeTime: '2026-01-01T00:00:00Z' · seedRandom: 42`,
+  },
+  {
+    tag: "PERCEPTUAL ENGINE",
+    title: "Smart rendering & spatial diffing",
+    desc: "Scores 8-connected diff clusters with local Chroma SSIM (YCbCr) and wavelet CW-SSIM—catching color and layout shifts on small buttons while overriding 1px font hinting drift.",
+    snippet: `cluster #1 · targetSelector: "aside .sidebar-cta"
+chromaSSIM: 0.614 (flagged) · cwSSIM: 0.994 (font AA ignored)`,
+  },
+] as const;
+
+export const CHECKLIST_FEATURES = [
+  {
+    title: "Auto route & Storybook discovery",
+    desc: "Crawls live links and parses Next.js, Remix, Astro, Nuxt, SvelteKit, and Storybook 8 index trees.",
+  },
+  {
+    title: "Pre-capture actions",
+    desc: "Run click, hover, fill, scroll, and waitForSelector steps per route before taking the screenshot.",
+  },
+  {
+    title: "PII & input redaction",
+    desc: "Masks password, email, and [data-sensitive] elements and scrubs [REDACTED] in DOM snapshots.",
+  },
+  {
+    title: "Parallel render pool",
+    desc: "Reuses warm Playwright Chromium contexts across routes and viewports with configurable concurrency.",
+  },
+  {
+    title: "Production URL monitor",
+    desc: "Scheduled frontguard monitor checks against live URLs with Slack/webhook alerts and flake tracking.",
+  },
+  {
+    title: "Sandbox fix verification",
+    desc: "Injects candidate CSS patches into an isolated Playwright context and re-diffs to verify fixes.",
+  },
+] as const;
+
+export const COMPARISON_ROWS = [
+  {
+    cap: "Open-source core",
+    fg: "MIT",
     percy: "✕",
     chromatic: "✕",
-    backstop: "✓",
-    lostpixel: "✓",
-  },
-  {
-    cap: "AI change classification",
-    fg: "✓",
-    percy: "◐",
-    chromatic: "✕",
-    backstop: "✕",
-    lostpixel: "✕",
-  },
-  {
-    cap: "Experimental fix verification",
-    fg: "◐",
-    percy: "✕",
-    chromatic: "✕",
-    backstop: "✕",
-    lostpixel: "✕",
-  },
-  {
-    cap: "Configurable multi-render consensus",
-    fg: "◐",
-    percy: "◐",
-    chromatic: "◐",
-    backstop: "✕",
-    lostpixel: "✕",
-  },
-  {
-    cap: "Runs without a hosted service",
-    fg: "✓",
-    percy: "✕",
-    chromatic: "✕",
-    backstop: "✓",
-    lostpixel: "◐",
-  },
-  {
-    cap: "Free tier",
-    fg: "Forever",
-    percy: "5k/mo",
-    chromatic: "5k/mo",
-    backstop: "Free",
+    backstop: "MIT",
     lostpixel: "Sunset",
   },
-];
+  {
+    cap: "Runs 100% locally (no cloud account)",
+    fg: "✓",
+    percy: "✕",
+    chromatic: "✕",
+    backstop: "✓",
+    lostpixel: "◐",
+  },
+  {
+    cap: "Perceptual SSIM + spatial cluster diff",
+    fg: "✓",
+    percy: "◐",
+    chromatic: "✕",
+    backstop: "✕",
+    lostpixel: "✕",
+  },
+  {
+    cap: "Frame-stability convergence check",
+    fg: "✓",
+    percy: "◐",
+    chromatic: "◐",
+    backstop: "✕",
+    lostpixel: "✕",
+  },
+  {
+    cap: "AI classification (BYOK)",
+    fg: "◐",
+    percy: "◐",
+    chromatic: "✕",
+    backstop: "✕",
+    lostpixel: "✕",
+  },
+  {
+    cap: "CSS suggestion verification (opt-in)",
+    fg: "◐",
+    percy: "✕",
+    chromatic: "✕",
+    backstop: "✕",
+    lostpixel: "✕",
+  },
+  {
+    cap: "Built-in WCAG + perf-budget plugins",
+    fg: "✓",
+    percy: "✕",
+    chromatic: "◐",
+    backstop: "✕",
+    lostpixel: "✕",
+  },
+  {
+    cap: "Git orphan-branch baseline storage",
+    fg: "✓",
+    percy: "✕",
+    chromatic: "✕",
+    backstop: "✕",
+    lostpixel: "✕",
+  },
+] as const;
 
-export interface PluginItem {
-  name: string;
-  tag: string;
-  desc: string;
-}
-
-export const PLUGINS: PluginItem[] = [
+export const PLUGINS = [
   {
     name: "Figma",
     tag: "DESIGN JUDGE",
@@ -342,119 +443,37 @@ export const PLUGINS: PluginItem[] = [
     tag: "HISTORY",
     desc: "Production visual monitoring & alerting.",
   },
-];
+] as const;
 
 export const LIFECYCLE_HOOKS_TEXT =
   "setup · beforeDiscover · afterDiscover · beforeRender · afterRender · afterCompare · afterRun · onError · teardown";
 
-export interface HonestCard {
-  label: string;
-  color: string;
-  body: string;
+export function useCopy(): [boolean, (text: string) => void] {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  const copy = (text: string) => {
+    try {
+      navigator.clipboard?.writeText(text);
+    } catch {
+      /* ignore clipboard errors in headless environments */
+    }
+    setCopied(true);
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+    }
+    timerRef.current = setTimeout(() => {
+      setCopied(false);
+      timerRef.current = null;
+    }, 1800);
+  };
+  return [copied, copy];
 }
-
-export const HONEST_CARDS: HonestCard[] = [
-  {
-    label: "YOU BRING THE KEY",
-    color: "#e8862e",
-    body: "AI is optional and uses your selected OpenAI, Anthropic, or Google Gemini account (or a custom OpenAI-compatible baseUrl). Changed screenshots go directly to that provider, not through a Frontguard proxy; leave AI disabled for a fully local run.",
-  },
-  {
-    label: "YOU STAY IN THE LOOP",
-    color: "#4fb477",
-    body: "Let AI explain what changed, classify shift severity, and suggest candidate CSS fixes while keeping pass/fail decisions deterministic. With fix verification enabled, a verified fix is automatically recorded as an accepted local fix-pattern signal. Neither behavior updates baselines; review model output and patches.",
-  },
-  {
-    label: "NUMBERS, NOT CLAIMS",
-    color: "#5b8def",
-    body: "It's young. We publish the validation harness, including repository boot failures and the fact that the current run did not measure AI accuracy. Trust starts with visible limits.",
-  },
-];
-
-export const CLI_HTML = `<span style="color: #a89f94;">$</span> npx -p @frontguard/cli frontguard run
-
-<span style="color: #4fb477;">  ✓ 11 passed</span>   <span style="color: #ff8b8e;">✘ 1 regression</span>
-<span style="color: #a89f94;">  Cluster #1: (48, 224) 148×164px · Chroma SSIM 61.4%</span>`;
-
-export const PW_HTML = `<span style="color: #c678dd;">import</span> { test, expect } <span style="color: #c678dd;">from</span> <span style="color: #98c379;">'@playwright/test'</span>;
-<span style="color: #c678dd;">import</span> { visualTest } <span style="color: #c678dd;">from</span> <span style="color: #98c379;">'@frontguard/playwright'</span>;
-
-test(<span style="color: #98c379;">'home page'</span>, <span style="color: #c678dd;">async</span> ({ page }) => {
-  <span style="color: #c678dd;">await</span> page.goto(<span style="color: #98c379;">'/'</span>);
-  <span style="color: #c678dd;">const</span> result = <span style="color: #c678dd;">await</span> visualTest(page, <span style="color: #98c379;">'home-page'</span>, {
-    waitForStable: <span style="color: #56b6c2;">true</span>,
-    redactSensitive: <span style="color: #56b6c2;">true</span>,
-  });
-  expect(result.passed).toBe(<span style="color: #56b6c2;">true</span>);
-});`;
-
-export const MCP_HTML = `<span style="color: #a89f94;">$</span> npx -p @frontguard/cli frontguard guide mcp --json
-<span style="color: #a89f94;"># Or register @frontguard/mcp in Claude Code / Cursor:</span>
-<span style="color: #4fb477;">→</span> list_regressions · inspect_diff_cluster_dom
-<span style="color: #e8862e;">→</span> get_suggested_fix · verify_css_patch · promote_baseline`;
-
-export const CONFIG_CODE = `export default {
-  baseUrl: 'http://localhost:3000',
-
-  // auto-discover routes or configure pre-capture actions
-  discover: {
-    startUrl: '/',
-    maxDepth: 3,
-    exclude: ['/admin/*', '/api/*'],
-  },
-  routes: [
-    {
-      path: '/pricing',
-      actions: [
-        { type: 'waitForSelector', selector: '[data-ready]' },
-        { type: 'click', selector: '[data-billing="annual"]' },
-      ],
-    },
-  ],
-
-  viewports: [375, 768, 1440],
-  browsers: ['chromium'],
-  colorScheme: 'dark',
-  waitForStability: true,
-  redactSensitive: true,
-  freezeTime: '2026-01-01T00:00:00Z',
-  seedRandom: 42,
-  blockUrls: ['*google-analytics.com*'],
-  threshold: 0.01,
-
-  // AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini' | custom baseUrl)
-  ai: { provider: 'openai', model: 'gpt-4o' },
-};`;
-
-export const CONFIG_HTML = `<span style="color: #c678dd;">export default</span> {
-  baseUrl: <span style="color: #98c379;">'http://localhost:3000'</span>,
-
-  <span style="color: #a89f94;">// auto-discover routes or configure pre-capture actions</span>
-  discover: {
-    startUrl: <span style="color: #98c379;">'/'</span>,
-    maxDepth: <span style="color: #e8862e;">3</span>,
-    exclude: [<span style="color: #98c379;">'/admin/*'</span>, <span style="color: #98c379;">'/api/*'</span>],
-  },
-  routes: [
-    {
-      path: <span style="color: #98c379;">'/pricing'</span>,
-      actions: [
-        { type: <span style="color: #98c379;">'waitForSelector'</span>, selector: <span style="color: #98c379;">'[data-ready]'</span> },
-        { type: <span style="color: #98c379;">'click'</span>, selector: <span style="color: #98c379;">'[data-billing="annual"]'</span> },
-      ],
-    },
-  ],
-
-  viewports: [<span style="color: #e8862e;">375</span>, <span style="color: #e8862e;">768</span>, <span style="color: #e8862e;">1440</span>],
-  browsers: [<span style="color: #98c379;">'chromium'</span>],
-  colorScheme: <span style="color: #98c379;">'dark'</span>,
-  waitForStability: <span style="color: #56b6c2;">true</span>,
-  redactSensitive: <span style="color: #56b6c2;">true</span>,
-  freezeTime: <span style="color: #98c379;">'2026-01-01T00:00:00Z'</span>,
-  seedRandom: <span style="color: #e8862e;">42</span>,
-  blockUrls: [<span style="color: #98c379;">'*google-analytics.com*'</span>],
-  threshold: <span style="color: #e8862e;">0.01</span>,
-
-  <span style="color: #a89f94;">// AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini' | custom baseUrl)</span>
-  ai: { provider: <span style="color: #98c379;">'openai'</span>, model: <span style="color: #98c379;">'gpt-4o'</span> },
-};`;

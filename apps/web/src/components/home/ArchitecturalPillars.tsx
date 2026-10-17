@@ -1,234 +1,106 @@
 import { s } from "../../lib/style";
-import { MONO, PILLARS } from "./home-data";
+import { MONO } from "./home-data";
+
+const AI_JSON_LINES = [
+  { text: "{", highlight: false },
+  { text: '  "route": "/dashboard",', highlight: false },
+  { text: '  "classification": "critical",', highlight: true },
+  { text: '  "confidence": 0.92,', highlight: true },
+  {
+    text: '  "explanation": "Sidebar CTA button collapsed from 36px to 0px height",',
+    highlight: false,
+  },
+  {
+    text: '  "suggestion": "aside .sidebar-cta { min-height: 36px; display: flex; }",',
+    highlight: true,
+  },
+  { text: '  "exitCode": 1', highlight: false },
+  { text: "}", highlight: false },
+] as const;
 
 export function ArchitecturalPillars() {
   return (
-    <section
-      style={s(
-        "border-bottom: 1px solid #1f1c19; background: #100f0e;",
-      )}
-    >
-      <div
-        className="fg-shell"
-        style={s("padding-top: 96px; padding-bottom: 96px;")}
-      >
-        <div style={s("max-width: 720px; margin-bottom: 48px;")}>
-          <div className="fg-eyebrow" style={s("margin-bottom: 14px;")}>
-            // THREE ARCHITECTURAL PILLARS
-          </div>
-          <h2 className="fg-h2" style={s("margin-bottom: 12px;")}>
-            Deterministic pixel gates first. Grounded intelligence when you want
-            it.
-          </h2>
-          <p className="fg-lead">
-            Every run executes local pixel and perceptual similarity checks
-            without network calls. When you opt into BYOK analysis or fix
-            verification, model outputs stay strictly advisory.
-          </p>
-        </div>
-
-        {/* 3 Pillar Cards */}
-        <div className="fg-grid-3" style={s("margin-bottom: 56px;")}>
-          {PILLARS.map((pl) => (
-            <div
-              key={pl.n}
-              style={s(
-                "background: #131210; border: 1px solid #26221e; border-radius: 8px; padding: 28px; display: flex; flex-direction: column; justify-content: space-between; gap: 20px;",
-              )}
-            >
-              <div>
-                <div
-                  style={s(
-                    "display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px;",
-                  )}
-                >
-                  <h3
-                    style={s(
-                      "margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: #f5f1ea;",
-                    )}
-                  >
-                    {pl.h}
-                  </h3>
-                  <div
-                    style={{
-                      fontFamily: MONO,
-                      ...s(
-                        `font-size: 12px; color: ${pl.c}; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;`,
-                      ),
-                    }}
-                  >
-                    <span
-                      style={s(
-                        `width: 7px; height: 7px; border-radius: 999px; background: ${pl.c};`,
-                      )}
-                    />
-                    <span>{pl.n}</span>
-                  </div>
-                </div>
-                <p
-                  style={s(
-                    "margin: 0; font-size: 14px; color: #c8c0b6; line-height: 1.65;",
-                  )}
-                >
-                  {pl.p}
-                </p>
-              </div>
-
-              <div
-                style={s(
-                  "padding-top: 14px; border-top: 1px solid #1f1c19; display: grid; gap: 8px;",
-                )}
-              >
-                {pl.spec.map((item) => (
-                  <div
-                    key={item}
-                    style={{
-                      fontFamily: MONO,
-                      ...s(
-                        "font-size: 12px; color: #c8c0b6; display: flex; align-items: center; gap: 8px;",
-                      ),
-                    }}
-                  >
-                    <span style={s(`color: ${pl.c};`)}>›</span>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Unified AI Classification & Verification Card */}
+    <section className="fg-section">
+      <div className="fg-shell">
         <div
           className="fg-split-asym-left"
-          style={s(
-            "background: #131210; border: 1px solid #2a2622; border-radius: 10px; padding: 36px;",
-          )}
+          style={s("align-items: center;")}
         >
+          {/* Left Column: Outcome Explanation & Optional/Off-by-Default Guarantee */}
           <div>
-            <div className="fg-eyebrow" style={s("margin-bottom: 14px;")}>
-              // ADVISORY ANALYSIS · NEVER SILENTLY OVERRIDES EXIT CODES
+            <div className="fg-eyebrow">
+              OPTIONAL LAYER · OFF BY DEFAULT
             </div>
-            <h2
-              className="fg-h2"
-              style={s("font-size: clamp(24px, 3vw, 34px); margin-bottom: 16px;")}
-            >
-              Optional model-assisted classification for visual diffs.
+
+            <h2 className="fg-h2">
+              Optional model-assisted classification for visual diffs—scores
+              severity and suggests a CSS fix.
             </h2>
+
+            <p className="fg-body" style={s("margin-bottom: 20px;")}>
+              By default, Frontguard runs 100% offline using deterministic pixel
+              and perceptual similarity math. When you opt in, Frontguard crops
+              each diff cluster with its DOM selector and asks your model to
+              classify severity and draft a candidate CSS patch—without ever
+              silently overriding a failing exit code.
+            </p>
+
             <p
+              className="fg-small"
               style={s(
-                "margin: 0 0 24px 0; font-size: 15px; color: #c8c0b6; line-height: 1.65;",
+                "margin: 0; color: var(--text-muted); font-family: var(--fg-mono); font-size: 12px;",
               )}
             >
-              Traditional visual tools report raw pixel counts. When you
-              configure an OpenAI, Anthropic, or Google Gemini key (or a custom
-              OpenAI-compatible baseUrl), Frontguard crops around each
-              connected-component diff cluster with spatial targetSelector DOM
-              attribution and asks your model to classify severity, explain the
-              visual shift, and optionally verify a candidate CSS patch in a
-              Playwright sandbox.
+              BYOK: OpenAI, Anthropic, Gemini, or custom baseUrl · Baselines
+              are never auto-overwritten.
             </p>
-            <div style={s("display: grid; gap: 10px;")}>
-              {[
-                [
-                  "Pixel diff + cluster SSIM",
-                  "Runs locally on every screenshot with targetSelector DOM attribution",
-                ],
-                [
-                  "Advisory AI classification",
-                  "Labels shifts as critical, warning, info, or noise with confidence score",
-                ],
-                [
-                  "Opt-in fix verification",
-                  "Applies candidate CSS in a temporary browser context and re-diffs",
-                ],
-              ].map(([a, b]) => (
-                <div
-                  key={a}
-                  style={s(
-                    "display: flex; align-items: baseline; gap: 12px; padding: 10px 14px; background: #171513; border: 1px solid #24201c; border-radius: 6px; flex-wrap: wrap;",
-                  )}
-                >
-                  <span
-                    style={{
-                      fontFamily: MONO,
-                      ...s("font-size: 12px; color: #e8862e; font-weight: 600;"),
-                    }}
-                  >
-                    ✓ {a}:
-                  </span>
-                  <span style={s("font-size: 13px; color: #c8c0b6;")}>
-                    {b}
-                  </span>
-                </div>
-              ))}
-            </div>
           </div>
 
-          {/* Structured Advisory JSON Telemetry Artifact */}
+          {/* Right Column: Compact 8-Line report.json with --accent-subtle highlights */}
           <div
             style={s(
-              "background: #0f0e0c; border: 1px solid #26221e; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;",
+              "background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;",
             )}
           >
             <div
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "padding: 11px 16px; background: #171513; border-bottom: 1px solid #24201c; font-size: 12px; color: #a89f94; display: flex; justify-content: space-between; align-items: center;",
+                  "padding: 11px 16px; background: #171512; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;",
                 ),
               }}
             >
               <span>.frontguard/results/report.json</span>
-              <span style={s("color: #4fb477;")}>exitCode: 1 (deterministic)</span>
+              <span style={s("color: var(--success);")}>
+                deterministic exitCode: 1
+              </span>
             </div>
+
             <pre
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "margin: 0; padding: 18px 20px; font-size: 12px; line-height: 1.7; color: #d8d0c5; overflow-x: auto;",
+                  "margin: 0; padding: 16px 0; font-size: 12.5px; line-height: 1.75; color: var(--text-primary); overflow-x: auto;",
                 ),
               }}
             >
-              <code>{`{
-  "route": "/dashboard",
-  "viewport": 1440,
-  "status": "regression",
-  "diffPercentage": 1.84,
-  "clusters": [
-    {
-      "id": 1,
-      "bbox": { "x": 48, "y": 224, "width": 148, "height": 164 },
-      "targetSelector": "aside .sidebar-cta",
-      "chromaSSIM": 0.614,
-      "cwSSIM": 0.589
-    }
-  ],
-  "aiAnalysis": {
-    "classification": "critical",
-    "confidence": 0.92,
-    "explanation": "Primary CTA button in sidebar collapsed to 0px height"
-  },
-  "suggestedFix": {
-    "target": "aside .sidebar-cta",
-    "patch": "aside .sidebar-cta { min-height: 36px; display: flex; }",
-    "verified": false
-  }
-}`}</code>
+              <code>
+                {AI_JSON_LINES.map((line, i) => (
+                  <div
+                    key={i}
+                    style={s(
+                      `padding: 1px 20px; ${
+                        line.highlight
+                          ? "background: var(--accent-subtle); border-left: 1px solid var(--accent);"
+                          : "border-left: 1px solid transparent;"
+                      }`,
+                    )}
+                  >
+                    {line.text}
+                  </div>
+                ))}
+              </code>
             </pre>
-            <div
-              style={{
-                fontFamily: MONO,
-                ...s(
-                  "padding: 10px 16px; background: #141210; border-top: 1px solid #24201c; font-size: 12px; color: #a89f94; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;",
-                ),
-              }}
-            >
-              <span>BYOK: OpenAI · Anthropic · Gemini · custom baseUrl</span>
-              <span style={s("color: #e8862e;")}>
-                Baselines never auto-overwritten
-              </span>
-            </div>
           </div>
         </div>
       </div>

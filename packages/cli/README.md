@@ -207,6 +207,7 @@ export default {
 The supported path is the local CLI. Hosted cloud, MCP, GitHub App, and Docker Compose onboarding remain pre-release:
 
 - **Spatial diff clusters & DOM selector attribution** — Connected-component diff clusters report Chroma-SSIM, CW-SSIM, and `cluster.targetSelector` (the most-specific DOM selector at the cluster center).
+- **Optional AI analysis** — Multi-provider BYOK (`openai`, `anthropic`, `gemini`, plus custom OpenAI-compatible `baseUrl` for OpenRouter / Ollama / vLLM) can classify a pixel change on the default compare path; it does not change pass/fail and has no published accuracy benchmark. Experimental `frontguard run --mode judge --experimental` is a separate opt-in whose verdict is the model, not pixel diff.
 - **Experimental AI fixes** — `--generate-fixes` and `--verify-fixes` are separate opt-ins; unverified suggestions remain labeled for review.
 - **Fix-pattern database** — `accept-fix` / `reject-fix` / `export-patterns` train and share a local pattern store that the pipeline reuses before calling the AI.
 - **`frontguard doctor`** — environment diagnostics for sources of non-determinism (Node, Playwright/Chromium, browsers, config, git).
@@ -215,6 +216,16 @@ The supported path is the local CLI. Hosted cloud, MCP, GitHub App, and Docker C
 - **Inspectable artifacts** — HTML reports retain baseline/current/diff images; remote thumbnails require an explicit image-upload backend.
 
 See the [full CHANGELOG](https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md), [interactive documentation](https://frontguard.dev/docs), and [validation results](https://github.com/ravidsrk/frontguard/tree/main/validation). The published run used AI-disabled local comparisons and is not an AI-accuracy or cross-OS benchmark.
+
+## Telemetry
+
+Anonymous usage telemetry is **off by default**. Nothing is sent unless you opt in with `FRONTGUARD_TELEMETRY=1` or `telemetry: true` in config.
+
+Opt out with any of `--no-telemetry`, `FRONTGUARD_TELEMETRY=0`, `DO_NOT_TRACK=1`, or `telemetry: false`.
+
+When enabled, the CLI POSTs one JSON event to `https://telemetry.frontguard.dev/v1/events` (override with `FRONTGUARD_TELEMETRY_ENDPOINT`). Fields: `command`, `version`, `routes`, `regressions`, `aiProvider`, `antiFlake`, `ci`, `durationMs`, `errorType`, `ts`. No URLs, paths, screenshots, or keys. The HTTP peer can see the source IP. There is no published retention period for the default collector.
+
+Full schema: [telemetry.md](https://github.com/ravidsrk/frontguard/blob/main/docs/telemetry.md).
 
 ## License
 
