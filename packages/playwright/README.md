@@ -43,6 +43,10 @@ Baselines are plain PNG files in `__visual_baselines__/`. Commit them to git. Re
 
 ## Features
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/perceptual-diff-clusters.jpg" alt="Perceptual Diff Engine and Spatial DOM-Cluster Attribution" width="840"/>
+</p>
+
 - 📸 **Pixel-perfect diffs** — pixelmatch + SSIM perceptual comparison
 - 🤖 **AI classification** — knows if a change is a regression, intentional, or content update
 - 🎭 **Element masking** — hide dynamic content (ads, timestamps, avatars)
@@ -83,6 +87,10 @@ test('dashboard', async ({ page }) => {
 ```
 
 ### Freeze time for deterministic screenshots
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/anti-flake-hermetic-render.jpg" alt="Deterministic Rendering and Anti-Flake Engine" width="840"/>
+</p>
 
 ```typescript
 import { test, expect } from '@playwright/test';

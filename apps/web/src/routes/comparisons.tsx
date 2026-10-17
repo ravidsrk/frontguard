@@ -367,6 +367,17 @@ function Comparisons() {
               ))}
             </div>
           </div>
+          <figure style={s('margin: 36px 0 0; border: 1px solid #2a2622; background: #131210; padding: 14px;')}>
+            <img
+              src="/images/docs/migration-and-trust-boundary.jpg"
+              alt="Local-first privacy boundary and legacy VRT migration schema"
+              loading="lazy"
+              style={s('width: 100%; height: auto; display: block; border: 1px solid #211e1b;')}
+            />
+            <figcaption style={s(`font-family: ${MONO}; font-size: 11.5px; color: #8c847a; padding: 10px 4px 2px; line-height: 1.5;`)}>
+              FIG 03 // Local-first privacy boundary and migration mapping from legacy/SaaS VRT tools into frontguard.config.ts
+            </figcaption>
+          </figure>
         </div>
       </section>
 

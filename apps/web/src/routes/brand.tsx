@@ -661,6 +661,46 @@ function Brand() {
                 src: '/images/docs/playwright-storybook-workflow.jpg',
                 alt: 'Frontguard Playwright and Storybook visual workflow diagram',
               },
+              {
+                label: 'QUICK START & EXPLICIT BASELINE GATE',
+                src: '/images/docs/quick-start-terminal-loop.jpg',
+                alt: 'Quick start two-terminal workflow and explicit baseline gate diagram',
+              },
+              {
+                label: 'CLOSED-LOOP AI CSS FIX & SANDBOX',
+                src: '/images/docs/closed-loop-ai-fix-sandbox.jpg',
+                alt: 'Closed-loop AI CSS fix and sandbox verification engine diagram',
+              },
+              {
+                label: '9-HOOK PLUGIN ARCHITECTURE & AUDITS',
+                src: '/images/docs/plugin-lifecycle-audits.jpg',
+                alt: '9-hook plugin architecture and unified render audits diagram',
+              },
+              {
+                label: 'CI/CD TWO-LANE BASELINE GOVERNANCE',
+                src: '/images/docs/ci-cd-github-actions-flow.jpg',
+                alt: 'CI/CD and GitHub Actions two-lane baseline governance diagram',
+              },
+              {
+                label: 'PRODUCTION MONITORING & ALERT PIPELINE',
+                src: '/images/docs/production-monitoring-daemon.jpg',
+                alt: 'Frontguard Monitor production monitoring and alert pipeline diagram',
+              },
+              {
+                label: '4-MODE HTML VISUAL DIFF WORKBENCH',
+                src: '/images/docs/html-workbench-4mode-inspector.jpg',
+                alt: 'Interactive 4-mode HTML visual diff workbench diagram',
+              },
+              {
+                label: 'CLOUD API, DOCKER & NPM TOPOLOGY',
+                src: '/images/docs/self-host-cloud-topology.jpg',
+                alt: 'Cloud API, Docker renderer, and npm distribution topology diagram',
+              },
+              {
+                label: 'LOCAL-FIRST PRIVACY & MIGRATION MATRIX',
+                src: '/images/docs/migration-and-trust-boundary.jpg',
+                alt: 'Local-first privacy boundary and migration workflow diagram',
+              },
             ].map((asset) => (
               <div
                 key={asset.src}
