@@ -160,7 +160,7 @@ const FILE_EDITS: Array<{ file: string; edits: RequiredEdit[] }> = [
         find: /frontguard\/render:\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
         replace: `frontguard/render:${version}`,
         label: "TanStack mirror renderer tag",
-        expected: 1,
+        expected: 2,
       },
     ],
   },
