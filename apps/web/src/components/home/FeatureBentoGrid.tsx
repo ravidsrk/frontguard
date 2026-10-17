@@ -35,7 +35,7 @@ export function FeatureBentoGrid() {
             </h2>
           </div>
           <p className="fg-lead" style={s("max-width: 380px;")}>
-            Built for real frontend repositories — monorepos, dynamic hydration,
+            Built for real frontend repositories: monorepos, dynamic hydration,
             authenticated routes, and multi-viewport matrices.
           </p>
         </div>
@@ -49,7 +49,7 @@ export function FeatureBentoGrid() {
                 f.span === 6 ? "fg-bento-span-6" : "fg-bento-span-4"
               }
               style={s(
-                "background: #131210; padding: 28px; display: flex; flex-direction: column; justify-content: space-between; gap: 20px;",
+                "background: #131210; border: 1px solid #26221e; border-radius: 8px; padding: 28px; display: flex; flex-direction: column; justify-content: space-between; gap: 20px;",
               )}
             >
               <div>
@@ -62,7 +62,7 @@ export function FeatureBentoGrid() {
                     style={{
                       fontFamily: MONO,
                       ...s(
-                        `font-size: 11px; color: ${f.accent}; letter-spacing: 0.1em; font-weight: 600;`,
+                        `font-size: 12px; color: ${f.accent}; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600;`,
                       ),
                     }}
                   >
@@ -72,7 +72,7 @@ export function FeatureBentoGrid() {
                     style={{
                       fontFamily: MONO,
                       ...s(
-                        "font-size: 10px; color: #b8b0a6; background: #191714; border: 1px solid #26221e; padding: 2px 8px; border-radius: 3px;",
+                        "font-size: 12px; color: #c8c0b6; background: #191714; border: 1px solid #26221e; padding: 2px 8px; border-radius: 3px;",
                       ),
                     }}
                   >
@@ -89,7 +89,7 @@ export function FeatureBentoGrid() {
                 </h3>
                 <p
                   style={s(
-                    "margin: 0; font-size: 14px; color: #9c948a; line-height: 1.6;",
+                    "margin: 0; font-size: 14px; color: #c8c0b6; line-height: 1.65;",
                   )}
                 >
                   {f.desc}
@@ -100,7 +100,7 @@ export function FeatureBentoGrid() {
                 style={{
                   fontFamily: MONO,
                   ...s(
-                    "padding: 9px 12px; background: #0e0d0b; border: 1px solid #1f1c19; border-radius: 5px; font-size: 11px; color: #8c847a; display: flex; align-items: center; gap: 8px;",
+                    "padding: 9px 12px; background: #0e0d0b; border: 1px solid #1f1c19; border-radius: 5px; font-size: 12px; color: #a89f94; display: flex; align-items: center; gap: 8px;",
                   ),
                 }}
               >
@@ -132,7 +132,7 @@ export function FeatureBentoGrid() {
             </h3>
             <p
               style={s(
-                "margin: 0 0 22px 0; font-size: 14.5px; color: #9c948a; line-height: 1.65;",
+                "margin: 0 0 22px 0; font-size: 15px; color: #c8c0b6; line-height: 1.65;",
               )}
             >
               Configure pre-capture interaction steps (
@@ -176,7 +176,7 @@ export function FeatureBentoGrid() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; color: #b8b0a6;",
+                  "display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: #c8c0b6;",
                 ),
               }}
             >
@@ -193,7 +193,7 @@ export function FeatureBentoGrid() {
                 <span
                   key={pill}
                   style={s(
-                    "padding: 4px 9px; background: #181613; border: 1px solid #26221e; border-radius: 4px;",
+                    "padding: 4px 10px; background: #181613; border: 1px solid #26221e; border-radius: 4px;",
                   )}
                 >
                   {pill}
@@ -215,7 +215,7 @@ export function FeatureBentoGrid() {
               <span
                 style={{
                   fontFamily: MONO,
-                  ...s("font-size: 12px; color: #b8b0a6;"),
+                  ...s("font-size: 12px; color: #c8c0b6;"),
                 }}
               >
                 frontguard.config.ts
@@ -227,8 +227,8 @@ export function FeatureBentoGrid() {
                 style={{
                   fontFamily: MONO,
                   ...s(
-                    `padding: 3px 9px; font-size: 11px; border-radius: 4px; border: 1px solid #2a2622; background: #131210; color: ${
-                      configCopied ? "#4fb477" : "#9c948a"
+                    `padding: 4px 10px; font-size: 12px; border-radius: 4px; border: 1px solid #2a2622; background: #131210; color: ${
+                      configCopied ? "#4fb477" : "#a89f94"
                     }; cursor: pointer;`,
                   ),
                 }}

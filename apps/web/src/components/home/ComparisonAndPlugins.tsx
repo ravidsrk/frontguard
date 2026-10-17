@@ -45,113 +45,122 @@ export function ComparisonAndPlugins() {
             </Link>
           </div>
 
-          <div
-            style={s(
-              "border: 1px solid #26221e; border-radius: 8px; overflow-x: auto; background: #131210;",
-            )}
-          >
-            <div style={s("min-width: 720px;")}>
-              <div
-                style={{
-                  fontFamily: MONO,
-                  ...s(
-                    "display: grid; grid-template-columns: 2.2fr repeat(5, 1fr); background: #1a1815; border-bottom: 1px solid #26221e; font-size: 12px;",
-                  ),
-                }}
-              >
-                <div style={s("padding: 16px 20px; color: #8c847a;")}>
-                  CAPABILITY
-                </div>
-                <div
-                  style={s(
-                    "padding: 16px 14px; color: #e8862e; font-weight: 600; background: rgba(232,134,46,0.06); border-left: 1px solid #26221e;",
-                  )}
+          <div style={s("overflow-x: auto;")}>
+            <table
+              style={s(
+                "width: 100%; min-width: 720px; border-collapse: collapse; border: 1px solid #26221e; background: #131210;",
+              )}
+            >
+              <thead>
+                <tr
+                  style={{
+                    fontFamily: MONO,
+                    ...s(
+                      "background: #1a1815; border-bottom: 1px solid #26221e; font-size: 12px; text-align: left;",
+                    ),
+                  }}
                 >
-                  Frontguard
-                </div>
-                <div
-                  style={s(
-                    "padding: 16px 14px; color: #b8b0a6; border-left: 1px solid #26221e;",
-                  )}
-                >
-                  Percy
-                </div>
-                <div
-                  style={s(
-                    "padding: 16px 14px; color: #b8b0a6; border-left: 1px solid #26221e;",
-                  )}
-                >
-                  Chromatic
-                </div>
-                <div
-                  style={s(
-                    "padding: 16px 14px; color: #b8b0a6; border-left: 1px solid #26221e;",
-                  )}
-                >
-                  BackstopJS
-                </div>
-                <div
-                  style={s(
-                    "padding: 16px 14px; color: #b8b0a6; border-left: 1px solid #26221e;",
-                  )}
-                >
-                  Lost Pixel
-                </div>
-              </div>
-              {COMPARISON_ROWS.map((r, i) => {
-                const cell = (val: string, hi = false) => {
-                  let col = "#b8b0a6";
-                  if (val === "✓" || val === "Forever" || val === "Free")
-                    col = "#4fb477";
-                  else if (val === "✕" || val === "Sunset") col = "#564f48";
-                  else if (val === "◐") col = "#e8862e";
-                  return (
-                    <div
-                      style={{
-                        fontFamily: MONO,
-                        ...s(
-                          `padding: 15px 14px; border-left: 1px solid #26221e; font-size: 13px; color: ${col}; ${
-                            hi
-                              ? "background: rgba(232,134,46,0.04); font-weight: 600;"
-                              : ""
-                          }`,
-                        ),
-                      }}
-                    >
-                      {val}
-                    </div>
-                  );
-                };
-                return (
-                  <div
-                    key={r.cap}
+                  <th style={s("padding: 16px 20px; color: #a89f94; font-weight: 600;")}>
+                    CAPABILITY
+                  </th>
+                  <th
                     style={s(
-                      `display: grid; grid-template-columns: 2.2fr repeat(5, 1fr); ${
-                        i < COMPARISON_ROWS.length - 1
-                          ? "border-bottom: 1px solid #1f1c19;"
-                          : ""
-                      } font-size: 14px;`,
+                      "padding: 16px 14px; color: #e8862e; font-weight: 600; background: rgba(232,134,46,0.06); border-left: 1px solid #26221e;",
                     )}
                   >
-                    <div style={s("padding: 15px 20px; color: #f5f1ea;")}>
-                      {r.cap}
-                    </div>
-                    {cell(r.fg, true)}
-                    {cell(r.percy)}
-                    {cell(r.chromatic)}
-                    {cell(r.backstop)}
-                    {cell(r.lostpixel)}
-                  </div>
-                );
-              })}
-            </div>
+                    Frontguard
+                  </th>
+                  <th
+                    style={s(
+                      "padding: 16px 14px; color: #c8c0b6; font-weight: 600; border-left: 1px solid #26221e;",
+                    )}
+                  >
+                    Percy
+                  </th>
+                  <th
+                    style={s(
+                      "padding: 16px 14px; color: #c8c0b6; font-weight: 600; border-left: 1px solid #26221e;",
+                    )}
+                  >
+                    Chromatic
+                  </th>
+                  <th
+                    style={s(
+                      "padding: 16px 14px; color: #c8c0b6; font-weight: 600; border-left: 1px solid #26221e;",
+                    )}
+                  >
+                    BackstopJS
+                  </th>
+                  <th
+                    style={s(
+                      "padding: 16px 14px; color: #c8c0b6; font-weight: 600; border-left: 1px solid #26221e;",
+                    )}
+                  >
+                    Lost Pixel
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARISON_ROWS.map((r, i) => {
+                  const cell = (val: string, hi = false) => {
+                    let col = "#c8c0b6";
+                    if (val === "✓" || val === "Forever" || val === "Free")
+                      col = "#4fb477";
+                    else if (val === "✕" || val === "Sunset") col = "#a89f94";
+                    else if (val === "◐") col = "#e8862e";
+                    return (
+                      <td
+                        style={{
+                          fontFamily: MONO,
+                          ...s(
+                            `padding: 15px 14px; border-left: 1px solid #26221e; font-size: 13px; color: ${col}; ${
+                              hi
+                                ? "background: rgba(232,134,46,0.04); font-weight: 600;"
+                                : ""
+                            }`,
+                          ),
+                        }}
+                      >
+                        {val}
+                      </td>
+                    );
+                  };
+                  return (
+                    <tr
+                      key={r.cap}
+                      style={s(
+                        `${
+                          i < COMPARISON_ROWS.length - 1
+                            ? "border-bottom: 1px solid #1f1c19;"
+                            : ""
+                        } font-size: 14px;`,
+                      )}
+                    >
+                      <th
+                        scope="row"
+                        style={s(
+                          "padding: 15px 20px; color: #f5f1ea; font-weight: 500; text-align: left;",
+                        )}
+                      >
+                        {r.cap}
+                      </th>
+                      {cell(r.fg, true)}
+                      {cell(r.percy)}
+                      {cell(r.chromatic)}
+                      {cell(r.backstop)}
+                      {cell(r.lostpixel)}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
           <div
             style={{
               fontFamily: MONO,
               ...s(
-                "margin-top: 16px; display: flex; justify-content: space-between; font-size: 11px; color: #7c746b; flex-wrap: wrap; gap: 12px;",
+                "margin-top: 16px; display: flex; justify-content: space-between; font-size: 12px; color: #a89f94; flex-wrap: wrap; gap: 12px;",
               ),
             }}
           >
@@ -159,7 +168,7 @@ export function ComparisonAndPlugins() {
               ✓ supported · ◐ partial / paid add-on / opt-in · ✕ not available
             </div>
             <div>
-              Based on public docs &amp; pricing as of March 2026 ·Lost Pixel
+              Based on public docs &amp; pricing as of March 2026 · Lost Pixel
               archived Feb 2026
             </div>
           </div>
@@ -214,7 +223,7 @@ export function ComparisonAndPlugins() {
                     style={{
                       fontFamily: MONO,
                       ...s(
-                        "font-size: 10px; color: #e8862e; letter-spacing: 0.08em; margin-bottom: 10px;",
+                        "font-size: 12px; color: #e8862e; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px;",
                       ),
                     }}
                   >
@@ -230,7 +239,7 @@ export function ComparisonAndPlugins() {
                 </div>
                 <div
                   style={s(
-                    "font-size: 13px; color: #9c948a; line-height: 1.5;",
+                    "font-size: 14px; color: #c8c0b6; line-height: 1.55;",
                   )}
                 >
                   {p.desc}
@@ -243,7 +252,7 @@ export function ComparisonAndPlugins() {
             style={{
               fontFamily: MONO,
               ...s(
-                "margin-top: 20px; padding: 14px 18px; background: #131210; border: 1px solid #26221e; border-radius: 6px; font-size: 11.5px; color: #8c847a; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;",
+                "margin-top: 20px; padding: 14px 18px; background: #131210; border: 1px solid #26221e; border-radius: 6px; font-size: 12px; color: #c8c0b6; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;",
               ),
             }}
           >

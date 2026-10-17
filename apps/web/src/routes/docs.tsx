@@ -107,14 +107,14 @@ function DocsLayout() {
               <Shield w={20} h={24} />
               <span style={s(`font-family: ${MONO}; font-weight: 700; font-size: 15px; letter-spacing: -0.02em; color: #f5f1ea;`)}>frontguard</span>
             </Link>
-            <span style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; border: 1px solid #2a2622; padding: 3px 9px;`)}>DOCS</span>
+            <span style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94; border: 1px solid #2a2622; padding: 3px 9px;`)}>DOCS</span>
           </div>
           <div style={s(`display: flex; align-items: center; gap: 22px; font-family: ${MONO}; font-size: 13px;`)}>
-            <Link to="/" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>home</Link>
-            <Link to="/pricing" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>pricing</Link>
-            <Link to="/comparisons" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>compare</Link>
-            <Link to="/changelog" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>changelog</Link>
-            <a href="https://github.com/ravidsrk/frontguard" className="fg-navlink" style={s('color: #b8b0a6; text-decoration: none;')}>github</a>
+            <Link to="/" className="fg-navlink" style={s('color: #c8c0b6; text-decoration: none;')}>home</Link>
+            <Link to="/pricing" className="fg-navlink" style={s('color: #c8c0b6; text-decoration: none;')}>pricing</Link>
+            <Link to="/comparisons" className="fg-navlink" style={s('color: #c8c0b6; text-decoration: none;')}>compare</Link>
+            <Link to="/changelog" className="fg-navlink" style={s('color: #c8c0b6; text-decoration: none;')}>changelog</Link>
+            <a href="https://github.com/ravidsrk/frontguard" className="fg-navlink" style={s('color: #c8c0b6; text-decoration: none;')}>github</a>
           </div>
         </div>
       </header>
@@ -127,7 +127,7 @@ function DocsLayout() {
             params={{ _splat: group.ids[0] ?? 'index' }}
             aria-label={group.label}
           >
-            {group.label.toLowerCase()}
+            {group.label.replace(' — ', ' · ').toLowerCase()}
           </Link>
         ))}
         <details style={s('flex: 0 0 auto; position: relative;')}>
@@ -147,10 +147,10 @@ function DocsLayout() {
               <div key={group.label}>
                 <div
                   style={s(
-                    `font-family: ${MONO}; font-size: 10px; color: #e8862e; letter-spacing: 0.08em; margin-bottom: 6px;`,
+                    `font-family: ${MONO}; font-size: 12px; color: #e8862e; letter-spacing: 0.02em; margin-bottom: 6px;`,
                   )}
                 >
-                  // {group.label.toLowerCase()}
+                  // {group.label.replace(' — ', ' · ').toLowerCase()}
                 </div>
                 <div style={s('display: grid; gap: 4px;')}>
                   {group.ids.map((id) => {
@@ -161,7 +161,7 @@ function DocsLayout() {
                         to="/docs/$"
                         params={{ _splat: id }}
                         style={s(
-                          `display: block; font-size: 12.5px; color: ${active === id ? '#e8862e' : '#d8d0c5'}; text-decoration: none; padding: 4px 8px;`,
+                          `display: block; font-size: 13px; color: ${active === id ? '#e8862e' : '#d8d0c5'}; text-decoration: none; padding: 4px 8px;`,
                         )}
                       >
                         {it.label}
@@ -189,13 +189,13 @@ function DocsLayout() {
               />
             </div>
             {filteredGroups.length === 0 ? (
-              <div style={s(`padding: 0 22px; font-family: ${MONO}; font-size: 12px; color: #7c746b;`)}>
+              <div style={s(`padding: 0 22px; font-family: ${MONO}; font-size: 12px; color: #a89f94;`)}>
                 No matching articles.
               </div>
             ) : (
               filteredGroups.map((group) => (
                 <div key={group.label} style={s('margin-bottom: 24px; padding: 0 22px;')}>
-                  <div style={s(`font-family: ${MONO}; font-size: 10.5px; color: #564f48; letter-spacing: 0.1em; margin-bottom: 11px;`)}>{group.label}</div>
+                  <div style={s(`font-family: ${MONO}; font-size: 12px; font-weight: 600; color: #a89f94; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 11px;`)}>{group.label.replace(' — ', ' · ')}</div>
                   {group.ids.map((id) => {
                     const it = byId(id)
                     const isActive = active === id
@@ -205,7 +205,7 @@ function DocsLayout() {
                         to="/docs/$"
                         params={{ _splat: id }}
                         className="fg-sb-item"
-                        style={s(`display: block; font-size: 13.5px; color: ${isActive ? '#e8862e' : '#8c847a'}; text-decoration: none; padding: 6px 0 6px 12px; border-left: 2px solid ${isActive ? '#e8862e' : '#211e1b'}; margin-bottom: 1px;`)}
+                        style={s(`display: block; font-size: 13.5px; color: ${isActive ? '#e8862e' : '#b8b0a6'}; text-decoration: none; padding: 6px 0 6px 12px; border-left: 2px solid ${isActive ? '#e8862e' : '#211e1b'}; margin-bottom: 1px;`)}
                       >
                         {it.label}
                       </Link>
@@ -223,20 +223,20 @@ function DocsLayout() {
 
         <aside className="fg-docs-toc" style={s('padding: 44px 24px; border-left: 1px solid #211e1b;')}>
           <div style={s('position: sticky; top: 84px;')}>
-            <div style={s(`font-family: ${MONO}; font-size: 10.5px; color: #564f48; letter-spacing: 0.1em; margin-bottom: 14px;`)}>ON THIS PAGE</div>
+            <div style={s(`font-family: ${MONO}; font-size: 12px; font-weight: 600; color: #a89f94; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;`)}>ON THIS PAGE</div>
             {cur.toc.map((t) => (
               <a
                 key={t}
                 href={`#${slugifyHeading(t)}`}
                 className="fg-toc"
-                style={s('display: block; text-decoration: none; font-size: 13px; color: #7c746b; padding: 5px 0; line-height: 1.4;')}
+                style={s('display: block; text-decoration: none; font-size: 13px; color: #b8b0a6; padding: 5px 0; line-height: 1.4;')}
               >
                 {t}
               </a>
             ))}
             <div style={s('margin-top: 26px; border-top: 1px solid #211e1b; padding-top: 20px;')}>
               <a href="https://github.com/ravidsrk/frontguard" className="fg-btn-primary" style={s(`display: block; text-align: center; background: #e8862e; color: #0d0c0b; font-family: ${MONO}; font-weight: 700; font-size: 12px; padding: 10px; text-decoration: none;`)}>★ Star on GitHub</a>
-              <a href="https://github.com/ravidsrk/frontguard" className="fg-navlink" style={s(`display: block; text-align: center; font-family: ${MONO}; font-size: 11px; color: #6b645c; text-decoration: none; margin-top: 12px;`)}>Edit this page ↗</a>
+              <a href="https://github.com/ravidsrk/frontguard" className="fg-navlink" style={s(`display: block; text-align: center; font-family: ${MONO}; font-size: 12px; color: #a89f94; text-decoration: none; margin-top: 12px;`)}>Edit this page ↗</a>
             </div>
           </div>
         </aside>

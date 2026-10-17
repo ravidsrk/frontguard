@@ -38,7 +38,7 @@ export const RELEASES: Release[] = [
     tagBorder: '#3a2a18',
     tagBg: '#1a130b',
     date: 'on main',
-    title: '0.2.3 (RC) — Fail-closed pipeline & production hardening',
+    title: '0.2.3 (RC): Fail-closed pipeline & production hardening',
     summary:
       'Release candidate 0.2.3 hardens the comparison pipeline to fail closed, enforces read-only baseline checks, keeps AI classifications advisory, and closes route-discovery, plugin, and Cloud API schema gaps.',
     groups: [
@@ -48,37 +48,37 @@ export const RELEASES: Release[] = [
           {
             term: 'Fail-closed pipeline & read-only baselines',
             detail:
-              ' — empty comparisons, render/storage/AI errors, rejected judge calls, and diverged CI baselines fail closed; baseline writes require explicit update mode.',
+              ': empty comparisons, render/storage/AI errors, rejected judge calls, and diverged CI baselines fail closed; baseline writes require explicit update mode.',
           },
           {
             term: 'Deterministic AI pass/fail contract',
             detail:
-              ' — AI classifications and fix suggestions are advisory annotations and never silently downgrade failing pixel diffs.',
+              ': AI classifications and fix suggestions are advisory annotations and never silently downgrade failing pixel diffs.',
           },
           {
             term: 'Framework route discovery & Storybook 8 cache',
             detail:
-              ' — Next.js App Router route groups/parallel slots, Remix _index routes, and Storybook 8 static parameter caches are resolved accurately.',
+              ': Next.js App Router route groups/parallel slots, Remix _index routes, and Storybook 8 static parameter caches are resolved accurately.',
           },
           {
             term: 'Plugin, Git worktree & Cloud API hardening',
             detail:
-              ' — Perf Budgets DOM script injection, Figma buffer cleanup, batch Git orphan baseline commits, D1 schema/migration sync, and webhook/SSRF guards.',
+              ': Perf Budgets DOM script injection, Figma buffer cleanup, batch Git orphan baseline commits, D1 schema/migration sync, and webhook/SSRF guards.',
           },
           {
             term: 'Perceptual diffing v2 & spatial DOM-cluster attribution',
             detail:
-              ' — connected-component diff bounding boxes, spatial cluster targetSelector DOM attribution, region-scoped chroma YCbCr SSIM + 4-orientation CW-SSIM, localized anti-dilution guard, and Set-of-Mark cropping.',
+              ': connected-component diff bounding boxes, spatial cluster targetSelector DOM attribution, region-scoped chroma YCbCr SSIM + 4-orientation CW-SSIM, localized anti-dilution guard, and Set-of-Mark cropping.',
           },
           {
             term: 'Visual Cortex MCP tools & Cloud CAS deduplication',
             detail:
-              ' — adds inspect_diff_cluster_dom, verify_css_patch, and promote_baseline to @frontguard/mcp with local report fallback, plus SHA-256 Git CAS manifest tracking and Cloud CAS endpoints.',
+              ': adds inspect_diff_cluster_dom, verify_css_patch, and promote_baseline to @frontguard/mcp with local report fallback, plus SHA-256 Git CAS manifest tracking and Cloud CAS endpoints.',
           },
           {
             term: 'CLI agent guide, anti-flake controls & multi-provider AI',
             detail:
-              ' — adds frontguard guide [topic] (--json), waitForStability multi-frame convergence, redactSensitive DOM/HTML input masking, freezeTime ISO / seedRandom / blockUrls anti-flake controls, pre-capture route actions with colorScheme emulation, and Google Gemini + custom baseUrl AI provider support.',
+              ': adds frontguard guide [topic] (--json), waitForStability multi-frame convergence, redactSensitive DOM/HTML input masking, freezeTime ISO / seedRandom / blockUrls anti-flake controls, pre-capture route actions with colorScheme emulation, and Google Gemini + custom baseUrl AI provider support.',
           },
         ],
       },
@@ -88,7 +88,7 @@ export const RELEASES: Release[] = [
           {
             term: 'HTTP security headers & supply-chain updates',
             detail:
-              ' — strict CSP/HSTS/frame-ancestors headers on frontguard.dev, monitor SSRF validation, and updated transitive dependencies.',
+              ': strict CSP/HSTS/frame-ancestors headers on frontguard.dev, monitor SSRF validation, and updated transitive dependencies.',
           },
         ],
       },
@@ -113,12 +113,12 @@ export const RELEASES: Release[] = [
           {
             term: 'CLI config loader dependencies',
             detail:
-              ' — keeps optional TypeScript/ESM config loader dependencies intact in the published @frontguard/cli tarball.',
+              ': keeps optional TypeScript/ESM config loader dependencies intact in the published @frontguard/cli tarball.',
           },
           {
             term: 'Workspace package READMEs & version sync',
             detail:
-              ' — ships workspace-local READMEs and closes release metadata drift across @frontguard/cli, @frontguard/playwright, @frontguard/mcp, create-frontguard-plugin, and @frontguard/netlify-plugin.',
+              ': ships workspace-local READMEs and closes release metadata drift across @frontguard/cli, @frontguard/playwright, @frontguard/mcp, create-frontguard-plugin, and @frontguard/netlify-plugin.',
           },
         ],
       },
@@ -143,17 +143,17 @@ export const RELEASES: Release[] = [
           {
             term: 'CLI config loader & telemetry opt-out precedence',
             detail:
-              ' — resolves .ts/.js/.mjs/.cjs configs cleanly and ensures environment opt-outs override telemetry.enabled.',
+              ': resolves .ts/.js/.mjs/.cjs configs cleanly and ensures environment opt-outs override telemetry.enabled.',
           },
           {
             term: 'MCP server & Storybook 8.6 readiness',
             detail:
-              ' — realpath-safe MCP entry guard with clean stdio JSON-RPC output, and Storybook 8.6 finished-phase parameter discovery.',
+              ': realpath-safe MCP entry guard with clean stdio JSON-RPC output, and Storybook 8.6 finished-phase parameter discovery.',
           },
           {
             term: 'Netlify plugin & canonical install docs',
             detail:
-              ' — inspects real cloud-api status values and standardizes scoped @frontguard/cli commands across docs.',
+              ': inspects real cloud-api status values and standardizes scoped @frontguard/cli commands across docs.',
           },
         ],
       },
@@ -163,7 +163,7 @@ export const RELEASES: Release[] = [
           {
             term: 'Supply-chain & Slack SSRF guards',
             detail:
-              ' — migrated to @daytona/sdk, cleared high/critical audit findings, and added SSRF validation on Slack slash-command URLs.',
+              ': migrated to @daytona/sdk, cleared high/critical audit findings, and added SSRF validation on Slack slash-command URLs.',
           },
         ],
       },
@@ -171,9 +171,9 @@ export const RELEASES: Release[] = [
   },
   {
     version: '0.2.0',
-    vColor: '#8c847a',
+    vColor: '#c8c0b6',
     statusLabel: 'MINOR RELEASE',
-    tagColor: '#8c847a',
+    tagColor: '#c8c0b6',
     tagBorder: '#2a2622',
     tagBg: '#131210',
     date: '2026-06-17',
@@ -188,66 +188,66 @@ export const RELEASES: Release[] = [
           {
             term: 'Storybook integration',
             detail:
-              ' — a storybook config block enumerates stories from a running Storybook (8.x / 7.x) and renders each, with play()-aware capture and per-story overrides. frontguard init auto-detects .storybook.',
+              ': a storybook config block enumerates stories from a running Storybook (8.x / 7.x) and renders each, with play()-aware capture and per-story overrides. frontguard init auto-detects .storybook.',
           },
           {
             term: 'OpenTelemetry export',
             detail:
-              ' — run completions emit OTLP/HTTP metrics (runs, comparisons, regressions, duration) to a configurable endpoint; runs on Cloudflare Workers.',
+              ': run completions emit OTLP/HTTP metrics (runs, comparisons, regressions, duration) to a configurable endpoint; runs on Cloudflare Workers.',
           },
           {
             term: 'Native Slack app',
             detail:
-              ' — a Hono handler with signing-secret verification, the /frontguard slash command, OAuth v2 install, and result posting.',
+              ': a Hono handler with signing-secret verification, the /frontguard slash command, OAuth v2 install, and result posting.',
           },
           {
             term: 'Run-over-run perf regressions',
             detail:
-              ' — the perf-budgets plugin can persist each run’s metrics and flag any metric that degraded since the last run.',
+              ': the perf-budgets plugin can persist each run’s metrics and flag any metric that degraded since the last run.',
           },
           {
             term: 'Accessibility-aware AI',
             detail:
-              ' — axe-core violations are fused into the AI prompt so the model can correlate a visual change with a known a11y issue.',
+              ': axe-core violations are fused into the AI prompt so the model can correlate a visual change with a known a11y issue.',
           },
           {
             term: 'frontguard doctor',
             detail:
-              ' — environment diagnostics for sources of non-determinism (Node, Playwright/Chromium, browsers, config, git state).',
+              ': environment diagnostics for sources of non-determinism (Node, Playwright/Chromium, browsers, config, git state).',
           },
           {
             term: 'frontguard monitor',
             detail:
-              ' — live production URL monitoring with --once, --watch/--interval daemon polling, --history, and webhook alerts.',
+              ': live production URL monitoring with --once, --watch/--interval daemon polling, --history, and webhook alerts.',
           },
           {
             term: 'AI fix generation + sandbox verification',
             detail:
-              ' — generateFixes produces minimal CSS patches; verifyFixes applies them in a sandbox, re-renders, and re-compares against baseline.',
+              ': generateFixes produces minimal CSS patches; verifyFixes applies them in a sandbox, re-renders, and re-compares against baseline.',
           },
           {
             term: 'Fix-pattern database (reuse patterns accepted ≥3 times)',
             detail:
-              ' — a SQLite store with accept-fix / reject-fix / export-patterns; the pipeline reuses patterns accepted ≥3 times before calling the AI.',
+              ': a SQLite store with accept-fix / reject-fix / export-patterns; the pipeline reuses patterns accepted ≥3 times before calling the AI.',
           },
           {
             term: 'Accessibility & performance plugins',
             detail:
-              ' — axe-core WCAG audits and LCP/CLS/TTFB budgets, both correlated inline with the visual diff.',
+              ': axe-core WCAG audits and LCP/CLS/TTFB budgets, both correlated inline with the visual diff.',
           },
           {
             term: 'Cloud platform (Hono, D1+R2+GitHub OAuth)',
             detail:
-              ' — a Hono service with run submission, baseline approval and usage metering; Cloudflare D1 + R2 + GitHub OAuth.',
+              ': a Hono service with run submission, baseline approval and usage metering; Cloudflare D1 + R2 + GitHub OAuth.',
           },
           {
             term: 'Teams & billing (Stripe)',
             detail:
-              ' — multi-tenant teams with roles, invitations, approvals, an activity feed, and Stripe billing.',
+              ': multi-tenant teams with roles, invitations, approvals, an activity feed, and Stripe billing.',
           },
           {
             term: 'Integrations (Vercel OAuth, Netlify Build Plugin, GitHub App)',
-            detail: ' — real Vercel OAuth app, Netlify Build Plugin, and a GitHub App with Check Runs.',
+            detail: ': real Vercel OAuth app, Netlify Build Plugin, and a GitHub App with Check Runs.',
           },
         ],
       },
@@ -268,44 +268,44 @@ export const RELEASES: Release[] = [
   },
   {
     version: '0.1.0',
-    vColor: '#8c847a',
+    vColor: '#c8c0b6',
     statusLabel: 'INITIAL RELEASE',
-    tagColor: '#8c847a',
+    tagColor: '#c8c0b6',
     tagBorder: '#2a2622',
     tagBg: '#131210',
     date: '2026-01-01',
     isoDate: '2026-01-01',
     title: 'The core engine',
     summary:
-      'CLI, route discovery, multi-browser capture, pixel diffing, AI analysis, Git baselines and the plugin architecture — the foundation.',
+      'CLI, route discovery, multi-browser capture, pixel diffing, AI analysis, Git baselines and the plugin architecture: the foundation.',
     groups: [
       {
         kind: 'added',
         items: [
-          { term: 'CLI', detail: ' — frontguard init and run with proper flow control and exit codes.' },
+          { term: 'CLI', detail: ': frontguard init and run with proper flow control and exit codes.' },
           {
             term: 'route discovery',
             detail:
-              ' — auto-crawl plus filesystem detection for Next.js, Nuxt, SvelteKit, Astro and Remix.',
+              ': auto-crawl plus filesystem detection for Next.js, Nuxt, SvelteKit, Astro and Remix.',
           },
-          { term: 'multi-browser capture', detail: ' — Chromium, Firefox and WebKit via Playwright.' },
+          { term: 'multi-browser capture', detail: ': Chromium, Firefox and WebKit via Playwright.' },
           {
             term: 'pixelmatch diffing (0–100%)',
-            detail: ' — pixel-level diffing via pixelmatch with a standardized 0–100 diff percentage.',
+            detail: ': pixel-level diffing via pixelmatch with a standardized 0–100 diff percentage.',
           },
           {
             term: 'AI analysis (BYOK)',
             detail:
-              ' — BYOK support for OpenAI and Anthropic vision models on a unified confidence scale.',
+              ': BYOK support for OpenAI and Anthropic vision models on a unified confidence scale.',
           },
           {
             term: 'Git baselines (orphan branch)',
-            detail: ' — orphan-branch storage for baseline screenshots via worktrees.',
+            detail: ': orphan-branch storage for baseline screenshots via worktrees.',
           },
           {
             term: 'plugin architecture (6 hooks + Figma/perf/monitor)',
             detail:
-              ' — 6 lifecycle hooks with error isolation, plus Figma, perf-budgets and monitoring plugins.',
+              ': 6 lifecycle hooks with error isolation, plus Figma, perf-budgets and monitoring plugins.',
           },
         ],
       },
@@ -315,7 +315,7 @@ export const RELEASES: Release[] = [
           {
             term: 'hardened by default',
             detail:
-              ' — shell-injection prevention, path-traversal guards, API-key redaction, and XSS-escaped HTML reports.',
+              ': shell-injection prevention, path-traversal guards, API-key redaction, and XSS-escaped HTML reports.',
           },
         ],
       },
@@ -325,7 +325,7 @@ export const RELEASES: Release[] = [
           {
             term: '395 tests across 26 test files',
             detail:
-              ' covering 27 source files — vision, crawler, Playwright, plugins, reporters, storage and E2E.',
+              ' covering 27 source files: vision, crawler, Playwright, plugins, reporters, storage and E2E.',
           },
         ],
       },

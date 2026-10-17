@@ -64,7 +64,7 @@ export function ClosingCommandDeck() {
             </span>
             <span
               style={s(
-                `font-size: 11px; color: ${ctaCopied ? "#4fb477" : "#8c847a"}; padding: 2px 7px; border-radius: 3px; background: #1d1a17; border: 1px solid #2a2622;`,
+                `font-size: 12px; color: ${ctaCopied ? "#4fb477" : "#a89f94"}; padding: 2px 8px; border-radius: 3px; background: #1d1a17; border: 1px solid #2a2622;`,
               )}
             >
               {ctaCopied ? "copied ✓" : "copy"}

@@ -41,7 +41,7 @@ const COLS: {
 ]
 
 const linkStyle = s(
-  'display: block; font-size: 13.5px; color: #8c847a; text-decoration: none; margin-bottom: 9px;',
+  'display: block; font-size: 14px; color: #c8c0b6; text-decoration: none; margin-bottom: 10px;',
 )
 
 export function Footer() {
@@ -71,7 +71,7 @@ export function Footer() {
           </Link>
           <p
             style={s(
-              'font-size: 13px; color: #6b645c; margin: 0; max-width: 280px; line-height: 1.55;',
+              'font-size: 14px; color: #b8b0a6; margin: 0; max-width: 280px; line-height: 1.6;',
             )}
           >
             Local visual regression testing with optional AI assistance. MIT
@@ -82,7 +82,7 @@ export function Footer() {
           <div key={col.head}>
             <div
               style={s(
-                "font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #564f48; letter-spacing: 0.06em; margin-bottom: 14px;",
+                "font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: #a89f94; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 14px;",
               )}
             >
               {col.head}
@@ -116,14 +116,14 @@ export function Footer() {
         >
           <span
             style={s(
-              "font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #564f48;",
+              "font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a89f94;",
             )}
           >
             © 2026 Frontguard · MIT License
           </span>
           <span
             style={s(
-              "font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #564f48;",
+              "font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a89f94;",
             )}
           >
             Built for teams who ship fast.

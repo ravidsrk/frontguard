@@ -33,30 +33,41 @@ export function ArchitecturalPillars() {
             <div
               key={pl.n}
               style={s(
-                `background: #131210; border: 1px solid #26221e; border-top: 2px solid ${pl.c}; border-radius: 8px; padding: 28px; display: flex; flex-direction: column; justify-content: space-between; gap: 20px;`,
+                "background: #131210; border: 1px solid #26221e; border-radius: 8px; padding: 28px; display: flex; flex-direction: column; justify-content: space-between; gap: 20px;",
               )}
             >
               <div>
                 <div
-                  style={{
-                    fontFamily: MONO,
-                    ...s(
-                      `font-size: 11px; color: ${pl.c}; letter-spacing: 0.1em; margin-bottom: 14px; font-weight: 600;`,
-                    ),
-                  }}
-                >
-                  {pl.n}
-                </div>
-                <h3
                   style={s(
-                    "margin: 0 0 10px 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: #f5f1ea;",
+                    "display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px;",
                   )}
                 >
-                  {pl.h}
-                </h3>
+                  <h3
+                    style={s(
+                      "margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: #f5f1ea;",
+                    )}
+                  >
+                    {pl.h}
+                  </h3>
+                  <div
+                    style={{
+                      fontFamily: MONO,
+                      ...s(
+                        `font-size: 12px; color: ${pl.c}; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;`,
+                      ),
+                    }}
+                  >
+                    <span
+                      style={s(
+                        `width: 7px; height: 7px; border-radius: 999px; background: ${pl.c};`,
+                      )}
+                    />
+                    <span>{pl.n}</span>
+                  </div>
+                </div>
                 <p
                   style={s(
-                    "margin: 0; font-size: 14px; color: #9c948a; line-height: 1.6;",
+                    "margin: 0; font-size: 14px; color: #c8c0b6; line-height: 1.65;",
                   )}
                 >
                   {pl.p}
@@ -65,7 +76,7 @@ export function ArchitecturalPillars() {
 
               <div
                 style={s(
-                  "padding-top: 14px; border-top: 1px solid #1f1c19; display: grid; gap: 6px;",
+                  "padding-top: 14px; border-top: 1px solid #1f1c19; display: grid; gap: 8px;",
                 )}
               >
                 {pl.spec.map((item) => (
@@ -74,7 +85,7 @@ export function ArchitecturalPillars() {
                     style={{
                       fontFamily: MONO,
                       ...s(
-                        "font-size: 11px; color: #b8b0a6; display: flex; align-items: center; gap: 8px;",
+                        "font-size: 12px; color: #c8c0b6; display: flex; align-items: center; gap: 8px;",
                       ),
                     }}
                   >
@@ -106,7 +117,7 @@ export function ArchitecturalPillars() {
             </h2>
             <p
               style={s(
-                "margin: 0 0 24px 0; font-size: 15px; color: #9c948a; line-height: 1.65;",
+                "margin: 0 0 24px 0; font-size: 15px; color: #c8c0b6; line-height: 1.65;",
               )}
             >
               Traditional visual tools report raw pixel counts. When you
@@ -144,10 +155,10 @@ export function ArchitecturalPillars() {
                       ...s("font-size: 12px; color: #e8862e; font-weight: 600;"),
                     }}
                   >
-                    ✓ {a}
+                    ✓ {a}:
                   </span>
-                  <span style={s("font-size: 12px; color: #8c847a;")}>
-                    — {b}
+                  <span style={s("font-size: 13px; color: #c8c0b6;")}>
+                    {b}
                   </span>
                 </div>
               ))}
@@ -164,7 +175,7 @@ export function ArchitecturalPillars() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "padding: 11px 16px; background: #171513; border-bottom: 1px solid #24201c; font-size: 11px; color: #8c847a; display: flex; justify-content: space-between; align-items: center;",
+                  "padding: 11px 16px; background: #171513; border-bottom: 1px solid #24201c; font-size: 12px; color: #a89f94; display: flex; justify-content: space-between; align-items: center;",
                 ),
               }}
             >
@@ -175,7 +186,7 @@ export function ArchitecturalPillars() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "margin: 0; padding: 18px 20px; font-size: 11.5px; line-height: 1.7; color: #d8d0c5; overflow-x: auto;",
+                  "margin: 0; padding: 18px 20px; font-size: 12px; line-height: 1.7; color: #d8d0c5; overflow-x: auto;",
                 ),
               }}
             >
@@ -209,7 +220,7 @@ export function ArchitecturalPillars() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "padding: 10px 16px; background: #141210; border-top: 1px solid #24201c; font-size: 11px; color: #8c847a; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;",
+                  "padding: 10px 16px; background: #141210; border-top: 1px solid #24201c; font-size: 12px; color: #a89f94; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;",
                 ),
               }}
             >

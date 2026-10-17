@@ -70,7 +70,7 @@ function Home() {
   return (
     <div
       style={s(
-        "min-height: 100vh; background: #0d0c0b; color: #f5f1ea; font-family: 'Space Grotesk', system-ui, sans-serif; -webkit-font-smoothing: antialiased;",
+        "min-height: 100vh; background: #0d0c0b; color: #f5f1ea; font-family: 'IBM Plex Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased;",
       )}
     >
       <Nav />

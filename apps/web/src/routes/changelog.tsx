@@ -70,18 +70,21 @@ const CHANGELOG_SOURCE = `${REPO_URL}/blob/main/CHANGELOG.md`
 
 function Changelog() {
   return (
-    <div style={s('background: #0d0c0b; color: #b8b0a6; min-height: 100vh;')}>
+    <div style={s('background: #0d0c0b; color: #c8c0b6; min-height: 100vh;')}>
       <Nav active="changelog" />
 
       <main id="main-content">
       <header style={s('max-width: 860px; margin: 0 auto; padding: 72px 28px 36px;')}>
-        <div
+        <nav
+          aria-label="Breadcrumb"
           style={s(
-            `font-family: ${MONO}; font-size: 12px; color: #e8862e; letter-spacing: 0.08em; margin-bottom: 16px;`,
+            `display: inline-flex; align-items: center; gap: 8px; font-family: ${MONO}; font-size: 12px; color: #a89f94; margin-bottom: 16px;`,
           )}
         >
-          // CHANGELOG
-        </div>
+          <a href="/" style={s('color: #a89f94; text-decoration: none;')}>Home</a>
+          <span aria-hidden="true">/</span>
+          <span style={s('color: #e8862e;')}>Changelog</span>
+        </nav>
         <h1
           style={s(
             'font-size: clamp(34px, 5vw, 48px); line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 16px;',
@@ -89,7 +92,7 @@ function Changelog() {
         >
           What's new in Frontguard
         </h1>
-        <p style={s('font-size: 17px; line-height: 1.55; color: #b8b0a6; margin: 0; max-width: 560px;')}>
+        <p style={s('font-size: 17px; line-height: 1.55; color: #c8c0b6; margin: 0; max-width: 560px;')}>
           Following{' '}
           <a
             href={KEEP_A_CHANGELOG}
@@ -128,12 +131,12 @@ function Changelog() {
                 </div>
                 <span
                   style={s(
-                    `display: inline-block; font-family: ${MONO}; font-size: 10.5px; color: ${r.tagColor}; border: 1px solid ${r.tagBorder}; background: ${r.tagBg}; padding: 3px 8px; margin-bottom: 12px;`,
+                    `display: inline-block; font-family: ${MONO}; font-size: 12px; color: ${r.tagColor}; border: 1px solid ${r.tagBorder}; background: ${r.tagBg}; padding: 3px 8px; margin-bottom: 12px;`,
                   )}
                 >
                   {r.statusLabel}
                 </span>
-                <div style={s(`font-family: ${MONO}; font-size: 12px; color: #6b645c;`)}>
+                <div style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94;`)}>
                   {r.isoDate ? <time dateTime={r.isoDate}>{r.date}</time> : r.date}
                 </div>
               </div>
@@ -155,14 +158,14 @@ function Changelog() {
               >
                 {r.title}
               </h2>
-              <p style={s('font-size: 15px; line-height: 1.6; color: #b8b0a6; margin: 0 0 24px;')}>
+              <p style={s('font-size: 15px; line-height: 1.6; color: #c8c0b6; margin: 0 0 24px;')}>
                 {r.summary}
               </p>
               {r.groups.map((g) => (
                 <div key={g.kind} style={s('margin-bottom: 22px;')}>
                   <div
                     style={s(
-                      `display: inline-flex; align-items: center; gap: 8px; font-family: ${MONO}; font-size: 11px; color: ${GROUP_COLORS[g.kind]}; letter-spacing: 0.06em; margin-bottom: 12px;`,
+                      `display: inline-flex; align-items: center; gap: 8px; font-family: ${MONO}; font-size: 12px; color: ${GROUP_COLORS[g.kind]}; letter-spacing: 0.06em; margin-bottom: 12px;`,
                     )}
                   >
                     <span style={s(`width: 6px; height: 6px; background: ${GROUP_COLORS[g.kind]};`)} />
@@ -176,7 +179,7 @@ function Changelog() {
                           'display: grid; grid-template-columns: 14px 1fr; gap: 10px; font-size: 14px; line-height: 1.55; color: #c8c0b6;',
                         )}
                       >
-                        <span style={s(`color: #564f48; font-family: ${MONO};`)}>·</span>
+                        <span style={s(`color: #a89f94; font-family: ${MONO};`)}>·</span>
                         <span>
                           <strong style={s('color: #f5f1ea; font-weight: 600;')}>{it.term}</strong>
                           {it.detail}
@@ -196,7 +199,7 @@ function Changelog() {
             target="_blank"
             rel="noopener noreferrer"
             className="fg-link"
-            style={s(`font-family: ${MONO}; font-size: 13px; color: #8c847a; text-decoration: none;`)}
+            style={s(`font-family: ${MONO}; font-size: 13px; color: #c8c0b6; text-decoration: none;`)}
           >
             View full changelog on GitHub ↗
           </a>

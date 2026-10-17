@@ -36,8 +36,8 @@ export const MATRIX: MatrixRow[] = [
 ]
 
 export const ALTERNATIVES = [
-  { name: 'Percy', status: 'hosted review workflow', color: '#8c847a' },
-  { name: 'Chromatic', status: 'Storybook-centered', color: '#8c847a' },
+  { name: 'Percy', status: 'hosted review workflow', color: '#c8c0b6' },
+  { name: 'Chromatic', status: 'Storybook-centered', color: '#c8c0b6' },
   { name: 'BackstopJS', status: 'low recent activity', color: '#e8862e' },
   { name: 'Lost Pixel', status: 'sunset', color: '#e5484d' },
 ] as const
@@ -55,15 +55,15 @@ export const VERSUS = [
   {
     name: 'Chromatic',
     their:
-      'Best-in-class for Storybook component testing, with TurboSnap and a tight Storybook publish flow.',
+      'Purpose-built for Storybook component testing, with TurboSnap and a tight Storybook publish flow.',
     ours:
-      'Tests the real app at real URLs, not just isolated stories — and classifies regression vs. intentional so review queues stay short. Storybook capture is supported too.',
+      'Tests the real app at real URLs, not just isolated stories, and classifies regression vs. intentional so review queues stay short. Storybook capture is supported too.',
     cta: 'Read the comparison',
     href: 'comparisons/frontguard-vs-chromatic',
   },
   {
     name: 'BackstopJS',
-    their: 'A free, self-hosted classic — simple, scriptable, no vendor at all.',
+    their: 'A free, self-hosted classic: simple, scriptable, no vendor at all.',
     ours:
       'Adds route discovery, configurable multi-render consensus, and optional AI analysis while retaining a local workflow.',
     cta: 'Migration guide',

@@ -12,7 +12,7 @@ import { s } from '../lib/style'
 
 const SEO_TITLE = 'Brand — The Frontguard brand system'
 const SEO_DESCRIPTION =
-  'The Frontguard brand system: shield mark, warm neutral palette, Space Grotesk + JetBrains Mono typography, and terminal-native voice.'
+  'The Frontguard brand system: shield mark, warm neutral palette, IBM Plex Sans + JetBrains Mono typography, and terminal-native voice.'
 const BRAND_PATH = '/brand'
 
 const BRAND_ORGANIZATION_JSON_LD = {
@@ -52,6 +52,7 @@ export const Route = createFileRoute('/brand')({
 })
 
 const MONO = "'JetBrains Mono', monospace"
+const SANS = "'IBM Plex Sans', sans-serif"
 const clip = 'polygon(0% 0%, 100% 0%, 100% 62%, 50% 100%, 0% 62%)'
 
 const neutrals = [
@@ -73,7 +74,7 @@ const statuses = [
 const say = [
   'Name the real problem: false positives, flake, muted channels.',
   'Quote the classifier: "intentional change, not a regression."',
-  'Lead with the local MIT CLI and optional BYOK analysis — earn trust with facts.',
+  'Lead with the local MIT CLI and optional BYOK analysis; earn trust with facts.',
   'Publish real numbers, including where it gets things wrong.',
 ]
 
@@ -88,7 +89,7 @@ const voice = [
   {
     label: 'HONEST',
     color: '#4fb477',
-    body: "Lead with the real problem — false positives and flake. Skeptical engineers smell hype. Don't oversell.",
+    body: "Lead with the real problem: false positives and flake. Skeptical engineers smell hype. Don't oversell.",
   },
   {
     label: 'PRECISE',
@@ -124,7 +125,7 @@ function Mark({ w, h, seam, notch }: { w: number; h: number; seam: number; notch
 
 function Brand() {
   return (
-    <div style={s('background: #0d0c0b; color: #b8b0a6; min-height: 100vh;')}>
+    <div style={s('background: #0d0c0b; color: #c8c0b6; min-height: 100vh;')}>
       <Nav active="brand" />
 
       <main id="main-content" style={s('padding: 56px 28px 80px;')}>
@@ -140,11 +141,11 @@ function Brand() {
           </h1>
           <p
             style={s(
-              'font-size: 17px; color: #b8b0a6; margin: 0 0 64px; max-width: 540px; line-height: 1.55;',
+              'font-size: 17px; color: #c8c0b6; margin: 0 0 64px; max-width: 540px; line-height: 1.55;',
             )}
           >
             A terminal-native identity for an open-source developer tool. Sharp, precise,
-            mono-forward — built to look at home in a CLI and a PR comment alike.
+            and mono-forward, built to look at home in a CLI and a PR comment alike.
           </p>
 
           <h2
@@ -176,17 +177,17 @@ function Brand() {
                 <div style={s(`font-family: ${MONO}; font-size: 12px; color: #f5f1ea; margin-bottom: 6px;`)}>
                   The shield
                 </div>
-                <p style={s('font-size: 13.5px; line-height: 1.55; color: #8c847a; margin: 0;')}>
-                  A geometric shield = protection, the guard at the gate. Built from a single
-                  5-point polygon — no decorative SVG.
+                <p style={s('font-size: 13.5px; line-height: 1.55; color: #c8c0b6; margin: 0;')}>
+                  A geometric shield represents protection: the guard at the gate. Built from a single
+                  5-point polygon with no decorative SVG.
                 </p>
               </div>
               <div>
                 <div style={s(`font-family: ${MONO}; font-size: 12px; color: #f5f1ea; margin-bottom: 6px;`)}>
                   The seam
                 </div>
-                <p style={s('font-size: 13.5px; line-height: 1.55; color: #8c847a; margin: 0;')}>
-                  A center split divides the shield into two halves —{' '}
+                <p style={s('font-size: 13.5px; line-height: 1.55; color: #c8c0b6; margin: 0;')}>
+                  A center split divides the shield into two halves:{' '}
                   <span style={s('color: #e8862e;')}>baseline</span> vs{' '}
                   <span style={s('color: #e8862e;')}>current</span>. The visual diff, built into
                   the mark.
@@ -196,14 +197,14 @@ function Brand() {
                 <div style={s(`font-family: ${MONO}; font-size: 12px; color: #f5f1ea; margin-bottom: 6px;`)}>
                   The cursor
                 </div>
-                <p style={s('font-size: 13.5px; line-height: 1.55; color: #8c847a; margin: 0;')}>
+                <p style={s('font-size: 13.5px; line-height: 1.55; color: #c8c0b6; margin: 0;')}>
                   The wordmark ends in a blinking block cursor{' '}
                   <span
                     style={s(
                       'display: inline-block; width: 7px; height: 13px; background: #e8862e; vertical-align: -1px; animation: fg-blink 1.1s step-end infinite;',
                     )}
                   />{' '}
-                  — the terminal, always.
+                  representing the terminal, always.
                 </p>
               </div>
             </div>
@@ -235,7 +236,7 @@ function Brand() {
                   />
                 </span>
               </div>
-              <span style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48;`)}>
+              <span style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94;`)}>
                 PRIMARY LOCKUP
               </span>
             </div>
@@ -268,7 +269,7 @@ function Brand() {
                   frontguard
                 </span>
               </div>
-              <span style={s(`font-family: ${MONO}; font-size: 11px; color: #9b958c;`)}>
+              <span style={s(`font-family: ${MONO}; font-size: 12px; color: #575049;`)}>
                 MONO · ON LIGHT
               </span>
             </div>
@@ -278,7 +279,7 @@ function Brand() {
               )}
             >
               <Mark w={46} h={55} seam={3} notch="#131210" />
-              <span style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48;`)}>
+              <span style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94;`)}>
                 MARK · APP ICON
               </span>
             </div>
@@ -293,10 +294,10 @@ function Brand() {
           </h2>
           <div
             style={s(
-              `font-family: ${MONO}; font-size: 11px; color: #564f48; letter-spacing: 0.06em; margin-bottom: 12px;`,
+              `font-family: ${MONO}; font-size: 12px; color: #a89f94; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px;`,
             )}
           >
-            CANVAS &amp; INK — warm neutrals
+            CANVAS &amp; INK · WARM NEUTRALS
           </div>
           <div
             className="fg-swatches-grid"
@@ -310,10 +311,10 @@ function Brand() {
                   data-testid="swatch-fill"
                   style={s(`height: 84px; background: ${c.hex}; border: 1px solid #2a2622;`)}
                 />
-                <div style={s(`font-family: ${MONO}; font-size: 11px; color: #d8d0c5; margin-top: 8px;`)}>
+                <div style={s(`font-family: ${MONO}; font-size: 12px; color: #d8d0c5; margin-top: 8px;`)}>
                   {c.name}
                 </div>
-                <div style={s(`font-family: ${MONO}; font-size: 10.5px; color: #6b645c;`)}>{c.hex}</div>
+                <div style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94;`)}>{c.hex}</div>
               </div>
             ))}
           </div>
@@ -322,10 +323,10 @@ function Brand() {
             <div>
               <div
                 style={s(
-                  `font-family: ${MONO}; font-size: 11px; color: #564f48; letter-spacing: 0.06em; margin-bottom: 12px;`,
+                  `font-family: ${MONO}; font-size: 12px; color: #a89f94; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px;`,
                 )}
               >
-                BRAND ACCENT — amber
+                BRAND ACCENT · AMBER
               </div>
               <div
                 className="fg-swatch"
@@ -334,10 +335,10 @@ function Brand() {
                   'background: #e8862e; padding: 24px; min-height: 160px; display: flex; flex-direction: column; justify-content: space-between;',
                 )}
               >
-                <span style={s(`font-family: ${MONO}; font-size: 13px; color: #4a2a0e; font-weight: 700;`)}>
+                <span style={s(`font-family: ${MONO}; font-size: 13px; color: #2b1706; font-weight: 700;`)}>
                   Frontguard Amber
                 </span>
-                <div style={s(`font-family: ${MONO}; font-size: 12px; color: #4a2a0e; line-height: 1.7;`)}>
+                <div style={s(`font-family: ${MONO}; font-size: 12px; color: #2b1706; line-height: 1.7;`)}>
                   #E8862E
                   <br />
                   oklch(0.72 0.18 50)
@@ -347,10 +348,10 @@ function Brand() {
             <div>
               <div
                 style={s(
-                  `font-family: ${MONO}; font-size: 11px; color: #564f48; letter-spacing: 0.06em; margin-bottom: 12px;`,
+                  `font-family: ${MONO}; font-size: 12px; color: #a89f94; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px;`,
                 )}
               >
-                STATUS PALETTE — the terminal language
+                STATUS PALETTE · TERMINAL LANGUAGE
               </div>
               <div style={s('display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;')}>
                 {statuses.map((st) => (
@@ -372,7 +373,7 @@ function Brand() {
                       <div style={s(`font-family: ${MONO}; font-size: 13px; color: #f5f1ea;`)}>
                         {st.label}
                       </div>
-                      <div style={s(`font-family: ${MONO}; font-size: 10.5px; color: #6b645c;`)}>
+                      <div style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94;`)}>
                         {st.hex}
                       </div>
                     </div>
@@ -396,23 +397,23 @@ function Brand() {
                   'display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px;',
                 )}
               >
-                <span style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48;`)}>
+                <span style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94;`)}>
                   DISPLAY &amp; BODY
                 </span>
-                <span style={s(`font-family: ${MONO}; font-size: 11px; color: #e8862e;`)}>
-                  Space Grotesk
+                <span style={s(`font-family: ${MONO}; font-size: 12px; color: #e8862e;`)}>
+                  IBM Plex Sans
                 </span>
               </div>
               <div
                 style={s(
-                  "font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 46px; color: #f5f1ea; letter-spacing: -0.03em; line-height: 1; margin-bottom: 4px;",
+                  `font-family: ${SANS}; font-weight: 700; font-size: 46px; color: #f5f1ea; letter-spacing: -0.03em; line-height: 1; margin-bottom: 4px;`,
                 )}
               >
                 Aa
               </div>
               <div
                 style={s(
-                  "font-family: 'Space Grotesk', sans-serif; font-size: 15px; color: #8c847a; letter-spacing: 0.04em; margin-bottom: 18px;",
+                  `font-family: ${SANS}; font-size: 15px; color: #c8c0b6; letter-spacing: 0.02em; margin-bottom: 18px;`,
                 )}
               >
                 ABCDEFGHIJKLM abcdefghijklm 0123456789
@@ -424,10 +425,10 @@ function Brand() {
                   'display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px;',
                 )}
               >
-                <span style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48;`)}>
+                <span style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94;`)}>
                   CODE · LABELS · UI
                 </span>
-                <span style={s(`font-family: ${MONO}; font-size: 11px; color: #e8862e;`)}>
+                <span style={s(`font-family: ${MONO}; font-size: 12px; color: #e8862e;`)}>
                   JetBrains Mono
                 </span>
               </div>
@@ -438,7 +439,7 @@ function Brand() {
               >
                 Aa
               </div>
-              <div style={s(`font-family: ${MONO}; font-size: 14px; color: #8c847a; margin-bottom: 18px;`)}>
+              <div style={s(`font-family: ${MONO}; font-size: 14px; color: #c8c0b6; margin-bottom: 18px;`)}>
                 ABCDEFGHIJKLM abcdefghijklm 0123456789
               </div>
             </div>
@@ -454,12 +455,12 @@ function Brand() {
                 'display: flex; align-items: baseline; gap: 20px; padding: 12px 0; border-bottom: 1px solid #211e1b;',
               )}
             >
-              <span style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; width: 96px;`)}>
+              <span style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94; width: 108px;`)}>
                 DISPLAY / 52
               </span>
               <span
                 style={s(
-                  "font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 38px; color: #f5f1ea; letter-spacing: -0.035em;",
+                  `font-family: ${SANS}; font-weight: 700; font-size: 38px; color: #f5f1ea; letter-spacing: -0.035em;`,
                 )}
               >
                 Ship with confidence
@@ -470,12 +471,12 @@ function Brand() {
                 'display: flex; align-items: baseline; gap: 20px; padding: 12px 0; border-bottom: 1px solid #211e1b;',
               )}
             >
-              <span style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; width: 96px;`)}>
+              <span style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94; width: 108px;`)}>
                 HEADING / 38
               </span>
               <span
                 style={s(
-                  "font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 27px; color: #f5f1ea; letter-spacing: -0.02em;",
+                  `font-family: ${SANS}; font-weight: 600; font-size: 27px; color: #f5f1ea; letter-spacing: -0.02em;`,
                 )}
               >
                 Detect, understand, fix
@@ -486,19 +487,19 @@ function Brand() {
                 'display: flex; align-items: baseline; gap: 20px; padding: 12px 0; border-bottom: 1px solid #211e1b;',
               )}
             >
-              <span style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; width: 96px;`)}>
+              <span style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94; width: 108px;`)}>
                 BODY / 16
               </span>
               <span
                 style={s(
-                  "font-family: 'Space Grotesk', sans-serif; font-size: 16px; color: #b8b0a6;",
+                  `font-family: ${SANS}; font-size: 16px; color: #c8c0b6;`,
                 )}
               >
                 Renders every page and explains what changed and why.
               </span>
             </div>
             <div style={s('display: flex; align-items: baseline; gap: 20px; padding: 12px 0;')}>
-              <span style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; width: 96px;`)}>
+              <span style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94; width: 108px;`)}>
                 MONO / 13
               </span>
               <span style={s(`font-family: ${MONO}; font-size: 13px; color: #e8862e;`)}>
@@ -523,7 +524,7 @@ function Brand() {
                 <div style={s(`font-family: ${MONO}; font-size: 12px; color: ${v.color}; margin-bottom: 10px;`)}>
                   {v.label}
                 </div>
-                <p style={s('font-size: 14px; line-height: 1.55; color: #b8b0a6; margin: 0;')}>{v.body}</p>
+                <p style={s('font-size: 14px; line-height: 1.55; color: #c8c0b6; margin: 0;')}>{v.body}</p>
               </div>
             ))}
           </div>
@@ -542,7 +543,7 @@ function Brand() {
           >
             <div
               style={s(
-                `font-family: ${MONO}; font-size: 11px; color: #564f48; letter-spacing: 0.06em; margin-bottom: 14px;`,
+                `font-family: ${MONO}; font-size: 12px; color: #a89f94; letter-spacing: 0.06em; margin-bottom: 14px;`,
               )}
             >
               PRIMARY TAGLINE
@@ -557,7 +558,7 @@ function Brand() {
             <div style={s('height: 1px; background: #211e1b; margin: 28px 0;')} />
             <div
               style={s(
-                `font-family: ${MONO}; font-size: 11px; color: #564f48; letter-spacing: 0.06em; margin-bottom: 14px;`,
+                `font-family: ${MONO}; font-size: 12px; color: #a89f94; letter-spacing: 0.06em; margin-bottom: 14px;`,
               )}
             >
               THE ONE-LINER
@@ -600,7 +601,7 @@ function Brand() {
                   <li
                     key={x}
                     style={s(
-                      'display: grid; grid-template-columns: 16px 1fr; gap: 10px; font-size: 14px; line-height: 1.5; color: #b8b0a6;',
+                      'display: grid; grid-template-columns: 16px 1fr; gap: 10px; font-size: 14px; line-height: 1.5; color: #c8c0b6;',
                     )}
                   >
                     <span style={s(`color: #e5484d; font-family: ${MONO};`)}>−</span>

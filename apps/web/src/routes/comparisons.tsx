@@ -62,8 +62,8 @@ export const Route = createFileRoute('/comparisons')({
 const MONO = "'JetBrains Mono', monospace"
 const Y = '#4fb477'
 const P = '#e8862e'
-const N = '#6b645c'
-const INKC = '#a89f94'
+const N = '#a89f94'
+const INKC = '#c8c0b6'
 
 function cellColor(v: string, colIndex: number): string {
   if (colIndex === 0 && v.startsWith('✓')) return Y
@@ -75,18 +75,21 @@ function cellColor(v: string, colIndex: number): string {
 
 function Comparisons() {
   return (
-    <div style={s('background: #0d0c0b; color: #b8b0a6; min-height: 100vh;')}>
+    <div style={s('background: #0d0c0b; color: #c8c0b6; min-height: 100vh;')}>
       <Nav active="compare" />
 
       <main id="main-content">
       <header style={s('max-width: 1200px; margin: 0 auto; padding: 76px 28px 44px; text-align: center;')}>
-        <div
+        <nav
+          aria-label="Breadcrumb"
           style={s(
-            `font-family: ${MONO}; font-size: 12px; color: #e8862e; letter-spacing: 0.08em; margin-bottom: 16px;`,
+            `display: inline-flex; align-items: center; gap: 8px; font-family: ${MONO}; font-size: 12px; color: #a89f94; margin-bottom: 16px;`,
           )}
         >
-          // HOW IT COMPARES
-        </div>
+          <Link to="/" style={s('color: #a89f94; text-decoration: none;')}>Home</Link>
+          <span aria-hidden="true">/</span>
+          <span style={s('color: #e8862e;')}>Comparisons</span>
+        </nav>
         <h1
           style={s(
             'font-size: clamp(36px, 5.5vw, 52px); line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;',
@@ -96,7 +99,7 @@ function Comparisons() {
         </h1>
         <p
           style={s(
-            'font-size: 18px; line-height: 1.55; color: #b8b0a6; margin: 0 auto; max-width: 600px;',
+            'font-size: 18px; line-height: 1.55; color: #c8c0b6; margin: 0 auto; max-width: 600px;',
           )}
         >
           Compare the implemented local CLI against documented vendor capabilities. Frontguard’s
@@ -125,8 +128,8 @@ function Comparisons() {
       </section>
 
       <section style={s('max-width: 1200px; margin: 0 auto; padding: 8px 28px 40px;')}>
-        <div style={s('border: 1px solid #2a2622; overflow-x: auto;')} data-testid="vendor-matrix">
-          <table style={s('width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 860px;')}>
+        <div style={s('overflow-x: auto;')} data-testid="vendor-matrix">
+          <table style={s('width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 860px; border: 1px solid #2a2622; background: #131210;')}>
             <caption style={s('position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0);')}>
               Comparison between Frontguard, Percy, Chromatic, BackstopJS, Lost Pixel, and Argos
             </caption>
@@ -135,7 +138,7 @@ function Comparisons() {
                 <th
                   scope="col"
                   style={s(
-                    `text-align: left; padding: 18px; font-family: ${MONO}; font-size: 11px; color: #7c746b; font-weight: 500; letter-spacing: 0.04em;`,
+                    `text-align: left; padding: 18px; font-family: ${MONO}; font-size: 12px; color: #a89f94; font-weight: 600; letter-spacing: 0.04em;`,
                   )}
                 >
                   CAPABILITY
@@ -145,7 +148,7 @@ function Comparisons() {
                     key={h}
                     scope="col"
                     style={s(
-                      `padding: 18px 12px; font-family: ${MONO}; font-size: ${i === 0 ? '13px' : '12px'}; color: ${i === 0 ? '#e8862e' : '#8c847a'}; font-weight: ${i === 0 ? 700 : 500};`,
+                      `padding: 18px 12px; font-family: ${MONO}; font-size: ${i === 0 ? '13px' : '12px'}; color: ${i === 0 ? '#e8862e' : '#c8c0b6'}; font-weight: ${i === 0 ? 700 : 500};`,
                     )}
                   >
                     {h}
@@ -182,7 +185,7 @@ function Comparisons() {
         </div>
         <div
           style={s(
-            `display: flex; gap: 22px; flex-wrap: wrap; margin-top: 16px; font-family: ${MONO}; font-size: 11.5px; color: #6b645c;`,
+            `display: flex; gap: 22px; flex-wrap: wrap; margin-top: 16px; font-family: ${MONO}; font-size: 12px; color: #a89f94;`,
           )}
         >
           <span>
@@ -192,21 +195,21 @@ function Comparisons() {
             <span style={s('color: #e8862e;')}>◐</span> partial / limited
           </span>
           <span>
-            <span style={s('color: #6b645c;')}>✕</span> not available
+            <span style={s('color: #a89f94;')}>✕</span> not available
           </span>
         </div>
         <p
           style={s(
-            `margin-top: 16px; font-family: ${MONO}; font-size: 12px; color: #6b645c;`,
+            `margin-top: 16px; font-family: ${MONO}; font-size: 12px; color: #a89f94;`,
           )}
         >
-          Every cell traces to documented vendor behaviour — see{' '}
+          Every cell traces to documented vendor behaviour: see{' '}
           <a
             href="https://github.com/ravidsrk/frontguard/blob/main/docs/research.md"
             target="_blank"
             rel="noopener noreferrer"
             className="fg-link"
-            style={s('color: #8c847a; text-decoration: none;')}
+            style={s('color: #c8c0b6; text-decoration: none;')}
           >
             docs/research.md
           </a>
@@ -222,8 +225,8 @@ function Comparisons() {
         >
           Head to head
         </h2>
-        <p style={s('font-size: 16px; color: #b8b0a6; margin: 0 0 36px;')}>
-          The honest version — what each tool is genuinely good at, and where Frontguard pulls
+        <p style={s('font-size: 16px; color: #c8c0b6; margin: 0 0 36px;')}>
+          The honest version: what each tool is genuinely good at, and where Frontguard pulls
           ahead.
         </p>
         <div className="fg-responsive-grid" style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 18px;')}>
@@ -237,25 +240,25 @@ function Comparisons() {
                 <span style={s(`font-family: ${MONO}; font-size: 13px; color: #e8862e; font-weight: 700;`)}>
                   frontguard
                 </span>
-                <span style={s(`font-family: ${MONO}; font-size: 12px; color: #564f48;`)}>vs</span>
+                <span style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94;`)}>vs</span>
                 <span style={s(`font-family: ${MONO}; font-size: 13px; color: #d8d0c5;`)}>{v.name}</span>
               </div>
               <div style={s('margin-bottom: 16px;')}>
                 <div
                   style={s(
-                    `font-family: ${MONO}; font-size: 11px; color: #8c847a; letter-spacing: 0.04em; margin-bottom: 7px;`,
+                    `font-family: ${MONO}; font-size: 12px; color: #a89f94; letter-spacing: 0.04em; margin-bottom: 7px;`,
                   )}
                 >
                   {v.name.toUpperCase()} IS GOOD AT
                 </div>
-                <p style={s('margin: 0; font-size: 14px; line-height: 1.55; color: #b8b0a6;')}>
+                <p style={s('margin: 0; font-size: 14px; line-height: 1.55; color: #c8c0b6;')}>
                   {v.their}
                 </p>
               </div>
               <div style={s('margin-bottom: 20px;')}>
                 <div
                   style={s(
-                    `font-family: ${MONO}; font-size: 11px; color: #e8862e; letter-spacing: 0.04em; margin-bottom: 7px;`,
+                    `font-family: ${MONO}; font-size: 12px; color: #e8862e; letter-spacing: 0.04em; margin-bottom: 7px;`,
                   )}
                 >
                   WHERE FRONTGUARD WINS
@@ -269,7 +272,7 @@ function Comparisons() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="fg-link"
-                style={s(`font-family: ${MONO}; font-size: 12.5px; color: #8c847a; text-decoration: none;`)}
+                style={s(`font-family: ${MONO}; font-size: 12.5px; color: #c8c0b6; text-decoration: none;`)}
               >
                 {v.cta} →
               </a>
@@ -294,8 +297,8 @@ function Comparisons() {
               >
                 Switching is a config file, not a rewrite.
               </h2>
-              <p style={s('font-size: 15.5px; line-height: 1.6; color: #b8b0a6; margin: 0;')}>
-                Frontguard reads your app by URL — no test files to port, no proprietary snapshot
+              <p style={s('font-size: 15.5px; line-height: 1.6; color: #c8c0b6; margin: 0;')}>
+                Frontguard reads your app by URL, with no test files to port and no proprietary snapshot
                 format. Point it at your dev server, review the captures, then accept them with one
                 baseline-update command. Migration guides walk through the rest.
               </p>
@@ -315,7 +318,7 @@ function Comparisons() {
                 >
                   <div
                     style={s(
-                      `font-family: ${MONO}; font-size: 11px; color: #564f48; margin-bottom: 6px;`,
+                      `font-family: ${MONO}; font-size: 12px; color: #a89f94; margin-bottom: 6px;`,
                     )}
                   >
                     MIGRATE FROM
@@ -342,7 +345,7 @@ function Comparisons() {
           </h2>
           <p
             style={s(
-              'font-size: 17px; color: #b8b0a6; margin: 0 auto 30px; max-width: 440px; line-height: 1.55;',
+              'font-size: 17px; color: #c8c0b6; margin: 0 auto 30px; max-width: 440px; line-height: 1.55;',
             )}
           >
             Install the CLI, capture and review baselines explicitly, then compare changes locally.

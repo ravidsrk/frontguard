@@ -112,7 +112,7 @@ function DocArticle() {
       btn.setAttribute('aria-label', 'Copy code snippet')
       btn.textContent = 'Copy'
       btn.style.cssText =
-        "font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #b8b0a6; background: #1f1c19; border: 1px solid #322d28; padding: 3px 10px; cursor: pointer;"
+        "font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #c8c0b6; background: #1f1c19; border: 1px solid #322d28; padding: 4px 10px; cursor: pointer;"
 
       btn.addEventListener('click', () => {
         const text = pre.textContent ?? ''
@@ -142,7 +142,7 @@ function DocArticle() {
     return (
       <div style={s('padding: 40px 0;')}>
         <h1 style={s('font-size: 32px; font-weight: 700; color: #f5f1ea; margin: 0 0 12px;')}>Page not found</h1>
-        <p style={s('font-size: 15px; color: #b8b0a6; margin: 0 0 20px;')}>No docs article matches “{slug}”.</p>
+        <p style={s('font-size: 15px; color: #c8c0b6; margin: 0 0 20px;')}>No docs article matches “{slug}”.</p>
         <Link
           to="/docs/$"
           params={{ _splat: FIRST_DOC_SLUG }}
@@ -180,7 +180,7 @@ function DocArticle() {
       >
         <span
           style={s(
-            `font-family: ${MONO}; font-size: 10.5px; color: #6b645c; letter-spacing: 0.08em; margin-right: 6px;`,
+            `font-family: ${MONO}; font-size: 12px; color: #a89f94; letter-spacing: 0.06em; text-transform: uppercase; margin-right: 6px;`,
           )}
         >
           JUMP TO:
@@ -193,7 +193,7 @@ function DocArticle() {
               to="/docs/$"
               params={{ _splat: track.slug }}
               style={s(
-                `font-family: ${MONO}; font-size: 11.5px; padding: 4px 10px; border-radius: 4px; text-decoration: none; border: 1px solid ${isCurrent ? '#e8862e' : '#2a2622'}; background: ${isCurrent ? '#1a130b' : '#131210'}; color: ${isCurrent ? '#e8862e' : '#b8b0a6'};`,
+                `font-family: ${MONO}; font-size: 12px; padding: 4px 10px; border-radius: 4px; text-decoration: none; border: 1px solid ${isCurrent ? '#e8862e' : '#2a2622'}; background: ${isCurrent ? '#1a130b' : '#131210'}; color: ${isCurrent ? '#e8862e' : '#c8c0b6'};`,
               )}
             >
               {track.label}
@@ -207,9 +207,9 @@ function DocArticle() {
           'display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px;',
         )}
       >
-        <div style={s(`font-family: ${MONO}; font-size: 12px; color: #7c746b;`)}>
+        <div style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94;`)}>
           <span style={s('color: #e8862e;')}>{cur.section}</span> / {cur.label}
-          <span style={s('color: #564f48; margin-left: 10px;')}>
+          <span style={s('color: #a89f94; margin-left: 10px;')}>
             ({idx + 1} of {articles.length})
           </span>
         </div>
@@ -218,7 +218,7 @@ function DocArticle() {
           onClick={handleCopyArticle}
           aria-label="Copy article content"
           style={s(
-            `font-family: ${MONO}; font-size: 11px; color: ${copiedPage ? '#4fb477' : '#b8b0a6'}; background: #141210; border: 1px solid ${copiedPage ? '#255c3b' : '#2a2622'}; border-radius: 4px; padding: 4px 10px; cursor: pointer;`,
+            `font-family: ${MONO}; font-size: 12px; color: ${copiedPage ? '#4fb477' : '#c8c0b6'}; background: #141210; border: 1px solid ${copiedPage ? '#255c3b' : '#2a2622'}; border-radius: 4px; padding: 4px 10px; cursor: pointer;`,
           )}
         >
           {copiedPage ? 'Copied page ✓' : 'Copy page text'}
@@ -232,24 +232,24 @@ function DocArticle() {
       <div className="fg-docs-pagination" style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 28px; margin-top: 32px; border-top: 1px solid #211e1b;')}>
         {prev ? (
           <Link to="/docs/$" params={{ _splat: prev.id }} className="fg-link" style={s('border: 1px solid #2a2622; border-radius: 6px; background: #121110; padding: 18px 20px; text-decoration: none;')}>
-            <div style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; margin-bottom: 6px;`)}>← PREVIOUS</div>
+            <div style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94; margin-bottom: 6px;`)}>← PREVIOUS</div>
             <div className="fg-link-title" style={s('font-size: 15px; color: #d8d0c5;')}>{prev.label}</div>
           </Link>
         ) : (
-          <span style={s('border: 1px solid #2a2622; border-radius: 6px; padding: 18px 20px; opacity: 0.4;')}>
-            <div style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; margin-bottom: 6px;`)}>← PREVIOUS</div>
-            <div style={s('font-size: 15px; color: #d8d0c5;')}>Overview</div>
+          <span style={s('border: 1px dashed #2a2622; border-radius: 6px; background: #100f0e; padding: 18px 20px;')}>
+            <div style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94; margin-bottom: 6px;`)}>← PREVIOUS</div>
+            <div style={s('font-size: 15px; color: #b8b0a6;')}>Overview</div>
           </span>
         )}
         {next ? (
           <Link to="/docs/$" params={{ _splat: next.id }} className="fg-link" style={s('border: 1px solid #2a2622; border-radius: 6px; background: #121110; padding: 18px 20px; text-decoration: none; text-align: right;')}>
-            <div style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; margin-bottom: 6px;`)}>NEXT →</div>
+            <div style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94; margin-bottom: 6px;`)}>NEXT →</div>
             <div className="fg-link-title" style={s('font-size: 15px; color: #d8d0c5;')}>{next.label}</div>
           </Link>
         ) : (
-          <span style={s('border: 1px solid #2a2622; border-radius: 6px; padding: 18px 20px; text-align: right; opacity: 0.4;')}>
-            <div style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; margin-bottom: 6px;`)}>NEXT →</div>
-            <div style={s('font-size: 15px; color: #d8d0c5;')}>You&apos;re all caught up</div>
+          <span style={s('border: 1px dashed #2a2622; border-radius: 6px; background: #100f0e; padding: 18px 20px; text-align: right;')}>
+            <div style={s(`font-family: ${MONO}; font-size: 12px; color: #a89f94; margin-bottom: 6px;`)}>NEXT →</div>
+            <div style={s('font-size: 15px; color: #b8b0a6;')}>You&apos;re all caught up</div>
           </span>
         )}
       </div>

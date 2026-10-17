@@ -17,25 +17,27 @@
   --fg-border-hover: #54493f;
   --fg-ink-hi: #f5f1ea;
   --fg-ink-mid: #d8d0c5;
-  --fg-ink-body: #b8b0a6;
-  --fg-ink-muted: #8c847a;
+  --fg-ink-body: #c8c0b6;
+  --fg-ink-muted: #a89f94;
   --fg-amber: #e8862e;
   --fg-amber-hi: #f59b45;
   --fg-emerald: #4fb477;
   --fg-crimson: #e5484d;
   --fg-azure: #5b8def;
   --fg-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --fg-sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  --fg-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; color-scheme: dark; }
 
 body {
   background: var(--fg-bg);
   color: var(--fg-ink-body);
   font-family: var(--fg-sans);
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -51,12 +53,15 @@ a { color: inherit; }
 
 /* Inline source-design colors below this contrast threshold are upgraded here. */
 [style*="color: #564f48"],
+[style*="color:#564f48"],
 [style*="color: rgb(86, 79, 72)"],
 [style*="color: #6b645c"],
+[style*="color:#6b645c"],
 [style*="color: rgb(107, 100, 92)"],
 [style*="color: #7c746b"],
+[style*="color:#7c746b"],
 [style*="color: rgb(124, 116, 107)"] {
-  color: #8c847a !important;
+  color: #a89f94 !important;
 }
 
 /* ---- keyframes ---- */

@@ -123,7 +123,7 @@ export interface PillarItem {
 
 export const PILLARS: PillarItem[] = [
   {
-    n: "01 / DETECT",
+    n: "DETECT",
     c: "#4fb477",
     h: "Find what changed",
     p: "Pixel comparison across configured viewports and browsers, with connected-component diff clustering, spatial targetSelector DOM attribution, chroma/CW-SSIM perceptual scoring, masks, and optional multi-render consensus.",
@@ -134,7 +134,7 @@ export const PILLARS: PillarItem[] = [
     ],
   },
   {
-    n: "02 / UNDERSTAND",
+    n: "UNDERSTAND",
     c: "#e8862e",
     h: "Explain why it broke",
     p: "When configured, model-assisted analysis classifies changed screenshots and returns a confidence-scored explanation for human review across OpenAI, Anthropic, Google Gemini, or a custom OpenAI-compatible baseUrl.",
@@ -145,7 +145,7 @@ export const PILLARS: PillarItem[] = [
     ],
   },
   {
-    n: "03 / FIX",
+    n: "FIX",
     c: "#5b8def",
     h: "Verified, not guessed",
     p: "Experimental CSS suggestions can be generated and, with a separate verification opt-in, applied in a sandbox and re-rendered. Unverified suggestions remain labeled as such.",
@@ -371,10 +371,10 @@ export const HONEST_CARDS: HonestCard[] = [
   },
 ];
 
-export const CLI_HTML = `<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard run
+export const CLI_HTML = `<span style="color: #a89f94;">$</span> npx -p @frontguard/cli frontguard run
 
-<span style="color: #4fb477;">  ✓ 11 passed</span>   <span style="color: #e5484d;">✘ 1 regression</span>
-<span style="color: #7c746b;">  Cluster #1: (48, 224) 148×164px · Chroma SSIM 61.4%</span>`;
+<span style="color: #4fb477;">  ✓ 11 passed</span>   <span style="color: #ff8b8e;">✘ 1 regression</span>
+<span style="color: #a89f94;">  Cluster #1: (48, 224) 148×164px · Chroma SSIM 61.4%</span>`;
 
 export const PW_HTML = `<span style="color: #c678dd;">import</span> { test, expect } <span style="color: #c678dd;">from</span> <span style="color: #98c379;">'@playwright/test'</span>;
 <span style="color: #c678dd;">import</span> { visualTest } <span style="color: #c678dd;">from</span> <span style="color: #98c379;">'@frontguard/playwright'</span>;
@@ -388,8 +388,8 @@ test(<span style="color: #98c379;">'home page'</span>, <span style="color: #c678
   expect(result.passed).toBe(<span style="color: #56b6c2;">true</span>);
 });`;
 
-export const MCP_HTML = `<span style="color: #7c746b;">$</span> npx -p @frontguard/cli frontguard guide mcp --json
-<span style="color: #564f48;"># Or register @frontguard/mcp in Claude Code / Cursor:</span>
+export const MCP_HTML = `<span style="color: #a89f94;">$</span> npx -p @frontguard/cli frontguard guide mcp --json
+<span style="color: #a89f94;"># Or register @frontguard/mcp in Claude Code / Cursor:</span>
 <span style="color: #4fb477;">→</span> list_regressions · inspect_diff_cluster_dom
 <span style="color: #e8862e;">→</span> get_suggested_fix · verify_css_patch · promote_baseline`;
 
@@ -429,7 +429,7 @@ export const CONFIG_CODE = `export default {
 export const CONFIG_HTML = `<span style="color: #c678dd;">export default</span> {
   baseUrl: <span style="color: #98c379;">'http://localhost:3000'</span>,
 
-  <span style="color: #564f48;">// auto-discover routes or configure pre-capture actions</span>
+  <span style="color: #a89f94;">// auto-discover routes or configure pre-capture actions</span>
   discover: {
     startUrl: <span style="color: #98c379;">'/'</span>,
     maxDepth: <span style="color: #e8862e;">3</span>,
@@ -455,6 +455,6 @@ export const CONFIG_HTML = `<span style="color: #c678dd;">export default</span> 
   blockUrls: [<span style="color: #98c379;">'*google-analytics.com*'</span>],
   threshold: <span style="color: #e8862e;">0.01</span>,
 
-  <span style="color: #564f48;">// AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini' | custom baseUrl)</span>
+  <span style="color: #a89f94;">// AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini' | custom baseUrl)</span>
   ai: { provider: <span style="color: #98c379;">'openai'</span>, model: <span style="color: #98c379;">'gpt-4o'</span> },
 };`;

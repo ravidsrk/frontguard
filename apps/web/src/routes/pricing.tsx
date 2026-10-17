@@ -25,7 +25,7 @@ export const Route = createFileRoute('/pricing')({
 
 const MONO = "'JetBrains Mono', monospace"
 const YES = '#4fb477'
-const NO = '#564f48'
+const NO = '#a89f94'
 const AMBER = '#e8862e'
 const INK = '#d8d0c5'
 
@@ -48,7 +48,7 @@ type Tier = {
 const tiers: Tier[] = [
   {
     name: 'OPEN SOURCE',
-    accent: '#8c847a',
+    accent: '#c8c0b6',
     border: '#2a2622',
     bg: '#131210',
     price: '$0',
@@ -81,7 +81,7 @@ const tiers: Tier[] = [
     cta: 'Join the waitlist',
     ctaHref: 'mailto:hello@frontguard.dev?subject=Pro%20waitlist',
     external: true,
-    featuresLabel: 'PLANNED — NOT GENERALLY AVAILABLE',
+    featuresLabel: 'PLANNED · NOT GENERALLY AVAILABLE',
     features: [
       'Candidate hosted dashboard & report history',
       'Candidate managed baseline storage',
@@ -102,7 +102,7 @@ const tiers: Tier[] = [
     cta: 'Contact us',
     ctaHref: 'mailto:hello@frontguard.dev?subject=Enterprise%20Frontguard',
     external: true,
-    featuresLabel: 'ROADMAP — NOT GENERALLY AVAILABLE',
+    featuresLabel: 'ROADMAP · NOT GENERALLY AVAILABLE',
     features: [
       'Candidate team roles & invitations',
       'Candidate baseline review workflows',
@@ -115,15 +115,15 @@ const tiers: Tier[] = [
 ]
 
 const matrix = [
-  { cap: 'CLI — render, diff, report', v1: '✓', c1: YES, v2: '✓', c2: YES, v3: '✓', c3: YES },
+  { cap: 'CLI: render, diff, report', v1: '✓', c1: YES, v2: '✓', c2: YES, v3: '✓', c3: YES },
   { cap: 'AI analysis (BYOK)', v1: '✓', c1: YES, v2: '✓', c2: YES, v3: '✓', c3: YES },
   { cap: 'AI fix generation & verification', v1: '✓', c1: YES, v2: '✓', c2: YES, v3: '✓', c3: YES },
-  { cap: 'Hosted dashboard & history', v1: '—', c1: NO, v2: 'Planned', c2: AMBER, v3: 'Planned', c3: AMBER },
+  { cap: 'Hosted dashboard & history', v1: 'Local only', c1: NO, v2: 'Planned', c2: AMBER, v3: 'Planned', c3: AMBER },
   { cap: 'Managed baseline storage', v1: 'Git', c1: INK, v2: 'Planned', c2: AMBER, v3: 'Planned', c3: AMBER },
   { cap: 'Production monitoring scheduler', v1: 'CLI', c1: INK, v2: '—', c2: NO, v3: 'Planned', c3: AMBER },
   { cap: 'Slack / PagerDuty alerts', v1: 'Webhook', c1: INK, v2: 'Planned', c2: AMBER, v3: 'Planned', c3: AMBER },
-  { cap: 'Teams, roles & approvals', v1: '—', c1: NO, v2: '—', c2: NO, v3: 'Planned', c3: AMBER },
-  { cap: 'SSO & audit log', v1: '—', c1: NO, v2: '—', c2: NO, v3: 'Planned', c3: AMBER },
+  { cap: 'Teams, roles & approvals', v1: 'Local only', c1: NO, v2: 'Single-user', c2: NO, v3: 'Planned', c3: AMBER },
+  { cap: 'SSO & audit log', v1: 'Local only', c1: NO, v2: 'Single-user', c2: NO, v3: 'Planned', c3: AMBER },
 ]
 
 const faqs = [
@@ -145,7 +145,7 @@ const faqs = [
   },
   {
     q: 'OpenAI or Anthropic — which should I use?',
-    a: 'Choose the provider and model explicitly in frontguard.config.ts — OpenAI (gpt-4.1-mini, gpt-4o), Anthropic (claude-sonnet-4-20250514), Google Gemini (gemini-2.5-flash / gemini-2.5-pro), and custom OpenAI-compatible baseUrl endpoints (OpenRouter, Ollama, vLLM) are all supported. When AI is enabled, Frontguard sends screenshot evidence, basic route metadata, and optional accessibility findings directly to that provider; it does not send a DOM snapshot or console log.',
+    a: 'Choose the provider and model explicitly in frontguard.config.ts: OpenAI (gpt-4.1-mini, gpt-4o), Anthropic (claude-sonnet-4-20250514), Google Gemini (gemini-2.5-flash / gemini-2.5-pro), and custom OpenAI-compatible baseUrl endpoints (OpenRouter, Ollama, vLLM) are all supported. When AI is enabled, Frontguard sends screenshot evidence, basic route metadata, and optional accessibility findings directly to that provider; it does not send a DOM snapshot or console log.',
   },
   {
     q: 'Does Frontguard work with Storybook?',
@@ -211,19 +211,21 @@ function Pricing() {
   }
 
   return (
-    <div style={s('background: #0d0c0b; color: #b8b0a6; min-height: 100vh;')}>
+    <div style={s('background: #0d0c0b; color: #c8c0b6; min-height: 100vh;')}>
       <Nav active="pricing" />
 
       <main id="main-content">
       <header style={s('max-width: 1200px; margin: 0 auto; padding: 80px 28px 48px; text-align: center;')}>
-        <div
+        <nav
+          aria-label="Breadcrumb"
           style={s(
-            `display: inline-flex; align-items: center; gap: 10px; font-family: ${MONO}; font-size: 12px; color: #4fb477; border: 1px solid #24472f; background: #0e1410; padding: 6px 12px; margin-bottom: 26px; white-space: nowrap;`,
+            `display: inline-flex; align-items: center; gap: 8px; font-family: ${MONO}; font-size: 12px; color: #4fb477; margin-bottom: 20px;`,
           )}
         >
-          <span style={s('display: inline-block; width: 6px; height: 6px; background: #4fb477;')} />
-          THE CLI IS FREE FOREVER · MIT
-        </div>
+          <Link to="/" style={s('color: #a89f94; text-decoration: none;')}>Home</Link>
+          <span aria-hidden="true" style={s('color: #a89f94;')}>/</span>
+          <span>Pricing · MIT Open Source CLI</span>
+        </nav>
         <h1
           style={s(
             'font-size: clamp(36px, 6vw, 54px); line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea; margin: 0 0 18px;',
@@ -235,7 +237,7 @@ function Pricing() {
         </h1>
         <p
           style={s(
-            'font-size: 18px; line-height: 1.55; color: #b8b0a6; margin: 0 auto; max-width: 560px;',
+            'font-size: 18px; line-height: 1.55; color: #c8c0b6; margin: 0 auto; max-width: 560px;',
           )}
         >
           Run the local CLI for free without an account. Hosted plans are not generally
@@ -261,7 +263,7 @@ function Pricing() {
               {t.featured && (
                 <span
                   style={s(
-                    `position: absolute; top: -1px; right: 24px; background: #e8862e; color: #0d0c0b; font-family: ${MONO}; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; padding: 4px 10px; white-space: nowrap;`,
+                    `position: absolute; top: -1px; right: 24px; background: #e8862e; color: #0d0c0b; font-family: ${MONO}; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; padding: 4px 10px; white-space: nowrap;`,
                   )}
                 >
                   PRE-RELEASE
@@ -283,13 +285,13 @@ function Pricing() {
                 >
                   {t.price}
                 </span>
-                <span style={s(`font-family: ${MONO}; font-size: 13px; color: #7c746b;`)}>
+                <span style={s(`font-family: ${MONO}; font-size: 13px; color: #a89f94;`)}>
                   {t.per}
                 </span>
               </div>
               <p
                 style={s(
-                  'font-size: 14px; line-height: 1.5; color: #8c847a; margin: 0 0 22px; min-height: 42px;',
+                  'font-size: 14px; line-height: 1.5; color: #b8b0a6; margin: 0 0 22px; min-height: 42px;',
                 )}
               >
                 {t.tagline}
@@ -298,7 +300,7 @@ function Pricing() {
               <div style={s('height: 1px; background: #211e1b; margin: 24px 0;')} />
               <div
                 style={s(
-                  `font-family: ${MONO}; font-size: 11px; color: #564f48; letter-spacing: 0.06em; margin-bottom: 14px;`,
+                  `font-family: ${MONO}; font-size: 12px; color: #a89f94; letter-spacing: 0.06em; margin-bottom: 14px;`,
                 )}
               >
                 {t.featuresLabel}
@@ -323,7 +325,7 @@ function Pricing() {
         </div>
         <p
           style={s(
-            `text-align: center; font-family: ${MONO}; font-size: 12.5px; color: #6b645c; margin: 28px 0 0;`,
+            `text-align: center; font-family: ${MONO}; font-size: 12.5px; color: #a89f94; margin: 28px 0 0;`,
           )}
         >
           Cloud source is included for evaluation, but the hosted and self-host onboarding paths
@@ -339,75 +341,79 @@ function Pricing() {
         >
           Compare plans
         </h2>
-        <div style={s('border: 1px solid #2a2622; overflow-x: auto;')} data-testid="compare-matrix">
-          <div
+        <div style={s('overflow-x: auto;')} data-testid="compare-matrix">
+          <table
             style={s(
-              'display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; min-width: 600px; background: #161412; border-bottom: 1px solid #211e1b;',
+              'width: 100%; min-width: 600px; border-collapse: collapse; border: 1px solid #2a2622; background: #131210;',
             )}
           >
-            <div
-              style={s(
-                `padding: 16px 20px; font-family: ${MONO}; font-size: 11px; color: #564f48; letter-spacing: 0.04em;`,
-              )}
-            >
-              CAPABILITY
-            </div>
-            <div
-              style={s(
-                `padding: 16px 14px; text-align: center; font-family: ${MONO}; font-size: 12px; color: #8c847a;`,
-              )}
-            >
-              Open Source
-            </div>
-            <div
-              style={s(
-                `padding: 16px 14px; text-align: center; font-family: ${MONO}; font-size: 12px; color: #e8862e; font-weight: 700;`,
-              )}
-            >
-              Hosted (planned)
-            </div>
-            <div
-              style={s(
-                `padding: 16px 14px; text-align: center; font-family: ${MONO}; font-size: 12px; color: #8c847a;`,
-              )}
-            >
-              Team (planned)
-            </div>
-          </div>
-          {matrix.map((row) => (
-            <div
-              key={row.cap}
-              data-testid="matrix-row"
-              style={s(
-                'display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; min-width: 600px; border-bottom: 1px solid #211e1b;',
-              )}
-            >
-              <div style={s('padding: 14px 20px; font-size: 13.5px; color: #d8d0c5;')}>
-                {row.cap}
-              </div>
-              <div
-                style={s(
-                  `padding: 14px; text-align: center; font-family: ${MONO}; font-size: 13px; color: ${row.c1};`,
-                )}
-              >
-                {row.v1}
-              </div>
-              <div
-                style={s(
-                  `padding: 14px; text-align: center; font-family: ${MONO}; font-size: 13px; color: ${row.c2};`,
-                )}
-              >
-                {row.v2}
-              </div>
-              <div
-                style={s(
-                  `padding: 14px; text-align: center; font-family: ${MONO}; font-size: 13px; color: ${row.c3};`,
-                )}
-              >
-                {row.v3}
-              </div>
-            </div>
-          ))}
+            <thead>
+              <tr style={s('background: #161412; border-bottom: 1px solid #211e1b;')}>
+                <th
+                  style={s(
+                    `padding: 16px 20px; text-align: left; font-family: ${MONO}; font-size: 12px; color: #a89f94; letter-spacing: 0.04em; font-weight: 600;`,
+                  )}
+                >
+                  CAPABILITY
+                </th>
+                <th
+                  style={s(
+                    `padding: 16px 14px; text-align: center; font-family: ${MONO}; font-size: 12px; color: #c8c0b6; font-weight: 600;`,
+                  )}
+                >
+                  Open Source
+                </th>
+                <th
+                  style={s(
+                    `padding: 16px 14px; text-align: center; font-family: ${MONO}; font-size: 12px; color: #e8862e; font-weight: 700;`,
+                  )}
+                >
+                  Hosted (planned)
+                </th>
+                <th
+                  style={s(
+                    `padding: 16px 14px; text-align: center; font-family: ${MONO}; font-size: 12px; color: #c8c0b6; font-weight: 600;`,
+                  )}
+                >
+                  Team (planned)
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {matrix.map((row) => (
+                <tr
+                  key={row.cap}
+                  data-testid="matrix-row"
+                  style={s('border-bottom: 1px solid #211e1b;')}
+                >
+                  <td style={s('padding: 14px 20px; font-size: 14px; color: #d8d0c5;')}>
+                    {row.cap}
+                  </td>
+                  <td
+                    style={s(
+                      `padding: 14px; text-align: center; font-family: ${MONO}; font-size: 13px; color: ${row.c1};`,
+                    )}
+                  >
+                    {row.v1}
+                  </td>
+                  <td
+                    style={s(
+                      `padding: 14px; text-align: center; font-family: ${MONO}; font-size: 13px; color: ${row.c2};`,
+                    )}
+                  >
+                    {row.v2}
+                  </td>
+                  <td
+                    style={s(
+                      `padding: 14px; text-align: center; font-family: ${MONO}; font-size: 13px; color: ${row.c3};`,
+                    )}
+                  >
+                    {row.v3}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -434,7 +440,7 @@ function Pricing() {
                 >
                   {item.q}
                 </summary>
-                <p style={s('margin: 8px 0 0; font-size: 14.5px; line-height: 1.6; color: #b8b0a6;')}>
+                <p style={s('margin: 8px 0 0; font-size: 14.5px; line-height: 1.6; color: #c8c0b6;')}>
                   {item.a}
                 </p>
               </details>
@@ -454,7 +460,7 @@ function Pricing() {
           </h2>
           <p
             style={s(
-              'font-size: 17px; color: #b8b0a6; margin: 0 auto 32px; max-width: 460px; line-height: 1.55;',
+              'font-size: 17px; color: #c8c0b6; margin: 0 auto 32px; max-width: 460px; line-height: 1.55;',
             )}
           >
             Install the CLI without an account, start your app, explicitly accept reviewed
@@ -462,11 +468,11 @@ function Pricing() {
           </p>
           <div
             style={s(
-              'display: inline-flex; align-items: stretch; border: 1px solid #322d28; background: #161412; margin-bottom: 22px;',
+              'display: inline-flex; align-items: center; gap: 8px; border: 1px solid #322d28; background: #161412; padding: 8px 12px; margin-bottom: 22px;',
             )}
           >
-            <span style={s(`font-family: ${MONO}; font-size: 14px; color: #e6e0d6; padding: 14px 20px;`)}>
-              <span style={s('color: #7c746b;')}>$ </span>npm install @frontguard/cli
+            <span style={s(`font-family: ${MONO}; font-size: 14px; color: #e6e0d6; padding: 6px 8px;`)}>
+              <span style={s('color: #a89f94;')}>$ </span>npm install @frontguard/cli
             </span>
             <button
               type="button"
@@ -475,7 +481,7 @@ function Pricing() {
               aria-live="polite"
               className="fg-btn-ghost"
               style={s(
-                `font-family: ${MONO}; font-size: 12px; color: #b8b0a6; background: #1f1c19; border: none; border-left: 1px solid #322d28; padding: 0 18px; cursor: pointer;`,
+                `font-family: ${MONO}; font-size: 12px; color: #c8c0b6; background: #1f1c19; border: 1px solid #322d28; padding: 8px 14px; cursor: pointer;`,
               )}
             >
               {copyLabel}

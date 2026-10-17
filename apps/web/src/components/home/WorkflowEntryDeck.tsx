@@ -88,7 +88,7 @@ export function WorkflowEntryDeck() {
                   style={{
                     fontFamily: MONO,
                     ...s(
-                      "font-size: 11px; color: #e8862e; letter-spacing: 0.08em;",
+                      "font-size: 12px; color: #e8862e; letter-spacing: 0.06em; text-transform: uppercase;",
                     ),
                   }}
                 >
@@ -98,7 +98,7 @@ export function WorkflowEntryDeck() {
                   style={{
                     fontFamily: MONO,
                     ...s(
-                      "font-size: 10px; color: #8c847a; padding: 2px 7px; background: #1a1815; border-radius: 3px;",
+                      "font-size: 12px; color: #a89f94; padding: 2px 7px; background: #1a1815; border-radius: 3px;",
                     ),
                   }}
                 >
@@ -114,7 +114,7 @@ export function WorkflowEntryDeck() {
               </h3>
               <p
                 style={s(
-                  "margin: 0; font-size: 13.5px; color: #9c948a; line-height: 1.55;",
+                  "margin: 0; font-size: 14px; color: #c8c0b6; line-height: 1.6;",
                 )}
               >
                 Auto-discovers routes from your filesystem or live server,
@@ -129,7 +129,7 @@ export function WorkflowEntryDeck() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "margin: 0; background: #0d0c0b; border: 1px solid #1f1c19; border-radius: 6px; padding: 14px; font-size: 11.5px; line-height: 1.65; color: #d8d0c5; overflow-x: auto;",
+                  "margin: 0; background: #0d0c0b; border: 1px solid #1f1c19; border-radius: 6px; padding: 14px; font-size: 12px; line-height: 1.65; color: #d8d0c5; overflow-x: auto;",
                 ),
               }}
               dangerouslySetInnerHTML={{ __html: CLI_HTML }}
@@ -152,7 +152,7 @@ export function WorkflowEntryDeck() {
                   style={{
                     fontFamily: MONO,
                     ...s(
-                      "font-size: 11px; color: #4fb477; letter-spacing: 0.08em;",
+                      "font-size: 12px; color: #4fb477; letter-spacing: 0.06em; text-transform: uppercase;",
                     ),
                   }}
                 >
@@ -162,7 +162,7 @@ export function WorkflowEntryDeck() {
                   style={{
                     fontFamily: MONO,
                     ...s(
-                      "font-size: 10px; color: #8c847a; padding: 2px 7px; background: #1a1815; border-radius: 3px;",
+                      "font-size: 12px; color: #a89f94; padding: 2px 7px; background: #1a1815; border-radius: 3px;",
                     ),
                   }}
                 >
@@ -178,7 +178,7 @@ export function WorkflowEntryDeck() {
               </h3>
               <p
                 style={s(
-                  "margin: 0; font-size: 13.5px; color: #9c948a; line-height: 1.55;",
+                  "margin: 0; font-size: 14px; color: #c8c0b6; line-height: 1.6;",
                 )}
               >
                 Call{" "}
@@ -204,7 +204,7 @@ export function WorkflowEntryDeck() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "margin: 0; background: #0d0c0b; border: 1px solid #1f1c19; border-radius: 6px; padding: 14px; font-size: 11.5px; line-height: 1.65; color: #d8d0c5; overflow-x: auto;",
+                  "margin: 0; background: #0d0c0b; border: 1px solid #1f1c19; border-radius: 6px; padding: 14px; font-size: 12px; line-height: 1.65; color: #d8d0c5; overflow-x: auto;",
                 ),
               }}
               dangerouslySetInnerHTML={{ __html: PW_HTML }}
@@ -227,7 +227,7 @@ export function WorkflowEntryDeck() {
                   style={{
                     fontFamily: MONO,
                     ...s(
-                      "font-size: 11px; color: #5b8def; letter-spacing: 0.08em;",
+                      "font-size: 12px; color: #5b8def; letter-spacing: 0.06em; text-transform: uppercase;",
                     ),
                   }}
                 >
@@ -237,7 +237,7 @@ export function WorkflowEntryDeck() {
                   style={{
                     fontFamily: MONO,
                     ...s(
-                      "font-size: 10px; color: #e8862e; padding: 2px 7px; background: rgba(232,134,46,0.1); border: 1px solid rgba(232,134,46,0.28); border-radius: 3px;",
+                      "font-size: 12px; color: #e8862e; padding: 2px 7px; background: rgba(232,134,46,0.1); border: 1px solid rgba(232,134,46,0.28); border-radius: 3px;",
                     ),
                   }}
                 >
@@ -249,11 +249,11 @@ export function WorkflowEntryDeck() {
                   "margin: 0 0 8px 0; font-size: 20px; font-weight: 600; letter-spacing: -0.015em; color: #f5f1ea;",
                 )}
               >
-                Visual cortex for Claude Code & Cursor
+                Visual cortex for Claude Code &amp; Cursor
               </h3>
               <p
                 style={s(
-                  "margin: 0; font-size: 13.5px; color: #9c948a; line-height: 1.55;",
+                  "margin: 0; font-size: 14px; color: #c8c0b6; line-height: 1.6;",
                 )}
               >
                 Run{" "}
@@ -271,7 +271,7 @@ export function WorkflowEntryDeck() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "margin: 0; background: #0d0c0b; border: 1px solid #1f1c19; border-radius: 6px; padding: 14px; font-size: 11.5px; line-height: 1.65; color: #d8d0c5; overflow-x: auto;",
+                  "margin: 0; background: #0d0c0b; border: 1px solid #1f1c19; border-radius: 6px; padding: 14px; font-size: 12px; line-height: 1.65; color: #d8d0c5; overflow-x: auto;",
                 ),
               }}
               dangerouslySetInnerHTML={{ __html: MCP_HTML }}
@@ -335,8 +335,8 @@ export function WorkflowEntryDeck() {
                         }; background: ${
                           isActive ? "rgba(232,134,46,0.12)" : "transparent"
                         }; color: ${
-                          isActive ? "#f5f1ea" : "#8c847a"
-                        }; font-size: 11.5px; cursor: pointer; text-align: left;`,
+                          isActive ? "#f5f1ea" : "#a89f94"
+                        }; font-size: 12px; cursor: pointer; text-align: left;`,
                       ),
                     }}
                   >
@@ -412,7 +412,7 @@ export function WorkflowEntryDeck() {
                     style={{
                       fontFamily: MONO,
                       ...s(
-                        "font-size: 11px; color: #4fb477; margin-bottom: 10px;",
+                        "font-size: 12px; color: #4fb477; margin-bottom: 10px;",
                       ),
                     }}
                   >
@@ -430,7 +430,7 @@ export function WorkflowEntryDeck() {
                   </pre>
                   <p
                     style={s(
-                      "margin: 0 0 16px 0; font-size: 14px; color: #9c948a; line-height: 1.6;",
+                      "margin: 0 0 16px 0; font-size: 14px; color: #c8c0b6; line-height: 1.6;",
                     )}
                   >
                     Drop{" "}
@@ -487,7 +487,7 @@ export function WorkflowEntryDeck() {
                     style={{
                       fontFamily: MONO,
                       ...s(
-                        "font-size: 11px; color: #e8862e; margin-bottom: 10px;",
+                        "font-size: 12px; color: #e8862e; margin-bottom: 10px;",
                       ),
                     }}
                   >
@@ -495,7 +495,7 @@ export function WorkflowEntryDeck() {
                   </div>
                   <p
                     style={s(
-                      "margin: 0 0 14px 0; font-size: 14px; color: #9c948a; line-height: 1.6;",
+                      "margin: 0 0 14px 0; font-size: 14px; color: #c8c0b6; line-height: 1.6;",
                     )}
                   >
                     Run{" "}
@@ -510,7 +510,7 @@ export function WorkflowEntryDeck() {
                   </p>
                   <div
                     style={s(
-                      "padding: 12px 14px; background: rgba(232,134,46,0.08); border: 1px solid rgba(232,134,46,0.28); border-radius: 6px; font-size: 12.5px; color: #b8b0a6; line-height: 1.55;",
+                      "padding: 12px 14px; background: rgba(232,134,46,0.08); border: 1px solid rgba(232,134,46,0.28); border-radius: 6px; font-size: 14px; color: #c8c0b6; line-height: 1.6;",
                     )}
                   >
                     Fetches the{" "}
@@ -546,7 +546,7 @@ export function WorkflowEntryDeck() {
             style={{
               fontFamily: MONO,
               ...s(
-                "padding: 12px 24px; background: #100f0d; border-top: 1px solid #24201c; font-size: 11.5px; color: #8c847a; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;",
+                "padding: 12px 24px; background: #100f0d; border-top: 1px solid #24201c; font-size: 12px; color: #a89f94; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;",
               ),
             }}
           >
@@ -601,7 +601,9 @@ function StepCard({
           <span
             style={{
               fontFamily: MONO,
-              ...s("font-size: 10px; color: #e8862e; letter-spacing: 0.08em;"),
+              ...s(
+                "font-size: 12px; color: #e8862e; letter-spacing: 0.06em; text-transform: uppercase;",
+              ),
             }}
           >
             {step}
@@ -612,7 +614,7 @@ function StepCard({
             style={{
               fontFamily: MONO,
               ...s(
-                "font-size: 10px; color: #8c847a; background: #181613; border: 1px solid #26221e; border-radius: 3px; padding: 2px 7px; cursor: pointer;",
+                "font-size: 12px; color: #a89f94; background: #181613; border: 1px solid #26221e; border-radius: 3px; padding: 3px 8px; cursor: pointer;",
               ),
             }}
           >
@@ -621,12 +623,12 @@ function StepCard({
         </div>
         <div
           style={s(
-            "font-size: 15px; font-weight: 600; color: #f5f1ea; margin-bottom: 6px;",
+            "font-size: 16px; font-weight: 600; color: #f5f1ea; margin-bottom: 6px;",
           )}
         >
           {title}
         </div>
-        <div style={s("font-size: 12.5px; color: #9c948a; line-height: 1.5;")}>
+        <div style={s("font-size: 14px; color: #c8c0b6; line-height: 1.55;")}>
           {note}
         </div>
       </div>
@@ -634,7 +636,7 @@ function StepCard({
         style={{
           fontFamily: MONO,
           ...s(
-            "padding: 10px 12px; background: #151311; border: 1px solid #26221e; border-radius: 5px; font-size: 11.5px; color: #f5f1ea; overflow-x: auto; white-space: nowrap;",
+            "padding: 10px 12px; background: #151311; border: 1px solid #26221e; border-radius: 5px; font-size: 12px; color: #f5f1ea; overflow-x: auto; white-space: nowrap;",
           ),
         }}
       >

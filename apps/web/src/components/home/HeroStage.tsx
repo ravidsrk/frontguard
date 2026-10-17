@@ -76,14 +76,14 @@ export function HeroStage() {
             >
               <span
                 style={s(
-                  "width: 7px; height: 7px; border-radius: 999px; background: #4fb477; box-shadow: 0 0 10px #4fb477;",
+                  "width: 8px; height: 8px; border-radius: 999px; background: #4fb477;",
                 )}
               />
               <span
                 style={{
                   fontFamily: MONO,
                   ...s(
-                    "font-size: 11px; color: #b8b0a6; letter-spacing: 0.04em;",
+                    "font-size: 12px; color: #c8c0b6; letter-spacing: 0.04em;",
                   ),
                 }}
               >
@@ -93,7 +93,7 @@ export function HeroStage() {
 
             <h1
               style={s(
-                "margin: 0 0 22px 0; font-size: clamp(44px, 5.4vw, 68px); line-height: 0.98; letter-spacing: -0.04em; font-weight: 700; color: #f5f1ea;",
+                "margin: 0 0 22px 0; font-size: clamp(40px, 5vw, 60px); line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: #f5f1ea;",
               )}
             >
               Catch the regression,{" "}
@@ -103,7 +103,7 @@ export function HeroStage() {
 
             <p
               style={s(
-                "margin: 0 0 28px 0; font-size: 17px; line-height: 1.6; color: #b8b0a6; max-width: 540px;",
+                "margin: 0 0 28px 0; font-size: 17px; line-height: 1.65; color: #c8c0b6; max-width: 540px;",
               )}
             >
               Open-source visual regression testing for engineers and AI coding
@@ -137,7 +137,7 @@ export function HeroStage() {
                 </span>
                 <span
                   style={s(
-                    `font-size: 11px; color: ${heroCopied ? "#4fb477" : "#8c847a"}; padding: 2px 7px; border-radius: 3px; background: #1d1a17; border: 1px solid #2a2622;`,
+                    `font-size: 12px; color: ${heroCopied ? "#4fb477" : "#a89f94"}; padding: 2px 8px; border-radius: 3px; background: #1d1a17; border: 1px solid #2a2622;`,
                   )}
                 >
                   {heroCopied ? "copied ✓" : "copy"}
@@ -165,7 +165,7 @@ export function HeroStage() {
                 style={{
                   fontFamily: MONO,
                   ...s(
-                    "font-size: 11px; color: #b8b0a6; background: #131210; border: 1px solid #24201c; border-radius: 4px; padding: 5px 10px; text-decoration: none;",
+                    "font-size: 12px; color: #c8c0b6; background: #131210; border: 1px solid #24201c; border-radius: 4px; padding: 6px 10px; text-decoration: none;",
                   ),
                 }}
               >
@@ -177,7 +177,7 @@ export function HeroStage() {
                 style={{
                   fontFamily: MONO,
                   ...s(
-                    "font-size: 11px; color: #e8862e; background: rgba(232,134,46,0.08); border: 1px solid rgba(232,134,46,0.28); border-radius: 4px; padding: 5px 10px; text-decoration: none;",
+                    "font-size: 12px; color: #e8862e; background: rgba(232,134,46,0.08); border: 1px solid rgba(232,134,46,0.28); border-radius: 4px; padding: 6px 10px; text-decoration: none;",
                   ),
                 }}
               >
@@ -190,7 +190,7 @@ export function HeroStage() {
                 style={{
                   fontFamily: MONO,
                   ...s(
-                    "font-size: 11px; color: #8c847a; background: #131210; border: 1px solid #24201c; border-radius: 4px; padding: 5px 10px; text-decoration: none;",
+                    "font-size: 12px; color: #a89f94; background: #131210; border: 1px solid #24201c; border-radius: 4px; padding: 6px 10px; text-decoration: none;",
                   ),
                 }}
               >
@@ -203,16 +203,16 @@ export function HeroStage() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "display: flex; flex-wrap: wrap; align-items: center; gap: 14px; font-size: 11px; color: #8c847a; padding-top: 14px; border-top: 1px solid #1f1c19;",
+                  "display: flex; flex-wrap: wrap; align-items: center; gap: 14px; font-size: 12px; color: #a89f94; padding-top: 14px; border-top: 1px solid #1f1c19;",
                 ),
               }}
             >
               <span>✓ Open-source (MIT)</span>
-              <span style={s("color: #3b3531;")}>·</span>
+              <span aria-hidden="true" style={s("color: #a89f94;")}>·</span>
               <span>✓ Git orphan baselines</span>
-              <span style={s("color: #3b3531;")}>·</span>
-              <span>✓ Frame stability & PII redaction</span>
-              <span style={s("color: #3b3531;")}>·</span>
+              <span aria-hidden="true" style={s("color: #a89f94;")}>·</span>
+              <span>✓ Frame stability &amp; PII redaction</span>
+              <span aria-hidden="true" style={s("color: #a89f94;")}>·</span>
               <span>✓ Optional BYOK AI</span>
             </div>
           </div>
@@ -221,13 +221,13 @@ export function HeroStage() {
           <div
             data-testid="hero-optical-viewfinder"
             style={s(
-              "background: #131210; border: 1px solid #2a2622; border-radius: 10px; overflow: hidden; box-shadow: 0 32px 90px rgba(0,0,0,0.62), 0 0 0 1px rgba(232,134,46,0.08);",
+              "background: #131210; border: 1px solid #2a2622; border-radius: 10px; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,0.55);",
             )}
           >
             {/* Viewfinder Top Telemetry Chrome */}
             <div
               style={s(
-                "display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 14px; background: #181613; border-bottom: 1px solid #26221e; flex-wrap: wrap;",
+                "display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; background: #181613; border-bottom: 1px solid #26221e; flex-wrap: wrap;",
               )}
             >
               <div style={s("display: flex; align-items: center; gap: 8px;")}>
@@ -239,7 +239,7 @@ export function HeroStage() {
                 <span
                   style={{
                     fontFamily: MONO,
-                    ...s("font-size: 11px; color: #f5f1ea; font-weight: 600;"),
+                    ...s("font-size: 12px; color: #f5f1ea; font-weight: 600;"),
                   }}
                 >
                   /dashboard
@@ -248,7 +248,7 @@ export function HeroStage() {
                   style={{
                     fontFamily: MONO,
                     ...s(
-                      "font-size: 10px; color: #e5484d; background: rgba(229,72,77,0.12); border: 1px solid rgba(229,72,77,0.35); padding: 2px 6px; border-radius: 3px;",
+                      "font-size: 12px; color: #ff8b8e; background: rgba(229,72,77,0.12); border: 1px solid rgba(229,72,77,0.35); padding: 2px 7px; border-radius: 3px;",
                     ),
                   }}
                 >
@@ -273,11 +273,11 @@ export function HeroStage() {
                       style={{
                         fontFamily: MONO,
                         ...s(
-                          `padding: 3px 8px; font-size: 10px; border-radius: 3px; cursor: pointer; border: 1px solid ${
+                          `padding: 4px 8px; font-size: 12px; border-radius: 3px; cursor: pointer; border: 1px solid ${
                             active ? "#e8862e" : "#2a2622"
                           }; background: ${
                             active ? "rgba(232,134,46,0.14)" : "#131210"
-                          }; color: ${active ? "#f5f1ea" : "#8c847a"};`,
+                          }; color: ${active ? "#f5f1ea" : "#a89f94"};`,
                         ),
                       }}
                     >
@@ -292,11 +292,11 @@ export function HeroStage() {
                   style={{
                     fontFamily: MONO,
                     ...s(
-                      `padding: 3px 8px; font-size: 10px; border-radius: 3px; cursor: pointer; border: 1px solid ${
+                      `padding: 4px 8px; font-size: 12px; border-radius: 3px; cursor: pointer; border: 1px solid ${
                         showClusterBox ? "rgba(229,72,77,0.5)" : "#2a2622"
                       }; background: ${
                         showClusterBox ? "rgba(229,72,77,0.12)" : "#131210"
-                      }; color: ${showClusterBox ? "#f5f1ea" : "#8c847a"};`,
+                      }; color: ${showClusterBox ? "#f5f1ea" : "#a89f94"};`,
                     ),
                   }}
                 >
@@ -310,7 +310,7 @@ export function HeroStage() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 14px; background: #100f0d; border-bottom: 1px solid #1f1c19; font-size: 10px; color: #8c847a; flex-wrap: wrap;",
+                  "display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; background: #100f0d; border-bottom: 1px solid #1f1c19; font-size: 12px; color: #a89f94; flex-wrap: wrap;",
                 ),
               }}
             >
@@ -318,7 +318,7 @@ export function HeroStage() {
                 <span style={s("color: #4fb477;")}>◀ BASELINE</span>{" "}
                 (frontguard-baselines)
               </span>
-              <span style={s("color: #b8b0a6;")}>
+              <span style={s("color: #c8c0b6;")}>
                 Chroma SSIM {meta.chromaSsim} · CW-SSIM {meta.cwSsim} ·{" "}
                 <span style={s("color: #4fb477;")}>✓ Settled (2f)</span>
               </span>
@@ -342,24 +342,24 @@ export function HeroStage() {
               >
                 <div
                   style={s(
-                    "height: 22px; background: #171513; border: 1px solid #25211d; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px;",
+                    "min-height: 28px; background: #171513; border: 1px solid #25211d; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; padding: 4px 10px;",
                   )}
                 >
-                  <div
+                  <span
                     style={s(
-                      "width: 68px; height: 6px; background: #3b3531; border-radius: 2px;",
+                      "display: inline-block; width: 68px; height: 6px; background: #3b3531; border-radius: 2px;",
                     )}
                   />
-                  <div
+                  <span
                     style={{
                       fontFamily: MONO,
                       ...s(
-                        "font-size: 9px; color: #8c847a; background: #1d1a17; border: 1px solid #2a2622; padding: 1px 5px; border-radius: 2px;",
+                        "font-size: 12px; color: #a89f94; background: #1d1a17; border: 1px solid #2a2622; padding: 2px 6px; border-radius: 2px;",
                       ),
                     }}
                   >
                     🔒████████ redacted
-                  </div>
+                  </span>
                 </div>
 
                 <div
@@ -398,14 +398,14 @@ export function HeroStage() {
                     {/* Collapsed CTA slot */}
                     <div
                       style={s(
-                        "height: 36px; border: 1px dashed #e5484d; background: repeating-linear-gradient(45deg, rgba(229,72,77,0.16), rgba(229,72,77,0.16) 5px, rgba(229,72,77,0.05) 5px, rgba(229,72,77,0.05) 10px); border-radius: 4px; display: flex; align-items: center; justify-content: center;",
+                        "min-height: 36px; padding: 6px 8px; border: 1px dashed #e5484d; background: rgba(229,72,77,0.14); border-radius: 4px; display: flex; align-items: center; justify-content: center;",
                       )}
                     >
                       <span
                         style={{
                           fontFamily: MONO,
                           ...s(
-                            "font-size: 9px; color: #ff8b8e; font-weight: 600;",
+                            "font-size: 12px; color: #ff8b8e; font-weight: 600;",
                           ),
                         }}
                       >
@@ -464,24 +464,24 @@ export function HeroStage() {
               >
                 <div
                   style={s(
-                    "height: 22px; background: #171513; border: 1px solid #25211d; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px;",
+                    "min-height: 28px; background: #171513; border: 1px solid #25211d; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; padding: 4px 10px;",
                   )}
                 >
-                  <div
+                  <span
                     style={s(
-                      "width: 68px; height: 6px; background: #3b3531; border-radius: 2px;",
+                      "display: inline-block; width: 68px; height: 6px; background: #3b3531; border-radius: 2px;",
                     )}
                   />
-                  <div
+                  <span
                     style={{
                       fontFamily: MONO,
                       ...s(
-                        "font-size: 9px; color: #8c847a; background: #1d1a17; border: 1px solid #2a2622; padding: 1px 5px; border-radius: 2px;",
+                        "font-size: 12px; color: #a89f94; background: #1d1a17; border: 1px solid #2a2622; padding: 2px 6px; border-radius: 2px;",
                       ),
                     }}
                   >
                     🔒████████ redacted
-                  </div>
+                  </span>
                 </div>
 
                 <div
@@ -519,14 +519,14 @@ export function HeroStage() {
 
                     <div
                       style={s(
-                        "height: 36px; background: #e8862e; border-radius: 4px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(232,134,46,0.28);",
+                        "min-height: 36px; padding: 6px 8px; background: #e8862e; border-radius: 4px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.45);",
                       )}
                     >
                       <span
                         style={{
                           fontFamily: MONO,
                           ...s(
-                            "font-size: 9px; color: #0d0c0b; font-weight: 700;",
+                            "font-size: 12px; color: #0d0c0b; font-weight: 700;",
                           ),
                         }}
                       >
@@ -581,14 +581,14 @@ export function HeroStage() {
               {showClusterBox && (
                 <div
                   style={s(
-                    `position: absolute; left: 18px; bottom: 18px; width: calc(${meta.sidebarWidth} - 14px); height: 52px; border: 1.5px solid #e5484d; border-radius: 5px; box-shadow: 0 0 0 3px rgba(229,72,77,0.16); pointer-events: none;`,
+                    `position: absolute; left: 18px; bottom: 18px; width: calc(${meta.sidebarWidth} - 14px); height: 52px; border: 1.5px solid #e5484d; border-radius: 5px; pointer-events: none;`,
                   )}
                 >
                   <span
                     style={{
                       fontFamily: MONO,
                       ...s(
-                        "position: absolute; top: -18px; left: -1px; background: #e5484d; color: #0d0c0b; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 2px; white-space: nowrap;",
+                        "position: absolute; top: -22px; left: -1px; background: #e5484d; color: #0d0c0b; font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 2px; white-space: nowrap;",
                       ),
                     }}
                   >
@@ -600,14 +600,14 @@ export function HeroStage() {
               {/* Split Curtain Divider Line & Handle */}
               <div
                 style={s(
-                  `position: absolute; top: 0; bottom: 0; left: ${splitPct}%; width: 2px; background: #e8862e; box-shadow: 0 0 12px rgba(232,134,46,0.8); pointer-events: none;`,
+                  `position: absolute; top: 0; bottom: 0; left: ${splitPct}%; width: 2px; background: #e8862e; box-shadow: 0 2px 8px rgba(0,0,0,0.5); pointer-events: none;`,
                 )}
               >
                 <div
                   style={{
                     fontFamily: MONO,
                     ...s(
-                      "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 3px 7px; border-radius: 999px; background: #e8862e; color: #0d0c0b; font-size: 9px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.6);",
+                      "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 3px 8px; border-radius: 999px; background: #e8862e; color: #0d0c0b; font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.6);",
                     ),
                   }}
                 >
@@ -625,7 +625,7 @@ export function HeroStage() {
               <span
                 style={{
                   fontFamily: MONO,
-                  ...s("font-size: 10px; color: #8c847a; white-space: nowrap;"),
+                  ...s("font-size: 12px; color: #a89f94; white-space: nowrap;"),
                 }}
               >
                 SPLIT CURTAIN
@@ -643,7 +643,7 @@ export function HeroStage() {
                 style={{
                   fontFamily: MONO,
                   ...s(
-                    "font-size: 10px; color: #f5f1ea; min-width: 34px; text-align: right;",
+                    "font-size: 12px; color: #f5f1ea; min-width: 38px; text-align: right;",
                   ),
                 }}
               >
@@ -656,7 +656,7 @@ export function HeroStage() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "padding: 12px 14px; background: #0f0e0c; font-size: 11px; line-height: 1.65; color: #b8b0a6;",
+                  "padding: 12px 14px; background: #0f0e0c; font-size: 12px; line-height: 1.65; color: #c8c0b6;",
                 ),
               }}
             >
@@ -665,12 +665,12 @@ export function HeroStage() {
                   $ npx -p @frontguard/cli frontguard run --affected
                 </span>
               </div>
-              <div style={s("color: #8c847a;")}>
+              <div style={s("color: #a89f94;")}>
                 ✓ 12/47 routes affected · 3 viewports · waitForStability settled
               </div>
               <div>
-                <span style={s("color: #e5484d;")}>✘ /dashboard</span>{" "}
-                <span style={s("color: #8c847a;")}>({viewport}px)</span> ·{" "}
+                <span style={s("color: #ff8b8e;")}>✘ /dashboard</span>{" "}
+                <span style={s("color: #a89f94;")}>({viewport}px)</span> ·{" "}
                 <span style={s("color: #e8862e;")}>1 warning</span> ·{" "}
                 <span style={s("color: #4fb477;")}>9 passed</span> ·{" "}
                 <span style={s("color: #5b8def;")}>1 new</span>

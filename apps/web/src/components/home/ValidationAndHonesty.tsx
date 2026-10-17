@@ -20,7 +20,7 @@ export function ValidationAndHonesty() {
     {
       label: "REPOS BOOTED",
       value: `${aggregate.reposBooted} / ${aggregate.reposAttempted}`,
-      sub: `${aggregate.reposSkipped} skipped — boot failures documented below`,
+      sub: `${aggregate.reposSkipped} skipped: boot failures documented below`,
       color: "#f5f1ea",
     },
     {
@@ -72,22 +72,27 @@ export function ValidationAndHonesty() {
             <div
               key={h.label}
               style={s(
-                `background: #131210; border: 1px solid #26221e; border-top: 2px solid ${h.color}; border-radius: 8px; padding: 26px;`,
+                "background: #131210; border: 1px solid #26221e; border-radius: 8px; padding: 26px;",
               )}
             >
               <div
                 style={{
                   fontFamily: MONO,
                   ...s(
-                    `font-size: 11px; color: ${h.color}; letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 600;`,
+                    `font-size: 12px; color: ${h.color}; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;`,
                   ),
                 }}
               >
-                {h.label}
+                <span
+                  style={s(
+                    `width: 7px; height: 7px; border-radius: 999px; background: ${h.color};`,
+                  )}
+                />
+                <span>{h.label}</span>
               </div>
               <p
                 style={s(
-                  "margin: 0; font-size: 14px; color: #b8b0a6; line-height: 1.65;",
+                  "margin: 0; font-size: 14px; color: #c8c0b6; line-height: 1.65;",
                 )}
               >
                 {h.body}
@@ -119,7 +124,7 @@ export function ValidationAndHonesty() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  `display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(79,180,119,0.08); border: 1px solid ${fpColor}; border-radius: 4px; font-size: 11px; color: ${fpColor}; letter-spacing: 0.08em;`,
+                  `display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(79,180,119,0.08); border: 1px solid ${fpColor}; border-radius: 4px; font-size: 12px; color: ${fpColor}; letter-spacing: 0.06em; text-transform: uppercase;`,
                 ),
               }}
             >
@@ -132,7 +137,7 @@ export function ValidationAndHonesty() {
             <div
               style={{
                 fontFamily: MONO,
-                ...s("font-size: 11px; color: #7c746b;"),
+                ...s("font-size: 12px; color: #a89f94;"),
               }}
             >
               CLI v{VALIDATION.cliVersion} · {VALIDATION.runDate}
@@ -153,7 +158,7 @@ export function ValidationAndHonesty() {
                 style={{
                   fontFamily: MONO,
                   ...s(
-                    "font-size: 10px; color: #8c847a; letter-spacing: 0.1em;",
+                    "font-size: 12px; color: #a89f94; letter-spacing: 0.06em; text-transform: uppercase;",
                   ),
                 }}
               >
@@ -171,7 +176,7 @@ export function ValidationAndHonesty() {
               </div>
               <div
                 style={s(
-                  "font-size: 12px; color: #8c847a; line-height: 1.45;",
+                  "font-size: 13px; color: #c8c0b6; line-height: 1.5;",
                 )}
               >
                 {k.sub}
@@ -191,7 +196,7 @@ export function ValidationAndHonesty() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "font-size: 11px; color: #4fb477; letter-spacing: 0.1em; margin-bottom: 14px;",
+                  "font-size: 12px; color: #4fb477; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 14px;",
                 ),
               }}
             >
@@ -222,7 +227,7 @@ export function ValidationAndHonesty() {
                     <span
                       style={{
                         fontFamily: MONO,
-                        ...s("font-size: 11px; color: #8c847a;"),
+                        ...s("font-size: 12px; color: #a89f94;"),
                       }}
                     >
                       {r.category}
@@ -232,7 +237,7 @@ export function ValidationAndHonesty() {
                     style={{
                       fontFamily: MONO,
                       ...s(
-                        "font-size: 12px; color: #b8b0a6; display: flex; flex-wrap: wrap; gap: 12px;",
+                        "font-size: 12px; color: #c8c0b6; display: flex; flex-wrap: wrap; gap: 12px;",
                       ),
                     }}
                   >
@@ -254,7 +259,7 @@ export function ValidationAndHonesty() {
                       </strong>
                     </span>
                     <span>·</span>
-                    <span style={s("color: #8c847a;")}>
+                    <span style={s("color: #a89f94;")}>
                       {r.recheckError} error{r.recheckError !== 1 ? "s" : ""}
                     </span>
                   </div>
@@ -272,15 +277,15 @@ export function ValidationAndHonesty() {
               style={{
                 fontFamily: MONO,
                 ...s(
-                  "font-size: 11px; color: #e8862e; letter-spacing: 0.1em; margin-bottom: 6px;",
+                  "font-size: 12px; color: #e8862e; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;",
                 ),
               }}
             >
-              ⊘ SKIPPED IN THIS RUN ({skipped.length}) — HONEST REPORTING
+              ⊘ SKIPPED IN THIS RUN ({skipped.length}) · HONEST REPORTING
             </div>
             <p
               style={s(
-                "margin: 0 0 14px 0; font-size: 12.5px; color: #8c847a; line-height: 1.55;",
+                "margin: 0 0 14px 0; font-size: 14px; color: #c8c0b6; line-height: 1.55;",
               )}
             >
               These repositories failed to boot in the headless harness before
@@ -313,7 +318,7 @@ export function ValidationAndHonesty() {
                     <span
                       style={{
                         fontFamily: MONO,
-                        ...s("font-size: 11px; color: #7c746b;"),
+                        ...s("font-size: 12px; color: #a89f94;"),
                       }}
                     >
                       {r.category}
@@ -324,7 +329,7 @@ export function ValidationAndHonesty() {
                       style={{
                         fontFamily: MONO,
                         ...s(
-                          "font-size: 11.5px; color: #8c847a; line-height: 1.5;",
+                          "font-size: 12px; color: #c8c0b6; line-height: 1.5;",
                         ),
                       }}
                     >
@@ -342,7 +347,7 @@ export function ValidationAndHonesty() {
           style={{
             fontFamily: MONO,
             ...s(
-              "margin-top: 20px; padding: 14px 18px; background: #131210; border: 1px solid #26221e; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 12px; color: #8c847a;",
+              "margin-top: 20px; padding: 14px 18px; background: #131210; border: 1px solid #26221e; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 12px; color: #a89f94;",
             ),
           }}
         >
@@ -363,7 +368,7 @@ export function ValidationAndHonesty() {
               href={VALIDATION_METHODOLOGY_URL}
               target="_blank"
               rel="noreferrer"
-              style={s("color: #b8b0a6; text-decoration: none;")}
+              style={s("color: #c8c0b6; text-decoration: none;")}
             >
               Methodology &amp; reproduction script →
             </a>

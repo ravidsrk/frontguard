@@ -41,25 +41,25 @@ const a = (href: string, text: string) =>
   `<a href="${href}" style="color: #e8862e; text-decoration: underline; text-underline-offset: 3px;">${text}</a>`
 
 const code = (label: string, body: string) =>
-  `<div style="background: #11100e; border: 1px solid #2a2622; border-radius: 6px; overflow: hidden; margin-bottom: 24px;"><div style="border-bottom: 1px solid #211e1b; background: #161412; padding: 8px 16px; font-family: ${MONO}; font-size: 11px; color: #8c847a; letter-spacing: 0.03em;">${label}</div><pre style="margin: 0; padding: 16px 20px; font-family: ${MONO}; font-size: 13px; line-height: 1.75; color: #e6dfd5; overflow-x: auto;">${body}</pre></div>`
+  `<div style="background: #11100e; border: 1px solid #2a2622; border-radius: 6px; overflow: hidden; margin-bottom: 24px;"><div style="border-bottom: 1px solid #211e1b; background: #161412; padding: 8px 16px; font-family: ${MONO}; font-size: 12px; color: #a89f94; letter-spacing: 0.03em;">${label}</div><pre style="margin: 0; padding: 16px 20px; font-family: ${MONO}; font-size: 13px; line-height: 1.75; color: #e6dfd5; overflow-x: auto;">${body}</pre></div>`
 
 const note = (label: string, body: string) =>
-  `<div style="background: #1a130b; border: 1px solid #3a2a18; border-left: 3px solid #e8862e; border-radius: 4px; margin-bottom: 24px; padding: 16px 18px;"><p style="font-size: 14.5px; line-height: 1.65; color: #e6e0d6; margin: 0;"><strong style="font-family: ${MONO}; font-size: 12px; letter-spacing: 0.04em; color: #e8862e; margin-right: 6px;">${label}</strong> ${body}</p></div>`
+  `<div style="background: #1a130b; border: 1px solid rgba(232,134,46,0.38); border-radius: 4px; margin-bottom: 24px; padding: 16px 18px;"><p style="font-size: 14.5px; line-height: 1.65; color: #e6e0d6; margin: 0;"><strong style="font-family: ${MONO}; font-size: 12px; letter-spacing: 0.04em; color: #e8862e; margin-right: 6px;">${label}</strong> ${body}</p></div>`
 
 const tip = (label: string, body: string) =>
-  `<div style="background: #0f1d15; border: 1px solid #1f462f; border-left: 3px solid #4fb477; border-radius: 4px; margin-bottom: 24px; padding: 16px 18px;"><p style="font-size: 14.5px; line-height: 1.65; color: #dcefe3; margin: 0;"><strong style="font-family: ${MONO}; font-size: 12px; letter-spacing: 0.04em; color: #4fb477; margin-right: 6px;">${label}</strong> ${body}</p></div>`
+  `<div style="background: #0f1d15; border: 1px solid rgba(79,180,119,0.38); border-radius: 4px; margin-bottom: 24px; padding: 16px 18px;"><p style="font-size: 14.5px; line-height: 1.65; color: #dcefe3; margin: 0;"><strong style="font-family: ${MONO}; font-size: 12px; letter-spacing: 0.04em; color: #4fb477; margin-right: 6px;">${label}</strong> ${body}</p></div>`
 
 const list = (items: string[]) =>
   `<ul style="font-size: 15.5px; line-height: 1.7; color: #c8c0b6; margin: 0 0 24px; padding-left: 22px;">${items.map((item) => `<li style="margin-bottom: 8px;">${item}</li>`).join('')}</ul>`
 
 const table = (headers: string[], rows: string[][]) =>
-  `<div style="overflow-x: auto; margin: 0 0 28px; border: 1px solid #2a2622; border-radius: 6px; background: #121110;"><table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;"><thead><tr style="background: #171513; border-bottom: 1px solid #2a2622;">${headers.map((h) => `<th style="padding: 11px 14px; font-family: ${MONO}; font-size: 11.5px; color: #e8862e; font-weight: 600; letter-spacing: 0.04em; white-space: nowrap;">${h}</th>`).join('')}</tr></thead><tbody>${rows.map((row, idx) => `<tr style="border-bottom: ${idx === rows.length - 1 ? 'none' : '1px solid #1f1c19'};">${row.map((cell, cIdx) => `<td style="padding: 11px 14px; color: ${cIdx === 0 ? '#f5f1ea' : '#c8c0b6'}; font-family: ${cIdx === 0 ? MONO : 'inherit'}; font-size: ${cIdx === 0 ? '12.5px' : '14px'}; line-height: 1.55; vertical-align: top;">${cell}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`
+  `<div style="overflow-x: auto; margin: 0 0 28px;"><table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; border: 1px solid #2a2622; background: #121110;"><thead><tr style="background: #171513; border-bottom: 1px solid #2a2622;">${headers.map((h) => `<th style="padding: 11px 14px; font-family: ${MONO}; font-size: 12px; color: #e8862e; font-weight: 600; letter-spacing: 0.04em; white-space: nowrap;">${h}</th>`).join('')}</tr></thead><tbody>${rows.map((row, idx) => `<tr style="border-bottom: ${idx === rows.length - 1 ? 'none' : '1px solid #1f1c19'};">${row.map((cell, cIdx) => `<td style="padding: 11px 14px; color: ${cIdx === 0 ? '#f5f1ea' : '#c8c0b6'}; font-family: ${cIdx === 0 ? MONO : 'inherit'}; font-size: ${cIdx === 0 ? '12.5px' : '14px'}; line-height: 1.55; vertical-align: top;">${cIdx === 0 && !cell.includes('<code') ? `<code style="font-family: inherit; font-size: inherit; color: inherit; background: transparent; border: none; padding: 0;">${cell}</code>` : cell}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`
 
 const steps = (items: { title: string; body: string }[]) =>
   `<div style="display: grid; gap: 16px; margin: 0 0 28px;">${items
     .map(
       (item, i) =>
-        `<div style="border: 1px solid #26221e; background: #121110; border-radius: 6px; padding: 18px 20px;"><div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><span style="font-family: ${MONO}; font-size: 11px; font-weight: 700; color: #0d0c0b; background: #e8862e; padding: 2px 8px; border-radius: 3px;">STEP 0${i + 1}</span><span style="font-size: 16px; font-weight: 600; color: #f5f1ea;">${item.title}</span></div><div style="font-size: 15px; line-height: 1.65; color: #c8c0b6;">${item.body}</div></div>`,
+        `<div style="border: 1px solid #26221e; background: #121110; border-radius: 6px; padding: 18px 20px;"><div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><span style="font-family: ${MONO}; font-size: 12px; font-weight: 700; color: #0d0c0b; background: #e8862e; padding: 2px 8px; border-radius: 3px;">STEP 0${i + 1}</span><span style="font-size: 16px; font-weight: 600; color: #f5f1ea;">${item.title}</span></div><div style="font-size: 15px; line-height: 1.65; color: #c8c0b6;">${item.body}</div></div>`,
     )
     .join('')}</div>`
 
@@ -69,7 +69,7 @@ const cards = (
   `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin: 0 0 28px;">${items
     .map(
       (c) =>
-        `<div style="border: 1px solid #2a2622; background: #131210; border-radius: 6px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between;"><div><div style="font-family: ${MONO}; font-size: 10.5px; color: #e8862e; letter-spacing: 0.08em; margin-bottom: 6px;">${c.tag}</div><div style="font-size: 16px; font-weight: 600; color: #f5f1ea; margin-bottom: 8px;">${c.title}</div><p style="font-size: 13.5px; line-height: 1.55; color: #b8b0a6; margin: 0 0 12px;">${c.desc}</p></div>${c.href ? `<div><a href="${c.href}" style="font-family: ${MONO}; font-size: 12px; color: #e8862e; text-decoration: none;">${c.cta ?? 'Read guide →'}</a></div>` : ''}</div>`,
+        `<div style="border: 1px solid #2a2622; background: #131210; border-radius: 6px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between;"><div><div style="font-family: ${MONO}; font-size: 12px; color: #e8862e; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;">${c.tag}</div><div style="font-size: 16px; font-weight: 600; color: #f5f1ea; margin-bottom: 8px;">${c.title}</div><p style="font-size: 13.5px; line-height: 1.55; color: #c8c0b6; margin: 0 0 12px;">${c.desc}</p></div>${c.href ? `<div><a href="${c.href}" style="font-family: ${MONO}; font-size: 12px; color: #e8862e; text-decoration: none;">${c.cta ?? 'Read guide →'}</a></div>` : ''}</div>`,
     )
     .join('')}</div>`
 
@@ -104,7 +104,7 @@ const comparisonNotice = note(
 
 export const articles: Article[] = [
   // ==========================================================================
-  // 1. GETTING STARTED — index
+  // 1. GETTING STARTED: index
   // ==========================================================================
   makeArticle(
     'index',
@@ -195,7 +195,7 @@ $ npx -p @frontguard/cli frontguard run`,
   ),
 
   // ==========================================================================
-  // 2. GETTING STARTED — installation
+  // 2. GETTING STARTED: installation
   // ==========================================================================
   makeArticle(
     'installation',
@@ -240,13 +240,13 @@ $ npx -p @frontguard/cli frontguard doctor`,
         ],
       ],
     )}${h2('Prerequisites')}${list([
-      '<strong>Node.js 22+</strong> — Required by the CLI runtime and worker pool.',
-      '<strong>Git repository</strong> — Required when storing baselines on the ' +
+      '<strong>Node.js 22+</strong>: Required by the CLI runtime and worker pool.',
+      '<strong>Git repository</strong>: Required when storing baselines on the ' +
         ic('frontguard-baselines') +
         ' orphan branch. Ensure your working tree is clean before running ' +
         ic('frontguard update-baselines') +
         ' for the first time.',
-      '<strong>Playwright Chromium</strong> — Installed once per machine or CI cache via ' +
+      '<strong>Playwright Chromium</strong>: Installed once per machine or CI cache via ' +
         ic('npx -p @frontguard/cli playwright install --with-deps chromium') +
         '.',
     ])}${h2('Verify with doctor')}${p(
@@ -264,7 +264,7 @@ $ npx -p @frontguard/cli frontguard doctor`,
   ),
 
   // ==========================================================================
-  // 3. GETTING STARTED — quick-start
+  // 3. GETTING STARTED: quick-start
   // ==========================================================================
   makeArticle(
     'quick-start',
@@ -304,7 +304,7 @@ $ npx -p @frontguard/cli frontguard run`,
       'terminal - catching a regression',
       `$ npx -p @frontguard/cli frontguard run
 
-  ✘ /pricing @ 1440px (chromium) — 1.84% changed (SSIM: 0.942, Chroma-SSIM: 0.610)
+  ✘ /pricing @ 1440px (chromium): 1.84% changed (SSIM: 0.942, Chroma-SSIM: 0.610)
     Cluster #1: (100, 200) 120×40px -> targetSelector: [data-testid="upgrade-btn"]
   Report written to ./frontguard-report/report.html (exit code 1)`,
     )}${h2('Inspect the HTML workbench')}${p(
@@ -321,7 +321,7 @@ $ npx -p @frontguard/cli frontguard run`,
   ),
 
   // ==========================================================================
-  // 4. REFERENCE — cli/index
+  // 4. REFERENCE: cli/index
   // ==========================================================================
   makeArticle(
     'cli/index',
@@ -388,7 +388,7 @@ $ npx -p @frontguard/cli frontguard run`,
   ),
 
   // ==========================================================================
-  // 5. REFERENCE — cli/commands
+  // 5. REFERENCE: cli/commands
   // ==========================================================================
   makeArticle(
     'cli/commands',
@@ -489,7 +489,7 @@ $ frontguard monitor --history`,
   ),
 
   // ==========================================================================
-  // 6. REFERENCE — cli/configuration
+  // 6. REFERENCE: cli/configuration
   // ==========================================================================
   makeArticle(
     'cli/configuration',
@@ -566,7 +566,7 @@ $ frontguard monitor --history`,
     )}${h2('Practical recipes')}${h3('Recipe 1: Interacting with Modals, Tabs & Auth Forms Before Capture')}${p(
       'Each entry in routes can specify an actions array executed sequentially by Playwright before stability checks and screenshot capture:',
     )}${code(
-      'frontguard.config.ts — per-route actions',
+      'frontguard.config.ts: per-route actions',
       `routes: [
   {
     path: '/settings',
@@ -581,7 +581,7 @@ $ frontguard monitor --history`,
     )}${h3('Recipe 2: Eliminating Third-Party & Time-Based Flake')}${p(
       'Combine freezeTime, seedRandom, blockUrls, and ignore selectors so charts, relative timestamps ("2 minutes ago"), and analytics banners render identically on every run:',
     )}${code(
-      'frontguard.config.ts — hermetic anti-flake setup',
+      'frontguard.config.ts: hermetic anti-flake setup',
       `export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
@@ -604,7 +604,7 @@ $ frontguard monitor --history`,
   ),
 
   // ==========================================================================
-  // 7. REFERENCE — playwright/index
+  // 7. REFERENCE: playwright/index
   // ==========================================================================
   makeArticle(
     'playwright/index',
@@ -615,7 +615,7 @@ $ frontguard monitor --history`,
       'SEPARATE BASELINE MODEL.',
       'The Playwright package stores files in __visual_baselines__ by default. Unlike ordinary CLI runs, visualTest creates a missing baseline and reports isNewBaseline: true.',
     )}${lead(
-      '@frontguard/playwright lets you run perceptual visual regression assertions directly inside your existing @playwright/test suites — right after complex multi-step user journeys, authenticated session setups, or mocked network responses.',
+      '@frontguard/playwright lets you run perceptual visual regression assertions directly inside your existing @playwright/test suites: right after complex multi-step user journeys, authenticated session setups, or mocked network responses.',
     )}${h2('Behavior')}${p(
       'When you call visualTest(page, name, options) inside a Playwright test, Frontguard captures the page (or a specific component via selector), applies any requested anti-flake overrides (freezeTime, seedRandom, blockUrls, waitForStable, redactSensitive), and compares the capture against __visual_baselines__/&lt;name&gt;-baseline.png using Pixelmatch + SSIM + 8-connected spatial diff clustering.',
     )}${h2('Example')}${code(
@@ -631,7 +631,7 @@ test('home', async ({ page }) =&gt; {
     )}${h2('Baseline model')}${p(
       'Set FRONTGUARD_UPDATE=1 or pass update: true to replace Playwright-package baselines deliberately. Commit those baseline files according to your repository policy.',
     )}${code(
-      'terminal — updating Playwright baselines',
+      'terminal: updating Playwright baselines',
       `# First run creates missing baselines in __visual_baselines__/ (isNewBaseline: true)
 $ npx playwright test
 
@@ -655,7 +655,7 @@ $ FRONTGUARD_UPDATE=1 npx playwright test`,
   ),
 
   // ==========================================================================
-  // 8. REFERENCE — playwright/setup
+  // 8. REFERENCE: playwright/setup
   // ==========================================================================
   makeArticle(
     'playwright/setup',
@@ -704,7 +704,7 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
   ),
 
   // ==========================================================================
-  // 9. REFERENCE — playwright/api
+  // 9. REFERENCE: playwright/api
   // ==========================================================================
   makeArticle(
     'playwright/api',
@@ -777,7 +777,7 @@ test('checkout summary layout stays locked', async ({ page }) =&gt; {
   ),
 
   // ==========================================================================
-  // 10. CI/CD — ci-cd/index
+  // 10. CI/CD: ci-cd/index
   // ==========================================================================
   makeArticle(
     'ci-cd/index',
@@ -807,7 +807,7 @@ test('checkout summary layout stays locked', async ({ page }) =&gt; {
     )}${h2('Output')}${p(
       'JSON is emitted to stdout only. Redirect it to ./frontguard-result.json if another step needs a file. The HTML report is written under the configured output directory.',
     )}${code(
-      'ci step — saving JSON and HTML artifacts',
+      'ci step: saving JSON and HTML artifacts',
       `# Run comparison and tee JSON output while preserving exit code:
 $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.json`,
     )}${h2('Action status')}${p(
@@ -816,7 +816,7 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
   ),
 
   // ==========================================================================
-  // 11. CI/CD — ci-cd/github-actions
+  // 11. CI/CD: ci-cd/github-actions
   // ==========================================================================
   makeArticle(
     'ci-cd/github-actions',
@@ -841,13 +841,13 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
       'Updated baselines still require the workflow to push frontguard-baselines in explicit update mode. Do not infer that the public v0 ref has passed this journey until the external smoke test is recorded.',
     )}${p(
       'For a copy-ready GitHub Actions workflow using the published CLI today, see ' +
-        a('/docs/guides/github-actions', 'Guides — GitHub Actions') +
+        a('/docs/guides/github-actions', 'Guides: GitHub Actions') +
         '.',
     )}`,
   ),
 
   // ==========================================================================
-  // 12. GUIDES — guides/ai-analysis
+  // 12. GUIDES: guides/ai-analysis
   // ==========================================================================
   makeArticle(
     'guides/ai-analysis',
@@ -885,7 +885,7 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
   },
 }`,
     )}${code(
-      'frontguard.config.ts — Local Ollama / OpenRouter via custom baseUrl',
+      'frontguard.config.ts: Local Ollama / OpenRouter via custom baseUrl',
       `export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
@@ -901,7 +901,7 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
   ),
 
   // ==========================================================================
-  // 13. GUIDES — guides/ai-fixes
+  // 13. GUIDES: guides/ai-fixes
   // ==========================================================================
   makeArticle(
     'guides/ai-fixes',
@@ -916,7 +916,7 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
     )}${h2('Experimental status')}${p(
       'By default, Frontguard only performs pixel and perceptual SSIM comparison. Enabling generateFixes asks the vision model for a targeted CSS rule grounded on the regressed cluster selector (cluster.targetSelector). Enabling verifyFixes opens a sandbox page, injects the candidate CSS rule, re-captures the screenshot, and re-runs the diff against your baseline.',
     )}${code(
-      'frontguard.config.ts — enabling candidate fixes & sandbox verification',
+      'frontguard.config.ts: enabling candidate fixes & sandbox verification',
       `export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
@@ -932,7 +932,7 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
     )}${h2('Fix-pattern CLI workflow')}${p(
       'You can curate the local fix-pattern store (.frontguard/fix-patterns.json) so recurring layout issues are matched locally before calling an external model:',
     )}${code(
-      'terminal — managing local fix patterns',
+      'terminal: managing local fix patterns',
       `# Mark suggestion #1 from the latest run as accepted:
 $ npx -p @frontguard/cli frontguard accept-fix 1
 
@@ -947,7 +947,7 @@ $ npx -p @frontguard/cli frontguard export-patterns &gt; .frontguard/shared-patt
   ),
 
   // ==========================================================================
-  // 14. GUIDES — guides/accessibility
+  // 14. GUIDES: guides/accessibility
   // ==========================================================================
   makeArticle(
     'guides/accessibility',
@@ -958,14 +958,14 @@ $ npx -p @frontguard/cli frontguard export-patterns &gt; .frontguard/shared-patt
       'OPTIONAL PLUGIN.',
       'The accessibility plugin depends on @axe-core/playwright and reports automated findings alongside a run.',
     )}${lead(
-      'Run automated axe-core WCAG accessibility checks in the exact same Chromium page pass as your visual regression screenshots — with zero extra browser cold-starts.',
+      'Run automated axe-core WCAG accessibility checks in the exact same Chromium page pass as your visual regression screenshots: with zero extra browser cold-starts.',
     )}${h2('Status')}${p(
       'Install the optional dependency and import the plugin from @frontguard/cli/plugins. Automated axe results do not establish WCAG conformance and do not replace keyboard or assistive-technology review.',
     )}${h2('Use')}${code(
-      'terminal — install optional peer dependency',
+      'terminal: install optional peer dependency',
       `$ npm install -D @axe-core/playwright`,
     )}${code(
-      'frontguard.config.ts — register the accessibility plugin',
+      'frontguard.config.ts: register the accessibility plugin',
       `import { createAccessibilityPlugin } from '@frontguard/cli/plugins'
 
 export default {
@@ -994,7 +994,7 @@ export default {
   ),
 
   // ==========================================================================
-  // 15. GUIDES — guides/performance-budgets
+  // 15. GUIDES: guides/performance-budgets
   // ==========================================================================
   makeArticle(
     'guides/performance-budgets',
@@ -1009,7 +1009,7 @@ export default {
     )}${h2('Experimental status')}${p(
       'Because Frontguard already boots Chromium and waits for network and frame convergence on every route, the performance budget plugin reads browser performance entries in the afterRender hook without launching a separate Lighthouse process.',
     )}${h2('Collecting Web Vitals in afterRender')}${code(
-      'frontguard.config.ts — collecting route performance metrics',
+      'frontguard.config.ts: collecting route performance metrics',
       `import { createPerformanceBudgetPlugin } from '@frontguard/cli/plugins'
 
 export default {
@@ -1043,7 +1043,7 @@ export default {
   ),
 
   // ==========================================================================
-  // 16. GUIDES — guides/third-party-scripts
+  // 16. GUIDES: guides/third-party-scripts
   // ==========================================================================
   makeArticle(
     'guides/third-party-scripts',
@@ -1069,7 +1069,7 @@ export default {
     )}${h2('Pairing with blockUrls')}${p(
       'When third-party scripts introduce visual flakiness (such as A/B testing flicker or floating customer-support bubbles), add their patterns to blockUrls in frontguard.config.ts so Playwright aborts them before screenshot capture:',
     )}${code(
-      'frontguard.config.ts — blocking flaky third-party origins',
+      'frontguard.config.ts: blocking flaky third-party origins',
       `export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
@@ -1086,7 +1086,7 @@ export default {
   ),
 
   // ==========================================================================
-  // 17. GUIDES — guides/production-monitoring
+  // 17. GUIDES: guides/production-monitoring
   // ==========================================================================
   makeArticle(
     'guides/production-monitoring',
@@ -1143,7 +1143,7 @@ jobs:
   ),
 
   // ==========================================================================
-  // 18. GUIDES — guides/cloud-api
+  // 18. GUIDES: guides/cloud-api
   // ==========================================================================
   makeArticle(
     'guides/cloud-api',
@@ -1177,7 +1177,7 @@ FRONTGUARD_API_KEY=fg_live_your_token_here`,
   ),
 
   // ==========================================================================
-  // 19. GUIDES — guides/custom-plugins
+  // 19. GUIDES: guides/custom-plugins
   // ==========================================================================
   makeArticle(
     'guides/custom-plugins',
@@ -1185,7 +1185,7 @@ FRONTGUARD_API_KEY=fg_live_your_token_here`,
     'Guides',
     ['Interface', 'Lifecycle', 'Practical plugin examples', 'Compatibility'],
     `${lead(
-      'Extend every stage of the Frontguard CLI pipeline — from injecting authentication headers before page render to uploading diff reports to S3 or Slack after a run completes.',
+      'Extend every stage of the Frontguard CLI pipeline: from injecting authentication headers before page render to uploading diff reports to S3 or Slack after a run completes.',
     )}${h2('Interface')}${p(
       'CLI plugins are plain objects implementing documented lifecycle hooks. Import public types and built-in factories from the installed @frontguard/cli package rather than copying internal source paths.',
     )}${h2('Lifecycle')}${p(
@@ -1204,7 +1204,7 @@ FRONTGUARD_API_KEY=fg_live_your_token_here`,
         ['09', 'teardown(ctx)', 'Runs in reverse registration order (LIFO) during cleanup to close sockets or temp resources.'],
       ],
     )}${h2('Practical plugin examples')}${h3('Example 1: Injecting Authentication Cookies & LocalStorage in beforeRender')}${code(
-      'frontguard.config.ts — auth session injector plugin',
+      'frontguard.config.ts: auth session injector plugin',
       `export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
@@ -1226,7 +1226,7 @@ FRONTGUARD_API_KEY=fg_live_your_token_here`,
   ],
 }`,
     )}${h3('Example 2: Posting a Custom JSON Webhook Summary in afterRun')}${code(
-      'frontguard.config.ts — custom webhook reporter plugin',
+      'frontguard.config.ts: custom webhook reporter plugin',
       `export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
@@ -1254,7 +1254,7 @@ FRONTGUARD_API_KEY=fg_live_your_token_here`,
   ),
 
   // ==========================================================================
-  // 20. GUIDES — guides/create-plugin
+  // 20. GUIDES: guides/create-plugin
   // ==========================================================================
   makeArticle(
     'guides/create-plugin',
@@ -1271,7 +1271,7 @@ FRONTGUARD_API_KEY=fg_live_your_token_here`,
     )}${h2('Authoring a typed plugin package')}${p(
       'A reusable plugin package only needs a factory function returning a name and the lifecycle hooks it uses:',
     )}${code(
-      'src/index.ts — standalone plugin structure',
+      'src/index.ts: standalone plugin structure',
       `export interface HeaderOverrideOptions {
   headers: Record&lt;string, string&gt;
 }
@@ -1302,7 +1302,7 @@ export function createHeaderOverridePlugin(options: HeaderOverrideOptions) {
   ),
 
   // ==========================================================================
-  // 21. GUIDES — guides/github-actions
+  // 21. GUIDES: guides/github-actions
   // ==========================================================================
   makeArticle(
     'guides/github-actions',
@@ -1316,7 +1316,7 @@ export function createHeaderOverridePlugin(options: HeaderOverrideOptions) {
     )}${p(
       'The generated workflow fetches origin/frontguard-baselines explicitly. Default actions/checkout fetch-depth: 1 only retrieves the triggering commit, so a CI user who omits that fetch gets an empty expected set.',
     )}${h2('Complete PR workflow YAML')}${code(
-      '.github/workflows/frontguard.yml — Lane 1: Comparison-Only PR Gate',
+      '.github/workflows/frontguard.yml: Lane 1: Comparison-Only PR Gate',
       `name: Frontguard Visual Check
 on:
   pull_request:
@@ -1364,7 +1364,7 @@ jobs:
     )}${h2('Baseline workflow')}${p(
       'Baseline acceptance belongs in a separate explicit workflow: run frontguard update-baselines, review the result, then push frontguard-baselines.',
     )}${code(
-      '.github/workflows/frontguard-update-baselines.yml — Lane 2: Explicit Baseline Promotion',
+      '.github/workflows/frontguard-update-baselines.yml: Lane 2: Explicit Baseline Promotion',
       `name: Update Frontguard Baselines
 on:
   workflow_dispatch:
@@ -1400,7 +1400,7 @@ jobs:
   ),
 
   // ==========================================================================
-  // 22. GUIDES — guides/migrate-from-backstopjs
+  // 22. GUIDES: guides/migrate-from-backstopjs
   // ==========================================================================
   makeArticle(
     'guides/migrate-from-backstopjs',
@@ -1452,7 +1452,7 @@ export default {
   ),
 
   // ==========================================================================
-  // 23. GUIDES — guides/migrate-from-lost-pixel
+  // 23. GUIDES: guides/migrate-from-lost-pixel
   // ==========================================================================
   makeArticle(
     'guides/migrate-from-lost-pixel',
@@ -1479,7 +1479,7 @@ export default {
         ['.lostpixel/baseline/', 'frontguard-baselines orphan branch', 'Stored on an isolated git orphan branch rather than main working tree.'],
       ],
     )}${code(
-      'frontguard.config.ts — equivalent page + Storybook setup',
+      'frontguard.config.ts: equivalent page + Storybook setup',
       `export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
@@ -1499,7 +1499,7 @@ export default {
   ),
 
   // ==========================================================================
-  // 24. INTEGRATIONS — integrations/mcp
+  // 24. INTEGRATIONS: integrations/mcp
   // ==========================================================================
   makeArticle(
     'integrations/mcp',
@@ -1511,7 +1511,7 @@ export default {
     )}${h2('Configuration')}${p(
       'For local development, @frontguard/mcp runs in zero-key Local Report Mode by reading ./frontguard-report/report.json written by frontguard run. Add it to your project .mcp.json or editor MCP settings:',
     )}${code(
-      '.mcp.json — Claude Code / Cursor / Windsurf local setup',
+      '.mcp.json: Claude Code / Cursor / Windsurf local setup',
       `{
   "mcpServers": {
     "frontguard": {
@@ -1563,7 +1563,7 @@ FRONTGUARD_API_KEY=&lt;frontguard-api-key&gt;`,
   ),
 
   // ==========================================================================
-  // 25. INTEGRATIONS — integrations/storybook
+  // 25. INTEGRATIONS: integrations/storybook
   // ==========================================================================
   makeArticle(
     'integrations/storybook',
@@ -1605,7 +1605,7 @@ FRONTGUARD_API_KEY=&lt;frontguard-api-key&gt;`,
   ),
 
   // ==========================================================================
-  // 26. INTEGRATIONS — integrations/netlify
+  // 26. INTEGRATIONS: integrations/netlify
   // ==========================================================================
   makeArticle(
     'integrations/netlify',
@@ -1619,7 +1619,7 @@ FRONTGUARD_API_KEY=&lt;frontguard-api-key&gt;`,
     )}${h2('Testing Netlify preview URLs with the CLI')}${p(
       'To test a Netlify Deploy Preview URL in your existing CI pipeline without using the pre-release plugin, pass the deploy preview URL via --url to frontguard run:',
     )}${code(
-      'terminal — comparing a live Netlify Deploy Preview against frontguard-baselines',
+      'terminal: comparing a live Netlify Deploy Preview against frontguard-baselines',
       `$ git fetch origin frontguard-baselines:frontguard-baselines
 $ npx -p @frontguard/cli frontguard run --url "$DEPLOY_PRIME_URL" --wait-for-stability`,
     )}${h2('Cloud requirement')}${p(
@@ -1628,7 +1628,7 @@ $ npx -p @frontguard/cli frontguard run --url "$DEPLOY_PRIME_URL" --wait-for-sta
   ),
 
   // ==========================================================================
-  // 27. INTEGRATIONS — integrations/slack
+  // 27. INTEGRATIONS: integrations/slack
   // ==========================================================================
   makeArticle(
     'integrations/slack',
@@ -1642,7 +1642,7 @@ $ npx -p @frontguard/cli frontguard run --url "$DEPLOY_PRIME_URL" --wait-for-sta
     )}${h2('Using Slack webhooks with frontguard monitor')}${p(
       'For local or CI-scheduled monitoring today, pass a standard Slack Incoming Webhook URL to frontguard monitor --webhook:',
     )}${code(
-      'terminal — alerting a Slack webhook on threshold breach',
+      'terminal: alerting a Slack webhook on threshold breach',
       `$ npx -p @frontguard/cli frontguard monitor \\
     --url https://example.com \\
     --threshold 0.05 \\
@@ -1654,7 +1654,7 @@ $ npx -p @frontguard/cli frontguard run --url "$DEPLOY_PRIME_URL" --wait-for-sta
   ),
 
   // ==========================================================================
-  // 28. INTEGRATIONS — integrations/vercel
+  // 28. INTEGRATIONS: integrations/vercel
   // ==========================================================================
   makeArticle(
     'integrations/vercel',
@@ -1668,7 +1668,7 @@ $ npx -p @frontguard/cli frontguard run --url "$DEPLOY_PRIME_URL" --wait-for-sta
     )}${h2('Testing Vercel preview URLs in GitHub Actions')}${p(
       'You can run @frontguard/cli directly against any Vercel preview URL once the deployment is ready:',
     )}${code(
-      'terminal — running Frontguard against a Vercel preview URL',
+      'terminal: running Frontguard against a Vercel preview URL',
       `$ git fetch origin frontguard-baselines:frontguard-baselines
 $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.vercel.app" --wait-for-stability`,
     )}${h2('Cloud requirement')}${p(
@@ -1677,7 +1677,7 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
   ),
 
   // ==========================================================================
-  // 29. INTEGRATIONS — integrations/github
+  // 29. INTEGRATIONS: integrations/github
   // ==========================================================================
   makeArticle(
     'integrations/github',
@@ -1695,13 +1695,13 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
       'Use the local CLI or a workflow you have independently verified. The GitHub App is not a replacement for those paths today.',
     )}${p(
       'See ' +
-        a('/docs/guides/github-actions', 'Guides — GitHub Actions') +
+        a('/docs/guides/github-actions', 'Guides: GitHub Actions') +
         ' for the supported two-lane GitHub Actions CLI setup.',
     )}`,
   ),
 
   // ==========================================================================
-  // 30. COMPARISONS — comparisons/frontguard-vs-argos
+  // 30. COMPARISONS: comparisons/frontguard-vs-argos
   // ==========================================================================
   makeArticle(
     'comparisons/frontguard-vs-argos',
@@ -1728,7 +1728,7 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
   ),
 
   // ==========================================================================
-  // 31. COMPARISONS — comparisons/frontguard-vs-percy
+  // 31. COMPARISONS: comparisons/frontguard-vs-percy
   // ==========================================================================
   makeArticle(
     'comparisons/frontguard-vs-percy',
@@ -1754,7 +1754,7 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
   ),
 
   // ==========================================================================
-  // 32. COMPARISONS — comparisons/frontguard-vs-chromatic
+  // 32. COMPARISONS: comparisons/frontguard-vs-chromatic
   // ==========================================================================
   makeArticle(
     'comparisons/frontguard-vs-chromatic',
@@ -1779,7 +1779,7 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
   ),
 
   // ==========================================================================
-  // 33. DEPLOYMENT & SANDBOXING — self-host
+  // 33. DEPLOYMENT & SANDBOXING: self-host
   // ==========================================================================
   makeArticle(
     'self-host',
@@ -1806,7 +1806,7 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
   ),
 
   // ==========================================================================
-  // 34. DEPLOYMENT & SANDBOXING — sandbox
+  // 34. DEPLOYMENT & SANDBOXING: sandbox
   // ==========================================================================
   makeArticle(
     'sandbox',
@@ -1845,7 +1845,7 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
   ),
 
   // ==========================================================================
-  // 35. DEPLOYMENT & SANDBOXING — cross-os-rendering
+  // 35. DEPLOYMENT & SANDBOXING: cross-os-rendering
   // ==========================================================================
   makeArticle(
     'cross-os-rendering',
@@ -1878,7 +1878,7 @@ $ docker image inspect frontguard/render:0.2.3`,
   ),
 
   // ==========================================================================
-  // 36. DEPLOYMENT & SANDBOXING — distribution
+  // 36. DEPLOYMENT & SANDBOXING: distribution
   // ==========================================================================
   makeArticle(
     'distribution',
@@ -1908,7 +1908,7 @@ $ npx -y @frontguard/mcp  # works locally with FRONTGUARD_LOCAL_REPORT or requir
   ),
 
   // ==========================================================================
-  // 37. TRUST — results
+  // 37. TRUST: results
   // ==========================================================================
   makeArticle(
     'results',

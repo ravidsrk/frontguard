@@ -30,7 +30,7 @@ export function SignalTelemetryBand() {
             </h2>
             <p className="fg-lead">
               Frontguard isolates localized UI clusters before computing YCbCr
-              Chroma SSIM and Complex Wavelet phase similarity — and publishes
+              Chroma SSIM and Complex Wavelet phase similarity, and publishes
               its benchmark harness limits openly.
             </p>
           </div>
@@ -60,7 +60,7 @@ export function SignalTelemetryBand() {
                   style={{
                     fontFamily: MONO,
                     ...s(
-                      "font-size: 10px; color: #7c746b; letter-spacing: 0.08em; margin-bottom: 8px;",
+                      "font-size: 12px; color: #a89f94; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px;",
                     ),
                   }}
                 >
@@ -79,7 +79,7 @@ export function SignalTelemetryBand() {
               </div>
               <div
                 style={s(
-                  "font-size: 13px; color: #b8b0a6; line-height: 1.5;",
+                  "font-size: 14px; color: #c8c0b6; line-height: 1.55;",
                 )}
               >
                 {st.d}
