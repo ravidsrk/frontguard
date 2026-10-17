@@ -34,6 +34,9 @@ const note = (label: string, body: string) =>
 const list = (items: string[]) =>
   `<ul style="font-size: 16px; line-height: 1.65; color: #c8c0b6; margin: 0 0 24px; padding-left: 24px;">${items.map((item) => `<li style="margin-bottom: 8px;">${item}</li>`).join('')}</ul>`
 
+const figure = (src: string, alt: string, caption: string) =>
+  `<figure style="margin: 0 0 28px; border: 1px solid #2a2622; background: #121110; overflow: hidden;"><img src="${src}" alt="${alt}" loading="lazy" style="display: block; width: 100%; height: auto; border-bottom: 1px solid #211e1b;" /><figcaption style="padding: 10px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8c847a; letter-spacing: 0.02em;">${caption}</figcaption></figure>`
+
 const makeArticle = (
   id: string,
   label: string,
@@ -69,7 +72,7 @@ export const articles: Article[] = [
     'Getting Started',
     'Getting started',
     ['Supported path', 'Quick start', 'Baseline contract'],
-    `${localCliNotice}${p('Frontguard renders configured pages, compares screenshots against reviewed baselines, and writes console, JSON, and HTML evidence. Optional model-assisted analysis runs only when you configure a provider.')}${h2('Quick start')}${code('terminal - setup', `$ npx -p @frontguard/cli frontguard init --ci`)}${p("In a separate app terminal, use your project's dev-server command and leave it running. The command below is one example; wait for the baseUrl generated in frontguard.config.ts to respond.")}${code('app terminal - leave running', `$ npm run dev`)}${p('Then use a Frontguard terminal; these commands read baseUrl from the generated config.')}${code('Frontguard terminal', `$ npx -p @frontguard/cli frontguard doctor
+    `${localCliNotice}${p('Frontguard renders configured pages, compares screenshots against reviewed baselines, and writes console, JSON, and HTML evidence. Optional model-assisted analysis runs only when you configure a provider.')}${figure('/images/docs/pipeline-architecture.jpg', 'Frontguard 5-Stage Visual Regression Pipeline', 'FIG 01 · 5-STAGE PIPELINE — DISCOVER · HERMETIC RENDER · PERCEPTUAL DIFF · VISION AI & FIX · GIT CAS & REPORT')}${h2('Quick start')}${code('terminal - setup', `$ npx -p @frontguard/cli frontguard init --ci`)}${p("In a separate app terminal, use your project's dev-server command and leave it running. The command below is one example; wait for the baseUrl generated in frontguard.config.ts to respond.")}${code('app terminal - leave running', `$ npm run dev`)}${p('Then use a Frontguard terminal; these commands read baseUrl from the generated config.')}${code('Frontguard terminal', `$ npx -p @frontguard/cli frontguard doctor
 $ npx -p @frontguard/cli frontguard update-baselines
 $ git push origin frontguard-baselines
 $ npx -p @frontguard/cli frontguard run`)}${h2('Baseline contract')}${p('Ordinary runs never accept CLI screenshots. Review captures first, then use frontguard update-baselines explicitly. Unaccepted new pages and regressions exit non-zero.')}`,
@@ -99,7 +102,7 @@ $ npx -p @frontguard/cli frontguard run`)}${p('Exit code 0 means comparisons pas
     'CLI Overview',
     'Reference',
     ['Pipeline', 'Artifacts', 'Next step'],
-    `${p('The CLI discovers routes, renders configured browser and viewport combinations, compares pixels, optionally requests model assistance, and writes reports.')}${list(['Baselines live on the frontguard-baselines orphan branch.', 'JSON mode writes machine-readable output to stdout.', 'The HTML report keeps baseline, current, and diff evidence on disk.'])}${p('Continue with CLI Commands for the supported command and exit-code contract.')}`,
+    `${p('The CLI discovers routes, renders configured browser and viewport combinations, compares pixels, optionally requests model assistance, and writes reports.')}${figure('/images/docs/pipeline-architecture.jpg', 'Frontguard 5-Stage Visual Regression Pipeline', 'FIG 01 · 5-STAGE PIPELINE — DISCOVER · HERMETIC RENDER · PERCEPTUAL DIFF · VISION AI & FIX · GIT CAS & REPORT')}${list(['Baselines live on the frontguard-baselines orphan branch.', 'JSON mode writes machine-readable output to stdout.', 'The HTML report keeps baseline, current, and diff evidence on disk.'])}${p('Continue with CLI Commands for the supported command and exit-code contract.')}`,
   ),
   makeArticle(
     'cli/commands',
@@ -152,14 +155,14 @@ $ frontguard monitor --history`)}${p('Use frontguard guide [topic] (topics: setu
   pageTimeout: 30000,
   maxHeight: 5000,
   outputDir: '.frontguard/results',
-}`)}${h2('Optional controls')}${p('Optional controls include colorScheme (light or dark), waitForStability for multi-frame layout convergence, redactSensitive for masking password/email/token fields and scrubbing DOM snapshots, freezeTime (boolean, epoch ms number, or ISO 8601 date string), seedRandom (boolean or numeric PRNG seed), blockUrls (URL glob or substring patterns to abort before rendering), per-route actions (click, hover, fill, press, waitForSelector, wait), masks, region-scoped Chroma-SSIM (YCbCr) and CW-SSIM cluster similarity with spatial cluster.targetSelector DOM attribution, configurable multi-render consensus, telemetry opt-in, and multi-provider BYOK analysis (openai, anthropic, gemini, or custom baseUrl / FRONTGUARD_OPENAI_BASE_URL). Verify an option against the installed package version before adding it.')}`,
+}`)}${h2('Optional controls')}${figure('/images/docs/anti-flake-hermetic-render.jpg', 'Deterministic Rendering and Anti-Flake Engine', 'FIG 02 · DETERMINISTIC STABILIZATION GATES — CLOCK FREEZE · PRNG SEED · NETWORK GUARD · FRAME CONVERGENCE · PII REDACTION')}${p('Optional controls include colorScheme (light or dark), waitForStability for multi-frame layout convergence, redactSensitive for masking password/email/token fields and scrubbing DOM snapshots, freezeTime (boolean, epoch ms number, or ISO 8601 date string), seedRandom (boolean or numeric PRNG seed), blockUrls (URL glob or substring patterns to abort before rendering), per-route actions (click, hover, fill, press, waitForSelector, wait), masks, region-scoped Chroma-SSIM (YCbCr) and CW-SSIM cluster similarity with spatial cluster.targetSelector DOM attribution, configurable multi-render consensus, telemetry opt-in, and multi-provider BYOK analysis (openai, anthropic, gemini, or custom baseUrl / FRONTGUARD_OPENAI_BASE_URL). Verify an option against the installed package version before adding it.')}`,
   ),
   makeArticle(
     'playwright/index',
     'Playwright Plugin',
     'Reference',
     ['Behavior', 'Example', 'Baseline model'],
-    `${note('SEPARATE BASELINE MODEL.', 'The Playwright package stores files in __visual_baselines__ by default. Unlike ordinary CLI runs, visualTest creates a missing baseline and reports isNewBaseline: true.')}${code('visual.spec.ts', `import { test, expect } from '@playwright/test'
+    `${note('SEPARATE BASELINE MODEL.', 'The Playwright package stores files in __visual_baselines__ by default. Unlike ordinary CLI runs, visualTest creates a missing baseline and reports isNewBaseline: true.')}${figure('/images/docs/playwright-storybook-workflow.jpg', 'Playwright and Storybook Visual Workflow', 'FIG 03 · @FRONTGUARD/PLAYWRIGHT & STORYBOOK 8 — COMPONENT-SCOPED CAPTURE, SPATIAL CLUSTERS & MULTI-VIEWPORT DIFFING')}${code('visual.spec.ts', `import { test, expect } from '@playwright/test'
 import { visualTest } from '@frontguard/playwright'
 
 test('home', async ({ page }) =&gt; {
@@ -205,7 +208,7 @@ test('home', async ({ page }) =&gt; {
     'AI Analysis',
     'Guides',
     ['Scope', 'Providers', 'Evidence limits'],
-    `${note('OPTIONAL BYOK.', 'Model-assisted analysis is not required for local pixel comparison. Screenshot evidence is sent directly to the provider account you configure.')}${p('Changed screenshots can be classified as regression, intentional, or content_update with a confidence score and explanation. AI analysis runs on every diff above threshold to explain visual changes, classify severity, and suggest candidate CSS fixes. AI annotations are advisory and never silently override pass/fail exit codes.')}${h2('Providers')}${p("Supported providers include OpenAI (provider: 'openai', models such as 'gpt-4.1-mini' or 'gpt-4o', env FRONTGUARD_OPENAI_KEY), Anthropic (provider: 'anthropic', model 'claude-sonnet-4-20250514', env FRONTGUARD_ANTHROPIC_KEY), Google Gemini (provider: 'gemini', model 'gemini-2.5-flash', env FRONTGUARD_GEMINI_KEY), and OpenAI-compatible custom endpoints via baseUrl or FRONTGUARD_OPENAI_BASE_URL for OpenRouter, Ollama, and vLLM.")}${code('frontguard.config.ts', `export default {
+    `${note('OPTIONAL BYOK.', 'Model-assisted analysis is not required for local pixel comparison. Screenshot evidence is sent directly to the provider account you configure.')}${figure('/images/docs/perceptual-diff-clusters.jpg', 'Perceptual Diff Engine and Spatial DOM-Cluster Attribution', 'FIG 04 · PERCEPTUAL DIFF & DOM ATTRIBUTION — CHROMA-SSIM, WAVELET CW-SSIM, 8-CONNECTED CLUSTERS & SANDBOX VERIFICATION')}${p('Changed screenshots can be classified as regression, intentional, or content_update with a confidence score and explanation. AI analysis runs on every diff above threshold to explain visual changes, classify severity, and suggest candidate CSS fixes. AI annotations are advisory and never silently override pass/fail exit codes.')}${h2('Providers')}${p("Supported providers include OpenAI (provider: 'openai', models such as 'gpt-4.1-mini' or 'gpt-4o', env FRONTGUARD_OPENAI_KEY), Anthropic (provider: 'anthropic', model 'claude-sonnet-4-20250514', env FRONTGUARD_ANTHROPIC_KEY), Google Gemini (provider: 'gemini', model 'gemini-2.5-flash', env FRONTGUARD_GEMINI_KEY), and OpenAI-compatible custom endpoints via baseUrl or FRONTGUARD_OPENAI_BASE_URL for OpenRouter, Ollama, and vLLM.")}${code('frontguard.config.ts', `export default {
   ai: {
     provider: 'gemini',
     model: 'gemini-2.5-flash',
@@ -219,7 +222,7 @@ test('home', async ({ page }) =&gt; {
     'AI Fixes & the Fix-Pattern Database',
     'Guides',
     ['Experimental status', 'Verification', 'Human review'],
-    `${note('EXPERIMENTAL.', 'Suggestion generation and sandbox verification are separate opt-ins. Suggestions can exist without verification.')}${p('With generateFixes and verifyFixes enabled, Frontguard can apply a CSS suggestion in a sandbox, re-render, and label the outcome Verified or Unverified. A verified result is automatically recorded as an accepted local fix-pattern signal when that database is available.')}${p('That automatic record does not update screenshot baselines or guarantee correctness. Review every patch and run broader tests.')}`,
+    `${note('EXPERIMENTAL.', 'Suggestion generation and sandbox verification are separate opt-ins. Suggestions can exist without verification.')}${figure('/images/docs/perceptual-diff-clusters.jpg', 'Perceptual Diff Engine and Spatial DOM-Cluster Attribution', 'FIG 04 · PERCEPTUAL DIFF & DOM ATTRIBUTION — CHROMA-SSIM, WAVELET CW-SSIM, 8-CONNECTED CLUSTERS & SANDBOX VERIFICATION')}${p('With generateFixes and verifyFixes enabled, Frontguard can apply a CSS suggestion in a sandbox, re-render, and label the outcome Verified or Unverified. A verified result is automatically recorded as an accepted local fix-pattern signal when that database is available.')}${p('That automatic record does not update screenshot baselines or guarantee correctness. Review every patch and run broader tests.')}`,
   ),
   makeArticle(
     'guides/accessibility',
@@ -259,7 +262,7 @@ $ frontguard monitor --history`)}${p('CLI monitor records run history under .fro
     'Cloud API',
     'Guides',
     ['Current status', 'Required URL', 'Production warning'],
-    `${cloudNotice}${p('Cloudflare Worker, D1, and R2 source exists for development and contract evaluation. api.frontguard.dev is not a working hosted default.')}${code('environment', 'FRONTGUARD_API_URL=https://your-frontguard-api.example.com')}${p('Do not use the pre-release cloud for production data until deployment, migrations, retention, recovery, and tenant isolation are independently verified.')}`,
+    `${cloudNotice}${figure('/images/docs/git-cas-storage.jpg', 'Zero-Pollution Git Orphan and Cloud CAS Storage', 'FIG 05 · BASELINE STORAGE ARCHITECTURE — STAGE 1 GIT ORPHAN BRANCH (frontguard-baselines) & STAGE 3 CLOUD R2 CAS (/v1/cas)')}${p('Cloudflare Worker, D1, and R2 source exists for development and contract evaluation. api.frontguard.dev is not a working hosted default.')}${code('environment', 'FRONTGUARD_API_URL=https://your-frontguard-api.example.com')}${p('Do not use the pre-release cloud for production data until deployment, migrations, retention, recovery, and tenant isolation are independently verified.')}`,
   ),
   makeArticle(
     'guides/custom-plugins',
@@ -280,7 +283,7 @@ $ frontguard monitor --history`)}${p('CLI monitor records run history under .fro
     'GitHub Actions',
     'Guides',
     ['Generated workflow', 'Baseline workflow', 'Composite Action'],
-    `${p('frontguard init --ci generates a comparison-only workflow that invokes the CLI directly, uses contents: read, and uploads the HTML artifact. Configure FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY only if optional analysis is enabled.')}${p('The generated workflow fetches origin/frontguard-baselines explicitly. Default actions/checkout fetch-depth: 1 only retrieves the triggering commit, so a CI user who omits that fetch gets an empty expected set.')}${p('Baseline acceptance belongs in a separate explicit workflow: run frontguard update-baselines, review the result, then push frontguard-baselines.')}${p('The generated workflow and the repository composite Action are separate surfaces. The public Action remains pre-release pending an external consumer smoke test.')}`,
+    `${figure('/images/docs/git-cas-storage.jpg', 'Zero-Pollution Git Orphan and Cloud CAS Storage', 'FIG 05 · BASELINE STORAGE ARCHITECTURE — STAGE 1 GIT ORPHAN BRANCH (frontguard-baselines) & STAGE 3 CLOUD R2 CAS (/v1/cas)')}${p('frontguard init --ci generates a comparison-only workflow that invokes the CLI directly, uses contents: read, and uploads the HTML artifact. Configure FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY only if optional analysis is enabled.')}${p('The generated workflow fetches origin/frontguard-baselines explicitly. Default actions/checkout fetch-depth: 1 only retrieves the triggering commit, so a CI user who omits that fetch gets an empty expected set.')}${p('Baseline acceptance belongs in a separate explicit workflow: run frontguard update-baselines, review the result, then push frontguard-baselines.')}${p('The generated workflow and the repository composite Action are separate surfaces. The public Action remains pre-release pending an external consumer smoke test.')}`,
   ),
   makeArticle(
     'guides/migrate-from-backstopjs',
@@ -301,7 +304,7 @@ $ frontguard monitor --history`)}${p('CLI monitor records run history under .fro
     'MCP server',
     'Integrations',
     ['Configuration', 'Tools', 'Approval limit'],
-    `${cloudNotice}${h2('Configuration')}${code('configuration', `# Local report mode (reads ./frontguard-report/report.json by default)
+    `${cloudNotice}${figure('/images/docs/mcp-visual-cortex.jpg', 'Frontguard MCP Agentic Visual Cortex Architecture', 'FIG 06 · @FRONTGUARD/MCP — 7-TOOL AGENTIC VISUAL CORTEX OVER STDIO JSON-RPC (LOCAL REPORT & CLOUD API MODES)')}${h2('Configuration')}${code('configuration', `# Local report mode (reads ./frontguard-report/report.json by default)
 FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json
 
 # Verified Cloud API deployment
@@ -313,7 +316,7 @@ FRONTGUARD_API_KEY=&lt;frontguard-api-key&gt;`)}${h2('Tools')}${p('The MCP serve
     'Storybook',
     'Integrations',
     ['Implemented source', 'Configuration', 'Release limit'],
-    `${note('SOURCE AVAILABLE.', 'The CLI includes Storybook index discovery and play-function-aware capture, but the public integration journey has not been externally acceptance-tested.')}${code('frontguard.config.ts', `storybook: {
+    `${note('SOURCE AVAILABLE.', 'The CLI includes Storybook index discovery and play-function-aware capture, but the public integration journey has not been externally acceptance-tested.')}${figure('/images/docs/playwright-storybook-workflow.jpg', 'Playwright and Storybook Visual Workflow', 'FIG 03 · @FRONTGUARD/PLAYWRIGHT & STORYBOOK 8 — COMPONENT-SCOPED CAPTURE, SPATIAL CLUSTERS & MULTI-VIEWPORT DIFFING')}${code('frontguard.config.ts', `storybook: {
   url: 'http://localhost:6006',
 }`)}${p('Run Storybook yourself, review discovered stories, and use the normal explicit CLI baseline workflow. Do not assume a hosted Storybook review service is included.')}`,
   ),
@@ -385,7 +388,7 @@ FRONTGUARD_API_KEY=&lt;frontguard-api-key&gt;`)}${h2('Tools')}${p('The MCP serve
     'Cross-OS rendering',
     'Deployment & Sandboxing',
     ['Current status', 'Local build', 'Limit'],
-    `${note('NOT VALIDATED.', 'The renderer is currently repository-source-only: no public image or cross-host byte-equivalence result is published.')}${p('From a clean clone, run the complete preparation sequence below at the repository root. The Dockerfile requires the renamed npm pack tarball in its build context.')}${code('terminal', `$ npm ci
+    `${note('NOT VALIDATED.', 'The renderer is currently repository-source-only: no public image or cross-host byte-equivalence result is published.')}${figure('/images/docs/anti-flake-hermetic-render.jpg', 'Deterministic Rendering and Anti-Flake Engine', 'FIG 02 · DETERMINISTIC STABILIZATION GATES — CLOCK FREEZE · PRNG SEED · NETWORK GUARD · FRAME CONVERGENCE · PII REDACTION')}${p('From a clean clone, run the complete preparation sequence below at the repository root. The Dockerfile requires the renamed npm pack tarball in its build context.')}${code('terminal', `$ npm ci
 $ npm run build --workspace=packages/cli
 $ npm pack ./packages/cli --pack-destination packages/cli/docker
 $ mv packages/cli/docker/frontguard-cli-*.tgz packages/cli/docker/frontguard-cli.tgz

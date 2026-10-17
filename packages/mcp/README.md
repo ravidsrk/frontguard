@@ -6,6 +6,10 @@
 
 ## Why
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/mcp-visual-cortex.jpg" alt="Frontguard MCP Agentic Visual Cortex Architecture" width="840"/>
+</p>
+
 Frontguard runs your visual-regression checks locally or in CI. The expensive part of that loop isn't the screenshots — it's the agent context-switch between "agent sees diff" and "agent inspects the report, DOM cluster, and suggested fix." This MCP server collapses that loop with **7 tools** across **Local Report Mode** (zero Cloud API key required) and **Cloud API Mode**: the agent calls `list_regressions`, inspects spatial diff clusters and DOM nodes with `inspect_diff_cluster_dom`, retrieves patches via `get_suggested_fix`, validates candidate CSS via `verify_css_patch`, and promotes verified local screenshots via `promote_baseline`.
 
 ## Install

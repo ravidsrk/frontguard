@@ -14,6 +14,10 @@ Frontguard gives frontend teams a local, inspectable screenshot comparison loop 
 > _Current test, source, version, and bundle metrics are derived by [`scripts/stats.ts`](./scripts/stats.ts). See [`scripts/stats.json`](./scripts/stats.json) for the canonical snapshot._
 
 <p align="center">
+  <img src="./apps/web/public/images/docs/og-hero-banner.jpg" alt="Frontguard visual regression testing banner" width="840"/>
+</p>
+
+<p align="center">
   <img src="./demo/frontguard-demo.gif" alt="Frontguard demo: init, doctor, run, AI classification" width="720"/><br/>
   <em>📽️ Demo: <code>frontguard init</code> → <code>doctor</code> → <code>run</code> → AI classification.</em>
 </p>
@@ -40,6 +44,10 @@ AI is optional; without it, the CLI performs local pixel comparison and writes l
 
 ## What It Does
 
+<p align="center">
+  <img src="./apps/web/public/images/docs/pipeline-architecture.jpg" alt="Frontguard 5-Stage Visual Regression Pipeline" width="840"/>
+</p>
+
 ```
 Developer runs Frontguard → Pages render → Pixels compare to reviewed baselines →
 Console and HTML evidence are written → Optional AI assists with changed screenshots
@@ -50,6 +58,10 @@ Console and HTML evidence are written → Optional AI assists with changed scree
 - **Detect** — Pixel comparison finds changes above the configured threshold
 - **Understand** — Optional AI returns a confidence-scored explanation for human review
 - **Fix** — Experimental CSS suggestions and sandbox verification are separate opt-ins
+
+<p align="center">
+  <img src="./apps/web/public/images/docs/perceptual-diff-clusters.jpg" alt="Perceptual Diff Engine and Spatial DOM-Cluster Attribution" width="840"/>
+</p>
 
 ## Quick Start
 
