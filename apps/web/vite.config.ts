@@ -7,10 +7,16 @@ import viteReact from '@vitejs/plugin-react'
 // The tanstackStart() plugin generates src/routeTree.gen.ts on first run.
 const isTest = !!process.env.VITEST
 
-export default defineConfig({
-  server: { port: 3000 },
+export default defineConfig(({ command }) => ({
+  server: {
+    host: '0.0.0.0',
+    port: Number(process.env.PORT) || 3000,
+    allowedHosts: ['.aq.dev'],
+  },
   plugins: [
-    ...(isTest ? [] : [cloudflare({ viteEnvironment: { name: 'ssr' } })]),
+    ...(isTest || command !== 'build'
+      ? []
+      : [cloudflare({ viteEnvironment: { name: 'ssr' } })]),
     tanstackStart(),
     viteReact(),
   ],
@@ -20,4 +26,4 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: true,
   },
-})
+}))
