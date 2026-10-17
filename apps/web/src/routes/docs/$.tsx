@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { articles, FIRST_DOC_SLUG, type Article } from '../../lib/docs-content'
 import { buildSeoHead, canonicalUrl } from '../../lib/seo'
@@ -13,6 +13,15 @@ import { s } from '../../lib/style'
 
 const docArticlePath = (slug: string) => `/docs/${slug}`
 const docArticleTitle = (article: Article) => `${article.label} — Frontguard Docs`
+
+const QUICK_TRACKS: { label: string; slug: string }[] = [
+  { label: 'Quick Start', slug: 'quick-start' },
+  { label: 'CLI Commands', slug: 'cli/commands' },
+  { label: 'Configuration', slug: 'cli/configuration' },
+  { label: 'Playwright API', slug: 'playwright/api' },
+  { label: 'MCP Server', slug: 'integrations/mcp' },
+  { label: 'GitHub Actions', slug: 'guides/github-actions' },
+]
 
 function docArticleJsonLd(article: Article) {
   const path = docArticlePath(article.id)
@@ -74,7 +83,9 @@ function DocArticle() {
   const { _splat: slug } = Route.useParams()
   const idx = articles.findIndex((a) => a.id === slug)
   const articleRef = useRef<HTMLDivElement>(null)
+  const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
   const activeId = idx !== -1 ? articles[idx]?.id : undefined
+  const copiedPage = Boolean(activeId && copiedSlug === activeId)
 
   useEffect(() => {
     const root = articleRef.current
@@ -148,35 +159,95 @@ function DocArticle() {
   const prev = articles[idx - 1]
   const next = articles[idx + 1]
 
+  const handleCopyArticle = () => {
+    const text = articleRef.current?.innerText ?? ''
+    try {
+      void navigator.clipboard?.writeText(text)
+    } catch {
+      /* noop */
+    }
+    const targetSlug = cur.id
+    setCopiedSlug(targetSlug)
+    window.setTimeout(() => setCopiedSlug((prevSlug) => (prevSlug === targetSlug ? null : prevSlug)), 1800)
+  }
+
   return (
     <>
-      <div style={s(`font-family: ${MONO}; font-size: 12px; color: #7c746b; margin-bottom: 18px;`)}>
-        <span style={s('color: #e8862e;')}>{cur.section}</span> / {cur.label}
+      <div
+        style={s(
+          'display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid #211e1b;',
+        )}
+      >
+        <span
+          style={s(
+            `font-family: ${MONO}; font-size: 10.5px; color: #6b645c; letter-spacing: 0.08em; margin-right: 6px;`,
+          )}
+        >
+          JUMP TO:
+        </span>
+        {QUICK_TRACKS.map((track) => {
+          const isCurrent = cur.id === track.slug
+          return (
+            <Link
+              key={track.slug}
+              to="/docs/$"
+              params={{ _splat: track.slug }}
+              style={s(
+                `font-family: ${MONO}; font-size: 11.5px; padding: 4px 10px; border-radius: 4px; text-decoration: none; border: 1px solid ${isCurrent ? '#e8862e' : '#2a2622'}; background: ${isCurrent ? '#1a130b' : '#131210'}; color: ${isCurrent ? '#e8862e' : '#b8b0a6'};`,
+              )}
+            >
+              {track.label}
+            </Link>
+          )
+        })}
+      </div>
+
+      <div
+        style={s(
+          'display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px;',
+        )}
+      >
+        <div style={s(`font-family: ${MONO}; font-size: 12px; color: #7c746b;`)}>
+          <span style={s('color: #e8862e;')}>{cur.section}</span> / {cur.label}
+          <span style={s('color: #564f48; margin-left: 10px;')}>
+            ({idx + 1} of {articles.length})
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleCopyArticle}
+          aria-label="Copy article content"
+          style={s(
+            `font-family: ${MONO}; font-size: 11px; color: ${copiedPage ? '#4fb477' : '#b8b0a6'}; background: #141210; border: 1px solid ${copiedPage ? '#255c3b' : '#2a2622'}; border-radius: 4px; padding: 4px 10px; cursor: pointer;`,
+          )}
+        >
+          {copiedPage ? 'Copied page ✓' : 'Copy page text'}
+        </button>
       </div>
 
       <div ref={articleRef}>
         <article key={cur.id} dangerouslySetInnerHTML={{ __html: cur.html }} />
       </div>
 
-      <div className="fg-docs-pagination" style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 28px; margin-top: 16px; border-top: 1px solid #211e1b;')}>
+      <div className="fg-docs-pagination" style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 28px; margin-top: 32px; border-top: 1px solid #211e1b;')}>
         {prev ? (
-          <Link to="/docs/$" params={{ _splat: prev.id }} className="fg-link" style={s('border: 1px solid #2a2622; padding: 18px 20px; text-decoration: none;')}>
+          <Link to="/docs/$" params={{ _splat: prev.id }} className="fg-link" style={s('border: 1px solid #2a2622; border-radius: 6px; background: #121110; padding: 18px 20px; text-decoration: none;')}>
             <div style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; margin-bottom: 6px;`)}>← PREVIOUS</div>
             <div className="fg-link-title" style={s('font-size: 15px; color: #d8d0c5;')}>{prev.label}</div>
           </Link>
         ) : (
-          <span style={s('border: 1px solid #2a2622; padding: 18px 20px; opacity: 0.4;')}>
+          <span style={s('border: 1px solid #2a2622; border-radius: 6px; padding: 18px 20px; opacity: 0.4;')}>
             <div style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; margin-bottom: 6px;`)}>← PREVIOUS</div>
             <div style={s('font-size: 15px; color: #d8d0c5;')}>Overview</div>
           </span>
         )}
         {next ? (
-          <Link to="/docs/$" params={{ _splat: next.id }} className="fg-link" style={s('border: 1px solid #2a2622; padding: 18px 20px; text-decoration: none; text-align: right;')}>
+          <Link to="/docs/$" params={{ _splat: next.id }} className="fg-link" style={s('border: 1px solid #2a2622; border-radius: 6px; background: #121110; padding: 18px 20px; text-decoration: none; text-align: right;')}>
             <div style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; margin-bottom: 6px;`)}>NEXT →</div>
             <div className="fg-link-title" style={s('font-size: 15px; color: #d8d0c5;')}>{next.label}</div>
           </Link>
         ) : (
-          <span style={s('border: 1px solid #2a2622; padding: 18px 20px; text-align: right; opacity: 0.4;')}>
+          <span style={s('border: 1px solid #2a2622; border-radius: 6px; padding: 18px 20px; text-align: right; opacity: 0.4;')}>
             <div style={s(`font-family: ${MONO}; font-size: 11px; color: #564f48; margin-bottom: 6px;`)}>NEXT →</div>
             <div style={s('font-size: 15px; color: #d8d0c5;')}>You&apos;re all caught up</div>
           </span>
@@ -185,3 +256,4 @@ function DocArticle() {
     </>
   )
 }
+

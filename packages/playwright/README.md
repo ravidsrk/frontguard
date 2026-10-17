@@ -31,10 +31,6 @@ That's it. First run creates baselines. Subsequent runs compare and flag regress
 
 ## How It Works
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/playwright-storybook-workflow.jpg" alt="Frontguard Playwright and Storybook Visual Workflow" width="840"/>
-</p>
-
 1. **First run** → takes a screenshot, saves it as the baseline
 2. **Subsequent runs** → takes a new screenshot, compares pixel-by-pixel against baseline
 3. **If diff exceeds threshold** → test fails with diff image + optional AI explanation
@@ -42,10 +38,6 @@ That's it. First run creates baselines. Subsequent runs compare and flag regress
 Baselines are plain PNG files in `__visual_baselines__/`. Commit them to git. Review diffs in PRs.
 
 ## Features
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/perceptual-diff-clusters.jpg" alt="Perceptual Diff Engine and Spatial DOM-Cluster Attribution" width="840"/>
-</p>
 
 - 📸 **Pixel-perfect diffs** — pixelmatch + SSIM perceptual comparison
 - 🤖 **AI classification** — knows if a change is a regression, intentional, or content update
@@ -87,10 +79,6 @@ test('dashboard', async ({ page }) => {
 ```
 
 ### Freeze time for deterministic screenshots
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/anti-flake-hermetic-render.jpg" alt="Deterministic Rendering and Anti-Flake Engine" width="840"/>
-</p>
 
 ```typescript
 import { test, expect } from '@playwright/test';
