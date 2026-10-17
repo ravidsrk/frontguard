@@ -278,6 +278,45 @@ function Comparisons() {
         </div>
       </section>
 
+      <section style={s('border-top: 1px solid #211e1b; background: #0d0c0b;')}>
+        <div style={s('max-width: 1200px; margin: 0 auto; padding: 64px 28px;')}>
+          <div style={s(`font-family: ${MONO}; font-size: 12px; color: #e8862e; letter-spacing: 0.08em; margin-bottom: 12px;`)}>
+            ARCHITECTURAL BREAKDOWN
+          </div>
+          <h2
+            style={s(
+              'font-size: 30px; letter-spacing: -0.03em; font-weight: 700; color: #f5f1ea; margin: 0 0 28px;',
+            )}
+          >
+            How local-first perceptual diffing and zero-bloat storage work.
+          </h2>
+          <div className="fg-responsive-grid" style={s('display: grid; grid-template-columns: 1fr 1fr; gap: 20px;')}>
+            <figure style={s('margin: 0; border: 1px solid #2a2622; background: #131210; padding: 14px;')}>
+              <img
+                src="/images/docs/perceptual-diff-clusters.jpg"
+                alt="Perceptual diff engine and spatial DOM-cluster attribution architecture"
+                loading="lazy"
+                style={s('width: 100%; height: auto; display: block; border: 1px solid #211e1b;')}
+              />
+              <figcaption style={s(`font-family: ${MONO}; font-size: 11.5px; color: #8c847a; padding: 10px 4px 2px; line-height: 1.5;`)}>
+                FIG 01 // Pixelmatch + Chroma-SSIM + Wavelet CW-SSIM with 8-connected DOM cluster attribution
+              </figcaption>
+            </figure>
+            <figure style={s('margin: 0; border: 1px solid #2a2622; background: #131210; padding: 14px;')}>
+              <img
+                src="/images/docs/git-cas-storage.jpg"
+                alt="Zero-pollution git orphan branch and Cloud CAS deduplication architecture"
+                loading="lazy"
+                style={s('width: 100%; height: auto; display: block; border: 1px solid #211e1b;')}
+              />
+              <figcaption style={s(`font-family: ${MONO}; font-size: 11.5px; color: #8c847a; padding: 10px 4px 2px; line-height: 1.5;`)}>
+                FIG 02 // Isolated frontguard-baselines git orphan branch and SHA-256 content-addressable storage
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
       <section style={s('border-top: 1px solid #211e1b; background: #100f0e;')}>
         <div style={s('max-width: 1200px; margin: 0 auto; padding: 64px 28px;')}>
           <div

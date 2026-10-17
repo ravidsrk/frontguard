@@ -41,6 +41,10 @@ See the [full CHANGELOG](https://github.com/ravidsrk/frontguard/blob/main/CHANGE
 
 ## What It Does
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/pipeline-architecture.jpg" alt="Frontguard 5-Stage Visual Regression Pipeline" width="840"/>
+</p>
+
 ```
 Developer runs Frontguard → Pages render → Pixels compare to reviewed baselines →
 Console and HTML evidence are written → Optional AI assists with changed screenshots
@@ -51,6 +55,10 @@ Console and HTML evidence are written → Optional AI assists with changed scree
 - **Detect** — Pixel comparison finds changes above the configured threshold
 - **Understand** — Optional AI returns a confidence-scored explanation for human review
 - **Fix** — Experimental CSS suggestions and sandbox verification are separate opt-ins
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/anti-flake-hermetic-render.jpg" alt="Deterministic Rendering and Anti-Flake Engine" width="840"/>
+</p>
 
 ## Quick Start
 
