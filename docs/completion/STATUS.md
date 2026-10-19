@@ -5,13 +5,14 @@
 ```
 VERDICT: CONDITIONAL GO (unchanged on 2026-10-19; scores not recomputed)
 COMPLETION: 45% historical — scores NOT recomputed after 40.7% file drift
-HEAD: d1f1408 on main · this branch adds the alert fix, not a new web deploy
-GATE: canonical frontguard.dev and www serve worker SHA d1f1408.
-      /privacy /terms /status 200. /pricing has no $29.
-      Scratch D1 restore and scratch wrangler rollback are done and deleted.
-NEXT: P4/T-21. Merge this PR after CI is green, then
-      gh workflow run "CI failure alert" --ref main -f drill=true.
-      H-03 stays open until that Actions run fires. H-05 does not gate.
+HEAD: e0676af (merge of PR #278)
+GATE: alert drill fired on main (issue #280, run 39229147720).
+      Canonical frontguard.dev serves the worker. D1 restore and rollback
+      were rehearsed on scratch resources and those resources were deleted.
+      H-01 through H-04 and H-07 are done. H-05 does not gate.
+NEXT: CI on e0676af must finish green (run 39229080039 was in progress when
+      the drill was recorded). Deploy Web has not completed since the domain
+      cutover, so gate item 2 is not closed.
 ```
 
 The Phase 0 and Phase 1 sections below are the 2026-09-01 record. They are not

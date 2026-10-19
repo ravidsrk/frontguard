@@ -617,3 +617,22 @@ dropped by a pull-request completion, and the surviving run follows the tip's
 own CI. Security: permissions add `actions: read` only; checkout stays on the
 default branch for `workflow_run`. Tests cover the tip lookup. The next commit
 exists so GitHub attaches that fix to the pull request.
+
+### 2026-10-19 — Actions drill on main
+
+Ravindra merged PR #278 with merge commit `e0676af` while CI on the PR head
+was still running. `main` then started CI run 39229080039.
+
+    gh workflow run "CI failure alert" --ref main -f drill=true
+
+Run 39229147720 succeeded. The script opened and closed
+https://github.com/ravidsrk/frontguard/issues/280 (`CLOSED`, reason
+`COMPLETED`, label `ci-red-drill`). Transcript:
+`evidence/T-21-actions-drill.txt`. H-03 and T-21 are done. `main` was not
+reddened.
+
+**Not a GO.** Gate item 2 is still open: CI on `e0676af` had not finished, and
+Deploy Web has not completed since `frontguard.dev` was attached to the worker.
+H-05 does not gate. Scores were not recomputed.
+
+**RESUME POINTER: `P4/T-21-ci` — alert drill is done. Wait for CI on e0676af, then a Deploy Web run that completes against the canonical domain.**
