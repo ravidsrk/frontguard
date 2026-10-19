@@ -217,3 +217,37 @@ credentials. Nameservers were already Cloudflare. Custom domains persist across
 a script-only deploy. Editing `apps/web/**` would start Deploy Web, and the CI
 token may not be allowed to edit zone routes. The Namecheap API user is not
 the email address (error `1011102`), and a registrar change was unnecessary.
+
+## A-20 — Treat the repeated research request as a deeper second pass
+
+**Phase:** 2026-10-19 post-launch roadmap
+**Decision:** The owner repeated the roadmap-research request after #283–#299
+were filed. Run eight new research tracks on what the first pass skipped, file
+only new items (#301–#310), and add second-pass evidence to existing children
+as comments.
+**Rejected:** Re-running the first pass and refiling #284–#299. Stopping to ask.
+**Reason:** R7 (b): duplicate public issues are hard to undo. Comments keep
+each child's history intact.
+
+## A-21 — File two security findings as private draft advisories
+
+**Phase:** 2026-10-19 post-launch roadmap
+**Decision:** Two security findings from the second research pass are filed
+as draft repository security advisories. Public issues and `docs/ROADMAP.md`
+mention them only as private hardening items, with no detail.
+**Rejected:** Public issues. Emailing `security@frontguard.dev` on the owner's
+behalf.
+**Reason:** `SECURITY.md` says not to open public issues for vulnerabilities,
+and private vulnerability reporting is off. Drafts are visible to maintainers
+only, publish nothing, and request no CVE. R7 (d).
+
+## A-22 — File the shared-path baseline collision from code reading
+
+**Phase:** 2026-10-19 post-launch roadmap
+**Decision:** File #301 with file and call-site references, and make a
+failing test its first acceptance item.
+**Rejected:** Installing Chromium system libraries (no sudo). Rendering in
+Docker (socket permission denied). Holding the issue until a repro is possible.
+**Reason:** R13 forbids claiming something works from reading code. It does
+not forbid reporting a suspected defect, provided the issue says it was not
+reproduced.
