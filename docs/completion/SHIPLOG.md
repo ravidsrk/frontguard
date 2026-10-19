@@ -545,7 +545,20 @@ not a shell string. Workflow permissions are `contents: read` and `issues: write
 `pull_request_target` is not used. Label creation tolerates "already exists"
 so the first failure can list issues by label.
 
-Drill proof is recorded after the workflow is on the remote. Until that issue
-exists, H-03 stays open and this task stays in flight.
+**Script drill fired.** `DRILL=true node scripts/ci-failure-alert.mjs` exited 0
+and opened then closed https://github.com/ravidsrk/frontguard/issues/279
+(`state: CLOSED`, reason `COMPLETED`, label `ci-red-drill`). Transcript:
+`evidence/T-21-drill.txt`.
 
-**RESUME POINTER: `P4/T-21` — drill not yet captured. H-01, H-02, H-07 open. H-04 still true of canonical `/pricing`.**
+The first drill attempt failed closed: with `FORCE_COLOR` set, `gh --json`
+prints ANSI around `[]` and `JSON.parse` throws. No issue was opened on that
+attempt. `parseGhJson` strips the color codes, and the `gh` child forces color
+off. Covered by a unit test.
+
+GitHub would not register `workflow_dispatch` for this file until it is on
+the default branch (`could not find any workflows named CI failure alert`).
+The Actions trigger itself is therefore not yet executed. H-03 stays open
+until a run of the workflow on `main` has fired. T-21 stays in flight for
+that reason.
+
+**RESUME POINTER: `P4/T-21` — script drill #279 closed. Workflow run on main still required. H-01, H-02, H-07 open. Canonical `/pricing` still sells $29.**

@@ -149,11 +149,24 @@ export async function applyAlert(decision, gh) {
   };
 }
 
+export function parseGhJson(text) {
+  const clean = String(text).replace(/\u001b\[[0-9;]*m/g, '').trim();
+  if (!clean) return [];
+  return JSON.parse(clean);
+}
+
 export function createGhAdapter() {
   const run = (args) =>
     execFileSync('gh', args, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        FORCE_COLOR: '0',
+        NO_COLOR: '1',
+        CLICOLOR: '0',
+        GH_FORCE_TTY: '0',
+      },
     });
 
   return {
@@ -176,7 +189,7 @@ export function createGhAdapter() {
       }
     },
     listOpen(label, marker) {
-      const issues = JSON.parse(
+      const issues = parseGhJson(
         run([
           'issue',
           'list',

@@ -791,7 +791,8 @@
       "commit": null,
       "evidence": [
         "docs/incident.md",
-        "scripts/test/ci-failure-alert.test.ts"
+        "scripts/test/ci-failure-alert.test.ts",
+        "docs/completion/evidence/T-21-drill.txt"
       ],
       "review": "manual",
       "attempts": 1,

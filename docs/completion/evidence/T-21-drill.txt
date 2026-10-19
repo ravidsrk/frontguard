@@ -1,0 +1,22 @@
+# T-21 drill — 2026-10-19
+
+Command (repo root, GH auth already in the environment):
+
+    DRILL=true EVENT_NAME=workflow_dispatch node scripts/ci-failure-alert.mjs
+
+Exit code: 0
+
+Stdout:
+
+    {
+      "decision": { "action": "open-or-comment", "title": "DRILL: CI failure alert", "closeAfter": true },
+      "result": { "did": "opened-and-closed", "number": 279, "url": "https://github.com/ravidsrk/frontguard/issues/279" }
+    }
+
+This runs the same script the workflow runs. GitHub would not register
+`workflow_dispatch` for `.github/workflows/ci-failure-alert.yml` until the file
+is on the default branch, so this drill is the script path, not a workflow_run.
+
+First attempt failed: `gh issue list --json` printed ANSI around `[]` because
+FORCE_COLOR is set in this environment. `parseGhJson` strips that. The failed
+attempt created the `ci-red-drill` label and did not open an issue.

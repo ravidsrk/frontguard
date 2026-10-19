@@ -7,6 +7,7 @@ import {
   MARKER_RED,
   applyAlert,
   decideAlert,
+  parseGhJson,
 } from '../ci-failure-alert.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -14,6 +15,13 @@ const workflow = readFileSync(
   path.join(repoRoot, '.github/workflows/ci-failure-alert.yml'),
   'utf8',
 );
+
+describe('parseGhJson', () => {
+  it('parses gh output when FORCE_COLOR wraps the JSON in ANSI', () => {
+    const colored = '\u001b[1;37m[\u001b[m\u001b[1;37m]\u001b[m\n';
+    expect(parseGhJson(colored)).toEqual([]);
+  });
+});
 
 describe('decideAlert', () => {
   it('opens a durable issue when CI fails on a push to main', () => {
