@@ -248,7 +248,7 @@ All actionable post-launch engineering work is tracked under parent issue [#283]
 ## 5. What Is Deliberately Not On This Roadmap
 
 - **Replacing `pixelmatch` with `odiff`, `Resemble.js`, a perceptual hash, a captioner or a VLM as the pass/fail gate, including prompt-based ignore rules.**
-  - No benchmark in the 2026 literature shows these outperforming `pixelmatch` on UI accuracy. No study evaluates any deterministic metric on UI screenshots at all.
+  - No benchmark in the 2026 literature shows these outperforming `pixelmatch` on UI accuracy.
   - WUICC-bench, LLMShot and UI-Lens show why models cannot serve as a deterministic regression gate.
   - Noise handling stays inside the same gate (`windowSize`, `ignoreMask`; [#284](https://github.com/ravidsrk/frontguard/issues/284)).
 - **Selectable alternative comparators as gates.** Playwright closed pluggable comparators as [out of scope](https://github.com/microsoft/playwright/issues/28578). Vitest declines to bundle perceptual comparators because there is no clear best one.
