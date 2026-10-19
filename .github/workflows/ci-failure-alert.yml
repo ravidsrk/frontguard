@@ -4,6 +4,11 @@ on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
+    # Pull-request CI also completes this workflow. Those runs would take a
+    # concurrency slot and then skip. GitHub cancels an older pending run in
+    # the same group even when cancel-in-progress is false, so a skipped PR
+    # run can drop a queued main failure. Only main CI may enqueue an alert.
+    branches: [main]
   workflow_dispatch:
     inputs:
       drill:
@@ -12,12 +17,16 @@ on:
         default: false
 
 permissions:
+  actions: read
   contents: read
   issues: write
 
 # Queue alert jobs. Do not cancel one that is already filing or closing an issue.
+# A drill uses its own group so it cannot replace a pending main alert.
+# The script re-reads CI for the main tip, so a newer main run that replaces
+# a pending one still records that tip.
 concurrency:
-  group: ci-failure-alert
+  group: ${{ github.event_name == 'workflow_dispatch' && 'ci-failure-alert-drill' || 'ci-failure-alert' }}
   cancel-in-progress: false
 
 jobs:

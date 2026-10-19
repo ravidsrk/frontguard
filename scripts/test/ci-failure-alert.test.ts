@@ -9,6 +9,8 @@ import {
   decideAlert,
   gateAgainstTip,
   parseGhJson,
+  reconcileWithTip,
+  selectTipRun,
 } from '../ci-failure-alert.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -308,6 +310,109 @@ describe('gateAgainstTip', () => {
   });
 });
 
+describe('selectTipRun', () => {
+  it('uses the newest completed push and ignores the rest', () => {
+    const chosen = selectTipRun(
+      [
+        {
+          headSha: 'tip',
+          status: 'completed',
+          event: 'pull_request',
+          conclusion: 'failure',
+          createdAt: '2026-10-19T12:00:00Z',
+          databaseId: 9,
+        },
+        {
+          headSha: 'tip',
+          status: 'in_progress',
+          event: 'push',
+          conclusion: '',
+          createdAt: '2026-10-19T12:05:00Z',
+          databaseId: 8,
+        },
+        {
+          headSha: 'tip',
+          status: 'completed',
+          event: 'push',
+          conclusion: 'failure',
+          createdAt: '2026-10-19T11:00:00Z',
+          databaseId: 3,
+        },
+        {
+          headSha: 'tip',
+          status: 'completed',
+          event: 'push',
+          conclusion: 'success',
+          createdAt: '2026-10-19T11:30:00Z',
+          databaseId: 4,
+        },
+        {
+          headSha: 'other',
+          status: 'completed',
+          event: 'push',
+          conclusion: 'failure',
+          createdAt: '2026-10-19T13:00:00Z',
+          databaseId: 10,
+        },
+      ],
+      'tip',
+    );
+    expect(chosen && chosen.databaseId).toBe(4);
+  });
+});
+
+describe('reconcileWithTip', () => {
+  const staleSuccess = {
+    eventName: 'workflow_run',
+    conclusion: 'success',
+    headBranch: 'main',
+    triggerEvent: 'push',
+    sha: 'older',
+    tip: 'tip',
+    runUrl: 'https://example.test/older',
+  };
+
+  it('opens when a replaced run was green but the tip CI failed', () => {
+    const decision = reconcileWithTip(staleSuccess, {
+      headSha: 'tip',
+      conclusion: 'failure',
+      url: 'https://example.test/tip',
+    });
+    expect(decision.action).toBe('open-or-comment');
+    expect(decision.body).toContain('`tip`');
+    expect(decision.body).toContain('https://example.test/tip');
+  });
+
+  it('closes when a replaced run failed but the tip CI is green', () => {
+    const decision = reconcileWithTip(
+      { ...staleSuccess, conclusion: 'failure', sha: 'older' },
+      { headSha: 'tip', conclusion: 'success', url: 'https://example.test/tip' },
+    );
+    expect(decision.action).toBe('resolve');
+  });
+
+  it('keeps the triggering verdict when that run is the tip and no lookup hit', () => {
+    const decision = reconcileWithTip(
+      { ...staleSuccess, sha: 'tip', tip: 'tip', conclusion: 'failure' },
+      null,
+    );
+    expect(decision.action).toBe('open-or-comment');
+  });
+
+  it('skips an older triggering run when the tip has no completed push CI', () => {
+    expect(reconcileWithTip(staleSuccess, null).action).toBe('skip');
+  });
+
+  it('does not let a red tip change a drill', () => {
+    const decision = reconcileWithTip(
+      { drill: true, sha: '', tip: '' },
+      { headSha: 'tip', conclusion: 'failure', url: 'https://example.test/tip' },
+    );
+    expect(decision.action).toBe('open-or-comment');
+    expect(decision.label).toBe('ci-red-drill');
+  });
+});
+
 describe('CI failure alert workflow', () => {
   it('listens to the CI workflow and can be dispatched as a drill', () => {
     expect(workflow).toContain('workflows: ["CI"]');
@@ -317,6 +422,9 @@ describe('CI failure alert workflow', () => {
     expect(workflow).toContain('contents: read');
     expect(workflow).toContain('scripts/ci-failure-alert.mjs');
     expect(workflow).toContain('github.event.repository.default_branch');
+    expect(workflow).toContain('branches: [main]');
+    expect(workflow).toContain('actions: read');
+    expect(workflow).toContain('ci-failure-alert-drill');
     expect(workflow).toContain('cancel-in-progress: false');
     expect(workflow).toContain('MAIN_TIP:');
     expect(workflow).not.toContain('pull_request_target');

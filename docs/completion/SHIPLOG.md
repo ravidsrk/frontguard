@@ -601,3 +601,10 @@ green, merge with a merge commit, then
 `gh workflow run "CI failure alert" --ref main -f drill=true`.
 
 **RESUME POINTER: `P4/T-21` — domain, D1 restore, and scratch rollback are done. Actions drill still waits on this branch landing on main.**
+
+Greptile reviewed `1496862`. Pending runs in one concurrency group replace each
+other even with `cancel-in-progress: false`, so a pull-request completion could
+drop a queued main failure. The alert workflow now listens only to CI on
+`main`, puts drills in their own group, and re-reads the tip's completed push
+CI before it opens or closes. The rollback note no longer says the next Deploy
+Web run fails its SHA check; that run deploys first and replaces the rollback.

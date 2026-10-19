@@ -8,9 +8,10 @@
  *   ALERT_DRY_RUN=1 prints the decision and does not call gh.
  *
  * A run updates the issue only when HEAD_SHA is the current main tip, so an
- * older green job cannot close an alert for a newer red push. Recovery closes
- * every matching open issue, and a create re-checks so two overlapping runs
- * do not leave a duplicate open.
+ * older green job cannot close an alert for a newer red push. When this run
+ * replaced a pending one, it re-reads the completed push CI for that tip and
+ * acts on that conclusion. Recovery closes every matching open issue, and a
+ * create re-checks so two overlapping runs do not leave a duplicate open.
  */
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -112,6 +113,57 @@ export function decideAlert(input) {
  * @param {ReturnType<typeof decideAlert>} decision
  * @param {{ sha?: string, tip?: string, drill?: boolean | string }} input
  */
+/**
+ * Newest completed push CI for the tip. In-progress, cancelled, and
+ * pull-request runs are not a verdict.
+ *
+ * @param {Array<{headSha?: string, status?: string, event?: string, conclusion?: string, createdAt?: string, databaseId?: number}> | null | undefined} runs
+ * @param {string} tip
+ */
+export function selectTipRun(runs, tip) {
+  const completed = (Array.isArray(runs) ? runs : []).filter(
+    (run) =>
+      run &&
+      run.headSha === tip &&
+      run.status === 'completed' &&
+      run.event === 'push' &&
+      (run.conclusion === 'success' || run.conclusion === 'failure'),
+  );
+  completed.sort((a, b) => {
+    const byTime = String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    if (byTime !== 0) return byTime;
+    return (b.databaseId || 0) - (a.databaseId || 0);
+  });
+  return completed[0] || null;
+}
+
+/**
+ * Decide from the tip's own CI when we know it. A run that only carries an
+ * older conclusion must not skip a tip that is already red or green.
+ *
+ * @param {Parameters<typeof decideAlert>[0] & { tip?: string }} trigger
+ * @param {ReturnType<typeof selectTipRun>} tipRun
+ */
+export function reconcileWithTip(trigger, tipRun) {
+  if (flag(trigger.drill)) {
+    return gateAgainstTip(decideAlert(trigger), trigger);
+  }
+  if (tipRun && tipRun.headSha) {
+    const input = {
+      eventName: 'workflow_run',
+      conclusion: tipRun.conclusion,
+      headBranch: 'main',
+      triggerEvent: 'push',
+      sha: tipRun.headSha,
+      runUrl: tipRun.url || '',
+      tip: tipRun.headSha,
+      drill: false,
+    };
+    return gateAgainstTip(decideAlert(input), input);
+  }
+  return gateAgainstTip(decideAlert(trigger), trigger);
+}
+
 export function gateAgainstTip(decision, input) {
   if (decision.action === 'skip' || flag(input.drill) || decision.marker === MARKER_DRILL) {
     return decision;
@@ -287,6 +339,25 @@ export function createGhAdapter() {
     close(number) {
       run(['issue', 'close', String(number), '--reason', 'completed']);
     },
+    listCiRuns(tip) {
+      if (!tip) return [];
+      return parseGhJson(
+        run([
+          'run',
+          'list',
+          '--workflow',
+          'ci.yml',
+          '--branch',
+          'main',
+          '--commit',
+          tip,
+          '--limit',
+          '20',
+          '--json',
+          'databaseId,conclusion,status,event,headSha,url,createdAt',
+        ]) || '[]',
+      );
+    },
   };
 }
 
@@ -305,12 +376,23 @@ function readEnv() {
 
 async function main() {
   const env = readEnv();
-  const decision = gateAgainstTip(decideAlert(env), env);
+  const gh = createGhAdapter();
+  let tipRun = null;
+  if (env.eventName === 'workflow_run' && !flag(env.drill) && env.tip) {
+    try {
+      tipRun = selectTipRun(gh.listCiRuns(env.tip), env.tip);
+    } catch (error) {
+      console.error(
+        `tip CI lookup failed: ${error instanceof Error ? error.message : error}`,
+      );
+    }
+  }
+  const decision = reconcileWithTip(env, tipRun);
   if (process.env.ALERT_DRY_RUN === '1') {
     process.stdout.write(`${JSON.stringify(decision, null, 2)}\n`);
     return;
   }
-  const result = await applyAlert(decision, createGhAdapter());
+  const result = await applyAlert(decision, gh);
   process.stdout.write(`${JSON.stringify({ decision, result }, null, 2)}\n`);
 }
 
