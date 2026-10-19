@@ -1,7 +1,7 @@
 {
-  "product": "Frontguard \u2014 AI-powered frontend visual regression testing",
+  "product": "Frontguard — AI-powered frontend visual regression testing",
   "repo_path": "/Users/ravindra/projects/frontguard",
-  "run_id": "20260914-resume",
+  "run_id": "20261019-restart",
   "mode": "drive",
   "stage": "S3",
   "baseline": {
@@ -10,13 +10,13 @@
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "f67aaa8",
-  "resume_pointer": "CONDITIONAL_GO",
+  "current_commit": "d1f1408cbf8d57f5130bf999ff63f4d1e3170e67",
+  "resume_pointer": "P4/T-21",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 45,
   "gate": {
     "status": "CONDITIONAL_GO",
-    "reason": "Agent-side plan work that is not blocked on a Human Action is done. Launch-gating Human Actions remain: H-01, H-02, H-03, H-04, H-07. Evidence: docs/completion/evidence/T-30-launch-gate.md"
+    "reason": "Canonical frontguard.dev and www serve worker SHA d1f1408: /privacy /terms /status 200, /pricing has no $29. Scratch D1 time-travel restore and scratch wrangler rollback were performed and the scratch resources were deleted. Still open: T-21 Actions drill is not on main (script drill issue 279 is closed). H-05 does not gate. Evidence: docs/completion/evidence/T-25-canonical-probe.txt"
   },
   "angles": [
     {
@@ -645,14 +645,17 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "blocked",
+      "status": "done",
       "branch": null,
       "pr": null,
       "commit": null,
-      "evidence": [],
-      "review": null,
+      "evidence": [
+        "apps/web/src/routes/__root.tsx",
+        "docs/completion/evidence/S1-20261019-baseline.md"
+      ],
+      "review": "observed on d1f1408; worker headers probed 2026-10-19",
       "attempts": 0,
-      "block_signature": "touches apps/web; merging triggers the path-filtered Deploy Web workflow, i.e. a production deploy. R15 requires owner authorisation."
+      "block_signature": null
     },
     {
       "id": "T-15",
@@ -782,13 +785,17 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
+      "status": "in_progress",
+      "branch": "completion/p4-ci-failure-alert",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
       "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "evidence": [
+        "docs/incident.md",
+        "scripts/test/ci-failure-alert.test.ts",
+        "docs/completion/evidence/T-21-drill.txt"
+      ],
+      "review": "manual",
+      "attempts": 2,
       "block_signature": null
     },
     {
@@ -800,13 +807,16 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
+      "status": "done",
+      "branch": "completion/p4-ci-failure-alert",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
       "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "evidence": [
+        "docs/completion/evidence/T-22-d1-restore.txt",
+        "docs/incident.md"
+      ],
+      "review": "manual",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -818,13 +828,16 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
+      "status": "done",
+      "branch": "completion/p4-ci-failure-alert",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
       "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "evidence": [
+        "docs/completion/evidence/T-23-rollback.txt",
+        "docs/incident.md"
+      ],
+      "review": "manual",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -836,13 +849,17 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
+      "status": "done",
+      "branch": "completion/p4-ci-failure-alert",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
       "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "evidence": [
+        "docs/incident.md",
+        "docs/completion/evidence/T-22-d1-restore.txt",
+        "docs/completion/evidence/T-23-rollback.txt"
+      ],
+      "review": "manual",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -854,14 +871,17 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "blocked",
-      "branch": null,
-      "pr": null,
-      "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
-      "block_signature": "frontguard.dev is not routed to the frontguard-web worker; a successful deploy does not change the canonical domain. See H-07."
+      "status": "done",
+      "branch": "completion/p4-ci-failure-alert",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
+      "commit": "d1f1408cbf8d57f5130bf999ff63f4d1e3170e67",
+      "evidence": [
+        "docs/completion/evidence/T-25-canonical-probe.txt",
+        "docs/completion/evidence/H-07-domain-attach.md"
+      ],
+      "review": "manual",
+      "attempts": 1,
+      "block_signature": null
     },
     {
       "id": "T-26",
@@ -895,13 +915,16 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
-      "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "status": "done",
+      "branch": "completion/p4-ci-failure-alert",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
+      "commit": "d1f1408cbf8d57f5130bf999ff63f4d1e3170e67",
+      "evidence": [
+        "docs/completion/evidence/T-25-canonical-probe.txt",
+        "apps/web/src/routes/pricing.tsx"
+      ],
+      "review": "manual",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -970,8 +993,8 @@
         "T-22"
       ],
       "gates_launch": true,
-      "verification": "agent performs a restore into a scratch target and captures the transcript",
-      "status": "open"
+      "verification": "Scratch D1 frontguard-restore-drill restored via wrangler d1 time-travel restore on 2026-10-19, then deleted. Workers Paid is expired, so the documented window is 7 days. Evidence: docs/completion/evidence/T-22-d1-restore.txt",
+      "status": "done"
     },
     {
       "id": "H-02",
@@ -980,12 +1003,12 @@
         "T-23"
       ],
       "gates_launch": true,
-      "verification": "agent records the transcript and writes the runbook around it",
-      "status": "open"
+      "verification": "Scratch worker frontguard-rollback-drill rolled back from v2 to v1 on 2026-10-19, then deleted. frontguard-web was not rolled back. Evidence: docs/completion/evidence/T-23-rollback.txt",
+      "status": "done"
     },
     {
       "id": "H-03",
-      "instruction": "Choose and enable the red-main alert channel",
+      "instruction": "Choose an external channel if GitHub issues are not enough. The agent is shipping a ci-red GitHub issue (A-17). This stays open until a drill issue has been opened.",
       "unblocks": [
         "T-21"
       ],
@@ -1000,8 +1023,8 @@
         "T-27"
       ],
       "gates_launch": true,
-      "verification": "agent implements the copy and re-probes for a truthful 200",
-      "status": "open"
+      "verification": "Live /pricing on frontguard.dev is the copy already shipped on d1f1408: hosted plans are not generally available, OPEN SOURCE $0, no $29. Probed 2026-10-19.",
+      "status": "done"
     },
     {
       "id": "H-05",
@@ -1025,15 +1048,15 @@
     },
     {
       "id": "H-07",
-      "instruction": "Point frontguard.dev (and www) at the frontguard-web Cloudflare Worker \u2014 either by adding a routes/custom_domain block to apps/web/wrangler.jsonc, or by attaching the custom domain to the worker in the Cloudflare dashboard. This replaces the older deployment currently serving the domain.",
+      "instruction": "Point frontguard.dev (and www) at the frontguard-web Cloudflare Worker — either by adding a routes/custom_domain block to apps/web/wrangler.jsonc, or by attaching the custom domain to the worker in the Cloudflare dashboard. This replaces the older deployment currently serving the domain.",
       "unblocks": [
         "T-25",
         "T-14",
         "T-27"
       ],
       "gates_launch": true,
-      "verification": "agent re-probes frontguard.dev for /.deploy-version == deployed SHA and 200 on /privacy, /terms, /status",
-      "status": "open"
+      "verification": "frontguard.dev and www.frontguard.dev custom domains on frontguard-web. /.deploy-version is d1f1408cbf8d57f5130bf999ff63f4d1e3170e67. /privacy /terms /status are 200. docs.frontguard.dev left on Pages.",
+      "status": "done"
     }
   ],
   "assumptions": [
@@ -1119,6 +1142,45 @@
         "drop fetch-depth: 0 from the generated workflow"
       ],
       "reason": "checkout fetch-depth: 0 is the triggering ref's history, not a sibling orphan branch"
+    },
+    {
+      "id": "A-16",
+      "phase": "20261019",
+      "decision": "Restart the baseline freeze; keep DEFINITION.md frozen; do not re-score angles",
+      "rejected": [
+        "continue with no freeze",
+        "replace the definition with README three-workflow scope"
+      ],
+      "reason": "281/690 files changed since f67aaa8 (40.7%). R13 forbids lowering the gate."
+    },
+    {
+      "id": "A-17",
+      "phase": "P4",
+      "decision": "Red-main alert is one GitHub issue",
+      "rejected": [
+        "wait for Slack/email",
+        "redden main on purpose"
+      ],
+      "reason": "No new secret, reversible, provable by workflow_dispatch drill"
+    },
+    {
+      "id": "A-18",
+      "phase": "20261019",
+      "decision": "Leave stash d537399 unapplied",
+      "rejected": [
+        "commit the 43-file session upgrade onto the completion branch"
+      ],
+      "reason": "Feature freeze (R6). Stash preserved locally."
+    },
+    {
+      "id": "A-19",
+      "phase": "20261019",
+      "decision": "Attach apex and www as Workers custom domains; leave wrangler routes commented",
+      "rejected": [
+        "uncomment apps/web routes and trigger Deploy Web",
+        "change Namecheap nameservers"
+      ],
+      "reason": "Owner authorized the existing Cloudflare credentials. Nameservers were already Cloudflare. Custom domains persist across script deploys."
     }
   ],
   "research": [],
@@ -1170,6 +1232,12 @@
       "commit": "c5836461411acb11dd60faec517e394017156dcd",
       "completion_pct": 45,
       "gate": "NOT_EVALUATED"
+    },
+    {
+      "run_id": "20261019-restart",
+      "commit": "d1f1408cbf8d57f5130bf999ff63f4d1e3170e67",
+      "completion_pct": 45,
+      "gate": "CONDITIONAL_GO"
     }
   ]
 }

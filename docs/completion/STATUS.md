@@ -3,13 +3,19 @@
 > Driven by `/product-completion`. Working state; rewritten each phase.
 
 ```
-VERDICT: PHASE 1 COMPLETE
-COMPLETION: 35% (baseline 5f0e141)   GATE: not evaluated — Definition of Complete not yet frozen
-CRITICAL FLOWS: 6 total · 1 verified · 3 partial · 0 cut · 2 unreachable
-GAPS: enumerated in Phase 3 · angles scored below
-TASKS: 0/0 · BLOCKED 0 · HUMAN ACTIONS gating launch: TBD (Phase 4)
-NEXT: Phase 2 — deep research (internal archaeology + external verification)
+VERDICT: CONDITIONAL GO (unchanged on 2026-10-19; scores not recomputed)
+COMPLETION: 45% historical — scores NOT recomputed after 40.7% file drift
+HEAD: d1f1408 on main · this branch adds the alert fix, not a new web deploy
+GATE: canonical frontguard.dev and www serve worker SHA d1f1408.
+      /privacy /terms /status 200. /pricing has no $29.
+      Scratch D1 restore and scratch wrangler rollback are done and deleted.
+NEXT: P4/T-21. Merge this PR after CI is green, then
+      gh workflow run "CI failure alert" --ref main -f drill=true.
+      H-03 stays open until that Actions run fires. H-05 does not gate.
 ```
+
+The Phase 0 and Phase 1 sections below are the 2026-09-01 record. They are not
+the current freeze. Current probes: `evidence/S1-20261019-baseline.md`.
 
 ---
 

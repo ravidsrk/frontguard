@@ -4,6 +4,11 @@ Things only Ravindra can do (R15). The agent does not deploy to production, writ
 data stores, rotate live keys, change DNS, touch billing, submit to app stores, or file with a
 regulator. Staging and sandbox are the agent's.
 
+**2026-10-19.** The owner told this session to perform the Namecheap and Cloudflare
+steps itself with the credentials already in the environment. That instruction
+covers H-01, H-02, and H-07 below. It does not authorise deploying `cloud-api`
+or rolling back `frontguard-web` outside an incident.
+
 Each entry states the exact instruction, what it unblocks, whether it gates launch, and the
 verification the agent runs once it is confirmed done.
 
@@ -25,6 +30,13 @@ scratch D1 target using the reported window and captures the transcript as gate 
 procedure against a scratch database rather than a live one. That still satisfies the gate: the
 gate asks for a restore to have been performed, not for production to be live.
 
+**Status: done (2026-10-19).** Workers Paid on this account is expired, so the
+documented Time Travel window is 7 days (Workers Free). Time Travel is on for a
+`version: production` database; there is no switch to flip. Scratch database
+`frontguard-restore-drill` was created, a row was deleted, `wrangler d1 time-travel restore`
+brought the row back, and the database was deleted. `wrangler d1 list` is empty
+again. Transcript: `evidence/T-22-d1-restore.txt`. No production D1 was touched.
+
 ---
 
 ## H-02 — Rehearse a Workers rollback · **GATES LAUNCH**
@@ -38,6 +50,11 @@ versions and is code-only (research B1 R-10) — the capability exists and is si
 
 **Unblocks:** T-23. **Verification:** the agent records the transcript as gate evidence and writes
 the rollback runbook (T-24) around the exact commands you ran.
+
+**Status: done (2026-10-19).** Scratch Worker `frontguard-rollback-drill` was
+deployed twice (`rollback-drill-v2` was live), `wrangler rollback` restored
+`rollback-drill-v1`, and the Worker was deleted. `frontguard-web` was not rolled
+back. Transcript: `evidence/T-23-rollback.txt`. Runbook: `docs/incident.md`.
 
 ---
 
@@ -54,6 +71,14 @@ workflow but cannot own the delivery destination.
 
 **Unblocks:** T-21. **Verification:** the agent deliberately reddens a throwaway branch build,
 confirms the alert fires, and captures the proof.
+
+**2026-10-19 update (A-17).** No webhook or email destination was available. The
+agent is implementing the alert as one GitHub issue (`main CI is red`) so the
+path can be proved without reddening `main` and without a new secret. This
+action stays **open** until the workflow has fired on `main`. Script drill
+issue #279 is already closed. A throwaway red build was rejected because it
+would break `main`. `workflow_dispatch` cannot be registered until the
+workflow file is on the default branch.
 
 ---
 
@@ -72,6 +97,12 @@ cannot pass while `/pricing` sells a \$29 trial. T-30 promoted this from non-gat
 
 **Verification:** the agent implements the chosen copy and re-probes the live
 route for a 200 with truthful content.
+
+**Status: done (2026-10-19).** The decision is the copy already on `d1f1408`:
+the CLI is MIT and `$0`, and hosted plans are not generally available. The
+waitlist is for design-partner conversations, not purchase. Attaching the
+domain made that the canonical page. Live `/pricing` is HTTP 200, contains that
+sentence, and does not contain `$29`. Probe: `evidence/T-25-canonical-probe.txt`.
 
 ---
 
@@ -117,19 +148,27 @@ them. DNS/routing is owner-only under R15.
 **Verification once confirmed:** re-probe `frontguard.dev` for `/.deploy-version` equal to the
 deployed SHA and HTTP 200 on `/privacy`, `/terms`, `/status`.
 
+**Status: done (2026-10-19).** Both `frontguard.dev` and `www.frontguard.dev` are
+Workers custom domains on `frontguard-web`. `/.deploy-version` is
+`d1f1408cbf8d57f5130bf999ff63f4d1e3170e67`. `/privacy`, `/terms`, and `/status`
+are HTTP 200. `docs.frontguard.dev` was left on Pages. Nameservers were already
+Cloudflare, so Namecheap was not changed (API error `1011102` for the
+email-derived usernames). Detail: `evidence/H-07-domain-attach.md`.
+
 ---
 
 ## Summary
 
 | id | gates launch | unblocks | status |
 |---|---|---|---|
-| H-01 D1 Time Travel retention | **yes** | T-22 | open |
-| H-02 Workers rollback rehearsal | **yes** | T-23 | open |
+| H-01 D1 Time Travel retention | **yes** | T-22 | **done** |
+| H-02 Workers rollback rehearsal | **yes** | T-23 | **done** |
 | H-03 red-`main` alert channel | **yes** | T-21 | open |
-| H-04 pricing story decision | **yes** | T-27 | open |
+| H-04 pricing story decision | **yes** | T-27 | **done** |
 | H-05 npm trusted publishing | no | — | open |
 | H-06 authorise apps/web deploy | no (done) | — | **done** |
-| H-07 attach frontguard.dev to worker | **yes** | T-14, T-25, T-27 | open |
+| H-07 attach frontguard.dev to worker | **yes** | T-14, T-25, T-27 | **done** |
 
-**Five Human Actions gate launch** (H-01, H-02, H-03, H-04, H-07). None block remaining
-agent-side plan work. Expected terminal verdict: **CONDITIONAL GO**.
+**One Human Action still gates launch:** H-03. The script drill (issue #279)
+has fired. The Actions `workflow_dispatch` drill has not, because the workflow
+file is not on `main` yet. H-05 does not gate. Verdict stays **CONDITIONAL GO**.

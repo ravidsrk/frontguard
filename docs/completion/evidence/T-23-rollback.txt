@@ -1,0 +1,42 @@
+# T-23 — scratch wrangler rollback — 2026-10-19
+
+Target was a new Worker, `frontguard-rollback-drill`, not `frontguard-web`.
+Wrangler 4.151.1. Config lived in `/tmp/fg-rollback-drill` (`workers_dev: true`).
+`frontguard-web` was not rolled back. After the drill, the scratch Worker was
+deleted and its workers.dev URL returned HTTP 404. The production worker still
+served SHA `d1f1408cbf8d57f5130bf999ff63f4d1e3170e67`.
+
+## Deploy v1
+
+    wrangler deploy
+    # Current Version ID: 55658cf9-5be6-4f69-81a2-79286a65ed08
+
+`curl https://frontguard-rollback-drill.ravidsrk.workers.dev/` → HTTP 200
+body `rollback-drill-v1`.
+
+## Deploy v2
+
+    wrangler deploy
+    # Current Version ID: efe7dfdb-f50e-49ac-8355-fc917bb5ed73
+
+Same URL → HTTP 200 body `rollback-drill-v2`.
+
+## Rollback
+
+    wrangler rollback --name frontguard-rollback-drill \
+      --message "scratch drill restore previous version" --yes
+
+Wrangler selected version `55658cf9-5be6-4f69-81a2-79286a65ed08` (the previous
+version) and deployed it to 100% of traffic.
+
+    Current Version ID: 55658cf9-5be6-4f69-81a2-79286a65ed08
+
+Same URL → HTTP 200 body `rollback-drill-v1`.
+
+## Cleanup
+
+    wrangler delete frontguard-rollback-drill --force
+    # Successfully deleted frontguard-rollback-drill
+
+The bound-resources warning from wrangler applies to a real rollback: D1, KV,
+and R2 are not rolled back with the script.

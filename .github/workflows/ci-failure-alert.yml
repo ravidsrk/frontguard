@@ -1,0 +1,63 @@
+name: CI failure alert
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    # Pull-request CI also completes this workflow. Those runs would take a
+    # concurrency slot and then skip. GitHub cancels an older pending run in
+    # the same group even when cancel-in-progress is false, so a skipped PR
+    # run can drop a queued main failure. Only main CI may enqueue an alert.
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      drill:
+        description: Open a drill issue and close it, to prove the alert path
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+# Queue alert jobs. Do not cancel one that is already filing or closing an issue.
+# A drill uses its own group so it cannot replace a pending main alert.
+# The script re-reads CI for the main tip, so a newer main run that replaces
+# a pending one still records that tip.
+concurrency:
+  group: ${{ github.event_name == 'workflow_dispatch' && 'ci-failure-alert-drill' || 'ci-failure-alert' }}
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # workflow_run must execute the script on the default branch, not the
+          # SHA of a failing pull request. A dispatch runs the selected ref.
+          ref: ${{ github.event_name == 'workflow_run' && format('refs/heads/{0}', github.event.repository.default_branch) || github.sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Read the current main tip
+        id: tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${{ github.event.repository.default_branch }}" --jq .sha)" >> "$GITHUB_OUTPUT"
+
+      - name: File, update, or resolve the CI alert issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+          DRILL: ${{ github.event.inputs.drill || 'false' }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          MAIN_TIP: ${{ steps.tip.outputs.sha }}
+        run: node scripts/ci-failure-alert.mjs

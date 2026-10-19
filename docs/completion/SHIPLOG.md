@@ -493,3 +493,127 @@ Evidence: `docs/completion/evidence/T-30-launch-gate.md`.
 
 **RESUME POINTER: `CONDITIONAL_GO`** — remaining launch-gating Human Actions:
 H-01, H-02, H-03, H-04, H-07. No further agent-side plan task is unblocked.
+
+---
+
+### RUN 20261019 — RESTART THRESHOLD MET (R4)
+
+**Mode:** drive. Agentic, write access.
+**Toolchain:** `git` 2.43.0 · `node` v22.23.3 · `npm` 10.9.9 · `gh` 2.102.0.
+`greptile` and `coderabbit` are not installed. R11 for this run is `review: manual`.
+`pnpm` 10.34.7 is present and unused (A-01).
+
+**Ancestor check:** `5f0e141` and `f67aaa8` are ancestors of `origin/main` `d1f1408`.
+Files changed since `f67aaa8`: **281 / 690 = 40.7%**. Restart threshold crossed.
+Logged as **A-16**. The frozen definition was not lowered and was not replaced.
+
+**What was re-checked, and what was not.** Live site, worker, CI, and Deploy Web
+were probed (`evidence/S1-20261019-baseline.md`). CI on `d1f1408` is green
+(run 39032446079). Deploy Web failed because `frontguard.dev` still does not
+serve the worker (run 39032446080). The 17 angle scores were **not** recomputed.
+No score was raised.
+
+**Observed already done in tree `d1f1408`, not by this commit:**
+
+- T-14 / G-19 — `apps/web` sends CSP, HSTS, and `X-Frame-Options`. Confirmed on
+  the worker. The canonical host still lacks them (H-07).
+- T-27 code — worker `/pricing` no longer sells a $29 trial. Canonical
+  `frontguard.dev/pricing` still does. Gate item 8 remains failed.
+
+**Cloudflare:** token cannot list accounts. T-22 and T-23 were not executed.
+H-01, H-02, H-07 stay open.
+
+**Local stash preserved, not applied:** `d537399` (43 files). Feature work from
+the previous session. Left out of this branch (A-18).
+
+**RESUME POINTER: `P4/T-21`**
+
+### P4 / T-21 — RED-MAIN ALERT · IN FLIGHT
+
+Branch: `completion/p4-ci-failure-alert`. Channel decision **A-17**: one GitHub
+issue, not Slack and not a deliberate red `main`.
+
+- Failed push to `main` opens or comments on `main CI is red` (`ci-red`).
+- Green push to `main` closes it.
+- Pull requests and cancelled runs do nothing.
+- `workflow_dispatch` drill opens `DRILL: CI failure alert` and closes it.
+- Operator note: `docs/incident.md`. It does not claim a restore or a rollback.
+
+Review: manual. Decision matrix covered by
+`scripts/test/ci-failure-alert.test.ts` (8 tests). `gh` arguments are an array,
+not a shell string. Workflow permissions are `contents: read` and `issues: write`.
+`pull_request_target` is not used. Label creation tolerates "already exists"
+so the first failure can list issues by label.
+
+**Script drill fired.** `DRILL=true node scripts/ci-failure-alert.mjs` exited 0
+and opened then closed https://github.com/ravidsrk/frontguard/issues/279
+(`state: CLOSED`, reason `COMPLETED`, label `ci-red-drill`). Transcript:
+`evidence/T-21-drill.txt`.
+
+The first drill attempt failed closed: with `FORCE_COLOR` set, `gh --json`
+prints ANSI around `[]` and `JSON.parse` throws. No issue was opened on that
+attempt. `parseGhJson` strips the color codes, and the `gh` child forces color
+off. Covered by a unit test.
+
+GitHub would not register `workflow_dispatch` for this file until it is on
+the default branch (`could not find any workflows named CI failure alert`).
+The Actions trigger itself is therefore not yet executed. H-03 stays open
+until a run of the workflow on `main` has fired. T-21 stays in flight for
+that reason.
+
+**RESUME POINTER: `P4/T-21` — script drill #279 closed. Workflow run on main still required. H-01, H-02, H-07 open. Canonical `/pricing` still sells $29.**
+
+### 2026-10-19 — Cloudflare operations the owner asked this session to run
+
+The owner said the Namecheap and Cloudflare access was already available and
+that this session should do those steps. No production D1 was time-traveled.
+`frontguard-web` was not rolled back. `cloud-api` was not deployed. Stash
+`d537399` was not applied. Angle scores were not recomputed.
+
+- **H-07 done.** Removed proxied CNAMEs to `frontguard.pages.dev` and attached
+  Workers custom domains `frontguard.dev` and `www.frontguard.dev` to
+  `frontguard-web`. `docs.frontguard.dev` still points at
+  `frontguard-docs.pages.dev`. Nameservers were already Cloudflare
+  (`emerson.ns.cloudflare.com`, `venus.ns.cloudflare.com`). Namecheap returned
+  `1011102` for the email-derived API users, so the registrar was not changed.
+  `wrangler.jsonc` routes stay commented (A-19).
+- **T-25 / H-04 / T-27 evidenced.** Apex and www `/.deploy-version` are
+  `d1f1408cbf8d57f5130bf999ff63f4d1e3170e67`. `/privacy`, `/terms`, `/status`
+  are HTTP 200. `/pricing` says hosted plans are not generally available and
+  does not contain `$29`. The pricing copy was already on `d1f1408`; the
+  cutover is what made it canonical. Probe:
+  `evidence/T-25-canonical-probe.txt`.
+- **H-01 / T-22 done.** Workers Paid is expired, so the documented Time Travel
+  window is 7 days. Scratch database `frontguard-restore-drill`
+  (`278ab0a2-0a20-4921-b5da-48601d343b27`) was restored with
+  `wrangler d1 time-travel restore` and then deleted. `wrangler d1 list` is
+  empty. Transcript: `evidence/T-22-d1-restore.txt`.
+- **H-02 / T-23 done.** Scratch Worker `frontguard-rollback-drill` went v1 →
+  v2 → `wrangler rollback` → v1, then was deleted. Production SHA unchanged.
+  Transcript: `evidence/T-23-rollback.txt`.
+- **T-24.** `docs/incident.md` now has the rollback command, the D1 restore
+  command, and the credential inventory. It does not claim the Actions alert
+  drill has fired.
+
+**Still open:** H-03 / T-21. Greptile's two P1s are fixed on this branch
+(`3c1ff63`) and unit-tested (14 tests). They are not on `main`. After CI is
+green, merge with a merge commit, then
+`gh workflow run "CI failure alert" --ref main -f drill=true`.
+
+**RESUME POINTER: `P4/T-21` — domain, D1 restore, and scratch rollback are done. Actions drill still waits on this branch landing on main.**
+
+Greptile reviewed `1496862`. Pending runs in one concurrency group replace each
+other even with `cancel-in-progress: false`, so a pull-request completion could
+drop a queued main failure. The alert workflow now listens only to CI on
+`main`, puts drills in their own group, and re-reads the tip's completed push
+CI before it opens or closes (`902991a`, 20 tests). The rollback note in
+`e9a34c8` says the next Deploy Web run deploys before its SHA check and can
+replace the restored version.
+
+The branch ref moved to `902991a`, but pull request #278 stayed on `e9a34c8`
+and Actions did not start for the fix. Review of that diff: manual (no local
+`greptile` or `coderabbit`). Correctness: a pending main failure is no longer
+dropped by a pull-request completion, and the surviving run follows the tip's
+own CI. Security: permissions add `actions: read` only; checkout stays on the
+default branch for `workflow_run`. Tests cover the tip lookup. The next commit
+exists so GitHub attaches that fix to the pull request.
