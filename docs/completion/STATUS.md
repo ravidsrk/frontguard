@@ -3,13 +3,15 @@
 > Driven by `/product-completion`. Working state; rewritten each phase.
 
 ```
-VERDICT: CONDITIONAL GO (unchanged on 2026-10-19)
+VERDICT: CONDITIONAL GO (unchanged on 2026-10-19; scores not recomputed)
 COMPLETION: 45% historical — scores NOT recomputed after 40.7% file drift
-HEAD: d1f1408 · CI green (run 39032446079) · Deploy Web failed (run 39032446080)
-GATE: still blocked. Canonical frontguard.dev is not the deployed worker.
-NEXT: P4/T-21 alert is in this branch. H-01, H-02, H-07 remain owner actions.
-      H-03 closes only after a drill issue is opened. H-04 remains true of
-      canonical /pricing, which still sells Pro at $29/month.
+HEAD: d1f1408 on main · this branch adds the alert fix, not a new web deploy
+GATE: canonical frontguard.dev and www serve worker SHA d1f1408.
+      /privacy /terms /status 200. /pricing has no $29.
+      Scratch D1 restore and scratch wrangler rollback are done and deleted.
+NEXT: P4/T-21. Merge this PR after CI is green, then
+      gh workflow run "CI failure alert" --ref main -f drill=true.
+      H-03 stays open until that Actions run fires. H-05 does not gate.
 ```
 
 The Phase 0 and Phase 1 sections below are the 2026-09-01 record. They are not

@@ -202,3 +202,18 @@ Playwright, web, and cloud-api edits from the previous session.
 **Rejected:** Committing that diff onto this branch as completion work.
 **Reason:** R6. Those edits add behavior after the definition was frozen. They
 are preserved locally so they are not deleted. They are not part of T-21.
+
+## A-19 — Attach the apex with a Workers custom domain
+
+**Phase:** 2026-10-19 / H-07
+**Decision:** Delete the proxied CNAMEs from `frontguard.dev` and
+`www.frontguard.dev` to `frontguard.pages.dev`, then attach both hostnames as
+custom domains of Worker `frontguard-web`. Leave `docs.frontguard.dev` on
+Pages. Leave the routes in `apps/web/wrangler.jsonc` commented.
+**Rejected:** Uncommenting those routes in this pass. Pointing `www` back at
+Pages. Calling Namecheap to change nameservers.
+**Reason:** The owner told this session to use the existing Cloudflare
+credentials. Nameservers were already Cloudflare. Custom domains persist across
+a script-only deploy. Editing `apps/web/**` would start Deploy Web, and the CI
+token may not be allowed to edit zone routes. The Namecheap API user is not
+the email address (error `1011102`), and a registrar change was unnecessary.

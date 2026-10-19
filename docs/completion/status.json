@@ -16,7 +16,7 @@
   "completion_pct": 45,
   "gate": {
     "status": "CONDITIONAL_GO",
-    "reason": "CI is green on d1f1408. Canonical frontguard.dev is still a different deployment: /pricing sells $29, /privacy /terms /status 404. H-01, H-02, H-07 open. T-21 alert is in progress pending a drill issue. Evidence: docs/completion/evidence/S1-20261019-baseline.md"
+    "reason": "Canonical frontguard.dev and www serve worker SHA d1f1408: /privacy /terms /status 200, /pricing has no $29. Scratch D1 time-travel restore and scratch wrangler rollback were performed and the scratch resources were deleted. Still open: T-21 Actions drill is not on main (script drill issue 279 is closed). H-05 does not gate. Evidence: docs/completion/evidence/T-25-canonical-probe.txt"
   },
   "angles": [
     {
@@ -787,7 +787,7 @@
       "owner": "agent",
       "status": "in_progress",
       "branch": "completion/p4-ci-failure-alert",
-      "pr": null,
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
       "commit": null,
       "evidence": [
         "docs/incident.md",
@@ -795,7 +795,7 @@
         "docs/completion/evidence/T-21-drill.txt"
       ],
       "review": "manual",
-      "attempts": 1,
+      "attempts": 2,
       "block_signature": null
     },
     {
@@ -807,13 +807,16 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
+      "status": "done",
+      "branch": "completion/p4-ci-failure-alert",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
       "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "evidence": [
+        "docs/completion/evidence/T-22-d1-restore.txt",
+        "docs/incident.md"
+      ],
+      "review": "manual",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -825,13 +828,16 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
+      "status": "done",
+      "branch": "completion/p4-ci-failure-alert",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
       "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "evidence": [
+        "docs/completion/evidence/T-23-rollback.txt",
+        "docs/incident.md"
+      ],
+      "review": "manual",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -843,13 +849,17 @@
       "size": "M",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
+      "status": "done",
+      "branch": "completion/p4-ci-failure-alert",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
       "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "evidence": [
+        "docs/incident.md",
+        "docs/completion/evidence/T-22-d1-restore.txt",
+        "docs/completion/evidence/T-23-rollback.txt"
+      ],
+      "review": "manual",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -861,14 +871,17 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "blocked",
-      "branch": null,
-      "pr": null,
-      "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
-      "block_signature": "frontguard.dev is not routed to the frontguard-web worker; a successful deploy does not change the canonical domain. See H-07."
+      "status": "done",
+      "branch": "completion/p4-ci-failure-alert",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
+      "commit": "d1f1408cbf8d57f5130bf999ff63f4d1e3170e67",
+      "evidence": [
+        "docs/completion/evidence/T-25-canonical-probe.txt",
+        "docs/completion/evidence/H-07-domain-attach.md"
+      ],
+      "review": "manual",
+      "attempts": 1,
+      "block_signature": null
     },
     {
       "id": "T-26",
@@ -902,13 +915,16 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "todo",
-      "branch": null,
-      "pr": null,
-      "commit": null,
-      "evidence": [],
-      "review": null,
-      "attempts": 0,
+      "status": "done",
+      "branch": "completion/p4-ci-failure-alert",
+      "pr": "https://github.com/ravidsrk/frontguard/pull/278",
+      "commit": "d1f1408cbf8d57f5130bf999ff63f4d1e3170e67",
+      "evidence": [
+        "docs/completion/evidence/T-25-canonical-probe.txt",
+        "apps/web/src/routes/pricing.tsx"
+      ],
+      "review": "manual",
+      "attempts": 1,
       "block_signature": null
     },
     {
@@ -977,8 +993,8 @@
         "T-22"
       ],
       "gates_launch": true,
-      "verification": "agent performs a restore into a scratch target and captures the transcript",
-      "status": "open"
+      "verification": "Scratch D1 frontguard-restore-drill restored via wrangler d1 time-travel restore on 2026-10-19, then deleted. Workers Paid is expired, so the documented window is 7 days. Evidence: docs/completion/evidence/T-22-d1-restore.txt",
+      "status": "done"
     },
     {
       "id": "H-02",
@@ -987,8 +1003,8 @@
         "T-23"
       ],
       "gates_launch": true,
-      "verification": "agent records the transcript and writes the runbook around it",
-      "status": "open"
+      "verification": "Scratch worker frontguard-rollback-drill rolled back from v2 to v1 on 2026-10-19, then deleted. frontguard-web was not rolled back. Evidence: docs/completion/evidence/T-23-rollback.txt",
+      "status": "done"
     },
     {
       "id": "H-03",
@@ -1007,8 +1023,8 @@
         "T-27"
       ],
       "gates_launch": true,
-      "verification": "agent implements the copy and re-probes for a truthful 200",
-      "status": "open"
+      "verification": "Live /pricing on frontguard.dev is the copy already shipped on d1f1408: hosted plans are not generally available, OPEN SOURCE $0, no $29. Probed 2026-10-19.",
+      "status": "done"
     },
     {
       "id": "H-05",
@@ -1039,8 +1055,8 @@
         "T-27"
       ],
       "gates_launch": true,
-      "verification": "agent re-probes frontguard.dev for /.deploy-version == deployed SHA and 200 on /privacy, /terms, /status",
-      "status": "open"
+      "verification": "frontguard.dev and www.frontguard.dev custom domains on frontguard-web. /.deploy-version is d1f1408cbf8d57f5130bf999ff63f4d1e3170e67. /privacy /terms /status are 200. docs.frontguard.dev left on Pages.",
+      "status": "done"
     }
   ],
   "assumptions": [
@@ -1155,6 +1171,16 @@
         "commit the 43-file session upgrade onto the completion branch"
       ],
       "reason": "Feature freeze (R6). Stash preserved locally."
+    },
+    {
+      "id": "A-19",
+      "phase": "20261019",
+      "decision": "Attach apex and www as Workers custom domains; leave wrangler routes commented",
+      "rejected": [
+        "uncomment apps/web routes and trigger Deploy Web",
+        "change Namecheap nameservers"
+      ],
+      "reason": "Owner authorized the existing Cloudflare credentials. Nameservers were already Cloudflare. Custom domains persist across script deploys."
     }
   ],
   "research": [],

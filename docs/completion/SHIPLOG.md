@@ -562,3 +562,42 @@ until a run of the workflow on `main` has fired. T-21 stays in flight for
 that reason.
 
 **RESUME POINTER: `P4/T-21` — script drill #279 closed. Workflow run on main still required. H-01, H-02, H-07 open. Canonical `/pricing` still sells $29.**
+
+### 2026-10-19 — Cloudflare operations the owner asked this session to run
+
+The owner said the Namecheap and Cloudflare access was already available and
+that this session should do those steps. No production D1 was time-traveled.
+`frontguard-web` was not rolled back. `cloud-api` was not deployed. Stash
+`d537399` was not applied. Angle scores were not recomputed.
+
+- **H-07 done.** Removed proxied CNAMEs to `frontguard.pages.dev` and attached
+  Workers custom domains `frontguard.dev` and `www.frontguard.dev` to
+  `frontguard-web`. `docs.frontguard.dev` still points at
+  `frontguard-docs.pages.dev`. Nameservers were already Cloudflare
+  (`emerson.ns.cloudflare.com`, `venus.ns.cloudflare.com`). Namecheap returned
+  `1011102` for the email-derived API users, so the registrar was not changed.
+  `wrangler.jsonc` routes stay commented (A-19).
+- **T-25 / H-04 / T-27 evidenced.** Apex and www `/.deploy-version` are
+  `d1f1408cbf8d57f5130bf999ff63f4d1e3170e67`. `/privacy`, `/terms`, `/status`
+  are HTTP 200. `/pricing` says hosted plans are not generally available and
+  does not contain `$29`. The pricing copy was already on `d1f1408`; the
+  cutover is what made it canonical. Probe:
+  `evidence/T-25-canonical-probe.txt`.
+- **H-01 / T-22 done.** Workers Paid is expired, so the documented Time Travel
+  window is 7 days. Scratch database `frontguard-restore-drill`
+  (`278ab0a2-0a20-4921-b5da-48601d343b27`) was restored with
+  `wrangler d1 time-travel restore` and then deleted. `wrangler d1 list` is
+  empty. Transcript: `evidence/T-22-d1-restore.txt`.
+- **H-02 / T-23 done.** Scratch Worker `frontguard-rollback-drill` went v1 →
+  v2 → `wrangler rollback` → v1, then was deleted. Production SHA unchanged.
+  Transcript: `evidence/T-23-rollback.txt`.
+- **T-24.** `docs/incident.md` now has the rollback command, the D1 restore
+  command, and the credential inventory. It does not claim the Actions alert
+  drill has fired.
+
+**Still open:** H-03 / T-21. Greptile's two P1s are fixed on this branch
+(`3c1ff63`) and unit-tested (14 tests). They are not on `main`. After CI is
+green, merge with a merge commit, then
+`gh workflow run "CI failure alert" --ref main -f drill=true`.
+
+**RESUME POINTER: `P4/T-21` — domain, D1 restore, and scratch rollback are done. Actions drill still waits on this branch landing on main.**

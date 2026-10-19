@@ -32,22 +32,81 @@ The drill opens `DRILL: CI failure alert` (label `ci-red-drill`) and closes it.
 2. A green CI run on `main` closes the issue. If it does not, the alert workflow
    itself failed. Re-run that workflow from the Actions tab.
 
-## What this note does not yet prove
+## Canonical site
 
-These launch-gate items are still owner actions. Do not treat them as done.
+`frontguard.dev` and `www.frontguard.dev` are Workers custom domains on
+`frontguard-web`. As of 2026-10-19 they serve the same SHA as
+`https://frontguard-web.ravidsrk.workers.dev/.deploy-version`.
+`docs.frontguard.dev` stays on Pages (`frontguard-docs.pages.dev`).
 
-- **Canonical site.** `https://frontguard-web.ravidsrk.workers.dev` serves the
-  current worker, including `/privacy`, `/terms`, and `/status`. `https://frontguard.dev`
-  is a different deployment. Attaching the domain is Human Action H-07. Do not
-  change DNS from an unattended run.
-- **Worker rollback.** `wrangler rollback` has not been rehearsed here. The
-  Cloudflare token available to the 2026-10-19 completion run could not list
-  accounts. Human Action H-02.
-- **D1 restore.** No scratch restore was performed. Human Action H-01.
-  `packages/cloud-api/wrangler.toml` still has `database_id = "REPLACE_WITH_D1_DATABASE_ID"`.
-  Do not deploy that worker to attach `api.frontguard.dev`.
+The routes in `apps/web/wrangler.jsonc` stay commented. The custom domains are
+attached on the account and survive a script-only deploy. Do not point either
+host back at `frontguard.pages.dev`.
 
-## Ownership
+## Roll back the web worker
 
-One maintainer. GitHub: `ravidsrk`. Registry and Cloudflare credentials live
-outside this repository. There is no second operator on record.
+Rehearsed on 2026-10-19 against a scratch Worker named
+`frontguard-rollback-drill`, then deleted. Transcript:
+`docs/completion/evidence/T-23-rollback.txt`. The rehearsal did not touch
+`frontguard-web`.
+
+From a checkout that contains `apps/web/wrangler.jsonc`, with the account id
+set and Wrangler authenticated as the account (global key plus email, or a
+token that can edit this Worker):
+
+```bash
+cd apps/web
+wrangler rollback --name frontguard-web --message "incident: restore previous web version"
+```
+
+Wrangler prints the current version and the previous version and asks before
+it shifts traffic. Confirm the version id is the one you want. Rollback does
+not restore D1, KV, or R2.
+
+Check `https://frontguard.dev/.deploy-version` afterwards. Deploy Web's probe
+expects that body to equal the SHA it just deployed, so a rollback makes the
+next unrelated web deploy fail that probe until the worker is deployed forward
+again.
+
+## Restore a D1 database
+
+Rehearsed on 2026-10-19 against scratch database `frontguard-restore-drill`
+(created, restored, deleted). Transcript:
+`docs/completion/evidence/T-22-d1-restore.txt`. There is no production D1.
+`packages/cloud-api/wrangler.toml` still has
+`database_id = "REPLACE_WITH_D1_DATABASE_ID"`. Do not deploy `cloud-api`, and
+do not attach `api.frontguard.dev`, until that id is a real database you mean
+to run.
+
+Time Travel is already on for a `version: production` database. This account's
+Workers Paid subscription is expired, so the documented window is 7 days
+(Workers Free). Workers Paid would be 30 days.
+
+```bash
+wrangler d1 time-travel info YOUR_DATABASE --timestamp "2026-10-19T09:00:00Z"
+wrangler d1 time-travel restore YOUR_DATABASE --bookmark BOOKMARK_FROM_INFO
+```
+
+Restore overwrites that database in place. The command prints
+`previous_bookmark`. A second restore to that bookmark undoes the first.
+`wrangler d1 execute --json` in Wrangler 4.151 did not print a bookmark; use
+`wrangler d1 time-travel info` or the D1 time-travel bookmark API.
+
+## Credentials
+
+One maintainer (`ravidsrk`). Nothing in this repository is a live secret.
+
+| Use | Where it lives |
+|---|---|
+| GitHub Deploy Web | repo secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` |
+| Workers and D1 from a shell | `CLOUDFLARE_EMAIL` + `CLOUDFLARE_GLOBAL_API_KEY`, plus `CLOUDFLARE_ACCOUNT_ID`. Unset `CLOUDFLARE_API_TOKEN`. Wrangler treats `CLOUDFLARE_API_KEY` as a global key, and the zone token does not have that shape. |
+| Zone DNS reads | `CLOUDFLARE_API_KEY` as a bearer token. It can list this zone and cannot manage Workers. |
+| Registrar | Nameservers are already `emerson.ns.cloudflare.com` and `venus.ns.cloudflare.com`. The Namecheap API user is not the email address (error `1011102`). A registrar call is not required to move this site. |
+| npm | long-lived `NPM_TOKEN` (H-05, not a launch gate) |
+
+## What is still open
+
+The Actions drill for this alert (`gh workflow run "CI failure alert" --ref main -f drill=true`)
+cannot be registered until this workflow file is on `main`. A script-level drill
+already opened and closed issue #279. H-03 stays open until the Actions run
+itself fires.

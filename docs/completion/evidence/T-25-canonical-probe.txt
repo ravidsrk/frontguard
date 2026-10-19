@@ -1,0 +1,36 @@
+# Canonical probe — 2026-10-19
+
+User-Agent: Mozilla/5.0 (compatible; FrontguardProbe/1.0)
+Deployed worker SHA expected: d1f1408cbf8d57f5130bf999ff63f4d1e3170e67
+
+Both hosts returned that SHA on `/.deploy-version` and the worker security
+headers (HSTS preload, CSP, X-Frame-Options DENY, nosniff, Referrer-Policy,
+Permissions-Policy).
+
+| URL | HTTP | notes |
+|---|---|---|
+| https://frontguard.dev/ | 200 | worker home (IBM Plex) |
+| https://frontguard.dev/pricing | 200 | no `$29`; "Hosted plans are not generally available" |
+| https://frontguard.dev/privacy | 200 | |
+| https://frontguard.dev/terms | 200 | |
+| https://frontguard.dev/status | 200 | |
+| https://frontguard.dev/.deploy-version | 200 | `d1f1408cbf8d57f5130bf999ff63f4d1e3170e67` |
+| https://www.frontguard.dev/ | 200 | same worker home |
+| https://www.frontguard.dev/pricing | 200 | same copy, no `$29` |
+| https://www.frontguard.dev/privacy | 200 | |
+| https://www.frontguard.dev/terms | 200 | |
+| https://www.frontguard.dev/status | 200 | |
+| https://www.frontguard.dev/.deploy-version | 200 | same SHA |
+| https://frontguard-web.ravidsrk.workers.dev/.deploy-version | 200 | same SHA |
+| https://docs.frontguard.dev/ | 200 | left on Pages; not moved |
+
+Pricing text on the apex (tags stripped):
+
+> Hosted plans are not generally available; the waitlist is for design-partner conversations, not purchase. OPEN SOURCE $0 / forever
+
+`www` returned a static 404 for a few seconds immediately after the custom
+domain attach, then served the worker. The table above is the settled probe.
+
+Python urllib with no browser user agent received HTTP 403 from Cloudflare on
+the apex. That 403 is bot handling, not a missing route. The curl probe with
+the user agent above is the one that counts.
