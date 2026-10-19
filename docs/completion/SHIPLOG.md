@@ -636,3 +636,26 @@ Deploy Web has not completed since `frontguard.dev` was attached to the worker.
 H-05 does not gate. Scores were not recomputed.
 
 **RESUME POINTER: `P4/T-21-ci` — alert drill is done. Wait for CI on e0676af, then a Deploy Web run that completes against the canonical domain.**
+
+### 2026-10-19 — Launch gate closed
+
+PR #281 merged as `fb6f336`. CI on that commit is green (run 39229749365:
+lint, build, test 22, test 24, e2e, audit, docs-links).
+
+Deploy Web was dispatched on `e0676af` (no `apps/web` diff since the previous
+worker). Run 39229657033 succeeded. The first canonical probe still saw
+`d1f1408`; the next saw `e0676af`. `/privacy`, `/terms`, and `/status` returned
+HTTP 200 inside that run. A live re-probe after the run matches. `fb6f336`
+does not change `apps/web`, so Deploy Web did not run again and was not
+cancelled.
+
+The green `main` alert run 39229564474 resolved with `did: none`. No `ci-red`
+issue was open.
+
+**Verdict: GO** on `DEFINITION.md` §2. Evidence:
+`evidence/T-31-launch-gate-20261019.md`. Angle scores stay at the frozen 45%
+(A-16). They were not raised. H-05 stays open and does not gate. No new issue
+was filed: the only open issue is #157 (weekly npm audit), and H-05 is already
+the human-action record for trusted publishing. `cloud-api` was not deployed.
+
+**RESUME POINTER: `SIGNED_OFF`**

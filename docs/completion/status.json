@@ -10,13 +10,13 @@
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "e0676af8aaf20109d81ce4594fcd40c795744317",
-  "resume_pointer": "P4/T-21-ci",
+  "current_commit": "fb6f3367ce962bef68264b64996a6056b8844760",
+  "resume_pointer": "SIGNED_OFF",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 45,
   "gate": {
-    "status": "CONDITIONAL_GO",
-    "reason": "Actions drill on main opened and closed issue 280 (run 39229147720). Canonical frontguard.dev serves the worker. Scratch D1 restore and scratch rollback were performed and deleted. H-05 does not gate. Still open: CI on merge commit e0676af was in progress, and Deploy Web has not completed since the domain cutover. Evidence: docs/completion/evidence/T-21-actions-drill.txt"
+    "status": "GO",
+    "reason": "DEFINITION.md section 2 is met on fb6f336. CI run 39229749365 is green. Deploy Web run 39229657033 succeeded and the canonical SHA probe passed. Alert drill issue 280 fired. H-05 does not gate. Angle scores were not recomputed (A-16). Evidence: docs/completion/evidence/T-31-launch-gate-20261019.md"
   },
   "angles": [
     {
@@ -1239,6 +1239,12 @@
       "commit": "d1f1408cbf8d57f5130bf999ff63f4d1e3170e67",
       "completion_pct": 45,
       "gate": "CONDITIONAL_GO"
+    },
+    {
+      "run_id": "20261019-restart",
+      "commit": "fb6f3367ce962bef68264b64996a6056b8844760",
+      "completion_pct": 45,
+      "gate": "GO"
     }
   ]
 }
