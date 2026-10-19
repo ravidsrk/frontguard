@@ -1,239 +1,150 @@
 # Frontguard Roadmap
 
-*Last updated: 2026-06-29. Anchored to [`docs/research.md`](./research.md) (mid-2026 competitive landscape, 16 competitors fetched live) and [`docs/product-completion-plan.md`](./product-completion-plan.md) (the frozen v0.2 boundary).*
+*Last updated: 2026-10-19. Anchored to [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) (frozen local-and-CI launch contract), [`docs/completion/SHIPLOG.md`](./completion/SHIPLOG.md) (launch gate **GO** on `2026-10-19`), and the post-launch research & issue backlog tracked in [#283](https://github.com/ravidsrk/frontguard/issues/283) ([#284](https://github.com/ravidsrk/frontguard/issues/284)–[#299](https://github.com/ravidsrk/frontguard/issues/299)).*
 
-> **Status note (2026-06-29):** **v0.2.2 is on npm.** Production-close (49/49 findings code-closed, PRs #94–#108), TanStack web adoption (PRs #63–#69), and agent-ready surfaces (PRs #144–#151) are merged to `main`. Engineering gates: full monorepo build + test green; `npm audit --omit=dev --audit-level=high` → 0 critical/high. **Remaining work is OPS/distribution** — DNS, `wrangler deploy`, Docker Hub publish, git tag `v0`, marketplace listings. See [`docs/production-close-readiness.md`](./production-close-readiness.md) and [`docs/launch-readiness.md`](./launch-readiness.md).
-
----
-
-# The Strategic Thesis
-
-The visual regression testing market (~$1B, 9.5% CAGR) has a **retention crisis, not a demand crisis.** Teams try visual testing, get burned by false positives from cross-OS rendering differences, blind-approve everything, lose trust, and abandon the tool within months.
-
-**The gap:** No tool combines CLI-first + AI vision analysis + Playwright-native + self-hostable + affordable. Percy is slow and expensive. Chromatic requires Storybook. Applitools is enterprise-only and opaque. Lost Pixel has no AI and is going stale. Playwright's built-in visual testing is notoriously flaky (428-day debugging battles documented).
-
-**Frontguard's bet:** AI that understands *what changed and whether it matters* beats pixel-perfect comparison. The rendering layer is a commodity (Daytona, Browserbase, etc. commoditize it further every quarter). The moat is the intelligence layer — AI classification, auto-fix generation, and the fix pattern database that compounds with usage.
-
-**The threat clock:** GitHub Copilot could add visual PR review in 12-18 months. Observability platforms (Datadog, Grafana) could bolt on visual monitoring in 12-24 months. We have a window, not infinite runway.
+> **Status note (2026-10-19):** Source is at **v0.2.3** (`0.2.2` published on npm with unreleased changelog entries ahead of that tag). The binding launch gate in [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) is **GO**: `main` is green across `lint`, `build`, `test` (Node 22 & 24), `e2e`, `audit`, and `docs-links`; `frontguard.dev` and `www.frontguard.dev` serve the live `frontguard-web` Worker with `/privacy`, `/terms`, and `/status` returning HTTP 200 and no unbuilt `$29` hosted tier advertised on `/pricing`; D1 Time Travel restore, Worker rollback, and the red-`main` CI failure alert (`#280`) have all been verified with captured evidence.
+>
+> **Supersession of the `2026-06-29` roadmap:** Earlier revisions of this file described `packages/cloud-api`, Stripe billing, and the GitHub App / Slack / Vercel / Netlify integrations as a live, shipped cloud platform and listed `$29/mo Pro` / `$49/mo Monitoring` / `$99/mo Business` pricing. Per [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) §0 and §4, Frontguard's completed scope is an **excellent local-and-CI visual regression CLI**. The cloud service and marketplace integrations exist as **source in this repository** and are **not deployed** (`api.frontguard.dev` does not resolve; hosted plans are not generally available). Deploying `cloud-api` is forbidden until the three hard gates in [#293](https://github.com/ravidsrk/frontguard/issues/293) are closed.
 
 ---
 
-# What's Shipped
+## 1. Strategic Thesis & 2026 Research Grounding
 
-The core engine, the AI moat, the cloud platform, and the integration surface are all built and tested. This is a working product, not a prototype.
+Visual regression testing fails in practice when teams either drown in subpixel rendering noise or hand pass/fail authority to an uncalibrated model that silently waves through real regressions.
 
-## Core engine (v0.1)
+Checked on **2026-10-19** across GitHub projects, arXiv papers, and practitioner posts on X:
 
-✅ **Anti-flake rendering** — Multi-render consensus via `findConsensusScreenshot()` (default `antiFlakeRenders: 3`), combined with SSIM perceptual matching. Solves the #1 reason teams abandon visual testing. Runs in <10 seconds where Percy adds 5+ minutes.
+1. **Deterministic `pixelmatch` stays the only pass/fail gate:**
+   - **GitHub landscape (2026-10-19):** Maintained local options remain Playwright's `toHaveScreenshot` (backed by `pixelmatch`, per-pixel `threshold` default `0.2`), BackstopJS (`6.3.25`, Resemble.js `misMatchThreshold: 0.1%`, seeking maintainer), and `reg-suit` (comparison CLI expecting caller-supplied images and external object storage). `lost-pixel/lost-pixel` was archived on **22 April 2026** when the team joined Figma (last release `v3.22.0` on `2024-11-14`), `storybookjs/test-runner` was archived on **30 September 2026**, and Loki has not released since **August 2024** (`v0.35.1`). Commercial platforms (Argos, Happo, Chromatic, Percy, Applitools) differentiate on hosted multi-user review workflows and object storage; Argos itself uses deterministic `odiff` pixel comparison rather than an AI pass/fail gate and states that self-hosting is not officially supported.
+   - **Academic papers (2025–2026):**
+     - **WUICC-bench** (*Beyond Pixel Diffs*, [`arXiv:2607.01728v1`](https://arxiv.org/abs/2607.01728), July 2026; 9,906 human-verified synthetic single-rule edits on WebSight HTML): naive pixel diffing scores `0.00%` no-change accuracy and `100%` change recall on visible non-meaningful edits, while trained image-difference captioners (SEN `96.27% / 96.16%`, ICT-Net `97.01% / 93.80%`, RSICCformer `85.82% / 95.33%`, RMNet `97.39% / 93.55%`) still miss **3.8%–6.5%** of meaningful single edits and achieve low caption BLEU-4 ($\le 0.2571$). Zero-shot VLMs either fail to suppress noise (Llama-3.2-11B-Vision-Instruct `21.64% / 79.39%`) or miss a third of meaningful regressions (Qwen2-VL-7B-Instruct `99.63% / 65.68%`).
+     - **LLMShot** ([`arXiv:2507.10062v2`](https://arxiv.org/abs/2507.10062), July 2025; 17 forced iOS XCTest failures on Gemma 3 4B/12B): 12B precision is only `66.67%` (F1 `74.42%`), the semantic-diff scalar swings wildly across model sizes (`0.921 ± 0.046` on 4B vs `0.079 ± 0.079` on 12B), and prompt-based ignore rules collapse (`13.79%` and `16.67%` F1 on 4B).
+     - **VisRefiner** ([`arXiv:2602.05998v1`](https://arxiv.org/abs/2602.05998), Feb 2026) is a screenshot-to-code trainer whose self-refinement is non-monotone across models, and **XBIDetective** ([`arXiv:2512.15804v1`](https://arxiv.org/abs/2512.15804), ICSE-SEIP 2026) reaches `79%` accuracy on cross-browser pairs with ongoing dynamic-content false positives.
+   - **Practitioner signals on X (2025-01 to 2026-10-19):** Useful operational warnings center on three rules: (a) pin the browser binary to the Playwright dependency rather than relying on drifting CI runner browsers, (b) do not rely on a single global whole-image ratio (`pixelmatch v8.0.0`, published **6 October 2026**, adds OKLab + HyAB color delta and `windowSize` to separate scattered anti-aliasing noise from localized edits), and (c) never let the AI agent that edited the UI be the sole unconfirmed approver of the new baseline (treat baseline promotion like merge rights).
 
-✅ **AI analysis & classification** — Dual-model analysis (GPT-4o + Anthropic vision). Classifies every diff as regression, intentional change, or content update, with severity scoring, confidence levels, and a `suggestedFix` field. When the accessibility plugin is active, axe-core findings for the page are **fused into the analysis prompt** so the model can correlate a visual change with a known a11y issue. No competitor has this.
-
-✅ **Screenshot diffing** — Dual-engine: pixelmatch for pixel precision + a full SSIM implementation for perceptual matching.
-
-✅ **CLI tool** — `run`, `init`, `update-baselines`, plus the commands below. Comprehensive flags for routes, viewports, thresholds, AI provider, and output formatting.
-
-✅ **GitHub Action** — Composite `action.yml` with automatic preview-URL detection for Vercel and Netlify, JSON output parsing.
-
-✅ **Route discovery** — Filesystem discovery for Next.js (App + Pages Router), Remix, SvelteKit, and Nuxt; live BFS crawl fallback for unknown frameworks.
-
-✅ **Multi-viewport rendering** — Default 375 / 768 / 1440px, fully configurable; every route tested at every viewport.
-
-✅ **Baseline management** — Git orphan-branch storage with worktree reads/writes and concurrent-update detection. Baselines live in version control, not a third-party cloud.
-
-✅ **Figma design compliance** — Figma plugin connects to the Figma API, exports frames as PNGs, and reports pixel deviations between design intent and rendered pages.
-
-## Earn-trust release (v0.2)
-
-✅ **PR thumbnail grid** — PR comments embed before/after/diff thumbnails (`renderImageGrid()` in `report/github-pr.ts`) backed by a 4-backend image-upload layer (`storage/image-upload.ts`): Cloudflare R2, AWS S3, GitHub Actions artifacts, and local filesystem. Configured via `imageUpload` in the config.
-
-✅ **Per-route threshold overrides** — `routes` accepts objects with per-route `threshold`, `ignore`, and `viewport`, resolved by `resolveThreshold()` in the pipeline:
-```typescript
-routes: [
-  { path: '/checkout', threshold: 0.001 },           // strict
-  { path: '/blog/*', threshold: 0.05 },              // lenient
-  { path: '/pricing', ignore: ['.testimonial-carousel'] },
-]
-```
-
-✅ **`frontguard doctor` command** — Environment diagnostics (`cli/doctor.ts`): Node, Playwright/Chromium versions, config validity, and git state, with actionable warnings.
-
-✅ **`frontguard monitor` command** — Live production URL checks with `--once`, `--watch`/`--interval` daemon polling, `--history` inspection, and webhook alerts.
-
-✅ **Comparison content** — `frontguard-vs-percy` and `frontguard-vs-chromatic` guides, plus `migrate-from-backstopjs` and `migrate-from-lost-pixel`. SEO play for "percy/chromatic alternative" search terms.
-
-✅ **Accessibility audits** — axe-core plugin (`plugins/accessibility.ts`) runs in the same render pass; reports WCAG violations (contrast, alt text, target size, focus, heading order) in console, HTML, **and** PR reports; optional `failOnViolation`.
-
-✅ **Performance budgets + visual correlation** — Perf-budgets plugin collects LCP/CLS/TTFB/page-weight/requests and enforces budgets. Budget violations are surfaced on `RunResult.perf` and **correlated inline with the visual diff for the same route** in every reporter ("this page shifted *and* is over its LCP budget"). With `trackRegressions`, it also persists metrics and flags **run-over-run regressions** ("*and* its TTFB is up 35% since last run").
-
-✅ **Third-party script monitoring** — `plugins/third-party-scripts.ts` inventories `<script src>` origins per page, classifies first- vs third-party against `baseUrl`, and reports origins that appeared/disappeared since the previous run (ad networks, analytics SDKs, chat widgets).
-
-✅ **Vercel / Netlify / GitHub-App integrations** — Real, functional integrations under `integrations/`: a Vercel OAuth app with webhook-driven preview runs, a Netlify Build Plugin (`manifest.yml` + `onSuccess` hook), and a GitHub App with signature verification, Check Runs, and installation bootstrapping.
-
-## The moat — AI auto-fix (Phase 3)
-
-✅ **AI fix generation + sandbox verification loop** — `diff/ai-fix.ts` generates minimal CSS patches (overflow, spacing, responsive, z-index, color). With `verifyFixes`, the **local sandbox** applies the patch, re-renders, and re-compares against the baseline (`sandbox/verify-fix.ts` + `sandbox/local.ts`); verified fixes are marked distinctly in reports.
-
-✅ **Fix pattern database** — `storage/fix-patterns.ts`: a `better-sqlite3` store recording accepted/rejected fixes, with `accept-fix` / `reject-fix` / `export-patterns` commands. The pipeline probes the DB before calling the AI, reusing patterns accepted ≥3 times — the compounding data moat.
-
-## Cloud platform (Phase 3–5 foundations)
-
-✅ **Cloud API** — Hono service (`packages/cloud-api`) with run submission, status, reports, baseline approval, usage metering, and a `/health` check.
-
-✅ **Persistent storage** — Cloudflare D1 (SQLite) store for runs/screenshots/monitors/teams/usage; Cloudflare R2 for screenshot blobs; in-memory store for dev/tests.
-
-✅ **Real auth** — GitHub OAuth + hashed API keys, per-key rate limiting.
-
-✅ **Production monitoring scheduler** — Workers Cron trigger (`scheduler.ts`) runs due monitors on cadence, retries once, prunes history per plan, and meters usage.
-
-✅ **Alerting with dedup + snooze** — Slack (incoming webhook), email (Resend), and **PagerDuty** (Events API v2) channels. Fingerprint-based deduplication suppresses repeat alerts for the same regression set; per-monitor snooze suppresses for N hours.
-
-✅ **Billing + teams** — Stripe customer/subscription tracking; multi-tenant teams with roles, invitations, baseline approvals, and an activity feed; per-plan feature gates and limits.
+2. **Frontguard's architectural position:**
+   - **Pass/fail is deterministic:** `pixelmatch` (with deterministic `ssimFallback` override when structural similarity clears `ssimThreshold: 0.98` and no severe local cluster exists) controls exit codes `0 / 1 / 2`.
+   - **AI is advisory and grounded:** Vision models classify diffs after a pixel failure, attribute spatial diff clusters to DOM selectors, and propose CSS fixes that are re-rendered in an isolated sandbox — but model output never silently passes a failing pixel check or overwrites a baseline.
 
 ---
 
-# Genuinely Remaining (in code)
+## 2. What Is Shipped & Verified (`v0.1`–`v0.2.3`)
 
-The code-buildable backlog is essentially empty — the remaining items need external accounts/collectors to *verify*, not to write.
+Everything below ships in the published local-and-CI packages (`@frontguard/cli`, `@frontguard/playwright`, `@frontguard/mcp`, `create-frontguard-plugin`, and `action.yml`) and is covered by the green CI pipeline and launch-gate evidence.
 
-✅ **Daytona sandbox fix verification** — **shipped.** `sandbox/daytona.ts` is a full implementation: it boots a Daytona sandbox via `@daytonaio/sdk`, uploads the AI-generated CSS to a temp file (never interpolated into a shell), runs the renderer, and returns the screenshot, with URL/viewport/browser validation and graceful failure when the SDK or `DAYTONA_API_KEY` is absent. Verifying it end-to-end needs a Daytona account; the code is done.
+### Core CLI & Deterministic Diff Engine (`@frontguard/cli`)
+- ✅ **Pixelmatch gate + perceptual SSIM (`diff/pixel.ts`, `diff/ssim.ts`)** — `compareScreenshot` uses `pixelmatch` as the pass/fail gate with exit codes `0` (pass / warning), `1` (regression / new page), and `2` (tool / config error). Default CLI `threshold` is `0.1` (meaning `10%` of pixels across the image, distinct from Playwright's per-pixel `0.2`), overridable per route (`routes: [{ path, threshold, ignore, viewport }]`). Includes full SSIM, chroma-SSIM, CW-SSIM, `ssimFallback: true` (`ssimThreshold: 0.98`), connected-component 8-neighbor spatial diff clustering, and DOM bounding-box selector attribution.
+- ✅ **Deterministic anti-flake controls (`render/stability.ts`, `docker/`)** — Capture-time `freezeTime`, Mulberry32 `seedRandom`, `blockUrls` network abort guard, `waitForStability` consecutive-frame convergence, `redactSensitive` input masking, and CSS selector / coordinate `ignore` masks. Optional multi-render consensus (`antiFlakeRenders`, default `1` in practice; opt-in `3+` renders via `findConsensusScreenshot()`), plus the pinned `linux/amd64` Docker renderer source (`packages/cli/Dockerfile`). *(Correction to the `2026-06-29` roadmap: `antiFlakeRenders` defaults to `1`, not `3`.)*
+- ✅ **Framework & Storybook discovery (`discovery/`)** — Filesystem route discovery for Next.js (App & Pages Router), Remix, SvelteKit, and Nuxt; Storybook 8 `/index.json` and Storybook 7 `/stories.json` discovery; live BFS crawler fallback; and `smartFilter` changed-file route scoping (with automatic all-routes fallback; note that the README `"12/47 routes affected by changed files"` line is illustrative sample CLI output, not a benchmark measurement).
+- ✅ **Multi-viewport & multi-browser capture (`render/`)** — Default `375 / 768 / 1440` viewports; `chromium` by default with `firefox` and `webkit` supported via `config.browsers`.
+- ✅ **Git orphan-branch baselines (`storage/git-orphan.ts`)** — Stores baseline PNGs and SHA-256 manifest on an isolated `frontguard-baselines` git orphan branch via temporary worktrees so `main` stays free of binary bloat.
+- ✅ **Interactive local HTML workbench & PR reporter (`report/html.ts`, `report/github-pr.ts`)** — Self-contained 4-mode HTML diff inspector (`packages/cli/src/report/html.ts`, 1,403 lines) with Side-by-Side, Swipe Curtain, Onion Skin, Diff Heatmap, spatial cluster table, and keyboard navigation; plus GitHub PR Markdown comments with `renderImageGrid()` thumbnails backed by `imageUpload` (Cloudflare R2, AWS S3, GitHub Actions artifacts, or local disk).
+- ✅ **CLI commands & onboarding (`cli/`)** — `init`, `doctor` (Node, browser, config, and git diagnostics), `run`, `update-baselines`, `monitor` (`--once`, `--watch`/`--interval`, `--history`, webhook alerts), `accept-fix`, `reject-fix`, `export-patterns`, and `plugin`.
+- ✅ **5 built-in plugins & 9 lifecycle hooks (`plugins/`, `create-frontguard-plugin`)**:
+  1. **Accessibility (`plugins/accessibility.ts`)** — `@axe-core/playwright` WCAG audit in the same render pass (`failOnImpact`, findings fused into optional AI analysis prompts).
+  2. **Performance budgets (`plugins/perf-budgets.ts`)** — LCP, CLS, FCP, TTFB, and transfer-size budgets correlated inline with visual diffs and run-over-run regressions (`trackRegressions`).
+  3. **Third-party scripts (`plugins/third-party-scripts.ts`)** — Inventories external `<script src>` origins per route and flags newly added or removed third-party domains.
+  4. **Figma design compliance (`plugins/figma.ts`)** — Compares live rendered routes against exported Figma frames.
+  5. **Production URL monitor (`plugins/monitor.ts`)** — Scheduled or one-shot live URL drift checks with webhook/Slack alerting.
+- ✅ **Optional BYOK AI triage, sandbox fix verification & experimental judge (`diff/ai-classifier.ts`, `diff/ai-fix.ts`, `diff/model-judge.ts`, `sandbox/`, `storage/fix-patterns.ts`)** — Multi-provider BYOK vision analysis (OpenAI, Anthropic, Gemini, custom `baseUrl`), candidate CSS patch generation with local Playwright (`sandbox/local.ts`) or Daytona (`sandbox/daytona.ts`) re-render verification, local SQLite fix-pattern store (`accept-fix` / `reject-fix` / `export-patterns`), and opt-in experimental judge mode (`--mode judge --experimental`).
+- ✅ **Demo & comparison guides (`demo/`, `apps/web/src/lib/docs-content.ts`)** — Committed `demo/frontguard-demo.gif` and `demo/frontguard-demo.svg` assets, plus comparison and migration guides (`frontguard-vs-percy`, `frontguard-vs-chromatic`, `migrate-from-backstopjs`, `migrate-from-lost-pixel`). *(Closes the `2026-06-29` roadmap's demo-recording follow-up.)*
 
-✅ **OpenTelemetry export** — **shipped** (cloud-api `otel/`): run/monitor completions emit OTLP/HTTP metrics to a configurable `OTEL_EXPORTER_OTLP_ENDPOINT` (no-op when unset). Point it at any OTLP collector (Datadog, Grafana, Honeycomb) to make Frontguard the visual module in your observability stack.
+### Playwright In-Test Package (`@frontguard/playwright`)
+- ✅ `visualTest()` and `expectVisual()` assertions with `__visual_baselines__/` storage, SSIM calculation, connected-component cluster extraction, DOM selector attribution, `mask` / `maskRegions`, `redactSensitive`, `freezeTime`, `seedRandom`, `blockUrls`, `waitForStable`, and `captureAriaSnapshot`.
 
-✅ **Native Slack app** — **shipped** (`integrations/slack-app/`): signing-secret verification, OAuth install, the `url_verification` handshake, and `chat.postMessage` posting — same bar as the Vercel/GitHub-App integrations (functional handler + tests; activation needs a registered Slack app).
-
-*Also recently closed:* **run-over-run CWV delta correlation** and **accessibility-aware AI analysis** — see "What's Shipped".
-
----
-
-# Follow-ups Requiring External Action
-
-These can't be completed from the codebase alone — they need accounts, recording, external repos, or human distribution. Tracked here so they aren't mistaken for shipped work.
-
-🟠 **Demo GIF + 30-second video** — the VHS tape (`demo/frontguard-demo.tape`) is **written**. *Owner action:* run `vhs demo/frontguard-demo.tape` against a running app to render `demo/frontguard-demo.gif`, then embed it at the top of the README. The launch lives or dies on the first 10 seconds.
-
-🟠 **Real-world validation on 5 OSS repos** — the harness is **built** (`validation/run-external.sh` + `validation/repos.json`: a Next.js app, Tailwind dashboard, component-library docs, e-commerce storefront, docs site). *Owner action:* run `./validation/run-external.sh` with AI API keys set (needs cloning the repos + render time) and fill in `validation/results-v0.2.md` with TP/FP/FN and classification accuracy. If accuracy is below 70% on real diffs, retune prompts before promoting AI as a feature.
-
-🟠 **v0.2 launch** — *Owner action:* pre-seed credibility in r/Playwright and r/QualityAssurance for 2 weeks, submit to awesome-playwright, then Show HN + r/Playwright + r/webdev + X thread on a Tue/Wed 9–10am ET, followed by a Dev.to walkthrough. Respond to every issue and comment personally.
-
-🟠 **Vercel Integration Marketplace listing** — the OAuth app works; publishing to the Marketplace is a separate submission with pricing/screenshots/category metadata. (The **OTel export** and **native Slack app** that previously sat here are now shipped — see "Genuinely Remaining".)
-
-🟠 **Long-horizon moat** — fine-tuned visual analysis model (after 10K+ labeled comparisons) and a community fix-pattern marketplace. Both depend on accumulated real-world usage data.
-
-**Kill criteria:** If you can't get 10 people to try it in 6 weeks of the v0.2 launch, the positioning is wrong. Pivot to pure Playwright plugin (drop the standalone CLI angle) or pivot to production monitoring (drop the CI testing angle).
+### Agentic MCP Server (`@frontguard/mcp`)
+- ✅ Stdio JSON-RPC 2.0 server exposing `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `promote_baseline` (requires `confirm_reviewed: true` and refuses unconfirmed local-report orphan-branch overwrites), `accept_baseline`, and `recent_runs`, operating in both zero-cloud local `report.json` mode and Cloud API mode.
 
 ---
 
-# Phase 4: Production Visual Monitoring (Month 6–12)
+## 3. Source-in-Repo — Gated & Not Deployed in Production
 
-**Goal:** 1,000 stars. $15K MRR. 30 paying teams. Expand from CI tool to always-on reliability platform.
+Per [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) §4, the following subsystems exist as tested source code in the monorepo but are **not deployed as live production services** and must not be advertised as generally available until their post-launch gates are met:
 
-The "Datadog for frontend" move. The rendering, diffing, AI analysis, scheduler, alerting, and third-party-script detection are built — the work here is depth and distribution, not new primitives.
-
-✅ **Zero-config URL monitoring** — Monitor plugin + cloud scheduler crawl, baseline, render on schedule, and alert on drift. Catches broken deploys, CDN failures, third-party script injection, ad layout corruption, A/B leakage.
-
-✅ **Third-party script monitoring** — Shipped (see above): detects when an ad/analytics/widget origin appears or disappears between runs.
-
-🟡 **Integration layer** — Slack + email + PagerDuty + generic webhooks work. Native Slack app (`integrations/slack-app/`) and OpenTelemetry export (`packages/cloud-api/src/otel/`) are **shipped**. *Remaining:* marketplace listings and live deploy (OPS).
-
-✅ **Performance visual correlation** — Budget-violation ↔ visual-diff correlation is shipped, as is **run-over-run CWV delta** correlation (a page that got slower since the last run is flagged and joined to its visual diff).
-
-**Pricing evolution:**
-- Add Monitoring tier: $49/mo — unlimited production URLs, hourly checks, alerting
-- Or bundle into Pro: $29/mo includes CI + monitoring (aggressive positioning vs Checkly's $60/mo)
+- 🔒 **`packages/cloud-api` (Hono / Cloudflare Worker, D1, R2, GitHub OAuth, Cron scheduler, Slack/email/PagerDuty alerting, hand-rolled OTLP/HTTP exporter in `src/otel/index.ts`)** — Not deployed (`api.frontguard.dev` does not resolve). Hard-gated on [#293](https://github.com/ravidsrk/frontguard/issues/293): (a) user-data erasure path, (b) restore-tested backup, and (c) fixing the run-status path so a run can never report `completed` without having compared.
+- 🔒 **Stripe billing & hosted pricing tiers (`packages/cloud-api/src/billing/`)** — Source only; no live money path. Public `/pricing` on `frontguard.dev` states that hosted plans are not generally available.
+- 🔒 **Third-party marketplace listings (`integrations/github-app`, `integrations/slack-app`, `integrations/vercel`, `integrations/netlify`)** — Handler source and tests live in `integrations/*`; external marketplace listings (`CF-06`) and production cloud hooks remain deferred until `cloud-api` clears [#293](https://github.com/ravidsrk/frontguard/issues/293).
 
 ---
 
-# Phase 5: Network Effects + Enterprise (Month 12–18)
+## 4. Post-Launch Roadmap (Tracked in GitHub Issue [#283](https://github.com/ravidsrk/frontguard/issues/283))
 
-**Goal:** $50K MRR. 100 paying teams. Enterprise pipeline.
+All actionable post-launch engineering work is tracked in GitHub under parent issue [#283](https://github.com/ravidsrk/frontguard/issues/283) (*"Post-launch roadmap: keep pixelmatch as the only pass/fail gate"*), ordered into **Now**, **Next**, and **Later**.
 
-🟡 **Marketplace integrations**
-- ✅ GitHub Action (composite action with JSON output parsing)
-- ✅ GitHub App (webhooks, Check Runs, installation flow)
-- ✅ Netlify Build Plugin
-- ✅ Vercel OAuth integration (webhook-driven preview runs)
-- 🔴 Vercel Integration **Marketplace** listing (external submission — see follow-ups)
+### Now — Protect the `pixelmatch` Gate & Approval Boundary
 
-🟡 **Team features**
-- ✅ Shared baselines / runs (cloud-hosted), role-based access (viewer/reviewer/admin), approval workflows, activity feed
-- 🔴 SSO/SAML for enterprise (gated to Business tier in plan config; integration unbuilt)
+1. **[#284](https://github.com/ravidsrk/frontguard/issues/284) — Measure small-text misses under the 10% pixel budget and adopt `pixelmatch` 8 as the same gate**
+   - **Problem:** Frontguard's default `threshold: 0.1` is a `10%` whole-image pixel ratio (unlike Playwright's per-pixel `0.2`), which can classify a small copy or icon regression as `changed` (exit `0`). Meanwhile, the lockfile resolves `pixelmatch@7.2.0` while `pixelmatch@8.0.0` (published `2026-10-06`) adds OKLab + HyAB perceptual color delta and `windowSize` to separate scattered anti-aliasing speckle from localized regressions.
+   - **Scope:** Upgrade to `pixelmatch@8.0.0`, test `windowSize` + OKLab/HyAB against scattered anti-alias noise vs. small text/icon edits, document `threshold` units vs. Playwright, measure `ssimOverride` flip frequency, and document browser binary pinning in CI.
 
-✅ **Figma-to-production visual comparison** — Shipped early in v0.1.
+2. **[#285](https://github.com/ravidsrk/frontguard/issues/285) — Re-run pixel validation on the current tree with true-positive fixtures**
+   - **Problem:** `validation/results-v0.2.md` (`2026-06-20`) measured `0.0%` pixel false-positive rate on CLI `0.2.0` across 2 of 5 repos (`39/43` routes with baseline), Chromium only, one macOS host, AI off, `ssimFallback` unexercised, and no true-positive arm.
+   - **Scope:** Extend `validation/run-external.sh` with intentional visual regression fixtures so true-positive recall and `ssimOverride` activations are recorded alongside false positives on the current `v0.2.3+` tree, preserving all v0.2 caveats whenever `0.0%` is cited.
 
-🔴 **Fine-tuned visual analysis model** — After 10,000+ comparisons with human feedback, fine-tune a smaller model (Phi-4 class) for higher accuracy, faster/cheaper inference, and on-prem privacy. *Depends on accumulated data.*
+3. **[#286](https://github.com/ravidsrk/frontguard/issues/286) — Publish an advisory judge evaluation and keep model output off exit codes**
+   - **Problem:** `--mode judge --experimental` is unmeasured in-repo (`G-22`), and external benchmarks (WUICC-bench `arXiv:2607.01728`, LLMShot `arXiv:2507.10062`, VisRefiner `arXiv:2602.05998`, XBIDetective `arXiv:2512.15804`) show vision models and prompt-ignore rules cannot safely replace a pixel gate.
+   - **Scope:** Publish an in-repo evaluation protocol reporting no-change accuracy and change recall separately, keep judge output strictly advisory (never altering exit codes `0 / 1 / 2` or promoting baselines), and reject scalar semantic-diff thresholds or prompt-ignore suppression.
 
-🔴 **Fix pattern marketplace** — Community-contributed fix patterns (Tailwind overflow, React hydration, Next.js image regressions, Grid/Flexbox cross-browser). Creates a data flywheel: more users → more patterns → better auto-fix → more users.
+4. **[#287](https://github.com/ravidsrk/frontguard/issues/287) — Separate baseline writes from the agent that edited the UI**
+   - **Problem:** While MCP `promote_baseline` requires `confirm_reviewed: true` and refuses local-report mode, `confirm_reviewed` is a self-asserted boolean and CLI `frontguard update-baselines` has no confirmation gate. An autonomous coding agent with shell access can edit UI code and run `frontguard update-baselines` to rubber-stamp its own regression.
+   - **Scope:** Require explicit human confirmation or a separate write credential on baseline promotion paths, ensure judge mode cannot trigger baseline writes, and document baseline promotion as equivalent to merge rights.
 
----
+5. **[#288](https://github.com/ravidsrk/frontguard/issues/288) — Block baseline updates on new serious `axe-core` violations**
+   - **Problem:** Frontguard ships `@axe-core/playwright` (`plugins/accessibility.ts`, `failOnImpact: 'serious'`), but accessibility violations do not currently block baseline promotion (`update-baselines` / `promote_baseline`), allowing a pixel-clean accessibility regression to be laundered into a baseline.
+   - **Scope:** Refuse baseline promotion when the accessibility plugin detects new violations at or above `failOnImpact`, while keeping `pixelmatch` as the image pass/fail comparator.
 
-# What's Deliberately Not On This Roadmap
+### Next — Component Runner Supply Gap & CLI Maintenance
 
-**Mobile app screenshots.** Different rendering pipeline (iOS Simulator, Android Emulator), different audience, different competitors (Applitools). Dilutes focus.
+6. **[#289](https://github.com/ravidsrk/frontguard/issues/289) — Discover Ladle and Histoire stories, and warn when the capture runner changes**
+   - **Problem:** With `lost-pixel/lost-pixel` archived (`2026-04-22`), `storybookjs/test-runner` archived (`2026-09-30`), and Loki inactive since August 2024, there is a supply gap for a maintained MIT CLI that discovers **Ladle** and **Histoire** component stories alongside Storybook.
+   - **Scope:** Add local Ladle and Histoire story index discovery feeding the existing `pixelmatch` pipeline, and emit a baseline-invalidation warning when the capture runner changes (citing the 1px runner-switch drift report).
 
-**Puppeteer support.** Playwright covers Puppeteer plus Firefox/WebKit. A second automation abstraction is pure overhead.
+7. **[#290](https://github.com/ravidsrk/frontguard/issues/290) — Prune PNG history on the `frontguard-baselines` orphan branch**
+   - **Problem:** `frontguard-baselines` keeps binary PNGs off `main`, but accumulating historical baseline commits over time bloats the orphan branch (`G-41`).
+   - **Scope:** Add a documented CLI retention command to truncate old PNG commit history on `frontguard-baselines` while preserving the current accepted baseline for every route/viewport/browser, verified by a post-prune comparison test.
 
-**Self-hosted cloud (for now).** Only if enterprise customers demand it AND will pay $500+/mo. The CLI is already self-hosted; the cloud is managed.
+8. **[#291](https://github.com/ravidsrk/frontguard/issues/291) — Split `pipeline.ts` at 1,422 lines and drop the stale `index.tsx` refactor**
+   - **Problem:** `DEFINITION.md` §4 (`G-39`) cited `packages/cli/src/core/pipeline.ts` at 1,328 lines and `apps/web/src/routes/index.tsx` at 1,811 lines. On the current tree, `index.tsx` is already refactored to **91 lines**, whereas `pipeline.ts` measures **1,422 lines**.
+   - **Scope:** Modularize `packages/cli/src/core/pipeline.ts` without changing `pixelmatch`, `ssimOverride`, `smartFilter`, or judge behavior, retire the obsolete `index.tsx` task, and label the README `"12/47 routes"` snippet as sample output.
 
-**Browser extension / DevTools integration.** Looks cool, adds zero distribution. Developers work in terminals and CI.
+9. **[#292](https://github.com/ravidsrk/frontguard/issues/292) — Enforce coverage thresholds in the CLI Vitest config**
+   - **Problem:** `packages/cli/vitest.config.ts` does not enforce coverage thresholds (`G-40`).
+   - **Scope:** Ratchet `packages/cli/vitest.config.ts` coverage thresholds from the current tree's measured coverage after the **Now** tests land.
 
-**Video-based regression (Replay.io's approach).** Compute-heavy, slow, unproven. Static screenshot + AI is faster and already works.
+### Later — Gated Hosted Differentiators & Non-Gating Artifacts
 
----
+10. **[#293](https://github.com/ravidsrk/frontguard/issues/293) — Close the three `cloud-api` deployment gates without deploying**
+    - **Scope:** Prerequisite gate from `DEFINITION.md` §4 before any `cloud-api` deployment: (1) verify/fix the run-status path (`daytona-runner.ts` / `processor.ts`, `G-34`) so a run never reports `completed` without a comparison, (2) implement and demonstrate user-data erasure across baselines and reports, and (3) demonstrate a restore-tested backup verified against source data. Does **not** deploy `api.frontguard.dev` or enable billing.
 
-# Threat Mitigation Map
+11. **[#294](https://github.com/ravidsrk/frontguard/issues/294) — Design a hosted review UI only after the `cloud-api` gates *(blocked by [#293](https://github.com/ravidsrk/frontguard/issues/293))***
+    - **Scope:** Multi-user PR visual review and approval UI design, strictly gated behind [#293](https://github.com/ravidsrk/frontguard/issues/293), enforcing the same human-confirmation and `axe-core` promotion blocks as local CLI/MCP workflows while keeping `pixelmatch` as the pass/fail signal.
 
-| Threat | Window | Mitigation Strategy |
-|--------|--------|---------------------|
-| GitHub Copilot adds visual PR review | 12-18 months | Ship auto-fix before they ship visual review. Auto-fix is 10x harder than detection — defensible even if Copilot can screenshot. |
-| Observability platforms add visual monitoring | 12-24 months | Position as "the visual layer they embed." Build OpenTelemetry integration so Frontguard IS the visual module for Datadog/Grafana. |
-| TestMu AI scale (2M+ users) | Now | They're enterprise/QA-first. Frontguard is developer-first, CLI-native. Different initial market. Don't compete head-on. |
-| Replay.io pivots to visual regression | 6-12 months | Video analysis is slow and expensive. Screenshot + AI is faster. Monitor but don't react. |
-| AI model commoditization | Ongoing | The moat isn't the model — it's the fix pattern database and workflow integration. Models are interchangeable; data isn't. |
-| Percy/Applitools improve their AI | Ongoing | Legacy architecture = slow iteration. Born-AI-native is structurally faster. Ship weekly. |
+12. **[#295](https://github.com/ravidsrk/frontguard/issues/295) — Design S3-backed baseline storage only after the `cloud-api` gates *(blocked by [#293](https://github.com/ravidsrk/frontguard/issues/293) and [#290](https://github.com/ravidsrk/frontguard/issues/290))***
+    - **Scope:** Object-storage baseline backend design (distinct from `imageUpload`, which already uploads PR diff thumbnails to R2/S3), gated on solving git orphan retention ([#290](https://github.com/ravidsrk/frontguard/issues/290)) and closing the `cloud-api` gates ([#293](https://github.com/ravidsrk/frontguard/issues/293)).
 
----
+13. **[#296](https://github.com/ravidsrk/frontguard/issues/296) — Add CLI OpenTelemetry without deploying the `cloud-api` exporter**
+    - **Scope:** Optional local CLI spans/timings for capture and comparison (`G-38`), off by default and never exporting screenshot bytes, documented separately from the existing `packages/cloud-api/src/otel/index.ts` worker exporter.
 
-# Pricing Strategy
+14. **[#297](https://github.com/ravidsrk/frontguard/issues/297) — Audit `apps/web` accessibility separately from the CLI `axe-core` plugin**
+    - **Scope:** Automated `axe-core` and keyboard-navigation verification against the built `apps/web` marketing and docs routes (`G-42`).
 
-**Principle: Never charge per screenshot.** This is the market's loudest pricing complaint. "No per-screenshot fees" is a selling point by itself.
+15. **[#298](https://github.com/ravidsrk/frontguard/issues/298) — Surface aged ignore masks for a human to drop *(explicit bet, weak external evidence)***
+    - **Scope:** Optional CLI report listing `ignore` selectors/regions older than a configured age so a human can review and remove stale masks (never auto-unmasked by a model or flake heuristic).
 
-| Tier | Price | Target | Conversion Trigger |
-|------|-------|--------|-------------------|
-| **Free** | $0 forever | Solo dev, evaluation | — |
-| **Pro** | $29/mo | Small teams (2-10) | Team collaboration: shared baselines, PR review, approval workflows |
-| **Business** | $99/mo | Mid-market (10-50) | SSO, production monitoring, unlimited projects |
-| **Enterprise** | Custom ($199+/mo) | Large orgs (50+) | On-prem, dedicated support, SLA |
+16. **[#299](https://github.com/ravidsrk/frontguard/issues/299) — Add optional ARIA and non-image text snapshots that do not gate pixels**
+    - **Scope:** Optional sidecar ARIA tree / JSON / Markdown text diffing alongside PNG captures, reported separately without altering `pixelmatch` pass/fail status or replacing `axe-core`.
 
-**Free tier includes:** Unlimited local CLI, 1 project, 500 cloud screenshots/mo, 7-day cloud history.
-**Pro gate:** Shared baselines, PR comments with review, unlimited projects, 30-day history.
-**Business gate:** Production monitoring, SSO/SAML, unlimited cloud screenshots, 90-day history.
+### Ongoing Operations & Hardening Tracked Separately
 
-**Why $29/mo Pro:** Chromatic's avg enterprise contract is $44K/yr. Applitools charges ~$299/user/mo. Frontguard Pro at $348/yr is 100x cheaper — an easy team-lead purchase with no procurement approval needed.
-
-**Why not $19/mo:** The research shows 8-15% free-to-paid conversion for dev tools. At $19/mo, you need 2x the customers to hit the same MRR. $29/mo is the sweet spot — still impulse-purchase territory for a dev team lead, but meaningful revenue per customer.
-
----
-
-# Success Metrics
-
-| Phase | Status | Key Metric | Kill Signal |
-|-------|--------|-----------|-------------|
-| v0.1: Core Engine | ✅ Shipped | Working CLI + GitHub Action + AI analysis + Figma compliance | — |
-| v0.2: Earn Trust | ✅ Built · 🟠 Launch pending | Engine, docs, integrations done; needs demo + real-repo validation + launch | Can't find 10 users in 6 weeks of launch |
-| Phase 3: The Moat | ✅ Built · 🟠 Adoption pending | Fix gen + verify + pattern DB shipped; need >20% fix acceptance from real users | <5% fix acceptance after tuning |
-| Phase 4: Monitor | ✅ Built · 🟠 Revenue pending | Scheduler + alerting + third-party detection shipped; need $15K MRR / 30 teams | <$5K MRR after 6 months of cloud |
-| Phase 5: Scale | 🟡 Foundations built | Teams/billing/integrations in place; need SSO, marketplace listing, fine-tuned model | Stalling growth, losing to platform incumbents |
+- **[#157](https://github.com/ravidsrk/frontguard/issues/157) — Weekly npm audit (production tree):** Automated weekly production dependency audit workflow.
+- **H-05 / G-44 — npm trusted publishing (OIDC without `NPM_TOKEN`):** Recorded in [`docs/completion/HUMAN_ACTIONS.md`](./completion/HUMAN_ACTIONS.md) and [`docs/completion/GAPS.md`](./completion/GAPS.md) with expiry **2027-03-01** (current release workflow already enforces tag/version match, `main` ancestry, green CI on exact SHA, and npm OIDC provenance attestation).
 
 ---
 
-# The Honest Bottom Line
+## 5. What Is Deliberately Not On This Roadmap
 
-Frontguard's window is 12-18 months before GitHub Copilot and observability platforms enter this space. The engineering bet has largely been made: the AI classification, anti-flake rendering, CLI workflow, CI integration, Figma compliance, auto-fix-with-verification, fix-pattern database, accessibility and performance analysis, third-party-script monitoring, production monitoring with multi-channel alerting, and the cloud platform (auth, storage, billing, teams) are all built and tested.
-
-What remains is **proving it and getting it adopted**, plus closing the last external-account integrations:
-
-1. **Validate on real repos and launch.** Synthetic accuracy means nothing — run against real diffs, record the numbers, record the demo, and ship the launch.
-2. **The fix pattern database.** Every accepted auto-fix trains the system. At 10K fixes the accuracy advantage is insurmountable by a new entrant. This is the data moat — and it only compounds with real usage.
-3. **Workflow integration depth.** Being the visual layer embedded in GitHub PRs, Slack/PagerDuty alerts, Vercel deploys, and (next) Datadog dashboards makes Frontguard hard to rip out.
-
-The code is ready. The next move is distribution.
+- **Replacing `pixelmatch` with `odiff`, `Resemble.js`, a perceptual hash, or a VLM pass/fail gate:** No benchmark in the 2026 literature shows `odiff` or `Resemble.js` outperforming `pixelmatch` on UI accuracy, and WUICC-bench / LLMShot demonstrate why VLMs and prompt-ignore rules cannot serve as a deterministic regression gate.
+- **Re-filing already-shipped local capabilities:** SSIM / chroma-SSIM / CW-SSIM (`ssimFallback`), Storybook `/index.json` discovery, CSS & coordinate ignore masks, `@axe-core/playwright` plugin, anti-flake controls (`freezeTime`, `seedRandom`, `blockUrls`, `waitForStability`), Firefox & WebKit capture, `smartFilter` changed-file scoping, local MCP `report.json` inspection, experimental judge mode, the external validation harness, and the 4-mode HTML diff report already ship.
+- **Stale god-file refactors (`apps/web/src/routes/index.tsx`, `html.ts`, `docs-content.ts`):** `apps/web/src/routes/index.tsx` is 91 lines; only `packages/cli/src/core/pipeline.ts` (1,422 lines) is tracked for modularization ([#291](https://github.com/ravidsrk/frontguard/issues/291)).
+- **Premature cloud deployment, live billing, or marketplace submissions:** Deploying `packages/cloud-api`, turning on Stripe billing, or submitting GitHub App / Slack / Vercel / Netlify marketplace listings stays off the near-term backlog until [#293](https://github.com/ravidsrk/frontguard/issues/293) is closed.
+- **Native mobile app screenshots (iOS Simulator / Android Emulator), Puppeteer abstraction, browser extensions, or video-replay diffing:** Different rendering pipelines and audiences that dilute focus from deterministic Playwright-based web visual regression testing.
