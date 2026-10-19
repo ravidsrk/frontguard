@@ -63,10 +63,10 @@ Wrangler prints the current version and the previous version and asks before
 it shifts traffic. Confirm the version id is the one you want. Rollback does
 not restore D1, KV, or R2.
 
-Check `https://frontguard.dev/.deploy-version` afterwards. Deploy Web's probe
-expects that body to equal the SHA it just deployed, so a rollback makes the
-next unrelated web deploy fail that probe until the worker is deployed forward
-again.
+Check `https://frontguard.dev/.deploy-version` afterwards. The next `Deploy Web`
+run deploys its build before checking the live SHA, so it can replace the
+version restored by the rollback. Do not rely on that check to preserve the
+restored version.
 
 ## Restore a D1 database
 
