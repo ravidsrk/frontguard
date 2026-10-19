@@ -7,6 +7,7 @@ import {
   MARKER_RED,
   applyAlert,
   decideAlert,
+  gateAgainstTip,
   parseGhJson,
 } from '../ci-failure-alert.mjs';
 
@@ -124,7 +125,7 @@ describe('applyAlert', () => {
         },
       },
     );
-    expect(result).toEqual({ did: 'commented', number: 9 });
+    expect(result).toEqual({ did: 'commented', number: 9, closedDuplicates: [] });
     expect(calls).toEqual(['label', 'comment:9']);
   });
 
@@ -176,7 +177,7 @@ describe('applyAlert', () => {
         },
       },
     );
-    expect(closed.did).toBe('closed');
+    expect(closed).toEqual({ did: 'closed', numbers: [3] });
 
     const none = await applyAlert(
       decideAlert({
@@ -203,6 +204,108 @@ describe('applyAlert', () => {
     );
     expect(none).toEqual({ did: 'none' });
   });
+
+  it('closes every open red issue on recovery, including a duplicate', async () => {
+    const closed: number[] = [];
+    const result = await applyAlert(
+      decideAlert({
+        eventName: 'workflow_run',
+        conclusion: 'success',
+        headBranch: 'main',
+        triggerEvent: 'push',
+        sha: 'tip',
+      }),
+      {
+        ensureLabel() {},
+        listOpen() {
+          return [{ number: 4 }, { number: 9 }];
+        },
+        open() {
+          return { number: 1 };
+        },
+        comment() {},
+        close(number: number) {
+          closed.push(number);
+        },
+      },
+    );
+    expect(result).toEqual({ did: 'closed', numbers: [4, 9] });
+    expect(closed).toEqual([4, 9]);
+  });
+
+  it('closes the duplicate when two overlapping failures both create an issue', async () => {
+    let calls = 0;
+    const closed: number[] = [];
+    const result = await applyAlert(
+      decideAlert({
+        eventName: 'workflow_run',
+        conclusion: 'failure',
+        headBranch: 'main',
+        triggerEvent: 'push',
+        sha: 'tip',
+      }),
+      {
+        ensureLabel() {},
+        listOpen() {
+          calls += 1;
+          if (calls === 1) return [];
+          return [
+            { number: 4 },
+            { number: 8 },
+          ];
+        },
+        open() {
+          return { number: 8, url: 'https://example.test/issues/8' };
+        },
+        comment() {},
+        close(number: number) {
+          closed.push(number);
+        },
+      },
+    );
+    expect(result.did).toBe('opened-deduped');
+    expect(result.number).toBe(4);
+    expect(closed).toEqual([8]);
+  });
+});
+
+describe('gateAgainstTip', () => {
+  const failure = decideAlert({
+    eventName: 'workflow_run',
+    conclusion: 'failure',
+    headBranch: 'main',
+    triggerEvent: 'push',
+    sha: 'older',
+  });
+  const success = decideAlert({
+    eventName: 'workflow_run',
+    conclusion: 'success',
+    headBranch: 'main',
+    triggerEvent: 'push',
+    sha: 'older',
+  });
+
+  it('ignores an older success and an older failure once main has moved', () => {
+    expect(gateAgainstTip(success, { sha: 'older', tip: 'newer' }).action).toBe('skip');
+    expect(gateAgainstTip(failure, { sha: 'older', tip: 'newer' }).action).toBe('skip');
+  });
+
+  it('keeps a run that is still the tip, and does not gate a drill', () => {
+    const current = decideAlert({
+      eventName: 'workflow_run',
+      conclusion: 'success',
+      headBranch: 'main',
+      triggerEvent: 'push',
+      sha: 'newer',
+    });
+    expect(gateAgainstTip(current, { sha: 'newer', tip: 'newer' }).action).toBe('resolve');
+    const drill = decideAlert({ drill: true });
+    expect(gateAgainstTip(drill, { sha: '', tip: '', drill: true }).action).toBe('open-or-comment');
+  });
+
+  it('fails closed when the tip is missing', () => {
+    expect(gateAgainstTip(success, { sha: 'older', tip: '' }).action).toBe('skip');
+  });
 });
 
 describe('CI failure alert workflow', () => {
@@ -214,6 +317,8 @@ describe('CI failure alert workflow', () => {
     expect(workflow).toContain('contents: read');
     expect(workflow).toContain('scripts/ci-failure-alert.mjs');
     expect(workflow).toContain('github.event.repository.default_branch');
+    expect(workflow).toContain('cancel-in-progress: false');
+    expect(workflow).toContain('MAIN_TIP:');
     expect(workflow).not.toContain('pull_request_target');
   });
 });

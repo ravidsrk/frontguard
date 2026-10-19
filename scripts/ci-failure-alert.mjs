@@ -4,8 +4,13 @@
  * Channel is one GitHub issue (assumption A-16). A green push to main closes
  * that issue. A workflow_dispatch drill opens a separate issue and closes it.
  *
- *   EVENT_NAME CONCLUSION HEAD_BRANCH TRIGGER_EVENT DRILL HEAD_SHA RUN_URL
+ *   EVENT_NAME CONCLUSION HEAD_BRANCH TRIGGER_EVENT DRILL HEAD_SHA RUN_URL MAIN_TIP
  *   ALERT_DRY_RUN=1 prints the decision and does not call gh.
+ *
+ * A run updates the issue only when HEAD_SHA is the current main tip, so an
+ * older green job cannot close an alert for a newer red push. Recovery closes
+ * every matching open issue, and a create re-checks so two overlapping runs
+ * do not leave a duplicate open.
  */
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -101,10 +106,37 @@ export function decideAlert(input) {
 }
 
 /**
+ * Ignore a completed CI run that is no longer the tip of main.
+ * Drills are not gated. A missing tip fails closed instead of closing an alert.
+ *
+ * @param {ReturnType<typeof decideAlert>} decision
+ * @param {{ sha?: string, tip?: string, drill?: boolean | string }} input
+ */
+export function gateAgainstTip(decision, input) {
+  if (decision.action === 'skip' || flag(input.drill) || decision.marker === MARKER_DRILL) {
+    return decision;
+  }
+  const sha = input.sha || '';
+  const tip = input.tip || '';
+  if (!sha || !tip || sha === 'unknown') {
+    return { action: 'skip', reason: 'missing sha or main tip' };
+  }
+  if (sha !== tip) {
+    return { action: 'skip', reason: 'run is not the latest commit on main' };
+  }
+  return decision;
+}
+
+function asList(value) {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+/**
  * @param {ReturnType<typeof decideAlert>} decision
  * @param {{
  *   ensureLabel: (name: string) => Promise<void> | void,
- *   listOpen: (label: string, marker: string) => Promise<{number: number} | null> | {number: number} | null,
+ *   listOpen: (label: string, marker: string) => Promise<Array<{number: number}> | {number: number} | null> | Array<{number: number}> | {number: number} | null,
  *   open: (issue: {title: string, body: string, label: string}) => Promise<{number: number, url?: string}> | {number: number, url?: string},
  *   comment: (number: number, body: string) => Promise<void> | void,
  *   close: (number: number) => Promise<void> | void,
@@ -119,20 +151,29 @@ export async function applyAlert(decision, gh) {
   await gh.ensureLabel(decision.label);
 
   if (decision.action === 'resolve') {
-    const open = await gh.listOpen(decision.label, decision.marker);
-    if (!open) return { did: 'none' };
-    await gh.comment(open.number, decision.body);
-    await gh.close(open.number);
-    return { did: 'closed', number: open.number };
+    const open = asList(await gh.listOpen(decision.label, decision.marker));
+    if (open.length === 0) return { did: 'none' };
+    for (const issue of open) {
+      await gh.comment(issue.number, decision.body);
+      await gh.close(issue.number);
+    }
+    return { did: 'closed', numbers: open.map((issue) => issue.number) };
   }
 
-  const existing = await gh.listOpen(decision.label, decision.marker);
-  if (existing) {
-    await gh.comment(existing.number, decision.body);
-    if (decision.closeAfter) await gh.close(existing.number);
+  const existing = asList(await gh.listOpen(decision.label, decision.marker)).sort(
+    (a, b) => a.number - b.number,
+  );
+  if (existing.length > 0) {
+    await gh.comment(existing[0].number, decision.body);
+    for (const extra of existing.slice(1)) {
+      await gh.comment(extra.number, `Duplicate of #${existing[0].number}. Closing.`);
+      await gh.close(extra.number);
+    }
+    if (decision.closeAfter) await gh.close(existing[0].number);
     return {
       did: decision.closeAfter ? 'commented-and-closed' : 'commented',
-      number: existing.number,
+      number: existing[0].number,
+      closedDuplicates: existing.slice(1).map((issue) => issue.number),
     };
   }
 
@@ -141,11 +182,31 @@ export async function applyAlert(decision, gh) {
     body: decision.body,
     label: decision.label,
   });
-  if (decision.closeAfter) await gh.close(created.number);
+  if (decision.closeAfter) {
+    await gh.close(created.number);
+    return {
+      did: 'opened-and-closed',
+      number: created.number,
+      url: created.url,
+    };
+  }
+
+  const after = asList(await gh.listOpen(decision.label, decision.marker)).sort(
+    (a, b) => a.number - b.number,
+  );
+  const canonical = after[0] || created;
+  const closedDuplicates = [];
+  for (const extra of after) {
+    if (extra.number === canonical.number) continue;
+    await gh.comment(extra.number, `Duplicate of #${canonical.number}. Closing.`);
+    await gh.close(extra.number);
+    closedDuplicates.push(extra.number);
+  }
   return {
-    did: decision.closeAfter ? 'opened-and-closed' : 'opened',
-    number: created.number,
+    did: closedDuplicates.length > 0 ? 'opened-deduped' : 'opened',
+    number: canonical.number,
     url: created.url,
+    closedDuplicates,
   };
 }
 
@@ -203,7 +264,7 @@ export function createGhAdapter() {
           'number,title,body',
         ]) || '[]',
       );
-      return issues.find((issue) => (issue.body || '').includes(marker)) ?? null;
+      return issues.filter((issue) => (issue.body || '').includes(marker));
     },
     open({ title, body, label }) {
       const url = run([
@@ -238,11 +299,13 @@ function readEnv() {
     drill: process.env.DRILL || '',
     sha: process.env.HEAD_SHA || process.env.GITHUB_SHA || '',
     runUrl: process.env.RUN_URL || '',
+    tip: process.env.MAIN_TIP || '',
   };
 }
 
 async function main() {
-  const decision = decideAlert(readEnv());
+  const env = readEnv();
+  const decision = gateAgainstTip(decideAlert(env), env);
   if (process.env.ALERT_DRY_RUN === '1') {
     process.stdout.write(`${JSON.stringify(decision, null, 2)}\n`);
     return;

@@ -15,6 +15,11 @@ permissions:
   contents: read
   issues: write
 
+# Queue alert jobs. Do not cancel one that is already filing or closing an issue.
+concurrency:
+  group: ci-failure-alert
+  cancel-in-progress: false
+
 jobs:
   alert:
     runs-on: ubuntu-latest
@@ -29,6 +34,12 @@ jobs:
         with:
           node-version: 22
 
+      - name: Read the current main tip
+        id: tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${{ github.event.repository.default_branch }}" --jq .sha)" >> "$GITHUB_OUTPUT"
+
       - name: File, update, or resolve the CI alert issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -39,4 +50,5 @@ jobs:
           DRILL: ${{ github.event.inputs.drill || 'false' }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           RUN_URL: ${{ github.event.workflow_run.html_url }}
+          MAIN_TIP: ${{ steps.tip.outputs.sha }}
         run: node scripts/ci-failure-alert.mjs
