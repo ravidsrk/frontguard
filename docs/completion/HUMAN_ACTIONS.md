@@ -73,12 +73,14 @@ workflow but cannot own the delivery destination.
 confirms the alert fires, and captures the proof.
 
 **2026-10-19 update (A-17).** No webhook or email destination was available. The
-agent is implementing the alert as one GitHub issue (`main CI is red`) so the
-path can be proved without reddening `main` and without a new secret. This
-action stays **open** until the workflow has fired on `main`. Script drill
-issue #279 is already closed. A throwaway red build was rejected because it
-would break `main`. `workflow_dispatch` cannot be registered until the
-workflow file is on the default branch.
+alert is one GitHub issue (`main CI is red`) so the path can be proved without
+reddening `main` and without a new secret.
+
+**Status: done (2026-10-19).** After the workflow reached `main`,
+`gh workflow run "CI failure alert" --ref main -f drill=true` succeeded and
+opened then closed issue #280 (`CLOSED` / `COMPLETED`, label `ci-red-drill`).
+Run 39229147720. Transcript: `evidence/T-21-actions-drill.txt`. `main` was not
+reddened. Script drill #279 was the earlier local proof.
 
 ---
 
@@ -163,12 +165,14 @@ email-derived usernames). Detail: `evidence/H-07-domain-attach.md`.
 |---|---|---|---|
 | H-01 D1 Time Travel retention | **yes** | T-22 | **done** |
 | H-02 Workers rollback rehearsal | **yes** | T-23 | **done** |
-| H-03 red-`main` alert channel | **yes** | T-21 | open |
+| H-03 red-`main` alert channel | **yes** | T-21 | **done** |
 | H-04 pricing story decision | **yes** | T-27 | **done** |
 | H-05 npm trusted publishing | no | — | open |
 | H-06 authorise apps/web deploy | no (done) | — | **done** |
 | H-07 attach frontguard.dev to worker | **yes** | T-14, T-25, T-27 | **done** |
 
-**One Human Action still gates launch:** H-03. The script drill (issue #279)
-has fired. The Actions `workflow_dispatch` drill has not, because the workflow
-file is not on `main` yet. H-05 does not gate. Verdict stays **CONDITIONAL GO**.
+**No launch-gating Human Action is still open.** H-05 (npm trusted publishing)
+does not gate. Verdict stays **CONDITIONAL GO** until CI on the merge commit
+`e0676af` is green and a Deploy Web run has completed against the attached
+domain. The last Deploy Web failure was the canonical SHA probe, before
+`frontguard.dev` served the worker. That workflow has not been re-run since.

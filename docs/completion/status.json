@@ -10,13 +10,13 @@
     "cold_start": "fail",
     "evidence": "docs/completion/evidence/P0-coldstart-03-test.txt"
   },
-  "current_commit": "d1f1408cbf8d57f5130bf999ff63f4d1e3170e67",
-  "resume_pointer": "P4/T-21",
+  "current_commit": "e0676af8aaf20109d81ce4594fcd40c795744317",
+  "resume_pointer": "P4/T-21-ci",
   "definition_frozen_at": "360c8f4571b8983c4ba7eb7f82f6d051987924df",
   "completion_pct": 45,
   "gate": {
     "status": "CONDITIONAL_GO",
-    "reason": "Canonical frontguard.dev and www serve worker SHA d1f1408: /privacy /terms /status 200, /pricing has no $29. Scratch D1 time-travel restore and scratch wrangler rollback were performed and the scratch resources were deleted. Still open: T-21 Actions drill is not on main (script drill issue 279 is closed). H-05 does not gate. Evidence: docs/completion/evidence/T-25-canonical-probe.txt"
+    "reason": "Actions drill on main opened and closed issue 280 (run 39229147720). Canonical frontguard.dev serves the worker. Scratch D1 restore and scratch rollback were performed and deleted. H-05 does not gate. Still open: CI on merge commit e0676af was in progress, and Deploy Web has not completed since the domain cutover. Evidence: docs/completion/evidence/T-21-actions-drill.txt"
   },
   "angles": [
     {
@@ -785,14 +785,15 @@
       "size": "S",
       "depends_on": [],
       "owner": "agent",
-      "status": "in_progress",
+      "status": "done",
       "branch": "completion/p4-ci-failure-alert",
       "pr": "https://github.com/ravidsrk/frontguard/pull/278",
-      "commit": null,
+      "commit": "e0676af8aaf20109d81ce4594fcd40c795744317",
       "evidence": [
         "docs/incident.md",
         "scripts/test/ci-failure-alert.test.ts",
-        "docs/completion/evidence/T-21-drill.txt"
+        "docs/completion/evidence/T-21-drill.txt",
+        "docs/completion/evidence/T-21-actions-drill.txt"
       ],
       "review": "manual",
       "attempts": 2,
@@ -1008,13 +1009,13 @@
     },
     {
       "id": "H-03",
-      "instruction": "Choose an external channel if GitHub issues are not enough. The agent is shipping a ci-red GitHub issue (A-17). This stays open until a drill issue has been opened.",
+      "instruction": "Choose an external channel if GitHub issues are not enough. The agent shipped a ci-red GitHub issue (A-17).",
       "unblocks": [
         "T-21"
       ],
       "gates_launch": true,
-      "verification": "agent reddens a throwaway build and confirms the alert fires",
-      "status": "open"
+      "verification": "workflow_dispatch drill on main opened and closed issue 280 on 2026-10-19. Run 39229147720. Evidence: docs/completion/evidence/T-21-actions-drill.txt",
+      "status": "done"
     },
     {
       "id": "H-04",

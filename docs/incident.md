@@ -104,9 +104,10 @@ One maintainer (`ravidsrk`). Nothing in this repository is a live secret.
 | Registrar | Nameservers are already `emerson.ns.cloudflare.com` and `venus.ns.cloudflare.com`. The Namecheap API user is not the email address (error `1011102`). A registrar call is not required to move this site. |
 | npm | long-lived `NPM_TOKEN` (H-05, not a launch gate) |
 
-## What is still open
+## Drill
 
-The Actions drill for this alert (`gh workflow run "CI failure alert" --ref main -f drill=true`)
-cannot be registered until this workflow file is on `main`. A script-level drill
-already opened and closed issue #279. H-03 stays open until the Actions run
-itself fires.
+On 2026-10-19, after this workflow landed on `main`, `workflow_dispatch` with
+`drill=true` opened and closed issue #280. The run is
+https://github.com/ravidsrk/frontguard/actions/runs/39229147720. A script-only
+drill had already opened and closed issue #279 before the workflow was on
+`main`.

@@ -1,0 +1,35 @@
+# T-21 Actions drill — 2026-10-19
+
+The workflow file is on `main` at merge commit `e0676af`. This run is
+`workflow_dispatch`, not the earlier script-only drill (issue #279).
+
+Command:
+
+    gh workflow run "CI failure alert" --ref main -f drill=true
+
+Run: https://github.com/ravidsrk/frontguard/actions/runs/39229147720
+Event: workflow_dispatch
+Head SHA: e0676af8aaf20109d81ce4594fcd40c795744317
+Conclusion: success
+
+Script stdout:
+
+    {
+      "decision": {
+        "action": "open-or-comment",
+        "title": "DRILL: CI failure alert",
+        "closeAfter": true
+      },
+      "result": {
+        "did": "opened-and-closed",
+        "number": 280,
+        "url": "https://github.com/ravidsrk/frontguard/issues/280"
+      }
+    }
+
+Issue #280: title `DRILL: CI failure alert`, label `ci-red-drill`, state
+CLOSED, reason COMPLETED, closed at 2026-10-19T09:19:16Z. The body says CI on
+`main` was not failed.
+
+`main` was not reddened. A push CI run for `e0676af` was still in progress
+when this drill finished (run 39229080039).
