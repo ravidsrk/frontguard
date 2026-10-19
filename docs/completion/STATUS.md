@@ -3,13 +3,17 @@
 > Driven by `/product-completion`. Working state; rewritten each phase.
 
 ```
-VERDICT: PHASE 1 COMPLETE
-COMPLETION: 35% (baseline 5f0e141)   GATE: not evaluated — Definition of Complete not yet frozen
-CRITICAL FLOWS: 6 total · 1 verified · 3 partial · 0 cut · 2 unreachable
-GAPS: enumerated in Phase 3 · angles scored below
-TASKS: 0/0 · BLOCKED 0 · HUMAN ACTIONS gating launch: TBD (Phase 4)
-NEXT: Phase 2 — deep research (internal archaeology + external verification)
+VERDICT: CONDITIONAL GO (unchanged on 2026-10-19)
+COMPLETION: 45% historical — scores NOT recomputed after 40.7% file drift
+HEAD: d1f1408 · CI green (run 39032446079) · Deploy Web failed (run 39032446080)
+GATE: still blocked. Canonical frontguard.dev is not the deployed worker.
+NEXT: P4/T-21 alert is in this branch. H-01, H-02, H-07 remain owner actions.
+      H-03 closes only after a drill issue is opened. H-04 remains true of
+      canonical /pricing, which still sells Pro at $29/month.
 ```
+
+The Phase 0 and Phase 1 sections below are the 2026-09-01 record. They are not
+the current freeze. Current probes: `evidence/S1-20261019-baseline.md`.
 
 ---
 

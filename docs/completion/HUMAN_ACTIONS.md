@@ -55,6 +55,12 @@ workflow but cannot own the delivery destination.
 **Unblocks:** T-21. **Verification:** the agent deliberately reddens a throwaway branch build,
 confirms the alert fires, and captures the proof.
 
+**2026-10-19 update (A-17).** No webhook or email destination was available. The
+agent is implementing the alert as one GitHub issue (`main CI is red`) so the
+path can be proved without reddening `main` and without a new secret. This
+action stays **open** until that drill issue exists. A throwaway red build was
+rejected because it would break `main`.
+
 ---
 
 ## H-04 — Confirm the intended pricing story · **GATES LAUNCH** (T-30)

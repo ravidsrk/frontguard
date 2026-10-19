@@ -169,3 +169,36 @@ the unpublished workspace CLI.
 **Reason:** Gate item 7 is "using the README alone." 0.2.2 still requires a clean working tree
 to create `frontguard-baselines`; source already narrowed that check to the checkout fallback.
 The README now includes the commit step 0.2.2 needs.
+
+## A-16 — Restart the run; do not replace the frozen definition
+
+**Phase:** 2026-10-19 resume
+**Decision:** Treat 281/690 files changed since `f67aaa8` as a restart of the
+baseline freeze. Keep `DEFINITION.md` frozen. Do not re-score all 17 angles in
+this session, and do not raise any score.
+**Rejected:** Continuing from `CONDITIONAL_GO` with no new freeze. Replacing the
+definition with the three workflows the README now lists (CLI, Playwright, MCP).
+**Reason:** R4 requires a restart above 20% drift. R13 forbids lowering the
+frozen gate. A full angle rescore without new executed proofs would invent
+scores. The launch-gate probes were repeated instead.
+
+## A-17 — The red-main alert is a GitHub issue
+
+**Phase:** P4 / T-21
+**Decision:** A failed push to `main` opens one issue titled `main CI is red`.
+A later green push closes it. A drill uses `workflow_dispatch` so `main` is
+not broken to prove the path.
+**Rejected:** Waiting on the owner to pick Slack or email (H-03 as originally
+worded). Reddening `main` on purpose.
+**Reason:** R7. The issue channel needs no new secret, is reversible by deleting
+the workflow, and matches the tracker this repo already uses. H-03 stays open
+until a drill issue has actually been opened.
+
+## A-18 — Do not ship the stashed session upgrades
+
+**Phase:** 2026-10-19 resume
+**Decision:** Leave stash `d537399` unapplied. It is 43 files of CLI, MCP,
+Playwright, web, and cloud-api edits from the previous session.
+**Rejected:** Committing that diff onto this branch as completion work.
+**Reason:** R6. Those edits add behavior after the definition was frozen. They
+are preserved locally so they are not deleted. They are not part of T-21.

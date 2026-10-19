@@ -1,0 +1,42 @@
+name: CI failure alert
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      drill:
+        description: Open a drill issue and close it, to prove the alert path
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # workflow_run must execute the script on the default branch, not the
+          # SHA of a failing pull request. A dispatch runs the selected ref.
+          ref: ${{ github.event_name == 'workflow_run' && format('refs/heads/{0}', github.event.repository.default_branch) || github.sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: File, update, or resolve the CI alert issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+          DRILL: ${{ github.event.inputs.drill || 'false' }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: node scripts/ci-failure-alert.mjs

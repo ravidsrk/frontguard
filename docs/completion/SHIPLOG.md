@@ -493,3 +493,59 @@ Evidence: `docs/completion/evidence/T-30-launch-gate.md`.
 
 **RESUME POINTER: `CONDITIONAL_GO`** — remaining launch-gating Human Actions:
 H-01, H-02, H-03, H-04, H-07. No further agent-side plan task is unblocked.
+
+---
+
+### RUN 20261019 — RESTART THRESHOLD MET (R4)
+
+**Mode:** drive. Agentic, write access.
+**Toolchain:** `git` 2.43.0 · `node` v22.23.3 · `npm` 10.9.9 · `gh` 2.102.0.
+`greptile` and `coderabbit` are not installed. R11 for this run is `review: manual`.
+`pnpm` 10.34.7 is present and unused (A-01).
+
+**Ancestor check:** `5f0e141` and `f67aaa8` are ancestors of `origin/main` `d1f1408`.
+Files changed since `f67aaa8`: **281 / 690 = 40.7%**. Restart threshold crossed.
+Logged as **A-16**. The frozen definition was not lowered and was not replaced.
+
+**What was re-checked, and what was not.** Live site, worker, CI, and Deploy Web
+were probed (`evidence/S1-20261019-baseline.md`). CI on `d1f1408` is green
+(run 39032446079). Deploy Web failed because `frontguard.dev` still does not
+serve the worker (run 39032446080). The 17 angle scores were **not** recomputed.
+No score was raised.
+
+**Observed already done in tree `d1f1408`, not by this commit:**
+
+- T-14 / G-19 — `apps/web` sends CSP, HSTS, and `X-Frame-Options`. Confirmed on
+  the worker. The canonical host still lacks them (H-07).
+- T-27 code — worker `/pricing` no longer sells a $29 trial. Canonical
+  `frontguard.dev/pricing` still does. Gate item 8 remains failed.
+
+**Cloudflare:** token cannot list accounts. T-22 and T-23 were not executed.
+H-01, H-02, H-07 stay open.
+
+**Local stash preserved, not applied:** `d537399` (43 files). Feature work from
+the previous session. Left out of this branch (A-18).
+
+**RESUME POINTER: `P4/T-21`**
+
+### P4 / T-21 — RED-MAIN ALERT · IN FLIGHT
+
+Branch: `completion/p4-ci-failure-alert`. Channel decision **A-17**: one GitHub
+issue, not Slack and not a deliberate red `main`.
+
+- Failed push to `main` opens or comments on `main CI is red` (`ci-red`).
+- Green push to `main` closes it.
+- Pull requests and cancelled runs do nothing.
+- `workflow_dispatch` drill opens `DRILL: CI failure alert` and closes it.
+- Operator note: `docs/incident.md`. It does not claim a restore or a rollback.
+
+Review: manual. Decision matrix covered by
+`scripts/test/ci-failure-alert.test.ts` (8 tests). `gh` arguments are an array,
+not a shell string. Workflow permissions are `contents: read` and `issues: write`.
+`pull_request_target` is not used. Label creation tolerates "already exists"
+so the first failure can list issues by label.
+
+Drill proof is recorded after the workflow is on the remote. Until that issue
+exists, H-03 stays open and this task stays in flight.
+
+**RESUME POINTER: `P4/T-21` — drill not yet captured. H-01, H-02, H-07 open. H-04 still true of canonical `/pricing`.**
