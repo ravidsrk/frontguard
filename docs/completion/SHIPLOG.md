@@ -606,5 +606,14 @@ Greptile reviewed `1496862`. Pending runs in one concurrency group replace each
 other even with `cancel-in-progress: false`, so a pull-request completion could
 drop a queued main failure. The alert workflow now listens only to CI on
 `main`, puts drills in their own group, and re-reads the tip's completed push
-CI before it opens or closes. The rollback note no longer says the next Deploy
-Web run fails its SHA check; that run deploys first and replaces the rollback.
+CI before it opens or closes (`902991a`, 20 tests). The rollback note in
+`e9a34c8` says the next Deploy Web run deploys before its SHA check and can
+replace the restored version.
+
+The branch ref moved to `902991a`, but pull request #278 stayed on `e9a34c8`
+and Actions did not start for the fix. Review of that diff: manual (no local
+`greptile` or `coderabbit`). Correctness: a pending main failure is no longer
+dropped by a pull-request completion, and the surviving run follows the tip's
+own CI. Security: permissions add `actions: read` only; checkout stays on the
+default branch for `workflow_run`. Tests cover the tip lookup. The next commit
+exists so GitHub attaches that fix to the pull request.
