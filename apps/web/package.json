@@ -20,7 +20,7 @@
     "@tanstack/react-router": "^1.170.44",
     "@tanstack/react-start": "^1.169.2",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.64.0",
@@ -31,7 +31,7 @@
     "@testing-library/react": "^16.3.0",
     "@types/node": "^26.6.1",
     "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^10.6.0",
     "eslint-plugin-react-hooks": "^7.1.1",
