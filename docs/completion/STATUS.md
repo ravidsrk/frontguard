@@ -3,16 +3,15 @@
 > Driven by `/product-completion`. Working state; rewritten each phase.
 
 ```
-VERDICT: CONDITIONAL GO (unchanged on 2026-10-19; scores not recomputed)
-COMPLETION: 45% historical — scores NOT recomputed after 40.7% file drift
-HEAD: e0676af (merge of PR #278)
-GATE: alert drill fired on main (issue #280, run 39229147720).
-      Canonical frontguard.dev serves the worker. D1 restore and rollback
-      were rehearsed on scratch resources and those resources were deleted.
-      H-01 through H-04 and H-07 are done. H-05 does not gate.
-NEXT: CI on e0676af must finish green (run 39229080039 was in progress when
-      the drill was recorded). Deploy Web has not completed since the domain
-      cutover, so gate item 2 is not closed.
+VERDICT: GO on the binding launch gate (DEFINITION.md section 2)
+COMPLETION: 45% historical — angle scores NOT recomputed (A-16)
+HEAD: fb6f336
+GATE: CI on fb6f336 is green (run 39229749365). Deploy Web on e0676af
+      succeeded (run 39229657033); fb6f336 does not change apps/web.
+      Alert drill issue #280 fired. Live site serves e0676af, legal pages
+      200, pricing has no $29. H-05 does not gate and stays open.
+NEXT: none for the launch gate. Do not deploy cloud-api. Do not raise
+      angle scores without a new scored audit.
 ```
 
 The Phase 0 and Phase 1 sections below are the 2026-09-01 record. They are not

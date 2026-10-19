@@ -172,7 +172,6 @@ email-derived usernames). Detail: `evidence/H-07-domain-attach.md`.
 | H-07 attach frontguard.dev to worker | **yes** | T-14, T-25, T-27 | **done** |
 
 **No launch-gating Human Action is still open.** H-05 (npm trusted publishing)
-does not gate. Verdict stays **CONDITIONAL GO** until CI on the merge commit
-`e0676af` is green and a Deploy Web run has completed against the attached
-domain. The last Deploy Web failure was the canonical SHA probe, before
-`frontguard.dev` served the worker. That workflow has not been re-run since.
+does not gate and stays open until 2027-03-01. CI on `fb6f336` is green, and
+Deploy Web run 39229657033 completed against `frontguard.dev`. The binding
+launch gate is **GO**. Evidence: `evidence/T-31-launch-gate-20261019.md`.
