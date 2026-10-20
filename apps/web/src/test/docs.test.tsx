@@ -37,7 +37,7 @@ async function renderArticle(slug: string) {
   });
   const view = render(<RouterProvider router={router} />);
   const article = view.container.querySelector("article");
-  return { ...view, article, html: article?.innerHTML ?? "" };
+  return { ...view, router, article, html: article?.innerHTML ?? "" };
 }
 
 function assertHtmlHygiene(html: string, slug: string) {
@@ -319,6 +319,8 @@ describe("docs clipboard feedback", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
     else Reflect.deleteProperty(navigator, "clipboard");
   });
@@ -328,6 +330,75 @@ describe("docs clipboard feedback", () => {
       ? screen.getByRole("button", { name: "Copy article content" })
       : screen.getAllByRole("button", { name: "Copy code snippet" })[0];
   }
+
+  function deferredWrite() {
+    let resolve!: () => void;
+    let reject!: (error: Error) => void;
+    const promise = new Promise<void>((done, fail) => { resolve = done; reject = fail; });
+    return { promise, resolve, reject };
+  }
+
+  it.each(["page", "snippet"])("keeps the newest %s success when an older write later fails", async (kind) => {
+    const first = deferredWrite();
+    const latest = deferredWrite();
+    const writeText = vi.fn<(text: string) => Promise<void>>()
+      .mockReturnValueOnce(first.promise).mockReturnValueOnce(latest.promise);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    await renderArticle("cli/commands");
+    vi.useFakeTimers();
+    const button = copyButton(kind);
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(writeText).toHaveBeenCalledTimes(2);
+    await act(async () => { latest.resolve(); });
+    expect(button.textContent).toMatch(/Copied/);
+    await act(async () => { first.reject(new Error("Older write denied")); });
+    expect(button.textContent).toMatch(/Copied/);
+    expect(button.textContent).not.toMatch(/Copy failed/);
+    await act(async () => { vi.advanceTimersByTime(1800); });
+    expect(button.textContent).not.toMatch(/Copied|Copy failed/);
+  });
+
+  it.each(["page", "snippet"])("keeps the newest %s failure when an older write later succeeds", async (kind) => {
+    const first = deferredWrite();
+    const latest = deferredWrite();
+    const writeText = vi.fn<(text: string) => Promise<void>>()
+      .mockReturnValueOnce(first.promise).mockReturnValueOnce(latest.promise);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    await renderArticle("cli/commands");
+    const button = copyButton(kind);
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await act(async () => { latest.reject(new Error("Newest write denied")); });
+    expect(button.textContent).toMatch(/Copy failed/);
+    await act(async () => { first.resolve(); });
+    expect(button.textContent).toMatch(/Copy failed/);
+    expect(button.textContent).not.toMatch(/Copied/);
+  });
+
+  it.each(["page", "snippet"])("discards a pending %s write after navigating to another article", async (kind) => {
+    const pending = deferredWrite();
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockReturnValue(pending.promise);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const { router } = await renderArticle("cli/commands");
+    const oldButton = copyButton(kind);
+    fireEvent.click(oldButton);
+    await act(async () => {
+      await router.navigate({ to: "/docs/$", params: { _splat: "guides/accessibility" } });
+    });
+    const timer = vi.spyOn(window, "setTimeout");
+    await act(async () => { pending.resolve(); });
+    expect(copyButton(kind).textContent).not.toMatch(/Copied|Copy failed/);
+    expect(timer.mock.calls.filter(([, delay]) => delay === 1800)).toHaveLength(0);
+    if (kind === "snippet") {
+      expect(oldButton.isConnected).toBe(false);
+      expect(oldButton.textContent).toBe("Copy");
+    }
+    await act(async () => {
+      await router.navigate({ to: "/docs/$", params: { _splat: "cli/commands" } });
+    });
+    expect(copyButton(kind).textContent).not.toMatch(/Copied|Copy failed/);
+  });
 
   it.each(["page", "snippet"])("waits for the %s clipboard write before showing success", async (kind) => {
     let finishWrite!: () => void;

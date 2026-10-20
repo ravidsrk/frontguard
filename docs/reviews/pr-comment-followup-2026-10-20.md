@@ -29,8 +29,8 @@ This change addresses all 16 current unresolved findings from the latest-30-PR a
 ## Validation
 
 - Build, workspace lint/typecheck, version synchronization and documentation links pass.
-- Workspace suites pass 2,121 tests with no skips, including three new CI-alert cases, six clipboard cases, the copied-example/schema/Slack contract checks, unknown-option warnings and two real-README plugin-manager tests.
-- The CI and clipboard regression cases failed before their fixes and pass afterward.
+- Workspace suites pass 2,127 tests with no skips, including three new CI-alert cases, twelve clipboard cases (including reversed completions and navigation), the copied-example/schema/Slack contract checks, unknown-option warnings and two real-README plugin-manager tests.
+- The original CI and clipboard regression cases failed before their fixes and pass afterward. Removing the clipboard request/navigation guards also makes all six new race cases fail; restoring the guards makes them pass.
 - A real-browser fixture in a scratch git repository passes an unchanged-pixel comparison with exit 0. With the documented accessibility options enabled, the same page exits 2. A direct axe audit identifies one serious color-contrast violation. The successful JSON comparison report parses after redirection; the error run emits no JSON. See [captured evidence](accessibility-recipe-2026-10-20.json).
 - A local production Worker serves all 13 modified docs routes with HTTP 200 and no browser page errors. Real Chromium clipboard writes succeed for both article text and code snippets; the output-flag placeholder remains visible.
 - The web and standalone documentation stores are identical.
