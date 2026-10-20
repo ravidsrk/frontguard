@@ -251,3 +251,29 @@ Docker (socket permission denied). Holding the issue until a repro is possible.
 **Reason:** R13 forbids claiming something works from reading code. It does
 not forbid reporting a suspected defect, provided the issue says it was not
 reproduced.
+
+## A-23 — Publish the research with private hardening details withheld
+
+**Phase:** 2026-10-20 roadmap follow-up
+**Decision:** The owner asked to commit and push everything. Publish both earlier
+reports and their source notes, with dated draft notices, portable repository
+links and an index. Withhold product-specific details of the two private
+hardening items, consistent with A-21 and SECURITY.md. Preserve the unredacted
+originals in the ignored audit directory; private findings remain privately tracked.
+**Rejected:** Publishing private advisory details inside a public research dump.
+**Reason:** A-21 already established private handling. The publication request
+authorizes the research archive without changing that disclosure decision.
+
+## A-24 — File the executed selection omission without claiming a pixel result
+
+**Phase:** 2026-10-20 roadmap follow-up
+**Decision:** File #321 from a disposable git fixture using the real smartFilter,
+parser and resolver. Add it to Now and require a full-versus-filtered mutation arm
+in #285. Record that no browser or end-to-end CLI verdict was measured. Keep
+older X evidence dated 2026-10-19 because the refresh was blocked by HTTP 401/403.
+**Rejected:** Refiling the existing font issue (#303), claiming a measured visual
+false-negative rate from route selection, or treating inaccessible X posts as
+new demand evidence.
+**Reason:** The mixed SVG/route edit selected only /about and skipped the homepage
+asset consumer. This is a reproduced selection defect. It does not implement a
+new feature, change the frozen launch verdict or authorize cloud deployment.
