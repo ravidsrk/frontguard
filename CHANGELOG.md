@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Delete Daytona verification sandboxes through the SDK's supported API and
+  preserve the filesystem receiver when uploading staged CSS.
 - Fail closed on empty comparisons, render/storage/AI errors, rejected judge
   calls, stale CI baselines, and unpublished or diverged baseline state.
 - Make baseline comparison read-only and require explicit update mode for all

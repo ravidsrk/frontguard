@@ -36,17 +36,17 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@daytona/sdk": "^0.189.0",
+    "@daytona/sdk": "^0.225.0",
     "hono": "^4.12.26",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^26.6.1",
-    "better-sqlite3": "^12.11.1",
-    "eslint": "^10.6.0",
+    "better-sqlite3": "^13.0.3",
+    "eslint": "^10.13.0",
     "tsup": "^8",
-    "tsx": "^4.23.13",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.0"
   }

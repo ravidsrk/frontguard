@@ -1,0 +1,14 @@
+{
+  "driver": "better-sqlite3 11.10.0 -> 13.0.3",
+  "sqliteBefore": "3.49.2",
+  "sqliteAfter": "3.53.4",
+  "platform": "linux",
+  "arch": "arm64",
+  "node": "v22.23.3",
+  "retainedTextAndBlob": true,
+  "transactionAfterUpgrade": true,
+  "retainedFixPattern": true,
+  "acceptCountBefore": 3,
+  "acceptCountAfter": 4,
+  "integrityCheck": "ok"
+}
