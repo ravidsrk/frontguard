@@ -9,6 +9,9 @@
   beta release.
 - Pin the renderer to Playwright `1.64.1` and align the Docker and Daytona
   browser images. Review baseline changes when adopting a new renderer.
+- Fix Daytona sandbox cleanup and CSS uploads using the SDK's typed API.
+- Update the optional native SQLite driver to `13.0.3`; verify existing fix
+  pattern files remain readable and writable after the upgrade.
 
 ## 0.2.2
 

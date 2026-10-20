@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { DaytonaSandbox, shellQuote } from '../../src/sandbox/daytona.js';
 import type { SandboxScreenshotParams } from '../../src/sandbox/types.js';
 import { createTestPng } from '../fixtures/helpers.js';
@@ -97,6 +97,32 @@ describe('DaytonaSandbox.screenshot — injection safety', () => {
   it('throws a clear error if create() was not called', async () => {
     const sb = new DaytonaSandbox();
     await expect(sb.screenshot(validParams)).rejects.toThrow(/not created/i);
+  });
+
+  it('preserves the SDK filesystem receiver when uploading CSS', async () => {
+    const { sb } = stubbedSandbox(createTestPng(4, 4).toString('base64'));
+    const fs = {
+      uploadFile: vi.fn(async function (this: unknown) {
+        expect(this).toBe(fs);
+      }),
+    };
+    (sb as unknown as { sandbox: { fs: unknown } }).sandbox.fs = fs;
+    await sb.screenshot(validParams);
+    expect(fs.uploadFile).toHaveBeenCalledOnce();
+  });
+});
+
+describe('DaytonaSandbox.destroy', () => {
+  it('deletes the remote sandbox once through the SDK client', async () => {
+    const { sb } = stubbedSandbox('');
+    const sandbox = (sb as unknown as { sandbox: unknown }).sandbox;
+    const deleteSandbox = vi.fn().mockResolvedValue(undefined);
+    (sb as unknown as { daytona: unknown }).daytona = { delete: deleteSandbox };
+
+    await sb.destroy();
+    await sb.destroy();
+
+    expect(deleteSandbox).toHaveBeenCalledExactlyOnceWith(sandbox);
   });
 });
 

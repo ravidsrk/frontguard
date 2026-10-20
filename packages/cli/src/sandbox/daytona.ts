@@ -10,6 +10,7 @@
  */
 
 import type { BrowserEngine } from '../core/types.js';
+import type { Daytona, Sandbox as DaytonaRemoteSandbox } from '@daytona/sdk';
 import type { Sandbox, SandboxPatch, SandboxScreenshotParams } from './types.js';
 import { logger } from '../utils/logger.js';
 import { cropToMaxHeight } from '../render/crop.js';
@@ -54,11 +55,8 @@ function validateUrl(raw: string): string {
 /** Daytona-backed sandbox. */
 export class DaytonaSandbox implements Sandbox {
   private cssPatches: string[] = [];
-  private sandbox: {
-    process: { executeCommand: (cmd: string) => Promise<{ result: string; exitCode: number }> };
-    fs?: { uploadFile?: (file: Buffer, remotePath: string) => Promise<void> };
-  } | null = null;
-  private daytona: { create: (opts: unknown) => Promise<unknown>; remove: (s: unknown) => Promise<void> } | null = null;
+  private sandbox: DaytonaRemoteSandbox | null = null;
+  private daytona: Daytona | null = null;
 
   async create(): Promise<void> {
     // Validate config BEFORE attempting the SDK import. Otherwise a missing
@@ -86,12 +84,8 @@ export class DaytonaSandbox implements Sandbox {
       );
     }
 
-    const Daytona = mod.Daytona as unknown as new () => {
-      create: (opts: unknown) => Promise<unknown>;
-      remove: (s: unknown) => Promise<void>;
-    };
-    this.daytona = new Daytona();
-    this.sandbox = (await this.daytona.create({ snapshot: FRONTGUARD_SNAPSHOT })) as typeof this.sandbox;
+    this.daytona = new mod.Daytona();
+    this.sandbox = await this.daytona.create({ snapshot: FRONTGUARD_SNAPSHOT });
     logger.debug('Daytona sandbox created');
   }
 
@@ -120,11 +114,11 @@ export class DaytonaSandbox implements Sandbox {
     // sandbox (via the SDK filesystem) and point the renderer at the path.
     const css = this.cssPatches.join('\n');
     const cssPath = '/tmp/frontguard-inject.css';
-    const upload = this.sandbox.fs?.uploadFile;
-    if (typeof upload !== 'function') {
+    const fs = this.sandbox.fs;
+    if (typeof fs?.uploadFile !== 'function') {
       throw new Error('Daytona render: sandbox filesystem (fs.uploadFile) is unavailable.');
     }
-    await upload(Buffer.from(css, 'utf8'), cssPath);
+    await fs.uploadFile(Buffer.from(css, 'utf8'), cssPath);
 
     // All remaining interpolated values are validated above, and quoted as a
     // belt-and-braces measure so they cannot break out of their argument.
@@ -150,7 +144,7 @@ export class DaytonaSandbox implements Sandbox {
     this.cssPatches = [];
     if (this.daytona && this.sandbox) {
       try {
-        await this.daytona.remove(this.sandbox);
+        await this.daytona.delete(this.sandbox);
         logger.debug('Daytona sandbox destroyed');
       } catch (err) {
         logger.warn(`Failed to destroy Daytona sandbox: ${err instanceof Error ? err.message : String(err)}`);
