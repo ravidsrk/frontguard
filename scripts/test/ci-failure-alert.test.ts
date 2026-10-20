@@ -372,6 +372,22 @@ describe('reconcileWithTip', () => {
     runUrl: 'https://example.test/older',
   };
 
+  it.each(['failure', 'success'])('never lets a fork PR on main apply a %s tip verdict', async (conclusion) => {
+    const decision = reconcileWithTip(
+      { ...staleSuccess, triggerEvent: 'pull_request', sha: 'fork-pr' },
+      { headSha: 'tip', conclusion, url: 'https://example.test/tip' },
+    );
+    expect(decision.action).toBe('skip');
+    const unexpectedWrite = () => { throw new Error('PR completion attempted an alert write'); };
+    expect(await applyAlert(decision, {
+      ensureLabel: unexpectedWrite,
+      listOpen: unexpectedWrite,
+      open: unexpectedWrite,
+      comment: unexpectedWrite,
+      close: unexpectedWrite,
+    })).toMatchObject({ did: 'skip' });
+  });
+
   it('opens when a replaced run was green but the tip CI failed', () => {
     const decision = reconcileWithTip(staleSuccess, {
       headSha: 'tip',
@@ -414,6 +430,27 @@ describe('reconcileWithTip', () => {
 });
 
 describe('CI failure alert workflow', () => {
+  it('keeps fork PR completions out of the main and drill concurrency queues', () => {
+    const expression = workflow.match(/^\s+group: \$\{\{(.+)\}\}$/m)?.[1];
+    expect(expression).toBeDefined();
+    // Evaluate the actual workflow's string/boolean expression, whose syntax
+    // is shared with JS here, including GitHub's format() call.
+    const group = new Function('github', 'format', `return (${expression});`);
+    const format = (template: string, id: number) => template.replace('{0}', String(id));
+    const event = (trigger: string, id: number, eventName = 'workflow_run') => ({
+      event_name: eventName,
+      run_id: id,
+      event: { workflow_run: { event: trigger, head_branch: 'main' } },
+    });
+    const main = group(event('push', 1), format);
+    const drill = group(event('', 2, 'workflow_dispatch'), format);
+    const fork = group(event('pull_request', 3), format);
+    expect(main).not.toBe(drill);
+    expect(fork).not.toBe(main);
+    expect(fork).not.toBe(drill);
+    expect(group(event('pull_request', 4), format)).not.toBe(fork);
+  });
+
   it('listens to the CI workflow and can be dispatched as a drill', () => {
     expect(workflow).toContain('workflows: ["CI"]');
     expect(workflow).toContain('types: [completed]');

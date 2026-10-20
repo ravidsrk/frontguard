@@ -156,7 +156,7 @@ Frontguard executes plugins across 9 ordered lifecycle hooks (`setup`, `beforeDi
 ```typescript
 import {
   createAccessibilityPlugin,
-  createPerformanceBudgetPlugin,
+  createPerfBudgetPlugin,
   createThirdPartyScriptPlugin,
 } from "@frontguard/cli/plugins";
 
@@ -165,8 +165,8 @@ export default {
   baseUrl: "http://localhost:3000",
   routes: ["/", "/pricing", "/checkout"],
   plugins: [
-    createAccessibilityPlugin({ standard: "wcag2aa", failOnImpact: "serious" }),
-    createPerformanceBudgetPlugin({ budgets: { lcpMs: 2500, cls: 0.1 } }),
+    createAccessibilityPlugin({ impact: "serious", failOnViolation: true }),
+    createPerfBudgetPlugin({ budgets: { lcp: 2500, cls: 0.1 } }),
     createThirdPartyScriptPlugin(),
   ],
 };
@@ -212,7 +212,7 @@ The supported path is the local CLI. Hosted cloud, MCP, GitHub App, and Docker C
 - **Fix-pattern database** — `accept-fix` / `reject-fix` / `export-patterns` train and share a local pattern store that the pipeline reuses before calling the AI.
 - **`frontguard doctor`** — environment diagnostics for sources of non-determinism (Node, Playwright/Chromium, browsers, config, git).
 - **`frontguard monitor`** — live production-URL monitoring with daemon polling, history, and webhook alerts.
-- **Accessibility + performance-budget plugins** — axe-core WCAG audits and LCP/CLS/TTFB budgets in the same render pass, correlated with the visual diff.
+- **Accessibility + performance-budget plugins** — axe-core audits captured route/viewport pairs in fresh Chromium pages; performance budgets report LCP/CLS/TTFB evidence alongside visual diffs.
 - **Inspectable artifacts** — HTML reports retain baseline/current/diff images; remote thumbnails require an explicit image-upload backend.
 
 See the [full CHANGELOG](https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md), [interactive documentation](https://frontguard.dev/docs), and [validation results](https://github.com/ravidsrk/frontguard/tree/main/validation). The published run used AI-disabled local comparisons and is not an AI-accuracy or cross-OS benchmark.

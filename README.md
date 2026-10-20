@@ -214,6 +214,15 @@ export default {
 
 ### 5. Connecting AI Coding Agents via `@frontguard/mcp` (Zero-Key Local Mode)
 
+Generate the local JSON report from your project directory (JSON goes to stdout):
+
+```bash
+mkdir -p frontguard-report
+npx -p @frontguard/cli frontguard run --output json > frontguard-report/report.json
+```
+
+Refresh this file after each comparison. Exit 1 can still produce a regression report; investigate exit 2 before using the report.
+
 Add `@frontguard/mcp` to `.mcp.json` (Claude Code, Cursor, or Windsurf). In local report mode, it reads `./frontguard-report/report.json` directly with zero Cloud API setup:
 
 ```json
@@ -232,15 +241,15 @@ Add `@frontguard/mcp` to `.mcp.json` (Claude Code, Cursor, or Windsurf). In loca
 
 Available MCP tools: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `promote_baseline`, `accept_baseline`, and `recent_runs`.
 
-### 6. Single-Pass Accessibility (WCAG), Web Vitals & Script Drift Audits
+### 6. Accessibility (WCAG), Performance Budgets & Script Drift Audits
 
-Frontguard ships a 9-hook plugin pipeline (`setup`, `beforeDiscover`, `afterDiscover`, `beforeRender`, `afterRender`, `afterCompare`, `afterRun`, `onError`, `teardown`) and built-in plugins that inspect the live DOM in the same Chromium render pass:
+Frontguard ships a 9-hook plugin pipeline (`setup`, `beforeDiscover`, `afterDiscover`, `beforeRender`, `afterRender`, `afterCompare`, `afterRun`, `onError`, `teardown`) and built-in plugins for accessibility, performance budgets and third-party scripts. The accessibility plugin audits route/viewport pairs in fresh Chromium pages after screenshot capture:
 
 ```typescript
 // frontguard.config.ts
 import {
   createAccessibilityPlugin,
-  createPerformanceBudgetPlugin,
+  createPerfBudgetPlugin,
   createThirdPartyScriptPlugin,
 } from '@frontguard/cli/plugins';
 
@@ -249,8 +258,8 @@ export default {
   baseUrl: 'http://localhost:3000',
   routes: ['/', '/pricing', '/checkout'],
   plugins: [
-    createAccessibilityPlugin({ standard: 'wcag2aa', failOnImpact: 'serious' }),
-    createPerformanceBudgetPlugin({ budgets: { lcpMs: 2500, cls: 0.1 } }),
+    createAccessibilityPlugin({ impact: 'serious', failOnViolation: true }),
+    createPerfBudgetPlugin({ budgets: { lcp: 2500, cls: 0.1 } }),
     createThirdPartyScriptPlugin(),
   ],
 };

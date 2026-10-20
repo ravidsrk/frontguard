@@ -210,6 +210,14 @@ async function auditUrl(
  * @returns A {@link FrontguardPlugin}.
  */
 export function createAccessibilityPlugin(config: AccessibilityConfig = {}): FrontguardPlugin {
+  const supported = ['impact', 'rules', 'excludeRules', 'failOnViolation'];
+  const unknown = Object.keys(config).filter((key) => !supported.includes(key));
+  if (unknown.length > 0) {
+    logger.warn(
+      `Accessibility plugin: unknown option(s): ${unknown.join(', ')}. ` +
+      `Supported options: ${supported.join(', ')}.`,
+    );
+  }
   let axeAvailable = false;
   // Results collected during `afterRender`, surfaced onto the RunResult in
   // `afterRun`. Kept in closure scope so `afterRun` is the canonical delivery

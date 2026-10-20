@@ -308,7 +308,7 @@ $ npx -p @frontguard/cli frontguard run`,
     Cluster #1: (100, 200) 120×40px -> targetSelector: [data-testid="upgrade-btn"]
   Report written to ./frontguard-report/report.html (exit code 1)`,
     )}${h2('Inspect the HTML workbench')}${p(
-      'Open ./frontguard-report/report.html in any browser (or serve it with frontguard serve). The HTML workbench is a single self-contained file with embedded images and keyboard shortcuts:',
+      'Open ./frontguard-report/report.html in a browser. To serve it over HTTP, run python3 -m http.server 8080 --directory ./frontguard-report and visit http://localhost:8080/report.html. Keep the images/ directory alongside report.html when moving or sharing the report; the HTML normally links to those PNG files.',
     )}${table(
       ['Shortcut', 'Action', 'Practical Use'],
       [
@@ -466,7 +466,7 @@ $ frontguard monitor --history`,
       [
         ['--url &lt;url&gt;', 'string', 'Override baseUrl from frontguard.config.ts (useful for staging or preview URLs).'],
         ['--threshold &lt;ratio&gt;', 'number (0-1)', 'Maximum allowed changed-pixel ratio (e.g., 0.01 = 1%).'],
-        ['--viewports &lt;list&gt;', 'numbers', 'Override viewport widths in pixels (e.g., --viewports 375 768 1440).'],
+        ['--viewports &lt;list&gt;', 'numbers', 'Override viewport widths with one comma-separated list (e.g., --viewports 375,768,1440).'],
         ['--browsers &lt;list&gt;', 'chromium | firefox | webkit', 'Browsers to render across.'],
         ['--color-scheme &lt;scheme&gt;', 'light | dark', 'Emulate prefers-color-scheme media query before rendering.'],
         ['--wait-for-stability', 'boolean', 'Poll consecutive animation frames until pixel variance converges (< 0.05%) before capture.'],
@@ -474,7 +474,7 @@ $ frontguard monitor --history`,
         ['--freeze-time [timestamp]', 'boolean | number | ISO string', 'Lock page.clock and Date.now() to a fixed epoch ms or ISO 8601 timestamp (e.g., 2026-01-01T00:00:00Z).'],
         ['--seed-random [seed]', 'boolean | number', 'Inject a deterministic Mulberry32 PRNG overriding Math.random() (default seed: 42).'],
         ['--block-urls &lt;patterns...&gt;', 'string[]', 'Abort matching third-party network requests (ads, analytics, live chat widgets) during page load.'],
-        ['--output <format>', 'console | json', 'Emit human-readable console output or structured JSON to stdout.'],
+        ['--output &lt;format&gt;', 'console | json', 'Emit human-readable console output or structured JSON to stdout.'],
         ['--docker', 'boolean', 'Execute rendering inside the local frontguard/render Docker container.'],
       ],
     )}${h2('Threshold units')}${p(
@@ -538,7 +538,7 @@ $ frontguard monitor --history`,
   workers: 4,
   pageTimeout: 30000,
   maxHeight: 5000,
-  outputDir: '.frontguard/results',
+  outputDir: './frontguard-report',
 }`,
     )}${h2('Configuration reference')}${table(
       ['Property', 'Type', 'Default', 'Description'],
@@ -547,11 +547,11 @@ $ frontguard monitor --history`,
         ['baseUrl', 'string', "'http://localhost:3000'", 'Root URL of the application under test.'],
         ['routes', 'Array&lt;string | RouteConfig&gt;', 'undefined', 'Explicit route paths or route objects with custom actions, viewports, and threshold overrides.'],
         ['discover', '{ startUrl, maxDepth, exclude }', 'undefined', 'Zero-config route crawler settings when routes is omitted.'],
-        ['storybook', '{ url, include?, exclude? }', 'undefined', 'Discover and render stories from a running Storybook 7/8 server.'],
+        ['storybook', '{ url, stories?, exclude? }', 'undefined', 'Discover and render stories from a running Storybook 7/8 server.'],
         ['viewports', 'number[]', '[375, 768, 1440]', 'Viewport widths in CSS pixels.'],
         ['browsers', "Array&lt;'chromium'|'firefox'|'webkit'&gt;", "['chromium']", 'Playwright browser engines to test.'],
         ['threshold', 'number (0-1)', '0.1', 'Changed-pixel ratio threshold (0.01 = 1%). Lower for stricter layout checks.'],
-        ['ssimThreshold', 'number (0-1)', '0.95', 'Minimum structural similarity score before flagging a visual regression.'],
+        ['ssimThreshold', 'number (0-1)', '0.98', 'SSIM fallback cutoff when ssimFallback is enabled.'],
         ['colorScheme', "'light' | 'dark'", 'undefined', 'Emulate prefers-color-scheme during capture.'],
         ['waitForStability', 'boolean', 'false', 'Wait for consecutive animation frames to converge before taking the screenshot.'],
         ['redactSensitive', 'boolean', 'false', 'Mask password/email/tel inputs and [data-frontguard-redact] nodes and scrub DOM snapshots.'],
@@ -561,7 +561,7 @@ $ frontguard monitor --history`,
         ['ignore', 'Array&lt;{ selector: string }&gt;', '[]', 'Hide or mask volatile DOM elements (e.g., live tickers, video players) during capture.'],
         ['ai', '{ provider, model?, baseUrl? }', 'undefined', 'Optional BYOK vision triage (openai, anthropic, gemini).'],
         ['plugins', 'FrontguardPlugin[]', '[]', 'Registered 9-hook lifecycle plugins (accessibility, performance budgets, script inventory, custom).'],
-        ['outputDir', 'string', "'.frontguard/results'", 'Directory where HTML and JSON artifacts are written.'],
+        ['outputDir', 'string', "'./frontguard-report'", 'Directory for HTML and images. JSON output is written to stdout; redirect it to save a file.'],
       ],
     )}${h2('Practical recipes')}${h3('Recipe 1: Interacting with Modals, Tabs & Auth Forms Before Capture')}${p(
       'Each entry in routes can specify an actions array executed sequentially by Playwright before stability checks and screenshot capture:',
@@ -728,7 +728,7 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
         ['threshold', 'number (0-1)', '0.01', 'Fraction of pixels allowed to differ before passed becomes false (0.01 = 1%).'],
         ['selector', 'string', 'undefined', 'CSS selector to capture a specific component instead of the full viewport.'],
         ['fullPage', 'boolean', 'true', 'Capture the full scrollable page height (ignored when selector is set).'],
-        ['waitForStable', 'boolean | { timeoutMs?, intervalMs? }', 'false', 'Poll consecutive frames until pixel variance < 0.05% and document.fonts.ready resolves.'],
+        ['waitForStable', 'boolean | { maxAttempts?: number, intervalMs?: number }', 'false', 'Wait for fonts, then compare consecutive captures using threshold. Defaults: maxAttempts 3, intervalMs 80.'],
         ['redactSensitive', 'boolean', 'false', 'Mask password/email/tel inputs and [data-frontguard-redact] elements before capture.'],
         ['freezeTime', 'boolean | number | string', 'undefined', 'Freeze page.clock and Date.now() via epoch ms or ISO 8601 string (e.g., "2026-01-01T00:00:00Z").'],
         ['seedRandom', 'boolean | number', 'undefined', 'Override Math.random() with a deterministic Mulberry32 PRNG (true uses seed 42).'],
@@ -741,7 +741,7 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
         ['update', 'boolean', 'process.env.FRONTGUARD_UPDATE === "1"', 'Overwrite the existing baseline PNG with the current capture.'],
       ],
     )}${h2('Result')}${p(
-      'The result includes passed, diffPercentage, paths, settled (frame convergence metadata from waitForStable), result.clusters (connected-component spatial diff clusters with bbox, pixelCount, and targetSelector DOM attribution), result.ariaSnapshot (when captureAriaSnapshot is enabled), optional AI output, SSIM, and isNewBaseline. Compare the returned result in your test; the function does not call a Playwright assertion for you.',
+      'The result includes passed, diffPercentage, baselinePath, currentPath, optional diffPath, boolean settled when waitForStable is enabled, clusters with bbox/rawDiffPixels/targetSelector, optional ariaSnapshot and AI output, SSIM, and isNewBaseline. Compare the returned result in your test; the function does not call a Playwright assertion for you.',
     )}${table(
       ['Field', 'Type', 'Description'],
       [
@@ -749,12 +749,14 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
         ['diffPercentage', 'number (0-1)', 'Ratio of changed pixels to total pixels (0.015 = 1.5%).'],
         ['ssim', 'number (0-1)', 'Structural similarity score between baseline and current image (1.0 = identical).'],
         ['isNewBaseline', 'boolean', 'True when no prior baseline existed and a new baseline PNG was written.'],
-        ['paths', '{ baseline, current?, diff? }', 'File paths to the baseline PNG and (on failure) current and diff PNGs.'],
+        ['baselinePath', 'string', 'File path to the baseline PNG.'],
+        ['currentPath', 'string', 'File path to the current PNG.'],
+        ['diffPath', 'string | undefined', 'File path to the diff PNG when one was written.'],
         ['clusters', 'PlaywrightDiffCluster[]', '8-connected spatial diff regions: { id, bbox: { x, y, width, height }, rawDiffPixels, targetSelector? }.'],
-        ['settled', '{ settled: boolean, framesChecked: number }', 'Frame convergence telemetry when waitForStable is enabled.'],
+        ['settled', 'boolean | undefined', 'Whether captures converged within maxAttempts; present when waitForStable is enabled.'],
         ['blockedRequestsCount', 'number', 'Number of network requests aborted by blockUrls.'],
         ['ariaSnapshot', 'string', 'Playwright ARIA tree YAML/text snapshot when captureAriaSnapshot: true.'],
-        ['ai', '{ classification, confidence, explanation, suggestedFix? }', 'Optional vision model triage result when ai is enabled and a diff occurred.'],
+        ['ai', '{ classification: string, severity: string, explanation: string } | undefined', 'Optional vision model triage result when ai is enabled and a diff occurred.'],
       ],
     )}${h2('Inspecting spatial clusters in tests')}${code(
       'tests/checkout-regression.spec.ts',
@@ -923,9 +925,10 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
   ai: {
     provider: 'openai',
     model: 'gpt-4.1-mini',
-    generateFixes: true, // Opt-in 1: generate candidate CSS patch
-    verifyFixes: true,   // Opt-in 2: inject CSS in sandbox & re-compare against baseline
   },
+  generateFixes: true, // Opt-in 1: generate candidate CSS patch
+  verifyFixes: true,   // Opt-in 2: inject CSS in sandbox & re-compare against baseline
+  fixSandbox: 'local', // Or 'daytona' with DAYTONA_API_KEY configured
 }`,
     )}${h2('Verification')}${p(
       'With generateFixes and verifyFixes enabled, Frontguard can apply a CSS suggestion in a sandbox, re-render, and label the outcome Verified or Unverified. A verified result is automatically recorded as an accepted local fix-pattern signal when that database is available.',
@@ -958,12 +961,12 @@ $ npx -p @frontguard/cli frontguard export-patterns &gt; .frontguard/shared-patt
       'OPTIONAL PLUGIN.',
       'The accessibility plugin depends on @axe-core/playwright and reports automated findings alongside a run.',
     )}${lead(
-      'Run automated axe-core WCAG accessibility checks in the exact same Chromium page pass as your visual regression screenshots: with zero extra browser cold-starts.',
+      'Run automated axe-core accessibility checks alongside visual regression screenshots. The plugin audits captured route/viewport pairs in fresh Chromium pages after rendering.',
     )}${h2('Status')}${p(
       'Install the optional dependency and import the plugin from @frontguard/cli/plugins. Automated axe results do not establish WCAG conformance and do not replace keyboard or assistive-technology review.',
     )}${h2('Use')}${code(
       'terminal: install optional peer dependency',
-      `$ npm install -D @axe-core/playwright`,
+      `$ npm install -D @axe-core/playwright@~4.13.0`,
     )}${code(
       'frontguard.config.ts: register the accessibility plugin',
       `import { createAccessibilityPlugin } from '@frontguard/cli/plugins'
@@ -974,19 +977,18 @@ export default {
   routes: ['/', '/pricing', '/checkout'],
   plugins: [
     createAccessibilityPlugin({
-      standard: 'wcag2aa',
-      failOnImpact: 'serious', // 'minor' | 'moderate' | 'serious' | 'critical'
-      exclude: ['.third-party-iframe'],
+      impact: 'serious', // Report serious and critical violations
+      failOnViolation: true,
     }),
   ],
 }`,
     )}${h2('Configuration & options')}${table(
       ['Option', 'Type', 'Default', 'Description'],
       [
-        ['standard', "'wcag2a' | 'wcag2aa' | 'wcag21aa' | 'best-practice'", "'wcag2aa'", 'WCAG rule tag set evaluated by axe-core during the afterRender hook.'],
-        ['failOnImpact', "'minor' | 'moderate' | 'serious' | 'critical'", "'serious'", 'Minimum violation impact level highlighted in console and HTML reports.'],
-        ['include', 'string[]', 'undefined', 'Optional CSS selectors to scope the accessibility audit to specific regions.'],
-        ['exclude', 'string[]', 'undefined', 'Optional CSS selectors (such as legacy embeds) to exclude from axe analysis.'],
+        ['impact', "'minor' | 'moderate' | 'serious' | 'critical'", "'minor'", 'Minimum severity to report. Set serious with failOnViolation to fail on serious and critical violations.'],
+        ['rules', 'string[]', 'undefined', 'Optional allowlist of axe rule IDs, not selectors or WCAG tags.'],
+        ['excludeRules', 'string[]', 'undefined', 'Optional denylist of axe rule IDs. Element selector exclusions are not supported. Unknown option keys produce a warning.'],
+        ['failOnViolation', 'boolean', 'false', 'Fail on reported violations at or above impact; when impact is omitted the failure cutoff is serious.'],
       ],
     )}${h2('Limit')}${p(
       'Automated axe-core rules catch common contrast, missing label, and ARIA role errors, but cannot verify keyboard focus traps, screen-reader announcement order, or cognitive usability. Always pair automated checks with manual assistive-technology testing.',
@@ -1005,25 +1007,24 @@ export default {
       'EXPERIMENTAL.',
       'The plugin can collect and report selected metrics, but its failOnBudgetExceeded path is not a verified standalone CI gate in the current release.',
     )}${lead(
-      'Capture Navigation Timing, Paint Timing (FCP, LCP), layout shift (CLS), and resource transfer weight during the same browser render pass used for visual diffing.',
+      'Report navigation timing, estimated LCP/CLS, resource transfer weight and request counts from captured routes. FCP is not a supported budget.',
     )}${h2('Experimental status')}${p(
       'Because Frontguard already boots Chromium and waits for network and frame convergence on every route, the performance budget plugin reads browser performance entries in the afterRender hook without launching a separate Lighthouse process.',
     )}${h2('Collecting Web Vitals in afterRender')}${code(
       'frontguard.config.ts: collecting route performance metrics',
-      `import { createPerformanceBudgetPlugin } from '@frontguard/cli/plugins'
+      `import { createPerfBudgetPlugin } from '@frontguard/cli/plugins'
 
 export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
   routes: ['/', '/pricing', '/dashboard'],
   plugins: [
-    createPerformanceBudgetPlugin({
+    createPerfBudgetPlugin({
       budgets: {
-        lcpMs: 2500,
-        fcpMs: 1200,
+        lcp: 2500,
         cls: 0.1,
-        ttfbMs: 600,
-        totalBytes: 1_500_000,
+        ttfb: 600,
+        maxPageWeight: 1500, // KB
       },
     }),
   ],
@@ -1031,11 +1032,11 @@ export default {
     )}${table(
       ['Metric', 'Budget Key', 'What It Measures'],
       [
-        ['Largest Contentful Paint', 'lcpMs', 'Time in ms until the largest visible hero text or image element renders.'],
-        ['First Contentful Paint', 'fcpMs', 'Time in ms until the first DOM text or graphic is painted.'],
+        ['Largest Contentful Paint', 'lcp', 'Estimated largest-content paint time in milliseconds.'],
         ['Cumulative Layout Shift', 'cls', 'Unitless layout instability score accumulated during page load.'],
-        ['Time to First Byte', 'ttfbMs', 'Response latency in ms for the document navigation request.'],
-        ['Total Transfer Weight', 'totalBytes', 'Sum of encoded transfer bytes across document, scripts, stylesheets, fonts, and images.'],
+        ['Time to First Byte', 'ttfb', 'Response latency in ms for the document navigation request.'],
+        ['Total Transfer Weight', 'maxPageWeight', 'Maximum total resource transfer weight in KB (1024 bytes).'],
+        ['Request Count', 'maxRequests', 'Maximum number of resource requests.'],
       ],
     )}${h2('Current limit')}${p(
       'Use the plugin output as supplemental evidence. Keep an independently verified performance gate for release decisions until the plugin exit-code path has a failing-first acceptance test.',
@@ -1108,8 +1109,9 @@ $ frontguard monitor --history`,
         ['--url &lt;url&gt;', 'baseUrl from config', 'Live production or staging URL to monitor.'],
         ['--threshold &lt;ratio&gt;', '0.05 (5%)', 'Changed-pixel ratio required to trigger a monitor alert (0-1 scale).'],
         ['--once', 'false', 'Execute a single check and exit immediately (ideal for Kubernetes CronJobs or GitHub Actions schedule).'],
-        ['--interval <seconds>', '300', 'Polling interval in seconds when running continuously as a foreground daemon.'],
-        ['--webhook &lt;url&gt;', 'undefined', 'Optional HTTP POST webhook (e.g., Slack incoming webhook) notified when threshold is breached.'],
+        ['--interval &lt;minutes&gt;', 'unset', 'Poll every N minutes. Without --interval or --watch, run once.'],
+        ['--watch', 'false', 'Continuously poll; default interval is one minute unless --interval is provided.'],
+        ['--webhook &lt;url&gt;', 'undefined', 'HTTP endpoint accepting Frontguard JSON alerts. Slack Incoming Webhooks require an adapter; see the Slack integration guide.'],
         ['--history', 'false', 'Print the local run history log stored under .frontguard/monitor-history.'],
       ],
     )}${h2('Scheduled cron recipe')}${p(
@@ -1185,71 +1187,75 @@ FRONTGUARD_API_KEY=fg_live_your_token_here`,
     'Guides',
     ['Interface', 'Lifecycle', 'Practical plugin examples', 'Compatibility'],
     `${lead(
-      'Extend every stage of the Frontguard CLI pipeline: from injecting authentication headers before page render to uploading diff reports to S3 or Slack after a run completes.',
+      'Extend the CLI pipeline by selecting authentication storage state before rendering, transforming captured results, or sending a report after a run.',
     )}${h2('Interface')}${p(
-      'CLI plugins are plain objects implementing documented lifecycle hooks. Import public types and built-in factories from the installed @frontguard/cli package rather than copying internal source paths.',
+      'Plugins are objects implementing FrontguardPlugin. Import that type from @frontguard/cli/plugins to check hook arguments and return values against your installed version.',
     )}${h2('Lifecycle')}${p(
-      'Hooks run in registration order and teardown runs in reverse order. Pin the CLI version and test plugin behavior against that version; no cross-version compatibility promise is published.',
+      'Hooks run in registration order; teardown runs in reverse order. Hooks receive configuration or captured results, not a live Playwright Page.',
     )}${table(
       ['Hook Order', 'Hook Name', 'When It Fires & Practical Use'],
       [
-        ['01', 'setup(ctx)', 'Runs once before discovery. Validate plugin options or initialize connections.'],
-        ['02', 'beforeDiscover(ctx)', 'Runs before route or Storybook discovery starts.'],
-        ['03', 'afterDiscover(ctx, routes)', 'Inspect, filter, or dynamically append routes prior to browser rendering.'],
-        ['04', 'beforeRender(ctx, page, route)', 'Runs on the live Playwright Page before navigation/capture. Inject auth cookies, localStorage tokens, or custom CSS.'],
-        ['05', 'afterRender(ctx, page, route)', 'Runs immediately after screenshot capture while the DOM is still live (used by accessibility, performance, and script plugins).'],
-        ['06', 'afterCompare(ctx, comparison)', 'Inspect pixel diff ratios, SSIM scores, and spatial clusters for each route.'],
-        ['07', 'afterRun(ctx, summary)', 'Runs after all routes and optional AI analysis finish. Send custom webhooks or upload artifacts.'],
-        ['08', 'onError(ctx, error)', 'Receives pipeline or plugin errors for structured logging.'],
-        ['09', 'teardown(ctx)', 'Runs in reverse registration order (LIFO) during cleanup to close sockets or temp resources.'],
+        ['01', 'setup(ctx)', 'Validate options and initialize state before discovery.'],
+        ['02', 'beforeDiscover(config)', 'Return the config to use for discovery.'],
+        ['03', 'afterDiscover(routes, config)', 'Return the routes to render after filtering or adding entries.'],
+        ['04', 'beforeRender({ routes, config })', 'Return { routes, config } to change capture configuration.'],
+        ['05', 'afterRender(screenshots, ctx)', 'Receives ScreenshotResult[]. Return a replacement array or void.'],
+        ['06', 'afterCompare(diffs, ctx)', 'Receives DiffResult[]. Return a replacement array or void.'],
+        ['07', 'afterRun(result, ctx)', 'Receives RunResult, including result.summary, before reporting.'],
+        ['08', 'onError(error, stage)', 'Handle a pipeline error; return true to suppress it.'],
+        ['09', 'teardown()', 'Release resources at the end of the run.'],
       ],
-    )}${h2('Practical plugin examples')}${h3('Example 1: Injecting Authentication Cookies & LocalStorage in beforeRender')}${code(
-      'frontguard.config.ts: auth session injector plugin',
-      `export default {
+    )}${h2('Practical plugin examples')}${h3('Example 1: Selecting authentication storage state')}${p(
+      'Create a Playwright storage-state file using your application login flow first. It can contain cookies and localStorage. Return its path in the capture config:',
+    )}${code(
+      'frontguard.config.ts: selecting a saved session',
+      `import type { FrontguardPlugin } from '@frontguard/cli/plugins'
+
+const sessionPlugin: FrontguardPlugin = {
+  name: 'use-review-session',
+  beforeRender({ routes, config }) {
+    return {
+      routes,
+      config: { ...config, auth: { storageState: './playwright/.auth/user.json' } },
+    }
+  },
+}
+
+export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
   routes: ['/dashboard', '/billing'],
-  plugins: [
-    {
-      name: 'inject-dev-session',
-      async beforeRender({ page }) {
-        await page.context().addCookies([
-          {
-            name: 'fg_session',
-            value: process.env.TEST_SESSION_COOKIE ?? 'dev-token',
-            domain: 'localhost',
-            path: '/',
-          },
-        ])
-      },
-    },
-  ],
+  plugins: [sessionPlugin],
 }`,
-    )}${h3('Example 2: Posting a Custom JSON Webhook Summary in afterRun')}${code(
+    )}${h3('Example 2: Posting a JSON webhook summary')}${code(
       'frontguard.config.ts: custom webhook reporter plugin',
-      `export default {
+      `import type { FrontguardPlugin } from '@frontguard/cli/plugins'
+
+const webhookPlugin: FrontguardPlugin = {
+  name: 'custom-ci-webhook',
+  async afterRun(result) {
+    const { summary } = result
+    if (summary.regressions &gt; 0 &amp;&amp; process.env.CI_ALERT_URL) {
+      const response = await fetch(process.env.CI_ALERT_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          regressions: summary.regressions,
+          totalComparisons: summary.total,
+        }),
+      })
+      if (!response.ok) throw new Error('Alert delivery failed')
+    }
+  },
+}
+
+export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
-  plugins: [
-    {
-      name: 'custom-ci-webhook',
-      async afterRun({ summary }) {
-        if (summary.regressions &gt; 0 &amp;&amp; process.env.CI_ALERT_URL) {
-          await fetch(process.env.CI_ALERT_URL, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              regressions: summary.regressions,
-              totalRoutes: summary.total,
-            }),
-          })
-        }
-      },
-    },
-  ],
+  plugins: [webhookPlugin],
 }`,
     )}${h2('Compatibility')}${p(
-      'Each hook is guarded by a configurable timeout (30 seconds by default) so a hung network call inside a custom plugin cannot stall your CI pipeline indefinitely.',
+      'Pin the CLI version and test your plugin against it. Destructuring afterRun({ summary }) is also valid because summary is a RunResult property. Each hook has a configurable timeout (30 seconds by default).',
     )}`,
   ),
 
@@ -1262,42 +1268,35 @@ FRONTGUARD_API_KEY=fg_live_your_token_here`,
     'Guides',
     ['Current status', 'Authoring a typed plugin package', 'Safe workflow'],
     `${note(
-      'AUTHOR GUIDE PENDING.',
-      'The prior scaffold examples were malformed and have been withdrawn rather than presented as executable code.',
+      'TYPED PLUGIN.',
+      'Build against the FrontguardPlugin interface from the CLI version you install.',
     )}${lead(
-      'Write standalone Frontguard plugins as standard TypeScript modules that export a factory function returning a FrontguardPlugin object.',
+      'Write a TypeScript factory returning a FrontguardPlugin object. Frontguard does not operate a plugin registry or compatibility certification service.',
     )}${h2('Current status')}${p(
-      'Build against the public plugin interfaces exported by your installed CLI version, add tests in the plugin repository, and follow the npm publishing process you independently verify. Frontguard does not operate a plugin registry or compatibility certification service.',
-    )}${h2('Authoring a typed plugin package')}${p(
-      'A reusable plugin package only needs a factory function returning a name and the lifecycle hooks it uses:',
-    )}${code(
+      'Use the public interfaces exported by your installed CLI, add tests in the plugin repository, and follow the npm publishing process you independently verify.',
+    )}${h2('Authoring a typed plugin package')}${code(
       'src/index.ts: standalone plugin structure',
-      `export interface HeaderOverrideOptions {
-  headers: Record&lt;string, string&gt;
+      `import type { FrontguardPlugin } from '@frontguard/cli/plugins'
+
+export interface StorageStateOptions {
+  path: string
 }
 
-export function createHeaderOverridePlugin(options: HeaderOverrideOptions) {
+export function createStorageStatePlugin(options: StorageStateOptions): FrontguardPlugin {
   return {
-    name: 'frontguard-plugin-header-override',
-    async beforeRender({ page }: { page: { setExtraHTTPHeaders: (h: Record&lt;string, string&gt;) =&gt; Promise&lt;void&gt; } }) {
-      await page.setExtraHTTPHeaders(options.headers)
+    name: 'frontguard-plugin-storage-state',
+    beforeRender({ routes, config }) {
+      return {
+        routes,
+        config: { ...config, auth: { storageState: options.path } },
+      }
     },
   }
 }`,
     )}${h2('Safe workflow')}${list([
-      'Keep plugin side effects isolated to the lifecycle hook that requires them (' +
-        ic('beforeRender') +
-        ' for page state, ' +
-        ic('afterRender') +
-        ' for DOM inspection, ' +
-        ic('afterRun') +
-        ' for reporting).',
-      'Always clean up external handles or temporary files inside ' +
-        ic('teardown') +
-        '.',
-      'Pin the peerDependency range for ' +
-        ic('@frontguard/cli') +
-        ' and test your plugin against real Playwright page fixtures in Vitest.',
+      'Use beforeRender for capture configuration, afterRender for captured screenshot results, and afterRun for reporting.',
+      'Clean up external handles or temporary files in teardown.',
+      'Pin the peerDependency range for @frontguard/cli and test with representative route and result fixtures.',
     ])}`,
   ),
 
@@ -1507,11 +1506,17 @@ export default {
     'Integrations',
     ['Configuration', 'Tools', 'Agentic debugging workflow', 'Approval limit'],
     `${cloudNotice}${lead(
-      '@frontguard/mcp is a 7-tool Model Context Protocol (MCP) server that gives AI coding agents (Claude Code, Cursor, Windsurf) structured access to visual regression reports, spatial DOM diff clusters, CSS patch validation, and local baseline promotion.',
+      '@frontguard/mcp gives coding agents structured access to local visual regression reports, DOM clusters and CSS patch validation. Reading local reports needs no cloud account or API key.',
     )}${h2('Configuration')}${p(
-      'For local development, @frontguard/mcp runs in zero-key Local Report Mode by reading ./frontguard-report/report.json written by frontguard run. Add it to your project .mcp.json or editor MCP settings:',
+      'From your project directory, start the app and prepare reviewed baselines first. JSON output goes to stdout, so create the report directory and redirect it into the file MCP will read:',
     )}${code(
-      '.mcp.json: Claude Code / Cursor / Windsurf local setup',
+      'terminal: create the local JSON report',
+      `mkdir -p frontguard-report
+npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/report.json`,
+    )}${p(
+      'Exit 1 means the report contains regressions or unaccepted screenshots; exit 2 indicates an error to investigate. Run the MCP client from this project directory, or use an absolute FRONTGUARD_LOCAL_REPORT path.',
+    )}${code(
+      '.mcp.json: local report setup',
       `{
   "mcpServers": {
     "frontguard": {
@@ -1523,42 +1528,34 @@ export default {
     }
   }
 }`,
-    )}${code(
-      'configuration',
-      `# Local report mode (reads ./frontguard-report/report.json by default)
-FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json
-
-# Verified Cloud API deployment
-FRONTGUARD_API_URL=https://your-frontguard-api.example.com
-FRONTGUARD_API_KEY=&lt;frontguard-api-key&gt;`,
-    )}${h2('Tools')}${p(
-      'The MCP server exposes 7 tools across local report mode (FRONTGUARD_LOCAL_REPORT or ./frontguard-report/report.json) and a verified Cloud API deployment: list_regressions, inspect_diff_cluster_dom, get_suggested_fix, verify_css_patch, promote_baseline, accept_baseline, and recent_runs.',
-    )}${table(
+    )}${p(
+      'Cloud-dependent tools require an independently verified FRONTGUARD_API_URL deployment and FRONTGUARD_API_KEY; no working hosted default is supplied.',
+    )}${h2('Tools')}${table(
       ['MCP Tool Name', 'Required Arguments', 'What It Returns to the Coding Agent'],
       [
-        ['list_regressions', 'run_id? (optional in local mode)', 'Lists failed/warned routes, viewports, diff ratios, SSIM scores, and cluster counts.'],
-        ['inspect_diff_cluster_dom', 'route, viewport?', 'Returns 8-connected spatial diff clusters with bounding boxes (bbox), Chroma-SSIM, CW-SSIM, and grounded DOM selector (targetSelector).'],
-        ['get_suggested_fix', 'route, viewport?', 'Returns candidate CSS fix, target selector, confidence score, and sandbox verification status.'],
-        ['verify_css_patch', 'route, css_patch, target_selector?', 'Validates CSS syntax (balanced braces, non-empty declarations) and guards against destructive rules (display: none, visibility: hidden, opacity: 0).'],
-        ['promote_baseline', 'route, confirm_reviewed: true', 'Promotes a human-reviewed current screenshot into the local baseline store.'],
-        ['accept_baseline', 'run_id, note?', 'Records whole-run approval metadata on a verified Cloud API deployment.'],
-        ['recent_runs', 'limit?', 'Lists recent visual test runs with pass/fail counts and timestamps.'],
+        ['list_regressions', 'pr_id; optional repo, branch', 'Lists regressions and their diffId values. Use a PR number or a run ID returned by recent_runs; branch is currently reserved.'],
+        ['inspect_diff_cluster_dom', 'diff_id; optional cluster_id', 'Returns captured DOM clusters, bounding boxes, selectors and diff evidence.'],
+        ['get_suggested_fix', 'diff_id', 'Returns a stored suggested fix if one exists.'],
+        ['verify_css_patch', 'diff_id, css_patch, target_selector', 'Validates CSS syntax, target alignment and safety against the report. It does not render or apply the patch.'],
+        ['promote_baseline', 'run_id, confirm_reviewed: true; optional routes', 'Cloud API mode only: records reviewed run approval. Refuses local-report mode; does not promote cloud PNGs.'],
+        ['accept_baseline', 'run_id, confirm_all_regressions_reviewed: true', 'Records whole-run approval metadata in the local JSON report or Cloud API; does not replace screenshot baselines.'],
+        ['recent_runs', 'optional repo, branch, limit', 'Lists runs, including the local run ID when reading a JSON report.'],
       ],
     )}${h2('Agentic debugging workflow')}${steps([
       {
-        title: 'Run Frontguard locally',
-        body: 'Execute npx -p @frontguard/cli frontguard run so ./frontguard-report/report.json is populated with current diff clusters and DOM selectors.',
+        title: 'Write the report',
+        body: 'Use the JSON command above. Recreate report.json after each comparison so MCP reads the current evidence.',
       },
       {
-        title: 'Ask your coding agent to inspect regressions',
-        body: 'Prompt Claude Code or Cursor: "Use Frontguard MCP to list current visual regressions, inspect the diff cluster DOM selector on /pricing, and fix the CSS layout shift."',
+        title: 'Inspect regressions',
+        body: 'Call recent_runs, then list_regressions with pr_id set to the returned run ID. Pass a returned diffId as the diff_id input to inspect_diff_cluster_dom or get_suggested_fix.',
       },
       {
-        title: 'Verify & re-run',
-        body: 'The agent calls list_regressions -> inspect_diff_cluster_dom -> verify_css_patch, edits your stylesheet, and re-runs frontguard run to confirm 0 regressions.',
+        title: 'Validate and re-run',
+        body: 'Call verify_css_patch with diff_id, css_patch and target_selector. Apply the reviewed code edit yourself and re-run Frontguard; CSS validation alone is not visual verification.',
       },
     ])}${h2('Approval limit')}${p(
-      'Use promote_baseline in local mode to promote a verified screenshot into the local baseline store. In cloud mode, accept_baseline records whole-run approval metadata only; cloud screenshot promotion is not implemented.',
+      'Local-report mode cannot replace PNG baselines. accept_baseline can mark the JSON report approved, but a human reviewer uses frontguard update-baselines to accept local screenshots. Cloud tools record approval metadata only, with explicit confirmation; cloud screenshot promotion is not implemented.',
     )}`,
   ),
 
@@ -1584,9 +1581,8 @@ FRONTGUARD_API_KEY=&lt;frontguard-api-key&gt;`,
   baseUrl: 'http://localhost:3000',
   storybook: {
     url: 'http://localhost:6006',
-    include: ['components-button--*', 'marketing-pricing--*'],
+    stories: ['components-button--*', 'marketing-pricing--*'],
     exclude: ['*--loading-skeleton'],
-    waitForPlayFunction: true,
   },
   viewports: [375, 1440],
   waitForStability: true,
@@ -1595,10 +1591,11 @@ FRONTGUARD_API_KEY=&lt;frontguard-api-key&gt;`,
       ['Property', 'Type', 'Default', 'Description'],
       [
         ['storybook.url', 'string', 'Required', 'Base URL of your running Storybook instance (e.g., http://localhost:6006).'],
-        ['storybook.include', 'string[]', 'undefined', 'Optional glob patterns matching story IDs or titles to include.'],
+        ['storybook.stories', 'string[]', 'undefined', 'Optional glob patterns matching story IDs or titles to include.'],
         ['storybook.exclude', 'string[]', 'undefined', 'Optional glob patterns of noisy or animated stories to skip.'],
-        ['storybook.waitForPlayFunction', 'boolean', 'true', 'Wait for Storybook interactive play() functions to finish before taking the screenshot.'],
       ],
+    )}${p(
+      'Play-function handling is built into story capture; there is no waitForPlayFunction configuration switch.',
     )}${h2('Release limit')}${p(
       'Run Storybook yourself, review discovered stories, and use the normal explicit CLI baseline workflow. Do not assume a hosted Storybook review service is included.',
     )}`,
@@ -1636,20 +1633,55 @@ $ npx -p @frontguard/cli frontguard run --url "$DEPLOY_PRIME_URL" --wait-for-sta
     'Integrations',
     ['Status', 'Using Slack webhooks with frontguard monitor', 'Cloud requirement'],
     `${integrationNotice}${cloudNotice}${lead(
-      'Send visual regression alerts to Slack via incoming webhooks in frontguard monitor or custom afterRun plugins, and understand the pre-release status of the Slack OAuth worker.',
+      'Forward monitor alerts to a Slack Incoming Webhook through an adapter that translates the Frontguard JSON payload into a Slack message.',
     )}${h2('Status')}${p(
       'The checked-in Slack worker and OAuth source are for evaluation. No installed public app, durable alert delivery, or support commitment is claimed.',
     )}${h2('Using Slack webhooks with frontguard monitor')}${p(
-      'For local or CI-scheduled monitoring today, pass a standard Slack Incoming Webhook URL to frontguard monitor --webhook:',
+      'Monitor sends { tool, timestamp, alerts, summary }. Slack expects text or blocks, so do not pass SLACK_WEBHOOK_URL directly to --webhook. Run this local adapter with Node 22:',
     )}${code(
-      'terminal: alerting a Slack webhook on threshold breach',
-      `$ npx -p @frontguard/cli frontguard monitor \\
-    --url https://example.com \\
-    --threshold 0.05 \\
-    --once \\
-    --webhook "$SLACK_WEBHOOK_URL"`,
+      'slack-adapter.mjs',
+      `import { createServer } from 'node:http'
+
+if (!process.env.SLACK_WEBHOOK_URL) throw new Error('Set SLACK_WEBHOOK_URL')
+
+createServer(async (req, res) =&gt; {
+  if (req.method !== 'POST' || req.url !== '/alerts') {
+    res.writeHead(404).end()
+    return
+  }
+  try {
+    let body = ''
+    for await (const chunk of req) {
+      body += chunk
+      if (Buffer.byteLength(body) &gt; 65536) {
+        res.writeHead(413).end('Alert too large')
+        return
+      }
+    }
+    const { summary } = JSON.parse(body)
+    const response = await fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        text: 'Frontguard: ' + summary.alerted + ' of ' + summary.total + ' checks alerted',
+      }),
+      signal: AbortSignal.timeout(10000),
+    })
+    res.writeHead(response.ok ? 200 : 502).end()
+  } catch {
+    res.writeHead(502).end('Alert forwarding failed')
+  }
+}).listen(8788, '127.0.0.1')`,
+    )}${code(
+      'terminal 1: leave the local adapter running',
+      `SLACK_WEBHOOK_URL='https://hooks.slack.com/services/your/webhook/path' node slack-adapter.mjs`,
+    )}${code(
+      'terminal 2: send Frontguard alerts to the adapter',
+      `npx -p @frontguard/cli frontguard monitor --url https://example.com --threshold 0.05 --once --webhook http://127.0.0.1:8788/alerts`,
+    )}${p(
+      'This example listens only on localhost. Use your existing authenticated alert service for remote CI runners; webhook delivery is best-effort.',
     )}${h2('Cloud requirement')}${p(
-      'Interactive Slack buttons and OAuth workspace installation in integrations/slack depend on a self-operated Cloud API deployment and are not generally available.',
+      'Interactive Slack buttons and OAuth installation in integrations/slack require a self-operated Cloud API deployment and are not generally available.',
     )}`,
   ),
 
@@ -1817,7 +1849,7 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
       'EXPERIMENTAL.',
       'Fix generation and verification are separate opt-ins. Local and Daytona backends do not establish cross-host render equivalence.',
     )}${lead(
-      'When both generateFixes and verifyFixes are enabled under ai, Frontguard tests candidate CSS patches in an isolated browser render before reporting them as Verified or Unverified.',
+      'When generateFixes and verifyFixes are enabled at the config top level and ai is configured, Frontguard tests candidate CSS patches in an isolated browser render before reporting them as Verified or Unverified.',
     )}${h2('Experimental status')}${p(
       'Verification applies a candidate patch, re-renders, and compares that result against the baseline. Verified and Unverified are observations from that run, not correctness guarantees.',
     )}${h2('How CSS patch verification works')}${steps([
@@ -1837,7 +1869,7 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
       ['Sandbox Backend', 'Configuration', 'Description'],
       [
         ['Local Playwright (Default)', 'verifyFixes: true', 'Re-renders the page in an isolated Playwright BrowserContext on the current machine.'],
-        ['Daytona Container Sandbox', 'sandbox: { provider: "daytona" }', 'Executes isolated verification inside an ephemeral Daytona workspace when configured.'],
+        ['Daytona Container Sandbox', "fixSandbox: 'daytona'", 'Executes isolated verification inside an ephemeral Daytona workspace when configured.'],
       ],
     )}${h2('Failure semantics')}${p(
       'If sandbox verification fails or times out, Frontguard preserves the original visual regression failure and labels the candidate fix as Unverified so your CI gate remains strict.',

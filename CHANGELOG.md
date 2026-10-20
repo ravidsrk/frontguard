@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Prevent pull-request CI completions from changing or replacing main failure
+  alerts, including fork branches named `main`.
+- Correct copied plugin, MCP, Playwright and monitoring documentation, warn
+  about unknown accessibility options, and report clipboard failures honestly.
 - Delete Daytona verification sandboxes through the SDK's supported API and
   preserve the filesystem receiver when uploading staged CSS.
 - Fail closed on empty comparisons, render/storage/AI errors, rejected judge

@@ -23,6 +23,11 @@ function flag(value) {
   return value === true || value === 'true';
 }
 
+function isMainPush(input) {
+  return input.eventName === 'workflow_run' &&
+    input.headBranch === 'main' && input.triggerEvent === 'push';
+}
+
 /**
  * @param {{
  *   eventName?: string,
@@ -56,10 +61,7 @@ export function decideAlert(input) {
     };
   }
 
-  const mainPush =
-    input.eventName === 'workflow_run' &&
-    input.headBranch === 'main' &&
-    input.triggerEvent === 'push';
+  const mainPush = isMainPush(input);
 
   if (mainPush && input.conclusion === 'failure') {
     return {
@@ -148,6 +150,9 @@ export function reconcileWithTip(trigger, tipRun) {
   if (flag(trigger.drill)) {
     return gateAgainstTip(decideAlert(trigger), trigger);
   }
+  // A fork PR may also have a source branch named main. Never turn that
+  // original event into a push just because the lookup found a main verdict.
+  if (!isMainPush(trigger)) return decideAlert(trigger);
   if (tipRun && tipRun.headSha) {
     const input = {
       eventName: 'workflow_run',
@@ -378,7 +383,7 @@ async function main() {
   const env = readEnv();
   const gh = createGhAdapter();
   let tipRun = null;
-  if (env.eventName === 'workflow_run' && !flag(env.drill) && env.tip) {
+  if (isMainPush(env) && !flag(env.drill) && env.tip) {
     try {
       tipRun = selectTipRun(gh.listCiRuns(env.tip), env.tip);
     } catch (error) {

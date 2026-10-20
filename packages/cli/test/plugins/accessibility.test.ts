@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   parseAxeResults,
   meetsImpactThreshold,
@@ -7,7 +7,9 @@ import {
   createAccessibilityPlugin,
   ACCESSIBILITY_RESULTS_KEY,
   type RawAxeResults,
+  type AccessibilityConfig,
 } from '../../src/plugins/accessibility.js';
+import { logger } from '../../src/utils/logger.js';
 import type { PluginContext } from '../../src/core/plugins.js';
 import type {
   AccessibilityResult,
@@ -119,6 +121,22 @@ describe('countFailingViolations', () => {
 });
 
 describe('createAccessibilityPlugin', () => {
+  it('warns about obsolete JavaScript option keys instead of silently accepting them', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    try {
+      createAccessibilityPlugin({ standard: 'wcag2aa', failOnImpact: 'serious' } as unknown as AccessibilityConfig);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0][0]).toContain('standard');
+      expect(warn.mock.calls[0][0]).toContain('failOnImpact');
+      expect(warn.mock.calls[0][0]).toContain('failOnViolation');
+      warn.mockClear();
+      createAccessibilityPlugin({ impact: 'serious', failOnViolation: true });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('has the correct name', () => {
     expect(createAccessibilityPlugin().name).toBe('accessibility');
   });

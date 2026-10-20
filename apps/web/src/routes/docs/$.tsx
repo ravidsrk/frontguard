@@ -10,6 +10,7 @@ import {
   jsonLdScript,
 } from '../../lib/schema-org'
 import { s } from '../../lib/style'
+import { copyText } from '../../lib/clipboard'
 
 const docArticlePath = (slug: string) => `/docs/${slug}`
 const docArticleTitle = (article: Article) => `${article.label} — Frontguard Docs`
@@ -84,14 +85,24 @@ function DocArticle() {
   const idx = articles.findIndex((a) => a.id === slug)
   const articleRef = useRef<HTMLDivElement>(null)
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
+  const [copyErrorSlug, setCopyErrorSlug] = useState<string | null>(null)
+  const pageCopyAttempt = useRef({ value: 0 })
+  const pageCopyTimer = useRef<number | undefined>(undefined)
   const activeId = idx !== -1 ? articles[idx]?.id : undefined
   const copiedPage = Boolean(activeId && copiedSlug === activeId)
+  const copyFailed = Boolean(activeId && copyErrorSlug === activeId)
+
+  useEffect(() => () => {
+    window.clearTimeout(pageCopyTimer.current)
+  }, [])
 
   useEffect(() => {
     const root = articleRef.current
     if (!root || !activeId) return
     const timers: number[] = []
     const createdButtons: HTMLButtonElement[] = []
+    const pageAttempt = pageCopyAttempt.current
+    let disposed = false
 
     const pres = root.querySelectorAll('pre')
     pres.forEach((pre) => {
@@ -110,22 +121,25 @@ function DocArticle() {
       btn.type = 'button'
       btn.className = 'fg-code-copy-btn fg-btn-ghost'
       btn.setAttribute('aria-label', 'Copy code snippet')
+      btn.setAttribute('aria-live', 'polite')
       btn.textContent = 'Copy'
       btn.style.cssText =
         "font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #c8c0b6; background: #1f1c19; border: 1px solid #322d28; padding: 4px 10px; cursor: pointer;"
 
-      btn.addEventListener('click', () => {
+      let attempt = 0
+      let feedbackTimer: number | undefined
+      btn.addEventListener('click', async () => {
+        const request = ++attempt
+        window.clearTimeout(feedbackTimer)
+        btn.textContent = 'Copy'
         const text = pre.textContent ?? ''
-        try {
-          void navigator.clipboard?.writeText(text)
-        } catch {
-          /* noop */
-        }
-        btn.textContent = 'Copied ✓'
-        const timer = window.setTimeout(() => {
+        const copied = await copyText(text)
+        if (disposed || request !== attempt) return
+        btn.textContent = copied ? 'Copied ✓' : 'Copy failed'
+        feedbackTimer = window.setTimeout(() => {
           btn.textContent = 'Copy'
         }, 1800)
-        timers.push(timer)
+        timers.push(feedbackTimer)
       })
 
       target.appendChild(btn)
@@ -133,6 +147,8 @@ function DocArticle() {
     })
 
     return () => {
+      disposed = true
+      pageAttempt.value++
       timers.forEach((t) => window.clearTimeout(t))
       createdButtons.forEach((b) => b.remove())
     }
@@ -159,16 +175,21 @@ function DocArticle() {
   const prev = articles[idx - 1]
   const next = articles[idx + 1]
 
-  const handleCopyArticle = () => {
-    const text = articleRef.current?.innerText ?? ''
-    try {
-      void navigator.clipboard?.writeText(text)
-    } catch {
-      /* noop */
-    }
+  const handleCopyArticle = async () => {
+    const request = ++pageCopyAttempt.current.value
     const targetSlug = cur.id
+    window.clearTimeout(pageCopyTimer.current)
+    setCopiedSlug(null)
+    setCopyErrorSlug(null)
+    const text = articleRef.current?.innerText ?? articleRef.current?.textContent ?? ''
+    const copied = await copyText(text)
+    if (request !== pageCopyAttempt.current.value) return
+    if (!copied) {
+      setCopyErrorSlug(targetSlug)
+      return
+    }
     setCopiedSlug(targetSlug)
-    window.setTimeout(() => setCopiedSlug((prevSlug) => (prevSlug === targetSlug ? null : prevSlug)), 1800)
+    pageCopyTimer.current = window.setTimeout(() => setCopiedSlug((prevSlug) => (prevSlug === targetSlug ? null : prevSlug)), 1800)
   }
 
   return (
@@ -217,11 +238,12 @@ function DocArticle() {
           type="button"
           onClick={handleCopyArticle}
           aria-label="Copy article content"
+          aria-live="polite"
           style={s(
             `font-family: ${MONO}; font-size: 12px; color: ${copiedPage ? '#4fb477' : '#c8c0b6'}; background: #141210; border: 1px solid ${copiedPage ? '#255c3b' : '#2a2622'}; border-radius: 4px; padding: 4px 10px; cursor: pointer;`,
           )}
         >
-          {copiedPage ? 'Copied page ✓' : 'Copy page text'}
+          {copiedPage ? 'Copied page ✓' : copyFailed ? 'Copy failed — retry' : 'Copy page text'}
         </button>
       </div>
 
