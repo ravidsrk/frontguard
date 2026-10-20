@@ -76,10 +76,6 @@ Table A lists what the spot check found for each claim. Every row is a grep-leve
 | Agents are kept away from promotion | Skill ends the agent path at `promote_baseline` and runs `update-baselines` | #287 must rewrite the skill |
 | Judge mode cannot move exit codes | Failing verdicts become `regressions`, exit 1 | #286's first change |
 | `update-baselines` might write the shared branch from PRs | Action pushes on any event; CLI `update-baselines` has no confirmation ([cli/index.ts](../packages/cli/src/cli/index.ts)) | #287, N3, N5 |
-
-
-
-
 | MCP ships `outputSchema` and `structuredContent` | All seven tools do, with a JSON text mirror; none declares annotations; SDK `^1.32.1`; no `mcpName` or `server.json` ([mcp index.ts](../packages/mcp/src/index.ts)) | N7, N10 |
 | MCP tools render pages | None launch a browser; `verify_css_patch` is static | Drop the origin-restriction candidate |
 | Regression rows carry image paths | Rows carry ids, route, viewport, status, diff percentage, classification, `hasSuggestedFix`, `reportUrl`; no image paths ([list-regressions.ts](../packages/mcp/src/tools/list-regressions.ts)) | Deferred |
@@ -106,8 +102,6 @@ Table B lists claims the spot check did not settle. Resolve each one against the
 | Upper bound on the `waitForStability` loop | Vitest's `timeout: 0` can loop forever | N1 |
 | `smartFilter` base on `merge_group` refs and on `fetch-depth: 2` | The `HEAD~1` fallback could scope a multi-commit PR to its last commit | N3 |
 | Whether the uploaded `frontguard-report` artifact holds full-resolution current PNGs | `review --from` needs them | N4 |
-
-
 | Consumer docs that recommend `update-baselines: true` on PR events | Blast radius of #287's guard | #287, N3 |
 | Whether the Firefox COOP emulation fix is in the pinned Playwright | Firefox drops `colorScheme` after COOP navigation until it is ([#43287](https://github.com/microsoft/playwright/issues/43287)) | N9 |
 | Hover reset, mid-capture resize, lazy-content pre-scroll, background-image waits | The notes listed these as anti-flake sub-items to verify | #285 fixtures |
@@ -440,7 +434,6 @@ Each row below is a feature that at least one notes file proposed or that the ma
 | A model, captioner or "AI diff" anywhere in pass/fail, including prompt-based ignore rules | Argos uses "deterministic pixel diffing, not AI-based visual comparison" and argues AI "compensates for flakiness" ([Argos](https://argos-ci.com/docs/learn/platform-fundamentals/how-argos-detects-visual-differences.md)); UI-Lens finds models near chance on layout classes | `windowSize` and `ignoreMask` inside the same gate (#284) |
 | Selectable alternative comparators (SSIM variants, perceptual metrics, odiff-class engines) as gates | No study compares deterministic metrics on UI screenshots; Vitest declines to bundle perceptual comparators because there is "no clear single 'best one'" ([Vitest guide](https://github.com/vitest-dev/vitest/blob/main/docs/guide/browser/visual-regression-testing.md)); Playwright closed pluggable comparators as out of scope ([#28578](https://github.com/microsoft/playwright/issues/28578)) | #284 fixtures; keep the SSIM override as is |
 | A Vitest `toMatchScreenshot` comparator adapter or a Storybook visual-test addon clone | The notes conflict. Against: no practitioner pull; Chromatic launched hosted Vitest visual testing with a Vitest core maintainer ([@chromaticcom](https://x.com/chromaticcom/status/2060053322241855658)); Vitest's engine has been BlazeDiff since 4.1 ([PR #9514](https://github.com/vitest-dev/vitest/pull/9514)) | Position the CLI as the local Storybook path (#289) |
-
 | Prompt or skill wording as the thing that stops promotion | "Do not modify the tests" barely mattered (weak study); CI agents follow issue text ([PromptPwnd](https://x.com/AikidoSecurity/status/1996608463938474239)) | #287's credential boundary; still rewrite the skill |
 | An agent or vision "looks good" verdict as a stop condition | Vendors already ship perception loops ([Copilot](https://x.com/github/status/1944826853048438832), [Cursor](https://x.com/cursor_ai/status/2042287192895267212)); screenshots carry hidden instructions (Brave) | The pixel verdict plus N8 |
 | Auto-passing or switching off the visual check in merge queues | bcgov did so and lost exact-commit verification; GitHub's April 2026 regression; PostHog's queue caught what PRs missed | N3 |
@@ -449,7 +442,6 @@ Each row below is a feature that at least one notes file proposed or that the ma
 | A browser-binary cache step in the Action | Restoring takes about as long as downloading ([Playwright CI](https://playwright.dev/docs/ci)) | Keep the pinned install the Action already does |
 | Determinism by flags: font hinting by default, shared cross-OS baselines, WebGL guarantees | The 2023 hinting flags are absent from 2026 defaults ([#20097](https://github.com/microsoft/playwright/issues/20097)); "not much you can do to get the same screenshots between OSes" ([#18240](https://github.com/microsoft/playwright/issues/18240)); the SwiftShader fallback is deprecated ([Chromium](https://chromium.googlesource.com/chromium/src/+/main/docs/gpu/swiftshader.md)) | N1; masks for canvas |
 | Raw DOM collision or element-protrusion lists, small-range-layout warnings | 9 of 43 and 3 of 90 visible; all **53** small-range reports on 20 new pages were false positives (VERVE) | N8 only |
-
 | Cross-locale or cross-browser pixel comparison as a gate | 55% precision against 91% for relational graphs (GWALI); F1 **0.35** on internal layout failures ([TWeb 2023](https://doi.org/10.1145/3580518)) | A relational report, if locales ever ship |
 | A self-healing test agent | Playwright's healer covers it, and its documented scope excludes baselines ([test agents](https://github.com/microsoft/playwright/blob/main/docs/src/test-agents-js.md)) | — |
 | MCP Tasks, Sampling, Roots or logging; Skills over MCP | 2026-07-28 moves Tasks to an extension and deprecates the rest; Skills client support is partial ([client matrix](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/extensions/client-matrix.mdx)) | N7, N10 |
