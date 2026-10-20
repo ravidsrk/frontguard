@@ -7,6 +7,8 @@
 - Harden baseline lifecycle, exit semantics, Action integration, reporter
   composition, telemetry privacy, and public documentation for the next OSS
   beta release.
+- Pin the renderer to Playwright `1.64.1` and align the Docker and Daytona
+  browser images. Review baseline changes when adopting a new renderer.
 
 ## 0.2.2
 

@@ -16,6 +16,16 @@ updates:
         patterns:
           - "playwright"
           - "@playwright/*"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
       types:
         patterns:
           - "@types/*"

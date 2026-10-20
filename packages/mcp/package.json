@@ -61,14 +61,14 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "zod": "^4.6.2"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@frontguard/cli": "*",
     "@types/node": "^26.6.1",
     "tsup": "^8.3.0",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.4"
+    "vitest": "^5.0.5"
   },
   "author": "Ravindra Kumar <ravidsrk@gmail.com>"
 }
