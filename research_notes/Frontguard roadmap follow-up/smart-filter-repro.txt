@@ -1,0 +1,24 @@
+Audited: 2026-10-20, main commit 1eef667
+Scope: actual route-selection implementation; no browser or pixels.
+Command: node --import tsx 'research_notes/Frontguard roadmap follow-up/smart-filter-repro.mjs'
+Expected on this commit: exit 1, asset consumer omitted.
+
+  ℹ Dependency graph: 1/2 routes affected by 2 changed file(s)
+  ℹ Skipping 1 unaffected route(s): /
+{
+  "changedFiles": [
+    "app/about/page.tsx",
+    "public/brand.svg"
+  ],
+  "selected": [
+    "/about"
+  ],
+  "skipped": [
+    "/"
+  ],
+  "assetConsumerSelected": false,
+  "reason": "1/2 routes affected by 2 changed file(s)",
+  "evidenceLimit": "Route selection only; no rendered pixels or CLI exit code measured."
+}
+
+Observed exit code: 1
