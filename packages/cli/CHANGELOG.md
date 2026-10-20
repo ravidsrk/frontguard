@@ -4,6 +4,8 @@
 
 ### Patch Changes
 
+- Correct the accessibility and performance plugin recipes; warn when obsolete
+  or unknown accessibility options would otherwise be silently ignored.
 - Harden baseline lifecycle, exit semantics, Action integration, reporter
   composition, telemetry privacy, and public documentation for the next OSS
   beta release.

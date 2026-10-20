@@ -52,15 +52,15 @@ setup → beforeDiscover → afterDiscover → beforeRender → afterRender → 
 
 | Hook | Signature | When It Runs |
 |------|-----------|--------------|
-| `setup` | `setup?(ctx: PluginContext): void \| Promise<void>` | Once at the start of a pipeline run before route discovery. Validate plugin options or initialize state. |
-| `beforeDiscover` | `beforeDiscover?(config: FrontguardConfig, ctx: PluginContext): FrontguardConfig \| void \| Promise<FrontguardConfig \| void>` | Before route discovery begins. May return a modified config. |
-| `afterDiscover` | `afterDiscover?(routes: RouteSpec[], ctx: PluginContext): RouteSpec[] \| void \| Promise<RouteSpec[] \| void>` | After routes are discovered. Filter, augment, or reorder the route list. |
-| `beforeRender` | `beforeRender?(page: Page, route: RouteSpec, viewport: number, ctx: PluginContext): void \| Promise<void>` | Before Playwright captures a screenshot for a route and viewport. Inject styles, mock APIs, or prepare DOM state. |
-| `afterRender` | `afterRender?(screenshot: Buffer, page: Page, route: RouteSpec, viewport: number, ctx: PluginContext): Buffer \| void \| Promise<Buffer \| void>` | Immediately after screenshot capture while the Playwright `Page` is still open. Run DOM/axe/performance checks or transform the buffer. |
-| `afterCompare` | `afterCompare?(comparison: ComparisonResult, ctx: PluginContext): ComparisonResult \| void \| Promise<ComparisonResult \| void>` | After pixel/SSIM comparison (and optional AI analysis) completes for a route and viewport. Attach plugin metadata or enrich the result. |
-| `afterRun` | `afterRun?(result: RunResult, ctx: PluginContext): void \| Promise<void>` | After all routes have been compared. Emit custom reports, metrics, or webhook notifications. |
-| `onError` | `onError?(error: Error, stage: string, ctx: PluginContext): boolean \| void \| Promise<boolean \| void>` | When an error occurs in any pipeline stage. Return `true` to suppress the error after handling it. |
-| `teardown` | `teardown?(ctx: PluginContext): void \| Promise<void>` | Once at the end of the pipeline run (in reverse registration order) to release resources. |
+| `setup` | `setup?(ctx: PluginContext): void \| Promise<void>` | Before discovery; validate options or initialize state. |
+| `beforeDiscover` | `beforeDiscover?(config: FrontguardConfig): FrontguardConfig \| Promise<FrontguardConfig>` | Return the discovery config. |
+| `afterDiscover` | `afterDiscover?(routes: Route[], config: FrontguardConfig): Route[] \| Promise<Route[]>` | Return filtered or augmented routes. |
+| `beforeRender` | `beforeRender?(input: { routes: Route[]; config: FrontguardConfig }): { routes: Route[]; config: FrontguardConfig } \| Promise<{ routes: Route[]; config: FrontguardConfig }>` | Return capture configuration and routes; no live Page is passed. |
+| `afterRender` | `afterRender?(screenshots: ScreenshotResult[], ctx: PluginContext): ScreenshotResult[] \| Promise<ScreenshotResult[]> \| void \| Promise<void>` | Inspect or replace the captured screenshot array. |
+| `afterCompare` | `afterCompare?(diffs: DiffResult[], ctx: PluginContext): DiffResult[] \| Promise<DiffResult[]> \| void \| Promise<void>` | Inspect or replace the comparison array. |
+| `afterRun` | `afterRun?(result: RunResult, ctx: PluginContext): void \| Promise<void>` | Report the run; `result.summary` holds aggregate counts. |
+| `onError` | `onError?(error: Error, stage: string): boolean \| Promise<boolean> \| void \| Promise<void>` | Return true to suppress an error. |
+| `teardown` | `teardown?(): void \| Promise<void>` | Release resources, in reverse registration order. |
 
 ## Registering a Plugin in `frontguard.config.ts`
 

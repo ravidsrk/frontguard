@@ -4,10 +4,8 @@ on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
-    # Pull-request CI also completes this workflow. Those runs would take a
-    # concurrency slot and then skip. GitHub cancels an older pending run in
-    # the same group even when cancel-in-progress is false, so a skipped PR
-    # run can drop a queued main failure. Only main CI may enqueue an alert.
+    # Fork PRs may also use a source branch named main. The event guard and
+    # separate ignored-run groups below keep those out of the alert queue.
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -22,15 +20,16 @@ permissions:
   issues: write
 
 # Queue alert jobs. Do not cancel one that is already filing or closing an issue.
-# A drill uses its own group so it cannot replace a pending main alert.
+# Drills and ignored events cannot replace a pending main alert.
 # The script re-reads CI for the main tip, so a newer main run that replaces
 # a pending one still records that tip.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && 'ci-failure-alert-drill' || 'ci-failure-alert' }}
+  group: ${{ github.event_name == 'workflow_dispatch' && 'ci-failure-alert-drill' || github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && 'ci-failure-alert' || format('ci-failure-alert-ignored-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
   alert:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

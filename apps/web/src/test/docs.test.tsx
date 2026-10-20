@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "../router";
 import {
@@ -311,5 +311,54 @@ describe("docs routes", () => {
 
     const filterInput = screen.getByRole("searchbox", { name: "Filter articles" });
     expect(filterInput).toHaveAttribute("placeholder", "Filter articles...");
+  });
+});
+
+describe("docs clipboard feedback", () => {
+  const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+
+  afterEach(() => {
+    cleanup();
+    if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  function copyButton(kind: string) {
+    return kind === "page"
+      ? screen.getByRole("button", { name: "Copy article content" })
+      : screen.getAllByRole("button", { name: "Copy code snippet" })[0];
+  }
+
+  it.each(["page", "snippet"])("waits for the %s clipboard write before showing success", async (kind) => {
+    let finishWrite!: () => void;
+    const writeText = vi.fn<(text: string) => Promise<void>>(() => new Promise<void>((resolve) => { finishWrite = resolve; }));
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    await renderArticle("cli/commands");
+    const button = copyButton(kind);
+    fireEvent.click(button);
+    expect(writeText).toHaveBeenCalledOnce();
+    expect(writeText.mock.calls[0]?.[0]).not.toBe("");
+    expect(button.textContent).not.toMatch(/Copied/);
+    await act(async () => { finishWrite(); });
+    expect(button.textContent).toMatch(/Copied/);
+  });
+
+  it.each(["page", "snippet"])("reports a denied %s clipboard write without false success", async (kind) => {
+    const writeText = vi.fn().mockRejectedValue(new Error("Clipboard permission denied"));
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    await renderArticle("cli/commands");
+    const button = copyButton(kind);
+    await act(async () => { fireEvent.click(button); });
+    expect(button.textContent).toMatch(/Copy failed/);
+    expect(button.textContent).not.toMatch(/Copied/);
+  });
+
+  it.each(["page", "snippet"])("reports unavailable clipboard access for %s copies", async (kind) => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    await renderArticle("cli/commands");
+    const button = copyButton(kind);
+    await act(async () => { fireEvent.click(button); });
+    expect(button.textContent).toMatch(/Copy failed/);
+    expect(button.textContent).not.toMatch(/Copied/);
   });
 });
