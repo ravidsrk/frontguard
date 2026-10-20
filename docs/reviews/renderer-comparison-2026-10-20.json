@@ -1,0 +1,184 @@
+{
+  "auditedSourceCommit": "e0748edc65ea66dea01db4ffa2111d6a987b9ed9",
+  "before": {
+    "playwright": "1.63.0",
+    "browser": "153.0.8010.12",
+    "platform": "linux",
+    "architecture": "arm64",
+    "viewports": [
+      375,
+      768,
+      1440
+    ]
+  },
+  "after": {
+    "playwright": "1.64.1",
+    "browser": "156.0.8078.4",
+    "platform": "linux",
+    "architecture": "arm64",
+    "viewports": [
+      375,
+      768,
+      1440
+    ]
+  },
+  "pixelmatch": "7.2.0",
+  "pixelmatchOptions": {
+    "threshold": 0.1,
+    "includeAA": false
+  },
+  "repetitionsPerVersion": 2,
+  "rows": [
+    {
+      "route": "index",
+      "width": 375,
+      "dimensionsBefore": [
+        375,
+        720
+      ],
+      "dimensionsAfter": [
+        375,
+        720
+      ],
+      "beforeRepeat": 0,
+      "afterRepeat": 0,
+      "upgradeDiff": 0,
+      "decodedBytesEqual": true
+    },
+    {
+      "route": "index",
+      "width": 768,
+      "dimensionsBefore": [
+        768,
+        720
+      ],
+      "dimensionsAfter": [
+        768,
+        720
+      ],
+      "beforeRepeat": 0,
+      "afterRepeat": 0,
+      "upgradeDiff": 0,
+      "decodedBytesEqual": true
+    },
+    {
+      "route": "index",
+      "width": 1440,
+      "dimensionsBefore": [
+        1440,
+        720
+      ],
+      "dimensionsAfter": [
+        1440,
+        720
+      ],
+      "beforeRepeat": 0,
+      "afterRepeat": 0,
+      "upgradeDiff": 0,
+      "decodedBytesEqual": true
+    },
+    {
+      "route": "about",
+      "width": 375,
+      "dimensionsBefore": [
+        375,
+        720
+      ],
+      "dimensionsAfter": [
+        375,
+        720
+      ],
+      "beforeRepeat": 0,
+      "afterRepeat": 0,
+      "upgradeDiff": 0,
+      "decodedBytesEqual": true
+    },
+    {
+      "route": "about",
+      "width": 768,
+      "dimensionsBefore": [
+        768,
+        720
+      ],
+      "dimensionsAfter": [
+        768,
+        720
+      ],
+      "beforeRepeat": 0,
+      "afterRepeat": 0,
+      "upgradeDiff": 0,
+      "decodedBytesEqual": true
+    },
+    {
+      "route": "about",
+      "width": 1440,
+      "dimensionsBefore": [
+        1440,
+        720
+      ],
+      "dimensionsAfter": [
+        1440,
+        720
+      ],
+      "beforeRepeat": 0,
+      "afterRepeat": 0,
+      "upgradeDiff": 0,
+      "decodedBytesEqual": true
+    },
+    {
+      "route": "pricing",
+      "width": 375,
+      "dimensionsBefore": [
+        375,
+        2075
+      ],
+      "dimensionsAfter": [
+        375,
+        2075
+      ],
+      "beforeRepeat": 0,
+      "afterRepeat": 0,
+      "upgradeDiff": 0,
+      "decodedBytesEqual": true
+    },
+    {
+      "route": "pricing",
+      "width": 768,
+      "dimensionsBefore": [
+        768,
+        2002
+      ],
+      "dimensionsAfter": [
+        768,
+        2002
+      ],
+      "beforeRepeat": 0,
+      "afterRepeat": 0,
+      "upgradeDiff": 0,
+      "decodedBytesEqual": true
+    },
+    {
+      "route": "pricing",
+      "width": 1440,
+      "dimensionsBefore": [
+        1440,
+        1076
+      ],
+      "dimensionsAfter": [
+        1440,
+        1076
+      ],
+      "beforeRepeat": 0,
+      "afterRepeat": 0,
+      "upgradeDiff": 0,
+      "decodedBytesEqual": true
+    }
+  ],
+  "limits": [
+    "One Linux ARM64 host",
+    "Chromium only",
+    "Static fixtures only; no mutation recall estimate",
+    "Fresh isolated cache used for the new browser",
+    "No accepted baselines written"
+  ]
+}

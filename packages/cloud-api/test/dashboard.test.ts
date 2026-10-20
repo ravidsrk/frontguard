@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   renderDashboard,
   relativeTime,
@@ -195,7 +195,25 @@ describe('GET /dashboard (session)', () => {
 });
 
 describe('dashboard monitor CRUD via forms', () => {
-  beforeEach(() => resetMemoryStore());
+  beforeEach(() => {
+    resetMemoryStore();
+    // Exercise URL validation without depending on live DNS or network timing.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+      if (url.origin !== 'https://cloudflare-dns.com' ||
+          url.pathname !== '/dns-query' ||
+          !['my.site', 'x.com'].includes(url.searchParams.get('name') ?? '')) {
+        throw new Error(`Unexpected network request in dashboard test: ${url}`);
+      }
+      return Response.json({
+        Answer: url.searchParams.get('type') === '1'
+          ? [{ type: 1, data: '93.184.216.34' }]
+          : [],
+      });
+    });
+  });
+
+  afterEach(() => vi.restoreAllMocks());
 
   it('creates a monitor from form fields', async () => {
     const res = await app.request('/dashboard/monitors', {
@@ -233,7 +251,7 @@ describe('dashboard monitor CRUD via forms', () => {
   });
 
   it('falls back to the default for an out-of-range alert threshold', async () => {
-    await app.request('/dashboard/monitors', {
+    const res = await app.request('/dashboard/monitors', {
       method: 'POST',
       headers: {
         ...(await sessionHeader('bob')),
@@ -242,6 +260,7 @@ describe('dashboard monitor CRUD via forms', () => {
       body: 'name=x&url=https://x.com&alertThreshold=2',
     });
 
+    expect(res.status).toBe(302);
     expect((await getMemoryStore().listMonitors('bob'))[0].alertThreshold).toBe(0.05);
   });
 

@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add component-scoped `selector` capture, `redactSensitive`, and `waitForStable` options to `@frontguard/playwright` (`visualTest` and `expectVisual`).
 - Add built-in offline CLI documentation (`frontguard guide [topic] [--json]`) and agent skill package (`skills/frontguard/`).
 
+### Changed
+
+- Pin Playwright to `1.64.1` and align the rendering images and browser test
+  dependency. The Chromium upgrade comparison is recorded in
+  [the dependency review](docs/reviews/dependency-cleanup-2026-10-20.md).
+
 ### Fixed
 
 - Fail closed on empty comparisons, render/storage/AI errors, rejected judge
