@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RunResult } from '../../src/core/types.js';
-import { comparisonExitCode } from '../../src/cli/exit-code.js';
+import { comparisonExitCode, runExitCode } from '../../src/cli/exit-code.js';
 
 function summary(overrides: Partial<RunResult['summary']> = {}): RunResult['summary'] {
   return {
@@ -36,5 +36,15 @@ describe('comparisonExitCode', () => {
     expect(comparisonExitCode(summary({ total: 0, passed: 0 }), 0)).toBe(2);
     expect(comparisonExitCode(summary({ passed: 0, errors: 1 }), 1)).toBe(2);
     expect(comparisonExitCode(summary({ passed: 0, newPages: 1 }), 0)).toBe(1);
+  });
+});
+
+describe('runExitCode', () => {
+  it('exits 2 for a strict fingerprint mismatch and leaves pixel failures at 1', () => {
+    const pixels = summary({ passed: 0, regressions: 1 });
+    expect(comparisonExitCode(pixels)).toBe(1);
+    expect(runExitCode(pixels, { strictFailure: true })).toBe(2);
+    expect(runExitCode(pixels, { strictFailure: false })).toBe(1);
+    expect(runExitCode(summary(), { strictFailure: false })).toBe(0);
   });
 });

@@ -33,6 +33,37 @@ import {
   resolveRedactSelectors,
 } from './redaction.js';
 import { extractDomElementBoxes } from './dom-elements.js';
+import { CAPTURE_SCREENSHOT_OPTIONS } from '../core/fingerprint.js';
+
+/**
+ * Bound for `document.fonts.ready`.
+ *
+ * The wait used to be unbounded. WebKit can leave the promise pending forever
+ * (playwright#42986), and the Chromium headless shell can stall on a font load
+ * (playwright#42962). Ten seconds covers a real font fetch. On timeout the
+ * route fails and the run exits 2.
+ */
+export const FONT_READY_TIMEOUT_MS = 10_000;
+
+async function waitForDocumentFonts(page: Page, routePath: string): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      page.evaluate(() => document.fonts.ready),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(
+            new Error(
+              `document.fonts.ready timed out after ${FONT_READY_TIMEOUT_MS}ms for route ${routePath}`,
+            ),
+          );
+        }, FONT_READY_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Deterministic rendering helpers (clock freeze & network request blocking)
@@ -363,8 +394,8 @@ export async function executeTask(
       // Inject animation-freezing CSS
       await page.addStyleTag({ content: FREEZE_ANIMATIONS_CSS });
 
-      // Wait for all web fonts to finish loading
-      await page.evaluate(() => document.fonts.ready);
+      // Wait for web fonts, but do not let a stuck document.fonts.ready hang the run.
+      await waitForDocumentFonts(page, task.route.path);
     }
 
     // --- Optional per-route waitForSelector & pre-capture interaction steps ----
@@ -452,7 +483,7 @@ export async function executeTask(
       const stabilityOpts =
         typeof config.waitForStability === 'object' ? config.waitForStability : {};
       const stability = await captureStableScreenshot(
-        async () => Buffer.from(await page!.screenshot({ fullPage: true, type: 'png' })),
+        async () => Buffer.from(await page!.screenshot(CAPTURE_SCREENSHOT_OPTIONS)),
         async (ms) => {
           if (typeof page!.waitForTimeout === 'function') {
             await page!.waitForTimeout(ms);
@@ -484,13 +515,13 @@ export async function executeTask(
       const buffers: Buffer[] = [];
       for (let i = 0; i < antiFlakeRenders; i++) {
         if (i > 0) await page.waitForTimeout(100);
-        buffers.push(Buffer.from(await page.screenshot({ fullPage: true, type: 'png' })));
+        buffers.push(Buffer.from(await page.screenshot(CAPTURE_SCREENSHOT_OPTIONS)));
       }
       screenshotBuffer = findConsensusScreenshot(buffers);
       logger.debug(`Anti-flake: took ${antiFlakeRenders} renders for ${task.route.path}`);
     } else {
       screenshotBuffer = Buffer.from(
-        await page.screenshot({ fullPage: true, type: 'png' }),
+        await page.screenshot(CAPTURE_SCREENSHOT_OPTIONS),
       );
     }
 

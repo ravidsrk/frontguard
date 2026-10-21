@@ -533,7 +533,7 @@ describe('GitOrphanStorage in a repository without commits', () => {
     expect(existsSync(configPath)).toBe(true);
     const version = readFileSync(new URL('../../../../VERSION', import.meta.url), 'utf8').trim();
     expect(await storage.readManifest()).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       createdBy: `frontguard@${version}`,
       routes: {},
     });

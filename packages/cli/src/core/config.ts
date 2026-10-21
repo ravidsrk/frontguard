@@ -477,6 +477,11 @@ export const configSchema = z.object({
   waitForStability: z
     .union([z.boolean(), stabilityConfigSchema])
     .optional(),
+  /**
+   * Renderer fingerprint mismatch policy. `warn` logs differing fields.
+   * `strict` exits 2 (untrusted comparison), never because pixels failed.
+   */
+  fingerprint: z.enum(["warn", "strict"]).default("warn"),
 }).superRefine((config, ctx) => {
   const message = duplicateBaselineKeyMessage(config);
   if (!message) return;
