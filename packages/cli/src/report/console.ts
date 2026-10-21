@@ -133,6 +133,7 @@ export class ConsoleReporter implements Reporter {
     }
 
     this.printAccessibility(result);
+    this.printTextSnapshots(result);
     this.printPerformance(result);
     this.printThirdPartyScripts(result);
     this.printSummary(result);
@@ -428,6 +429,24 @@ export class ConsoleReporter implements Reporter {
 
       console.log('');
     }
+  }
+
+  private printTextSnapshots(result: RunResult): void {
+    const rows = result.textSnapshots;
+    if (!rows || rows.length === 0) return;
+    const notable = rows.filter((row) => row.status !== 'match');
+    console.log(chalk.bold('  TEXT SNAPSHOTS — not a pixel result'));
+    if (notable.length === 0) {
+      console.log(chalk.dim('  Text snapshots match. Pixel status is unchanged.'));
+      console.log('');
+      return;
+    }
+    for (const row of notable) {
+      console.log(`  ${row.kind} ${row.status}: ${row.route} @ ${row.viewport}px [${row.browser}]`);
+      if (row.excerpt) console.log(chalk.dim(`  ${row.excerpt}`));
+    }
+    console.log(chalk.dim('  A text mismatch does not pass or fail the pixel comparison.'));
+    console.log('');
   }
 
   private printNewPages(result: RunResult): void {

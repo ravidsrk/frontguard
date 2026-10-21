@@ -530,6 +530,105 @@ describe('visualTest', () => {
 
     expect(page.locator).toHaveBeenCalledWith('body');
     expect(result.ariaSnapshot).toBe('- main:\n  - button "Checkout"');
+    expect(result.passed).toBe(true);
+    expect(result.textSnapshots).toEqual([
+      expect.objectContaining({ kind: 'aria', status: 'new' }),
+    ]);
+    expect(fs.readFileSync(result.textSnapshots![0]!.path, 'utf8')).toBe('- main:\n  - button "Checkout"');
+  });
+
+  it('keeps a pixel failure when the ARIA text matches', async () => {
+    const baseline = createPNG(40, 40, [10, 10, 10, 255]);
+    const current = createPNG(40, 40, [240, 10, 10, 255]);
+    const aria = { ariaSnapshot: vi.fn().mockResolvedValue('- main:\n  - button "Pay"') };
+    const first = createMockPage(baseline);
+    first.locator = vi.fn().mockReturnValue(aria);
+    await visualTest(first, 'pixel-fail-text-match', {
+      baselineDir: TEST_BASELINE_DIR,
+      captureAriaSnapshot: true,
+    });
+
+    const second = createMockPage(current);
+    second.locator = vi.fn().mockReturnValue(aria);
+    const result = await visualTest(second, 'pixel-fail-text-match', {
+      baselineDir: TEST_BASELINE_DIR,
+      captureAriaSnapshot: true,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.textSnapshots?.[0]?.status).toBe('match');
+  });
+
+  it('keeps a pixel pass when JSON text mismatches', async () => {
+    const img = createPNG(40, 40, [10, 120, 10, 255]);
+    const first = createMockPage(img);
+    first.locator = vi.fn().mockReturnValue({
+      textContent: vi.fn().mockResolvedValue('{"price":1}\n'),
+      first: () => ({ textContent: vi.fn().mockResolvedValue('{"price":1}\n') }),
+    });
+    await visualTest(first, 'pixel-pass-text-mismatch', {
+      baselineDir: TEST_BASELINE_DIR,
+      textSnapshot: { json: '#data' },
+    });
+
+    const second = createMockPage(img);
+    second.locator = vi.fn().mockReturnValue({
+      textContent: vi.fn().mockResolvedValue('{"price":2}'),
+      first: () => ({ textContent: vi.fn().mockResolvedValue('{"price":2}') }),
+    });
+    const result = await expectVisual(second, 'pixel-pass-text-mismatch', {
+      baselineDir: TEST_BASELINE_DIR,
+      textSnapshot: { json: '#data' },
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.textSnapshots).toEqual([
+      expect.objectContaining({
+        kind: 'json',
+        status: 'mismatch',
+        excerpt: 'was {"price":1} now {"price":2}',
+      }),
+    ]);
+  });
+
+  it('reports a text error without failing a pixel pass', async () => {
+    const img = createPNG(40, 40, [10, 120, 10, 255]);
+    await visualTest(createMockPage(img), 'text-error-pass', { baselineDir: TEST_BASELINE_DIR });
+    const page = createMockPage(img);
+    page.locator = vi.fn().mockReturnValue({
+      textContent: vi.fn().mockRejectedValue(new Error('selector missing')),
+      first: () => ({ textContent: vi.fn().mockRejectedValue(new Error('selector missing')) }),
+    });
+
+    const result = await expectVisual(page, 'text-error-pass', {
+      baselineDir: TEST_BASELINE_DIR,
+      textSnapshot: { json: '#missing' },
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.textSnapshots).toEqual([
+      expect.objectContaining({ kind: 'json', status: 'error' }),
+    ]);
+  });
+
+  it('throws before writing a baseline when text capture fails on update', async () => {
+    const img = createPNG(40, 40, [10, 120, 10, 255]);
+    const page = createMockPage(img);
+    page.locator = vi.fn().mockReturnValue({
+      textContent: vi.fn().mockRejectedValue(new Error('selector missing')),
+      first: () => ({ textContent: vi.fn().mockRejectedValue(new Error('selector missing')) }),
+    });
+
+    await expect(
+      visualTest(page, 'text-error-update', {
+        baselineDir: TEST_BASELINE_DIR,
+        update: true,
+        textSnapshot: { json: '#missing' },
+      }),
+    ).rejects.toThrow('selector missing');
+
+    const files = fs.existsSync(TEST_BASELINE_DIR) ? fs.readdirSync(TEST_BASELINE_DIR) : [];
+    expect(files.filter((file) => file.endsWith('.png') || file.endsWith('.json'))).toEqual([]);
   });
 
   it('attributes spatial diff clusters to the highest-overlap specific DOM selector', async () => {

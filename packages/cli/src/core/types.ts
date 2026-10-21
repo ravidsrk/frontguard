@@ -837,6 +837,16 @@ export interface PerfReport {
   }>;
 }
 
+export interface TextSnapshotReport {
+  route: string;
+  viewport: number;
+  browser: BrowserEngine;
+  kind: 'aria' | 'json' | 'markdown';
+  status: 'match' | 'mismatch' | 'new' | 'error';
+  /** Short mismatch preview. It does not change the pixel result. */
+  excerpt?: string;
+}
+
 export interface RunResult {
   /**
    * True when this result records a baseline update that wrote baselines.
@@ -877,6 +887,12 @@ export interface RunResult {
   fingerprintCheck?: FingerprintCheck;
   /** Accessibility audit results (Task 5.1), if the a11y plugin ran. */
   accessibility?: AccessibilityResult[];
+  /**
+   * Optional ARIA, JSON, or Markdown snapshots beside the PNG.
+   * A mismatch is reported here and does not change pixel status or exit code.
+   * axe-core remains the accessibility plugin.
+   */
+  textSnapshots?: TextSnapshotReport[];
   /** Performance budget results, if the perf-budgets plugin ran. */
   perf?: PerfReport[];
   /** Third-party script inventory changes, if the third-party-scripts plugin ran. */

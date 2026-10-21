@@ -124,7 +124,7 @@ Everything below ships in the published local-and-CI packages (`@frontguard/cli`
 - ✅ **Demo & comparison guides (`demo/`, `apps/web/src/lib/docs-content.ts`)** — Committed `demo/frontguard-demo.gif` and `demo/frontguard-demo.svg` assets, plus comparison and migration guides (`frontguard-vs-percy`, `frontguard-vs-chromatic`, `migrate-from-backstopjs`, `migrate-from-lost-pixel`). *(Closes the `2026-06-29` roadmap's demo-recording follow-up.)*
 
 ### Playwright In-Test Package (`@frontguard/playwright`)
-- ✅ `visualTest()` and `expectVisual()` assertions with `__visual_baselines__/` storage, SSIM calculation, connected-component cluster extraction, DOM selector attribution, `mask` / `maskRegions`, `redactSensitive`, `freezeTime`, `seedRandom`, `blockUrls` and `waitForStable`. `captureAriaSnapshot` returns the page's ARIA snapshot as a string; nothing stores or diffs it yet ([#299](https://github.com/ravidsrk/frontguard/issues/299)).
+- ✅ `visualTest()` and `expectVisual()` assertions with `__visual_baselines__/` storage, SSIM calculation, connected-component cluster extraction, DOM selector attribution, `mask` / `maskRegions`, `redactSensitive`, `freezeTime`, `seedRandom`, `blockUrls` and `waitForStable`. Optional `captureAriaSnapshot` and `textSnapshot` store a text file next to the PNG and diff it as text. A mismatch is reported on its own. It does not change `passed`, and axe-core remains the accessibility plugin ([#299](https://github.com/ravidsrk/frontguard/issues/299)).
 
 ### Agentic MCP Server (`@frontguard/mcp`)
 - ✅ A stdio JSON-RPC 2.0 server, built on `@modelcontextprotocol/sdk` `^1.32.1`, exposing seven tools with `outputSchema` and `structuredContent`:
@@ -238,7 +238,7 @@ All actionable post-launch engineering work is tracked under parent issue [#283]
     - Blocked by #293, #290, #306 and #303.
     - Distinct from `imageUpload`, which already uploads PR diff thumbnails.
 23. **[#298](https://github.com/ravidsrk/frontguard/issues/298) — Surface aged ignore masks for a human to drop.** One vendor account asked for this. `frontguard ignores --older-than <days>` lists rules whose `since` date is older than that, and the shots they cover. Shot coverage comes from configured routes. When routes are omitted, the command says coverage is unavailable and does not discover Storybook, crawl, or filesystem routes. Removing a rule is a config edit. No model, prompt, or flake heuristic removes a mask.
-24. **[#299](https://github.com/ravidsrk/frontguard/issues/299) — Add optional ARIA and non-image text snapshots that do not gate pixels.** Reuses `@frontguard/playwright`'s existing ARIA capture: add storage and diffing, then CLI capture.
+24. **[#299](https://github.com/ravidsrk/frontguard/issues/299) — Add optional ARIA and non-image text snapshots that do not gate pixels.** Optional `captureAriaSnapshot` and `textSnapshot.json` / `textSnapshot.markdown` store a text file next to the PNG and diff it as text. A mismatch is reported on its own. It does not change `comparisonMethod` from pixelmatch and does not pass a pixel regression. axe-core remains the accessibility plugin. Text diff is not a gate.
 25. **[#308](https://github.com/ravidsrk/frontguard/issues/308) — Report horizontal viewport overflow without gating.**
     - `scrollWidth` vs `innerWidth`, plus visible unclipped elements past the right edge, taken from the same settled state as the screenshot.
     - Never an exit-code input.

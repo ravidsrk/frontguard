@@ -91,7 +91,7 @@ import { uploadImages } from '../storage/upload-stage.js';
 import { detectPreviewUrl, waitForUrl } from '../utils/preview-url.js';
 import { logger } from '../utils/logger.js';
 import { withCliTrace, type CliTrace } from '../utils/otel.js';
-import { PluginManager } from './plugins.js';
+import { PluginManager, type PluginContext } from './plugins.js';
 
 // ---------------------------------------------------------------------------
 // Memory Management Helpers
@@ -1225,6 +1225,7 @@ async function writeUpdatedBaselines(
   // The accessibility plugin's own cutoff is the block. Pixel status is not an input.
   let baselineBlock: string | undefined;
   let baselineA11y: AccessibilityResult[] | undefined;
+  let textDone: { manager: PluginManager; ctx: PluginContext } | undefined;
   const a11yPlugin = config.plugins?.find((plugin) => plugin.name === 'accessibility');
   if (a11yPlugin) {
     const manager = new PluginManager();
@@ -1247,6 +1248,22 @@ async function writeUpdatedBaselines(
   }
 
   if (!baselineBlock) {
+    const textPlugin = config.plugins?.find((p) => p.name === 'text-snapshot');
+    if (textPlugin) {
+      const mgr = new PluginManager();
+      mgr.register(textPlugin);
+      const md = new Map<string, unknown>();
+      md.set('tw', true);
+      const textCtx = { config, logger, metadata: md };
+      try {
+        await mgr.setup(textCtx);
+        await mgr.runHook('afterRender', screenshots, textCtx);
+        textDone = { manager: mgr, ctx: textCtx };
+      } finally {
+        await mgr.teardown();
+      }
+    }
+
     // Init storage and write all baselines
     const writeSpan = trace.start('frontguard.baseline_write');
     reporter.onStageStart('compare', 'Writing baselines…');
@@ -1354,6 +1371,7 @@ async function writeUpdatedBaselines(
     ...(baselineBlock ? { baselineRefusal: baselineBlock } : { baselineUpdate: true }),
     ...(baselineA11y ? { accessibility: baselineA11y } : {}),
   };
+  if (textDone) await textDone.manager.runHook('afterRun', result, textDone.ctx);
   reporter.onStageStart('report', 'Generating baseline update report…');
   await reporter.onComplete(result);
   reporter.onStageComplete('report', 'Done');

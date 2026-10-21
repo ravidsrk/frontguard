@@ -723,7 +723,7 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
   options?: VisualTestOptions,
 ): Promise&lt;VisualTestResult&gt;`,
     )}${h2('Options')}${p(
-      'Options include threshold, selector (component-scoped locator capture), fullPage, mask, maskRegions, redactSensitive, waitForStable, freezeTime (boolean, epoch ms number, or ISO 8601 date string), seedRandom (boolean or numeric PRNG seed), blockUrls (URL patterns to block during capture), captureAriaSnapshot (captures Playwright ARIA tree snapshot), optional AI (openai, anthropic, gemini, or custom baseUrl), baselineDir, and update. Threshold is the fraction of pixels that may differ (0-1).',
+      'Options include threshold, selector (component-scoped locator capture), fullPage, mask, maskRegions, redactSensitive, waitForStable, freezeTime (boolean, epoch ms number, or ISO 8601 date string), seedRandom (boolean or numeric PRNG seed), blockUrls (URL patterns to block during capture), captureAriaSnapshot (stores the ARIA tree beside the PNG and diffs it as text; a mismatch does not change passed), textSnapshot (json and markdown selectors stored the same way), optional AI (openai, anthropic, gemini, or custom baseUrl), baselineDir, and update. Threshold is the fraction of pixels that may differ (0-1).',
     )}${table(
       ['Option', 'Type', 'Default', 'Description'],
       [
@@ -735,7 +735,8 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
         ['freezeTime', 'boolean | number | string', 'undefined', 'Freeze page.clock and Date.now() via epoch ms or ISO 8601 string (e.g., "2026-01-01T00:00:00Z").'],
         ['seedRandom', 'boolean | number', 'undefined', 'Override Math.random() with a deterministic Mulberry32 PRNG (true uses seed 42).'],
         ['blockUrls', 'string[]', 'undefined', 'Abort matching network requests via page.route() during capture and clean up afterward.'],
-        ['captureAriaSnapshot', 'boolean', 'false', 'Capture an accessibility ARIA role/label tree snapshot onto result.ariaSnapshot.'],
+        ['captureAriaSnapshot', 'boolean', 'false', 'Store the ARIA tree beside the PNG and diff it as text. A mismatch does not change passed. axe-core remains the accessibility plugin.'],
+        ['textSnapshot', '{ json?: string, markdown?: string }', 'undefined', 'Selectors whose text is stored as .json or .md beside the PNG. A mismatch does not change passed.'],
         ['mask', 'string[]', 'undefined', 'CSS selectors to cover with solid neutral boxes before screenshot capture.'],
         ['maskRegions', 'Array&lt;{ x, y, width, height }&gt;', 'undefined', 'Explicit pixel bounding boxes to mask out of comparison.'],
         ['ai', "boolean | { provider: 'openai'|'anthropic'|'gemini', model?, baseUrl? }", 'false', 'Run optional BYOK vision analysis when a diff exceeds threshold.'],
@@ -758,6 +759,7 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
         ['settled', 'boolean | undefined', 'Whether captures converged within maxAttempts; present when waitForStable is enabled.'],
         ['blockedRequestsCount', 'number', 'Number of network requests aborted by blockUrls.'],
         ['ariaSnapshot', 'string', 'Playwright ARIA tree YAML/text snapshot when captureAriaSnapshot: true.'],
+        ['textSnapshots', "Array<{ kind, status, path, excerpt? }>", 'Text diff beside the PNG. status is match, mismatch, new, or error. A mismatch excerpt does not change passed.'],
         ['ai', '{ classification: string, severity: string, explanation: string } | undefined', 'Optional vision model triage result when ai is enabled and a diff occurred.'],
       ],
     )}${h2('Inspecting spatial clusters in tests')}${code(

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Optional ARIA, JSON, and Markdown snapshots can be stored next to a PNG and diffed as text. A mismatch is reported on its own. It does not change `comparisonMethod` from pixelmatch and does not pass or fail a pixel regression. axe-core remains the accessibility plugin. Text diff is not a gate.
 - Add `frontguard ignores --older-than <days>`, which lists ignore rules whose `since` date is strictly older than that and the shots they cover. Shot coverage comes from configured routes. When routes are omitted, the command says coverage is unavailable and does not discover routes. The command does not remove a rule. The list follows one vendor account, not a consensus.
 - Add `frontguard prune-baselines`, which removes tip shots the full config no longer declares and can drop `frontguard-baselines` history that is not a merge-base ancestor. The default is a dry run. A route filter or a shard refuses.
 - Export CLI capture, compare, and baseline-write traces as OTLP/HTTP JSON when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Each span records a screenshot count and no URL, path, or image. This is separate from anonymous usage telemetry and from the cloud-api metrics exporter.
@@ -28,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Refuse `frontguard update-baselines` when the accessibility plugin has `failOnViolation: true` and finds a violation at or above `impact`, or when an audit does not complete. The audit uses the same storage state, color scheme, viewport height, wait, and route actions as the capture. A refused write is reported as not written and is not labeled accepted. The pixel status stays unchanged. A clean audit does not clear a pixel regression. An audit error on a compare run does not replace the pixel result.
+- Text comparison keeps the pixel result when capture or browser startup fails, and still refuses a baseline write on update. Text is read in the shot's browser after the same freeze, seed, block, and story-ready steps as the PNG. A stored snapshot is compared after one newline normalization, including leading spaces. A mismatch includes a short excerpt. `prune-baselines` removes the `.aria.txt`, `.json`, and `.md` siblings with the PNG.
 - Warn when a run's color scheme differs from the scheme stored on the baseline. The comparison still uses the same baseline file, and the warning does not change the exit code.
 - Prevent pull-request CI completions from changing or replacing main failure
   alerts, including fork branches named `main`.
