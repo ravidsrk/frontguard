@@ -119,6 +119,8 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
 
 Every tool returns JSON in the MCP `text` content channel; agents parse it directly.
 
+Tool `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `openWorldHint`) are untrusted hints and do not enforce anything. An untrusted server can lie. `promote_baseline` and `accept_baseline` also set `_meta["anthropic/requiresUserInteraction"]` so Claude Code prompts a person; that flag is a hint too. The control is [#287](https://github.com/ravidsrk/frontguard/issues/287): baseline writes stay off the agent's default path.
+
 ## Example agent prompts
 
 - _"What regressed in my latest local run (or on PR 42 in acme/shop)?"_ → calls `list_regressions({ pr_id: 'run_local' })` or `list_regressions({ pr_id: 42, repo: 'acme/shop' })`.

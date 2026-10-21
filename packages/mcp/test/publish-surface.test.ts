@@ -22,4 +22,10 @@ describe('MCP publish surface — no false hosted API default', () => {
     expect(authSrc).not.toMatch(/DEFAULT_API_URL/);
     expect(authSrc).not.toMatch(/api\.frontguard\.dev/);
   });
+
+  it('documents annotations as untrusted hints that do not enforce writes', () => {
+    expect(readme).toMatch(/untrusted hints/i);
+    expect(readme).toMatch(/do not enforce anything/i);
+    expect(readme).toMatch(/#287/);
+  });
 });

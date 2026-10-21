@@ -55,6 +55,61 @@ import {
 const SERVER_NAME = '@frontguard/mcp';
 const SERVER_VERSION = '0.2.3';
 
+export const SERVER_INSTRUCTIONS =
+  'Frontguard MCP server. Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, `promote_baseline` to promote reviewed visual changes, and `recent_runs` to browse history. `accept_baseline` currently records whole-run approval.';
+
+/**
+ * MCP annotations are untrusted hints. A client may skip a prompt because of
+ * them, and an untrusted server can lie. They do not enforce anything; #287
+ * is the control that keeps baseline writes away from the agent.
+ */
+function readOnlyAnnotations(title: string): {
+  title: string;
+  annotations: {
+    title: string;
+    readOnlyHint: true;
+    openWorldHint: false;
+    destructiveHint: false;
+  };
+} {
+  return {
+    title,
+    annotations: {
+      title,
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
+  };
+}
+
+/** Claude Code prompts on this flag even in auto and bypass-permissions modes. */
+const REQUIRES_USER_INTERACTION = {
+  'anthropic/requiresUserInteraction': true,
+} as const;
+
+function destructiveAnnotations(title: string): {
+  title: string;
+  annotations: {
+    title: string;
+    readOnlyHint: false;
+    destructiveHint: true;
+    openWorldHint: false;
+  };
+  _meta: { 'anthropic/requiresUserInteraction': true };
+} {
+  return {
+    title,
+    annotations: {
+      title,
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: false,
+    },
+    _meta: REQUIRES_USER_INTERACTION,
+  };
+}
+
 /**
  * Build a fresh {@link McpServer} with all Frontguard tools registered.
  * Exported so tests can drive it without spawning a subprocess.
@@ -64,15 +119,14 @@ export function createServer(): McpServer {
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
       capabilities: { tools: {} },
-      instructions:
-        'Frontguard MCP server. Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, `promote_baseline` to promote reviewed visual changes, and `recent_runs` to browse history. `accept_baseline` currently records whole-run approval.',
+      instructions: SERVER_INSTRUCTIONS,
     },
   );
 
   server.registerTool(
     'list_regressions',
     {
-      title: 'List regressions for a PR',
+      ...readOnlyAnnotations('List regressions for a PR'),
       description:
         'Return the visual regressions Frontguard detected on a given GitHub PR (or run id). Each row carries a `diffId` you can pass to `get_suggested_fix`.',
       inputSchema: listRegressionsInputSchema,
@@ -84,7 +138,7 @@ export function createServer(): McpServer {
   server.registerTool(
     'get_suggested_fix',
     {
-      title: 'Get the suggested fix for a diff',
+      ...readOnlyAnnotations('Get the suggested fix for a diff'),
       description:
         'Return the AI-generated patch for a single diff (keyed by the `diffId` from `list_regressions`).',
       inputSchema: getSuggestedFixInputSchema,
@@ -96,7 +150,7 @@ export function createServer(): McpServer {
   server.registerTool(
     'accept_baseline',
     {
-      title: 'Record whole-run baseline approval',
+      ...destructiveAnnotations('Record whole-run baseline approval'),
       description:
         'Record run-scoped whole-run approval after `confirm_all_regressions_reviewed: true`. Screenshot promotion is not implemented yet; use the CLI or composite Action to update baselines.',
       inputSchema: acceptBaselineInputSchema,
@@ -108,7 +162,7 @@ export function createServer(): McpServer {
   server.registerTool(
     'recent_runs',
     {
-      title: 'List recent Frontguard runs',
+      ...readOnlyAnnotations('List recent Frontguard runs'),
       description:
         'List the most recent runs the API key has access to. Optional `repo` and `branch` filters narrow the results.',
       inputSchema: recentRunsInputSchema,
@@ -120,7 +174,7 @@ export function createServer(): McpServer {
   server.registerTool(
     'inspect_diff_cluster_dom',
     {
-      title: 'Inspect diff cluster and grounded DOM target',
+      ...readOnlyAnnotations('Inspect diff cluster and grounded DOM target'),
       description:
         'Inspect a specific visual regression diff cluster, returning its bounding box, AI classification, suggested fix, and grounded DOM target selector.',
       inputSchema: inspectDiffClusterDomInputSchema,
@@ -132,7 +186,7 @@ export function createServer(): McpServer {
   server.registerTool(
     'verify_css_patch',
     {
-      title: 'Verify a candidate CSS patch before applying',
+      ...readOnlyAnnotations('Verify a candidate CSS patch before applying'),
       description:
         'Validate a candidate CSS patch against a visual regression diff for syntax correctness, target selector alignment, and layout-destroying properties.',
       inputSchema: verifyCssPatchInputSchema,
@@ -144,7 +198,7 @@ export function createServer(): McpServer {
   server.registerTool(
     'promote_baseline',
     {
-      title: 'Promote reviewed visual baselines',
+      ...destructiveAnnotations('Promote reviewed visual baselines'),
       description:
         'Promote reviewed visual changes to baseline after `confirm_reviewed: true`, optionally scoped to specific routes.',
       inputSchema: promoteBaselineInputSchema,

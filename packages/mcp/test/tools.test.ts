@@ -683,6 +683,56 @@ describe('MCP server tools/list + tools/call', () => {
     await server.close();
   });
 
+  it('lists read-only and destructive annotations, and keeps descriptions under 4096 characters', async () => {
+    const { client, server } = await connectPair();
+    const res = await client.listTools();
+    const byName = new Map(res.tools.map((tool) => [tool.name, tool]));
+
+    const readOnly = [
+      ['list_regressions', 'List regressions for a PR'],
+      ['get_suggested_fix', 'Get the suggested fix for a diff'],
+      ['recent_runs', 'List recent Frontguard runs'],
+      ['inspect_diff_cluster_dom', 'Inspect diff cluster and grounded DOM target'],
+      ['verify_css_patch', 'Verify a candidate CSS patch before applying'],
+    ] as const;
+    for (const [name, title] of readOnly) {
+      const tool = byName.get(name);
+      expect(tool?.title).toBe(title);
+      expect(tool?.annotations).toEqual({
+        title,
+        readOnlyHint: true,
+        openWorldHint: false,
+        destructiveHint: false,
+      });
+      expect(tool?._meta?.['anthropic/requiresUserInteraction']).toBeUndefined();
+      expect(tool?.description?.length ?? 0).toBeLessThan(4096);
+    }
+
+    const destructive = [
+      ['promote_baseline', 'Promote reviewed visual baselines'],
+      ['accept_baseline', 'Record whole-run baseline approval'],
+    ] as const;
+    for (const [name, title] of destructive) {
+      const tool = byName.get(name);
+      expect(tool?.title).toBe(title);
+      expect(tool?.annotations).toEqual({
+        title,
+        readOnlyHint: false,
+        destructiveHint: true,
+        openWorldHint: false,
+      });
+      expect(tool?._meta).toMatchObject({ 'anthropic/requiresUserInteraction': true });
+      expect(tool?.description?.length ?? 0).toBeLessThan(4096);
+    }
+
+    const instructions = client.getInstructions() ?? '';
+    expect(instructions.length).toBeGreaterThan(0);
+    expect(instructions.length).toBeLessThan(4096);
+
+    await client.close();
+    await server.close();
+  });
+
   it('accept_baseline description states run-scoped approval (mcp-6)', async () => {
     const { client, server } = await connectPair();
     const res = await client.listTools();
