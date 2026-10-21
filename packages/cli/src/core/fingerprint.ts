@@ -400,33 +400,43 @@ function bothPresentAndDiffer(baseline: unknown, current: unknown): boolean {
  * replaces the global list; an empty override does not.
  */
 function effectiveViewports(
-  route: { viewport?: readonly number[] } | undefined,
+  route: { viewport?: readonly number[]; usesGlobal?: boolean } | undefined,
   globalViewports: ReadonlySet<number> | null,
 ): ReadonlySet<number> | null {
-  if (route?.viewport && route.viewport.length > 0) return new Set(route.viewport);
+  const explicit = route?.viewport && route.viewport.length > 0 ? new Set(route.viewport) : null;
+  if (route?.usesGlobal) {
+    if (!globalViewports) return null;
+    if (!explicit) return globalViewports;
+    const union = new Set(globalViewports);
+    for (const width of explicit) union.add(width);
+    return union;
+  }
+  if (explicit) return explicit;
   return globalViewports;
 }
 
 /**
  * One entry per path. Repeated paths keep every width they capture.
- * An entry with no override uses the global list, so the union does too.
+ * An entry with no override uses the global list and does not drop a sibling
+ * override that names a different width.
  */
 function selectedRoutesByPath(
   routes: readonly { path: string; viewport?: readonly number[] }[],
-): Map<string, { path: string; viewport?: number[] }> {
-  const grouped = new Map<string, { path: string; viewport?: number[] }>();
+): Map<string, { path: string; viewport?: number[]; usesGlobal?: boolean }> {
+  const grouped = new Map<string, { path: string; viewport?: number[]; usesGlobal?: boolean }>();
   for (const route of routes) {
     const explicit = route.viewport && route.viewport.length > 0 ? [...route.viewport] : undefined;
     const current = grouped.get(route.path);
     if (!current) {
-      grouped.set(route.path, { path: route.path, viewport: explicit });
+      grouped.set(route.path, {
+        path: route.path,
+        viewport: explicit,
+        usesGlobal: explicit === undefined,
+      });
       continue;
     }
-    if (!current.viewport || !explicit) {
-      current.viewport = undefined;
-      continue;
-    }
-    current.viewport = [...new Set([...current.viewport, ...explicit])];
+    if (explicit === undefined) current.usesGlobal = true;
+    else current.viewport = [...new Set([...(current.viewport ?? []), ...explicit])];
   }
   return grouped;
 }
