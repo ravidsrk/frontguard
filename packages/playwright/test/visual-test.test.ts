@@ -388,7 +388,7 @@ describe('visualTest', () => {
       expectVisual(createMockPage(img2), 'expect-visual', {
         baselineDir: TEST_BASELINE_DIR,
       })
-    ).rejects.toThrow(/Visual regression detected for "expect-visual"/);
+    ).rejects.toThrow(/Visual regression detected for "expect-visual": .+% diff, 16×16 window \d+ > 64/);
   });
 
   it('captures component-scoped screenshot when selector option is provided', async () => {

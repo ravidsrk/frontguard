@@ -195,6 +195,7 @@ export function compareScreenshot(
     ...(current.redactedCount !== undefined ? { redactedCount: current.redactedCount } : {}),
     ...(current.blockedRequestsCount !== undefined ? { blockedRequestsCount: current.blockedRequestsCount } : {}),
   };
+  if (wmax > 64) result.windowMax = wmax;
 
   if (noteMsg) {
     result.error = noteMsg;

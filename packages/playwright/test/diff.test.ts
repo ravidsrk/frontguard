@@ -124,6 +124,7 @@ describe('compareImages', () => {
 
     expect(result.diffPercentage).toBeLessThan(0.1);
     expect(result.diffPercentage).toBeGreaterThan(0);
+    expect(result.windowMax).toBeGreaterThan(64);
     expect(result.passed).toBe(false);
   });
 
@@ -150,6 +151,7 @@ describe('compareImages', () => {
 
     expect(result.diffPercentage).toBeGreaterThan(0);
     expect(result.diffPercentage).toBeLessThan(0.1);
+    expect(result.windowMax).toBeLessThanOrEqual(64);
     expect(result.passed).toBe(true);
   });
 

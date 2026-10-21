@@ -309,6 +309,7 @@ describe('pixelmatch 8 color metric and window gate', () => {
     );
     expect(text.diffPercentage).toBeGreaterThan(0);
     expect(text.diffPercentage).toBeLessThan(10);
+    expect(text.windowMax).toBeGreaterThan(64);
     expect(text.status).toBe('regression');
     expect(text.ssimOverride).toBeUndefined();
 

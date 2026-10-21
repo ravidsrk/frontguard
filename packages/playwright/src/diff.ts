@@ -184,6 +184,7 @@ export function compareImages(
   return {
     passed,
     diffPercentage,
+    windowMax,
     diffBuffer,
     ssim,
     clusters,

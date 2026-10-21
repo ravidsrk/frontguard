@@ -55,6 +55,7 @@ interface SerializedDiff {
   browser: string;
   status: string;
   diffPercentage: number;
+  windowMax?: number;
   hasBaselineImage: boolean;
   hasCurrentImage: boolean;
   hasDiffImage: boolean;
@@ -145,6 +146,7 @@ function serializeDiff(diff: DiffResult): SerializedDiff {
     browser: diff.browser,
     status: diff.status,
     diffPercentage: diff.diffPercentage,
+    ...(diff.windowMax !== undefined ? { windowMax: diff.windowMax } : {}),
     hasBaselineImage: diff.comparedAgainstBaseline ?? !!diff.baselineImage,
     hasCurrentImage: !!diff.currentImage,
     hasDiffImage: !!diff.diffImage,
