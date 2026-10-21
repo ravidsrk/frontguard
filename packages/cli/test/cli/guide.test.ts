@@ -81,4 +81,13 @@ describe('buildConfig CLI flags for stability, redaction, and colorScheme', () =
     expect(config.waitForStability).toBe(true);
     expect(config.colorScheme).toBe('dark');
   });
+
+  it('requests every route without turning off capture stabilization', async () => {
+    const enabled = await buildConfig({ url: 'http://localhost:3000' });
+    const allRoutes = await buildConfig({ url: 'http://localhost:3000', allRoutes: true });
+    expect(enabled.smartRender).toBe(true);
+    expect(enabled.includeAllRoutes).toBeUndefined();
+    expect(allRoutes.smartRender).toBe(true);
+    expect(allRoutes.includeAllRoutes).toBe(true);
+  });
 });

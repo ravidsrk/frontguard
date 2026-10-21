@@ -19,8 +19,8 @@ Frontguard is a local-first visual regression and perceptual UI verification too
    ```
 3. **Writing or running Playwright E2E / component visual assertions?**
    Use `@frontguard/playwright` (`visualTest` or `expectVisual`) with `selector`, `waitForStable`, and `redactSensitive`.
-4. **Operating as an AI coding agent inspecting and fixing visual regressions?**
-   Use `@frontguard/mcp` tools (`list_regressions` → `inspect_diff_cluster_dom` → `verify_css_patch` → `promote_baseline`).
+4. **Operating as an AI coding agent inspecting visual regressions?**
+   Stop at evidence. Use `@frontguard/mcp` reads (`list_regressions` → `inspect_diff_cluster_dom` → `verify_css_patch`). Do not call `promote_baseline` or `accept_baseline`, and do not run `update-baselines`. Tell a human to run `frontguard update-baselines --confirm-baselines` after they review the report. `confirm_reviewed: true` is UX only; an agent setting it on itself is not a human review.
 
 ---
 
@@ -31,8 +31,10 @@ Frontguard is a local-first visual regression and perceptual UI verification too
 # Diagnose Node, Playwright browsers, config, and git repository state
 npx frontguard doctor
 
-# Record or update baselines on the git orphan branch (frontguard-baselines)
-npx frontguard update-baselines --url http://localhost:3000
+# A human records or updates baselines on the git orphan branch (frontguard-baselines).
+# The agent stops before this command. Judge mode and an advisory caption cannot confirm it.
+# An agent setting confirm_reviewed: true on itself is not a human review.
+npx frontguard update-baselines --confirm-baselines --url http://localhost:3000
 ```
 
 ### 2. Running Deterministic Visual Regression Checks

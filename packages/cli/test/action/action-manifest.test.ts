@@ -212,6 +212,13 @@ describe('Action launch contract', () => {
     expect(runner.indexOf('if [ "$RUN_EXIT" -eq 2 ]')).toBeLessThan(
       runner.indexOf('if [ "$REGRESSIONS" -gt 0 ]'),
     );
+    const toolError = runner.slice(
+      runner.indexOf('if [ "$RUN_FAILED" -eq 1 ]'),
+      runner.indexOf('if [ "$REGRESSIONS" -gt 0 ]'),
+    );
+    expect(toolError).toContain('exit 2');
+    expect(toolError).not.toContain('exit 1');
+    expect(runner).toContain('exit 1');
   });
 
   it.each([
@@ -387,7 +394,8 @@ describe('OPS-4: all GITHUB_OUTPUT writes use random-delimiter heredoc form', ()
     it(`${label}: keeps stderr out of the JSON capture file`, () => {
       const source = `${readAction(path)}\n${readAction(cliActionRunner)}`;
       expect(source).not.toMatch(/frontguard-result\.json 2>&1/);
-      expect(source).toContain('2>/tmp/frontguard-stderr.log');
+      expect(source).toContain('STDERR_LOG="/tmp/frontguard-stderr.log.$$"');
+      expect(source).toContain('2>"$STDERR_LOG"');
     });
 
     it(`${label}: surfaces run failures instead of silently passing`, () => {

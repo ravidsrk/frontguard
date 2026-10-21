@@ -545,6 +545,31 @@ describe('fixture sanity (packages/cli/__fixtures__/storybook)', () => {
     expect(modal).toContain('export default meta');
   });
 
+  it('keeps Storybook 9, 10, and 11 alpha on the Storybook 8 /index.json parser', async () => {
+    // Current Storybook (next) StoryIndex is still `{ v, entries }`.
+    // Story entries add subtype/exportName/parent; docs stay type "docs".
+    // The index does not name a major, so storybookMajor stays 8 and the
+    // parser is not forked.
+    const body = JSON.parse(
+      readFileSync(join(__dirname, 'fixtures', 'storybook', 'index.json'), 'utf8'),
+    ) as typeof SB8_INDEX;
+    const server = await startMockStorybook({ endpoint: 'index.json', body });
+    try {
+      const idx = await fetchStorybookIndex(server.url, 5_000);
+      expect(idx!.storybookMajor).toBe(8);
+      const result = await discoverStorybookStories({ url: server.url });
+      expect(result!.storybookMajor).toBe(8);
+      expect(result!.docsSkipped).toBe(1);
+      expect(result!.routes.map((route) => route.path).sort()).toEqual([
+        '/iframe.html?id=components-button--primary%3Aclick&viewMode=story',
+        '/iframe.html?id=components-button--primary&viewMode=story',
+      ]);
+      expect(result!.routes.every((route) => route.discoveredVia === 'storybook')).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
   it('fixture .storybook/main.ts is a Storybook 8 config', () => {
     const main = readFileSync(
       join(__dirname, '..', '..', '__fixtures__', 'storybook', '.storybook', 'main.ts'),

@@ -316,6 +316,11 @@ export interface FrontguardConfig {
   auth?: AuthConfig;
   /** Enable smart rendering — waits for animations, fonts, lazy images (default `true`). */
   smartRender: boolean;
+  /**
+   * Render every discovered route. Set by `--all-routes`.
+   * Does not turn off animation freeze or font waiting; `smartRender: false` does.
+   */
+  includeAllRoutes?: boolean;
   /** Number of parallel browser workers (default `4`). */
   workers: number;
   /** Page navigation timeout in milliseconds (default `30 000`). */
@@ -356,11 +361,29 @@ export interface FrontguardConfig {
   judge?: JudgeConfig;
   /**
    * Storybook integration. When set, routes are enumerated from the running
-   * Storybook server's `/index.json` (Storybook 8) or `/stories.json`
-   * (Storybook 7) and rendered via `/iframe.html?id=<story_id>&viewMode=story`,
-   * with the renderer awaiting each story's `play()` function before capture.
+   * Storybook server's `/index.json` (Storybook 8, 9, 10, and 11 alpha share
+   * this entries index) or `/stories.json` (Storybook 7) and rendered via
+   * `/iframe.html?id=<story_id>&viewMode=story`, with the renderer awaiting
+   * each story's `play()` function before capture.
    */
   storybook?: StorybookIntegrationConfig;
+  /**
+   * Ladle integration. Off unless `url` or `dir` is set. Stories come from
+   * Ladle's `meta.json` and render at `/?story=<id>&mode=preview`.
+   */
+  ladle?: LadleIntegrationConfig;
+  /**
+   * Histoire integration. Off unless `url` or `dir` is set. Variants come
+   * from the build's `histoire.json` and render at
+   * `/__sandbox.html?storyId=&variantId=`.
+   */
+  histoire?: HistoireIntegrationConfig;
+  /**
+   * Runner that produced the baselines about to be compared. When it differs
+   * from the runner selected above, discovery logs that those baselines are
+   * not comparable. This does not change pass/fail.
+   */
+  captureRunner?: CaptureRunnerName;
   /** Global browser color scheme emulation (`'light'` or `'dark'`). */
   colorScheme?: ColorScheme;
   /**
@@ -408,6 +431,47 @@ export interface StorybookIntegrationConfig {
   projectRoot?: string;
 }
 
+/** Story runner that can produce a set of baselines. */
+export type CaptureRunnerName = 'storybook' | 'ladle' | 'histoire';
+
+/**
+ * Ladle integration configuration.
+ *
+ * Absent, or present with neither `url` nor `dir`, leaves discovery off.
+ * `dir` reads `meta.json` from a local build. `url` fetches it from a server.
+ */
+export interface LadleIntegrationConfig {
+  /** Base URL of a running Ladle server (e.g. `http://localhost:61000`). */
+  url?: string;
+  /** Directory that contains Ladle's built `meta.json` (default build folder is `build`). */
+  dir?: string;
+  /** Optional include filter. Same matching rules as Storybook `stories`. */
+  stories?: string[];
+  /** Optional exclude filter. Same matching rules as `stories`. */
+  exclude?: string[];
+  /** Optional fetch timeout for `url` index requests, in milliseconds. */
+  fetchTimeoutMs?: number;
+}
+
+/**
+ * Histoire integration configuration.
+ *
+ * Absent, or present with neither `url` nor `dir`, leaves discovery off.
+ * `dir` reads `histoire.json` from a local build. `url` fetches it.
+ */
+export interface HistoireIntegrationConfig {
+  /** Base URL serving a Histoire build. */
+  url?: string;
+  /** Directory that contains `histoire.json` (default build folder is `.histoire/dist`). */
+  dir?: string;
+  /** Optional include filter. Same matching rules as Storybook `stories`. */
+  stories?: string[];
+  /** Optional exclude filter. Same matching rules as `stories`. */
+  exclude?: string[];
+  /** Optional fetch timeout for `url` index requests, in milliseconds. */
+  fetchTimeoutMs?: number;
+}
+
 /**
  * Configuration for model-as-judge (zero-baseline) mode (Task 8.4).
  *
@@ -445,7 +509,7 @@ export interface Route {
   /** Whether this route requires authentication. */
   auth?: boolean;
   /** How this route was discovered. */
-  discoveredVia?: 'crawl' | 'filesystem' | 'config' | 'sitemap' | 'storybook';
+  discoveredVia?: 'crawl' | 'filesystem' | 'config' | 'sitemap' | 'storybook' | 'ladle' | 'histoire';
   /** Per-route pixel-diff threshold (fraction 0–1). Overrides global `threshold` when set. */
   threshold?: number;
   /** Per-route ignore rules, merged with global rules during comparison. */

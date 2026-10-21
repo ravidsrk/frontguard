@@ -176,7 +176,11 @@ function DocsLayout() {
       </nav>
 
       <div className="fg-docs-grid" style={s('display: grid; grid-template-columns: 256px minmax(0, 1fr) 224px; max-width: 1400px; margin: 0 auto;')}>
-        <aside className="fg-docs-sidebar" style={s('border-right: 1px solid #211e1b; padding: 34px 0 80px;')}>
+        <aside
+          className="fg-docs-sidebar"
+          aria-label="Documentation"
+          style={s('border-right: 1px solid #211e1b; padding: 34px 0 80px;')}
+        >
           <div style={s('position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; padding-right: 4px;')}>
             <div style={s('padding: 0 22px 18px;')}>
               <input
@@ -221,7 +225,11 @@ function DocsLayout() {
           <Outlet />
         </main>
 
-        <aside className="fg-docs-toc" style={s('padding: 44px 24px; border-left: 1px solid #211e1b;')}>
+        <aside
+          className="fg-docs-toc"
+          aria-label="On this page"
+          style={s('padding: 44px 24px; border-left: 1px solid #211e1b;')}
+        >
           <div style={s('position: sticky; top: 84px;')}>
             <div style={s(`font-family: ${MONO}; font-size: 12px; font-weight: 600; color: #a89f94; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;`)}>ON THIS PAGE</div>
             {cur.toc.map((t) => (

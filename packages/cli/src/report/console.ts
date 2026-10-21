@@ -446,7 +446,7 @@ export class ConsoleReporter implements Reporter {
         `  ★ NEW PAGES (${result.summary.newPages}) — current captures were not accepted as baselines`,
       ),
     );
-    console.log(chalk.dim('  Review them, then run `frontguard update-baselines` to accept them.'));
+    console.log(chalk.dim('  Review them, then run `frontguard update-baselines --confirm-baselines` to accept them.'));
     console.log('');
   }
 

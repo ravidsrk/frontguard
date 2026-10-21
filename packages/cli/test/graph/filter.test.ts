@@ -18,7 +18,9 @@ vi.mock('../../src/graph/parser.js', () => ({
 }));
 
 vi.mock('../../src/graph/resolver.js', () => ({
-  getChangedPaths: vi.fn<(dir: string) => { present: string[]; removed: string[] }>(),
+  getChangedPaths: vi.fn<
+    (dir: string) => { present: string[]; removed: string[]; pinnedDiffError?: string }
+  >(),
   mapRoutesToFiles: vi.fn<(routes: Route[], dir: string) => Map<string, string[]>>(),
   filterAffectedRoutes: vi.fn<(
     routes: Route[],
@@ -77,13 +79,72 @@ function presentFiles(files: string[]): void {
 // ---------------------------------------------------------------------------
 
 describe('smartFilter', () => {
+  const originalEvent = process.env.GITHUB_EVENT_NAME;
+  const originalBase = process.env.FRONTGUARD_DIFF_BASE;
+
+  beforeEach(() => {
+    delete process.env.GITHUB_EVENT_NAME;
+    delete process.env.FRONTGUARD_DIFF_BASE;
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
+    if (originalEvent === undefined) delete process.env.GITHUB_EVENT_NAME;
+    else process.env.GITHUB_EVENT_NAME = originalEvent;
+    if (originalBase === undefined) delete process.env.FRONTGUARD_DIFF_BASE;
+    else process.env.FRONTGUARD_DIFF_BASE = originalBase;
   });
 
   // -----------------------------------------------------------------------
   // Feature gate
   // -----------------------------------------------------------------------
+
+  it('renders all routes on merge_group when no diff base is pinned', async () => {
+    process.env.GITHUB_EVENT_NAME = 'merge_group';
+    const routes = [route('/'), route('/pricing')];
+    const result = await smartFilter(routes, makeConfig());
+
+    expect(result.filtered).toEqual(routes);
+    expect(result.skipped).toHaveLength(0);
+    expect(result.reason).toMatch(/merge_group/);
+    expect(mockedGetChangedPaths).not.toHaveBeenCalled();
+  });
+
+  it('keeps filtering on merge_group when FRONTGUARD_DIFF_BASE is set', async () => {
+    process.env.GITHUB_EVENT_NAME = 'merge_group';
+    process.env.FRONTGUARD_DIFF_BASE = 'abc123def';
+    const routes = [route('/')];
+    presentFiles([]);
+
+    const result = await smartFilter(routes, makeConfig());
+
+    expect(mockedGetChangedPaths).toHaveBeenCalled();
+    expect(result.reason).toContain('no changes');
+  });
+
+  it('renders every route when --all-routes is set and leaves smartRender on', async () => {
+    const routes = [route('/'), route('/about')];
+    const result = await smartFilter(routes, makeConfig({ includeAllRoutes: true }));
+
+    expect(result.filtered).toEqual(routes);
+    expect(result.skipped).toHaveLength(0);
+    expect(result.reason).toContain('all routes requested');
+    expect(mockedGetChangedPaths).not.toHaveBeenCalled();
+  });
+
+  it('renders all routes when the pinned diff base cannot be compared', async () => {
+    mockedGetChangedPaths.mockReturnValue({
+      present: ['/repo/app/page.tsx'],
+      removed: [],
+      pinnedDiffError: 'FRONTGUARD_DIFF_BASE abc could not be compared; rendering all routes',
+    });
+    const routes = [route('/'), route('/pricing')];
+    const result = await smartFilter(routes, makeConfig());
+
+    expect(result.filtered).toEqual(routes);
+    expect(result.reason).toContain('FRONTGUARD_DIFF_BASE');
+    expect(mockedMapRoutesToFiles).not.toHaveBeenCalled();
+  });
 
   it('returns all routes when smartRender is disabled', async () => {
     const routes = [route('/'), route('/about')];

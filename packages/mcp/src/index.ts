@@ -1,10 +1,11 @@
 /**
  * Frontguard MCP server — stdio entry.
  *
- * Registers seven tools (`list_regressions`, `inspect_diff_cluster_dom`,
- * `get_suggested_fix`, `verify_css_patch`, `promote_baseline`,
- * `accept_baseline`, `recent_runs`) and connects them to a stdio transport
- * so editor agents (Claude Code, Cursor, Copilot) can call them in-loop.
+ * Registers read tools (`list_regressions`, `inspect_diff_cluster_dom`,
+ * `get_suggested_fix`, `verify_css_patch`, `recent_runs`) and connects them
+ * to a stdio transport. `promote_baseline` and `accept_baseline` are registered
+ * only when `FRONTGUARD_MCP_WRITES=1`, so editor agents (Claude Code, Cursor,
+ * Copilot) can call the read tools in-loop without a baseline write.
  * Supports both Cloud API mode and local CLI report mode (`FRONTGUARD_LOCAL_REPORT`).
  *
  * The server starts even without `FRONTGUARD_API_KEY` set — the SDK lists
@@ -55,8 +56,84 @@ import {
 const SERVER_NAME = '@frontguard/mcp';
 const SERVER_VERSION = '0.2.3';
 
+const READ_INSTRUCTIONS =
+  'Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, and `recent_runs` to browse history.';
+
+/** Instructions match the tools this process actually registers. */
+export function serverInstructions(env: NodeJS.ProcessEnv = process.env): string {
+  if (mcpWritesEnabled(env)) {
+    return (
+      'Frontguard MCP server. ' +
+      READ_INSTRUCTIONS +
+      ' Write tools are enabled: `promote_baseline` promotes reviewed visual changes, and `accept_baseline` records whole-run approval. A human still confirms baseline files with `frontguard update-baselines --confirm-baselines`.'
+    );
+  }
+  return (
+    'Frontguard MCP server. ' +
+    READ_INSTRUCTIONS +
+    ' This server is read-only. `promote_baseline` and `accept_baseline` are not registered. A human reviews the report and runs `frontguard update-baselines --confirm-baselines`.'
+  );
+}
+
 /**
- * Build a fresh {@link McpServer} with all Frontguard tools registered.
+ * MCP annotations are untrusted hints. A client may skip a prompt because of
+ * them, and an untrusted server can lie. They do not enforce anything; #287
+ * is the control that keeps baseline writes away from the agent.
+ */
+function readOnlyAnnotations(title: string): {
+  title: string;
+  annotations: {
+    title: string;
+    readOnlyHint: true;
+    openWorldHint: false;
+    destructiveHint: false;
+  };
+} {
+  return {
+    title,
+    annotations: {
+      title,
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
+  };
+}
+
+/** Claude Code prompts on this flag even in auto and bypass-permissions modes. */
+const REQUIRES_USER_INTERACTION = {
+  'anthropic/requiresUserInteraction': true,
+} as const;
+
+function destructiveAnnotations(title: string): {
+  title: string;
+  annotations: {
+    title: string;
+    readOnlyHint: false;
+    destructiveHint: true;
+    openWorldHint: false;
+  };
+  _meta: { 'anthropic/requiresUserInteraction': true };
+} {
+  return {
+    title,
+    annotations: {
+      title,
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: false,
+    },
+    _meta: REQUIRES_USER_INTERACTION,
+  };
+}
+
+/** Write tools stay unregistered unless this env var is exactly `1`. */
+export function mcpWritesEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.FRONTGUARD_MCP_WRITES === '1';
+}
+
+/**
+ * Build a fresh {@link McpServer} with Frontguard tools registered.
  * Exported so tests can drive it without spawning a subprocess.
  */
 export function createServer(): McpServer {
@@ -64,15 +141,14 @@ export function createServer(): McpServer {
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
       capabilities: { tools: {} },
-      instructions:
-        'Frontguard MCP server. Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, `promote_baseline` to promote reviewed visual changes, and `recent_runs` to browse history. `accept_baseline` currently records whole-run approval.',
+      instructions: serverInstructions(),
     },
   );
 
   server.registerTool(
     'list_regressions',
     {
-      title: 'List regressions for a PR',
+      ...readOnlyAnnotations('List regressions for a PR'),
       description:
         'Return the visual regressions Frontguard detected on a given GitHub PR (or run id). Each row carries a `diffId` you can pass to `get_suggested_fix`.',
       inputSchema: listRegressionsInputSchema,
@@ -84,7 +160,7 @@ export function createServer(): McpServer {
   server.registerTool(
     'get_suggested_fix',
     {
-      title: 'Get the suggested fix for a diff',
+      ...readOnlyAnnotations('Get the suggested fix for a diff'),
       description:
         'Return the AI-generated patch for a single diff (keyed by the `diffId` from `list_regressions`).',
       inputSchema: getSuggestedFixInputSchema,
@@ -93,22 +169,24 @@ export function createServer(): McpServer {
     async (args) => withCloudClient(async (client) => getSuggestedFix(client, args)),
   );
 
-  server.registerTool(
-    'accept_baseline',
-    {
-      title: 'Record whole-run baseline approval',
-      description:
-        'Record run-scoped whole-run approval after `confirm_all_regressions_reviewed: true`. Screenshot promotion is not implemented yet; use the CLI or composite Action to update baselines.',
-      inputSchema: acceptBaselineInputSchema,
-      outputSchema: acceptBaselineOutputSchema,
-    },
-    async (args) => withCloudClient(async (client) => acceptBaseline(client, args)),
-  );
+  if (mcpWritesEnabled()) {
+    server.registerTool(
+      'accept_baseline',
+      {
+        ...destructiveAnnotations('Record whole-run baseline approval'),
+        description:
+          'Record run-scoped whole-run approval after `confirm_all_regressions_reviewed: true`. Screenshot promotion is not implemented yet; use the CLI or composite Action to update baselines.',
+        inputSchema: acceptBaselineInputSchema,
+        outputSchema: acceptBaselineOutputSchema,
+      },
+      async (args) => withCloudClient(async (client) => acceptBaseline(client, args)),
+    );
+  }
 
   server.registerTool(
     'recent_runs',
     {
-      title: 'List recent Frontguard runs',
+      ...readOnlyAnnotations('List recent Frontguard runs'),
       description:
         'List the most recent runs the API key has access to. Optional `repo` and `branch` filters narrow the results.',
       inputSchema: recentRunsInputSchema,
@@ -120,7 +198,7 @@ export function createServer(): McpServer {
   server.registerTool(
     'inspect_diff_cluster_dom',
     {
-      title: 'Inspect diff cluster and grounded DOM target',
+      ...readOnlyAnnotations('Inspect diff cluster and grounded DOM target'),
       description:
         'Inspect a specific visual regression diff cluster, returning its bounding box, AI classification, suggested fix, and grounded DOM target selector.',
       inputSchema: inspectDiffClusterDomInputSchema,
@@ -132,7 +210,7 @@ export function createServer(): McpServer {
   server.registerTool(
     'verify_css_patch',
     {
-      title: 'Verify a candidate CSS patch before applying',
+      ...readOnlyAnnotations('Verify a candidate CSS patch before applying'),
       description:
         'Validate a candidate CSS patch against a visual regression diff for syntax correctness, target selector alignment, and layout-destroying properties.',
       inputSchema: verifyCssPatchInputSchema,
@@ -141,17 +219,19 @@ export function createServer(): McpServer {
     async (args) => withCloudClient(async (client) => verifyCssPatch(client, args)),
   );
 
-  server.registerTool(
-    'promote_baseline',
-    {
-      title: 'Promote reviewed visual baselines',
-      description:
-        'Promote reviewed visual changes to baseline after `confirm_reviewed: true`, optionally scoped to specific routes.',
-      inputSchema: promoteBaselineInputSchema,
-      outputSchema: promoteBaselineOutputSchema,
-    },
-    async (args) => withCloudClient(async (client) => promoteBaseline(client, args)),
-  );
+  if (mcpWritesEnabled()) {
+    server.registerTool(
+      'promote_baseline',
+      {
+        ...destructiveAnnotations('Promote reviewed visual baselines'),
+        description:
+          'Promote reviewed visual changes to baseline after `confirm_reviewed: true`, optionally scoped to specific routes.',
+        inputSchema: promoteBaselineInputSchema,
+        outputSchema: promoteBaselineOutputSchema,
+      },
+      async (args) => withCloudClient(async (client) => promoteBaseline(client, args)),
+    );
+  }
 
   return server;
 }

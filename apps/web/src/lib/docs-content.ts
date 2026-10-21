@@ -178,11 +178,11 @@ export const articles: Article[] = [
     )}${code(
       'Frontguard terminal',
       `$ npx -p @frontguard/cli frontguard doctor
-$ npx -p @frontguard/cli frontguard update-baselines
+$ npx -p @frontguard/cli frontguard update-baselines --confirm-baselines
 $ git push origin frontguard-baselines
 $ npx -p @frontguard/cli frontguard run`,
     )}${h2('Baseline contract')}${p(
-      'Ordinary runs never accept CLI screenshots. Review captures first, then use frontguard update-baselines explicitly. Unaccepted new pages and regressions exit non-zero.',
+      'Ordinary runs never accept CLI screenshots. Review captures first, then use frontguard update-baselines --confirm-baselines explicitly. Unaccepted new pages and regressions exit non-zero.',
     )}${table(
       ['Exit Code', 'Meaning', 'When It Happens'],
       [
@@ -224,7 +224,7 @@ $ npx -p @frontguard/cli frontguard doctor`,
           '@frontguard/cli',
           'Standalone multi-route & multi-viewport visual regression runner with HTML workbench, git orphan storage, and plugins.',
           'frontguard-baselines git orphan branch',
-          'Explicitly run frontguard update-baselines (ordinary runs never overwrite baselines).',
+          'Explicitly run frontguard update-baselines --confirm-baselines (ordinary runs never overwrite baselines).',
         ],
         [
           '@frontguard/playwright',
@@ -236,7 +236,7 @@ $ npx -p @frontguard/cli frontguard doctor`,
           '@frontguard/mcp',
           '7-tool Model Context Protocol server for Claude Code, Cursor, and Windsurf.',
           'Reads ./frontguard-report/report.json locally',
-          'Agent calls promote_baseline with confirm_reviewed: true.',
+          'MCP promotion is refused in local-report mode. A human runs frontguard update-baselines --confirm-baselines. Cloud approveRun is not a production path.',
         ],
       ],
     )}${h2('Prerequisites')}${list([
@@ -244,7 +244,7 @@ $ npx -p @frontguard/cli frontguard doctor`,
       '<strong>Git repository</strong>: Required when storing baselines on the ' +
         ic('frontguard-baselines') +
         ' orphan branch. Ensure your working tree is clean before running ' +
-        ic('frontguard update-baselines') +
+        ic('frontguard update-baselines --confirm-baselines') +
         ' for the first time.',
       '<strong>Playwright Chromium</strong>: Installed once per machine or CI cache via ' +
         ic('npx -p @frontguard/cli playwright install --with-deps chromium') +
@@ -293,7 +293,7 @@ $ git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"`,
     )}${code(
       'Frontguard terminal',
       `$ npx -p @frontguard/cli frontguard doctor
-$ npx -p @frontguard/cli frontguard update-baselines
+$ npx -p @frontguard/cli frontguard update-baselines --confirm-baselines
 $ git push origin frontguard-baselines
 $ npx -p @frontguard/cli frontguard run`,
     )}${h2('Compare')}${p(
@@ -406,9 +406,9 @@ $ npx -p @frontguard/cli frontguard run`,
           'frontguard run --wait-for-stability --redact-sensitive',
         ],
         [
-          'frontguard update-baselines',
+          'frontguard update-baselines --confirm-baselines',
           'Capture current renders and commit them as accepted baselines on the frontguard-baselines orphan branch.',
-          'frontguard update-baselines --url http://localhost:3000',
+          'frontguard update-baselines --confirm-baselines --url http://localhost:3000',
         ],
         [
           'frontguard init [--ci] [--yes]',
@@ -454,7 +454,7 @@ $ npx -p @frontguard/cli frontguard run`,
     )}${code(
       'terminal',
       `$ frontguard run --url http://localhost:3000 --threshold 0.01 --wait-for-stability --redact-sensitive --color-scheme dark --freeze-time [timestamp] --seed-random [seed] --block-urls &lt;patterns...&gt;
-$ frontguard update-baselines --url http://localhost:3000
+$ frontguard update-baselines --confirm-baselines --url http://localhost:3000
 $ frontguard doctor
 $ frontguard guide [topic] --json
 $ frontguard monitor --url https://example.com --threshold 0.05
@@ -803,7 +803,7 @@ test('checkout summary layout stays locked', async ({ page }) =&gt; {
           'Lane 2: Explicit Baseline Promotion',
           'workflow_dispatch (manual) or local developer terminal',
           'contents: write',
-          'Runs frontguard update-baselines after human review and pushes the updated manifest and deduplicated PNGs to origin/frontguard-baselines.',
+          'Runs frontguard update-baselines --confirm-baselines after human review and pushes the updated manifest and deduplicated PNGs to origin/frontguard-baselines.',
         ],
       ],
     )}${h2('Output')}${p(
@@ -840,7 +840,9 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
         ['pull-requests: write', 'Optional PR summary comments', 'Allows posting or updating the markdown diff summary table on the Pull Request.'],
       ],
     )}${h2('Baseline updates')}${p(
-      'Updated baselines still require the workflow to push frontguard-baselines in explicit update mode. Do not infer that the public v0 ref has passed this journey until the external smoke test is recorded.',
+      'Updated baselines still require the workflow to push frontguard-baselines in explicit update mode. Do not infer that the public v0 ref has passed this journey until the external smoke test is recorded. merge_group never writes baselines, even when allow-baseline-writes is true, and the Action renders every route for that event.',
+    )}${p(
+      'Use on: [pull_request, merge_group] with an identical job name. A workflow-level paths: filter on a required check leaves the queue pending. Queue runs compare against the shared latest baseline until #306. Capture the PR head SHA and check out with fetch-depth: 0, which is the history smartFilter needs for git diff base...HEAD.',
     )}${p(
       'For a copy-ready GitHub Actions workflow using the published CLI today, see ' +
         a('/docs/guides/github-actions', 'Guides: GitHub Actions') +
@@ -1361,7 +1363,7 @@ jobs:
           name: frontguard-report
           path: frontguard-report/`,
     )}${h2('Baseline workflow')}${p(
-      'Baseline acceptance belongs in a separate explicit workflow: run frontguard update-baselines, review the result, then push frontguard-baselines.',
+      'Baseline acceptance belongs in a separate explicit workflow: run frontguard update-baselines --confirm-baselines, review the result, then push frontguard-baselines.',
     )}${code(
       '.github/workflows/frontguard-update-baselines.yml: Lane 2: Explicit Baseline Promotion',
       `name: Update Frontguard Baselines
@@ -1391,10 +1393,31 @@ jobs:
           npm run build
           npm run start &amp;
           npx wait-on http://localhost:3000 --timeout 60000
-          npx -p @frontguard/cli frontguard update-baselines
+          npx -p @frontguard/cli frontguard update-baselines --confirm-baselines
           git push origin frontguard-baselines:frontguard-baselines`,
     )}${h2('Composite Action')}${p(
       'The generated workflow and the repository composite Action are separate surfaces. The public Action remains pre-release pending an external consumer smoke test.',
+    )}${h2('Merge queue')}${p(
+      'Register pull_request and merge_group on the same workflow with an identical job name. GitHub waits for that name before merging the queue.',
+    )}${code(
+      '.github/workflows/frontguard.yml: pull request and merge queue',
+      `on: [pull_request, merge_group]
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # smartFilter diffs base...HEAD. fetch-depth: 1 does not contain
+          # that base commit. Capture the PR head SHA so the checkout is the
+          # pull request head, not an unexpected merge ref.
+          fetch-depth: 0
+          ref: \${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}`,
+    )}${p(
+      'A workflow-level paths: filter on that required check skips the job when the queue commit does not touch those paths, and the queue stays pending. Do not put paths: on a required Frontguard check.',
+    )}${p(
+      'Queue runs compare against the shared latest frontguard-baselines branch until #306. They do not auto-pass. update-baselines on merge_group exits 2 and pushes nothing, even when allow-baseline-writes is true. On merge_group the Action passes --all-routes and sets FRONTGUARD_DIFF_BASE from github.event.merge_group.base_sha when that SHA is present. A queued regression still exits 1 and is written to the job summary, because the payload has no pull request number.',
     )}`,
   ),
 
@@ -1414,7 +1437,7 @@ jobs:
     )}${h2('Scope')}${list([
       'Map scenario URLs to routes and viewport widths.',
       'Convert misMatchThreshold percentages to Frontguard ratios by dividing by 100.',
-      'Start the app, review captures, run frontguard update-baselines, and push frontguard-baselines.',
+      'Start the app, review captures, run frontguard update-baselines --confirm-baselines, and push frontguard-baselines.',
       'Keep both tools in CI until the new comparisons are independently reviewed.',
     ])}${h2('Configuration mapping')}${table(
       ['BackstopJS (backstop.json)', 'Frontguard (frontguard.config.ts)', 'Migration Notes'],
@@ -1424,7 +1447,7 @@ jobs:
         ['scenarios[].misMatchThreshold: 1.5', 'threshold: 0.015', 'Divide BackstopJS percentage (0–100) by 100 to get Frontguard ratio (0–1).'],
         ['scenarios[].hideSelectors / removeSelectors', 'ignore: [{ selector: ".ad-banner" }]', 'Masks volatile DOM elements before capture.'],
         ['scenarios[].readySelector / delay', 'actions: [{ type: "waitForSelector", selector }, { type: "wait", ms }]', 'Combine with waitForStability: true for automatic frame convergence.'],
-        ['bitmaps_reference/', 'frontguard-baselines git orphan branch', 'Managed via frontguard update-baselines; keeps main branch free of PNG blobs.'],
+        ['bitmaps_reference/', 'frontguard-baselines git orphan branch', 'Managed via frontguard update-baselines --confirm-baselines; keeps main branch free of PNG blobs.'],
       ],
     )}${code(
       'Before (backstop.json) vs After (frontguard.config.ts)',
@@ -1444,7 +1467,7 @@ export default {
   waitForStability: true,
 }`,
     )}${h2('Baseline migration')}${p(
-      'Because BackstopJS uses its own Puppeteer/Playwright viewport framing and reference directory structure, do not copy old bitmaps_reference PNGs directly. Instead, boot your application, run frontguard update-baselines once to establish fresh Chromium baselines, inspect them, and push frontguard-baselines.',
+      'Because BackstopJS uses its own Puppeteer/Playwright viewport framing and reference directory structure, do not copy old bitmaps_reference PNGs directly. Instead, boot your application, run frontguard update-baselines --confirm-baselines once to establish fresh Chromium baselines, inspect them, and push frontguard-baselines.',
     )}${h2('Thresholds')}${p(
       'BackstopJS expresses misMatchThreshold on a 0–100 percentage scale (where 0.1 means 0.1%), whereas Frontguard uses a 0–1 ratio scale (where 0.001 means 0.1% and 0.01 means 1%). Always divide your BackstopJS threshold by 100.',
     )}`,
@@ -1491,7 +1514,7 @@ export default {
   waitForStability: true,
 }`,
     )}${h2('Baseline migration')}${p(
-      'Start your application (and Storybook if configured), run frontguard update-baselines, inspect the generated captures, and push origin/frontguard-baselines.',
+      'Start your application (and Storybook if configured), run frontguard update-baselines --confirm-baselines, inspect the generated captures, and push origin/frontguard-baselines.',
     )}${h2('Cutover')}${p(
       'Once your pull-request workflow passes cleanly against frontguard-baselines, remove the legacy Lost Pixel workflow and .lostpixel baseline directory.',
     )}`,
@@ -1555,7 +1578,7 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
         body: 'Call verify_css_patch with diff_id, css_patch and target_selector. Apply the reviewed code edit yourself and re-run Frontguard; CSS validation alone is not visual verification.',
       },
     ])}${h2('Approval limit')}${p(
-      'Local-report mode cannot replace PNG baselines. accept_baseline can mark the JSON report approved, but a human reviewer uses frontguard update-baselines to accept local screenshots. Cloud tools record approval metadata only, with explicit confirmation; cloud screenshot promotion is not implemented.',
+      'MCP promotion is refused in local-report mode and does not write the frontguard-baselines branch. The local write is the CLI command frontguard update-baselines --confirm-baselines, which a human runs. An agent setting confirm_reviewed: true on itself is not a human review, and an advisory caption cannot set that flag. Cloud approveRun is not a production path; do not point the MCP client at a production host. accept_baseline can mark a JSON report approved, but it does not replace screenshot baselines. Cloud tools record approval metadata only; cloud screenshot promotion is not implemented.',
     )}`,
   ),
 

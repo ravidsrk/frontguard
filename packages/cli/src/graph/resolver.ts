@@ -19,6 +19,7 @@ import {
   DependencyGraph,
   unresolvedRelativeImports,
 } from './parser.js';
+import { pinnedDiffBase } from './diff-base.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -341,7 +342,8 @@ export function mapRoutesToFiles(
  * value threaded through here would otherwise be one commit away from command
  * injection. src/storage/git-orphan.ts already does it this way.
  */
-function gitDiff(projectDir: string, args: string[]): string[] {
+/** Changed paths, or null when git exits non-zero. An empty diff is `[]`, not null. */
+function gitDiff(projectDir: string, args: string[]): string[] | null {
   try {
     const output = execFileSync('git', args, {
       cwd: projectDir,
@@ -354,7 +356,7 @@ function gitDiff(projectDir: string, args: string[]): string[] {
       .split('\n')
       .filter((line) => line.length > 0);
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -362,10 +364,15 @@ function gitDiff(projectDir: string, args: string[]): string[] {
  * Detects files changed in the current commit or PR.
  *
  * Tries multiple strategies in order of preference:
- * 1. `git diff --name-only origin/main...HEAD` — PR diff against main
+ * 1. `git diff --name-only <FRONTGUARD_DIFF_BASE>...HEAD` when that env is set,
+ *    otherwise `git diff --name-only origin/main...HEAD`
  * 2. `git diff --name-only HEAD~1` — last commit
  * 3. `git diff --name-only HEAD` — uncommitted changes
  * 4. `git diff --name-only --cached` — staged changes
+ *
+ * An empty pinned diff still falls through to strategy 2. It does not also
+ * consult origin/main. A pinned diff that git cannot run does not fall
+ * through: callers render every route. Unset env keeps the origin/main...HEAD chain.
  *
  * Resolves relative paths to absolute. Missing paths are returned separately
  * so a deletion is not treated as "no change".
@@ -376,43 +383,62 @@ function gitDiff(projectDir: string, args: string[]): string[] {
 export interface ChangedPaths {
   present: string[];
   removed: string[];
+  /**
+   * Set when `FRONTGUARD_DIFF_BASE` is set but git cannot compare it.
+   * Callers render every route. An empty successful diff does not set this.
+   */
+  pinnedDiffError?: string;
 }
 
-export function getChangedPaths(projectDir: string): ChangedPaths {
+export function getChangedPaths(
+  projectDir: string,
+  env: NodeJS.ProcessEnv = process.env,
+): ChangedPaths {
   const resolvedDir = resolve(projectDir);
   const allFiles = new Set<string>();
+  const pinnedBase = pinnedDiffBase(env);
 
-  // Strategy 1: PR diff against main (most common CI context)
-  // Fast-check if remote exists before attempting remote diff
-  let hasRemote = false;
-  try {
-    execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: resolvedDir, encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] });
-    hasRemote = true;
-  } catch {
-    // No remote configured — skip remote diff strategies
-    logger.debug('No git remote "origin" found — skipping remote diff');
-  }
+  if (pinnedBase) {
+    const pinnedFiles = gitDiff(resolvedDir, ['diff', '--name-only', `${pinnedBase}...HEAD`]);
+    if (pinnedFiles === null) {
+      const pinnedDiffError = `FRONTGUARD_DIFF_BASE ${pinnedBase} could not be compared; rendering all routes`;
+      logger.warn(pinnedDiffError);
+      return { present: [], removed: [], pinnedDiffError };
+    }
+    for (const f of pinnedFiles) allFiles.add(f);
+  } else {
+    // Strategy 1: PR diff against main (most common CI context)
+    // Fast-check if remote exists before attempting remote diff
+    let hasRemote = false;
+    try {
+      execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: resolvedDir, encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] });
+      hasRemote = true;
+    } catch {
+      // No remote configured — skip remote diff strategies
+      logger.debug('No git remote "origin" found — skipping remote diff');
+    }
 
-  if (hasRemote) {
-    const prFilesMain = gitDiff(resolvedDir, ['diff', '--name-only', 'origin/main...HEAD']);
-    for (const f of prFilesMain) allFiles.add(f);
+    if (hasRemote) {
+      const prFilesMain = gitDiff(resolvedDir, ['diff', '--name-only', 'origin/main...HEAD']) ?? [];
+      for (const f of prFilesMain) allFiles.add(f);
+    }
   }
 
   // Strategy 2: Last commit diff
   if (allFiles.size === 0) {
-    const commitFiles = gitDiff(resolvedDir, ['diff', '--name-only', 'HEAD~1']);
+    const commitFiles = gitDiff(resolvedDir, ['diff', '--name-only', 'HEAD~1']) ?? [];
     for (const f of commitFiles) allFiles.add(f);
   }
 
   // Strategy 3: Uncommitted changes
   if (allFiles.size === 0) {
-    const uncommitted = gitDiff(resolvedDir, ['diff', '--name-only', 'HEAD']);
+    const uncommitted = gitDiff(resolvedDir, ['diff', '--name-only', 'HEAD']) ?? [];
     for (const f of uncommitted) allFiles.add(f);
   }
 
   // Strategy 4: Staged changes
   if (allFiles.size === 0) {
-    const stagedFiles = gitDiff(resolvedDir, ['diff', '--name-only', '--cached']);
+    const stagedFiles = gitDiff(resolvedDir, ['diff', '--name-only', '--cached']) ?? [];
     for (const f of stagedFiles) allFiles.add(f);
   }
 
@@ -429,8 +455,11 @@ export function getChangedPaths(projectDir: string): ChangedPaths {
 }
 
 /** Existing changed files. Deletions are omitted; use {@link getChangedPaths} to see them. */
-export function getChangedFiles(projectDir: string): string[] {
-  return getChangedPaths(projectDir).present;
+export function getChangedFiles(
+  projectDir: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
+  return getChangedPaths(projectDir, env).present;
 }
 
 const STATIC_ASSET_EXTENSIONS = new Set([

@@ -73,6 +73,9 @@ export {
 import { discoverRoutes } from '../discovery/crawler.js';
 import { discoverRoutesFromFilesystem } from '../discovery/filesystem.js';
 import { discoverStorybookRoutesForConfig } from '../discovery/storybook.js';
+import { discoverLadleRoutesForConfig } from '../discovery/ladle.js';
+import { discoverHistoireRoutesForConfig } from '../discovery/histoire.js';
+import { selectedCaptureRunner, warnIfCaptureRunnerChanged } from '../discovery/capture-runner.js';
 import { smartFilter } from '../graph/filter.js';
 import { renderPages } from '../render/playwright.js';
 import { compareScreenshot, createNewPageResult } from '../diff/pixel.js';
@@ -278,8 +281,9 @@ export function resolveThreshold(route: Route, globalThreshold: number): number 
 /**
  * Discovers routes using the shared strategy:
  *   1. Explicit routes from config
- *   2. Crawl if discover options are set
- *   3. Filesystem discovery, falling back to crawl from '/'
+ *   2. One optional story runner (Storybook, else Ladle, else Histoire)
+ *   3. Crawl if discover options are set
+ *   4. Filesystem discovery, falling back to crawl from '/'
  *
  * Used by both `runPipeline` and `updateBaselines` to avoid duplication.
  */
@@ -290,20 +294,44 @@ async function discoverAllRoutes(config: FrontguardConfig): Promise<Route[]> {
     return toRouteObjects(config.routes);
   }
 
-  // 2. Storybook integration — enumerate stories from the running server.
-  //    When `storybook.url` is set we treat that URL as the effective
-  //    `baseUrl` for capture; the mutation lives in `runPipeline`'s caller
-  //    so the rest of the pipeline reads from `config.baseUrl` normally.
-  if (config.storybook?.url) {
-    const sb = await discoverStorybookRoutesForConfig(config);
-    if (sb && sb.routes.length > 0) {
-      // Re-point baseUrl so route paths like `/iframe.html?id=…` resolve
-      // against the Storybook server rather than the app under test.
-      config.baseUrl = sb.storybookUrl;
-      logger.info(`Storybook discovery returned ${sb.routes.length} route(s) (baseUrl → ${sb.storybookUrl})`);
-      return sb.routes;
+  // 2. One optional story runner. Explicit routes above still win. An unset
+  //    runner leaves crawl and filesystem discovery unchanged. A server URL,
+  //    when present, becomes `baseUrl` so story paths resolve against that
+  //    server. A directory-only index does not invent a file URL.
+  const runner = selectedCaptureRunner(config);
+  if (runner) {
+    warnIfCaptureRunnerChanged(runner, config);
+    if (runner === 'storybook') {
+      const sb = await discoverStorybookRoutesForConfig(config);
+      if (sb && sb.routes.length > 0) {
+        config.baseUrl = sb.storybookUrl;
+        logger.info(`Storybook discovery returned ${sb.routes.length} route(s) (baseUrl → ${sb.storybookUrl})`);
+        return sb.routes;
+      }
+      logger.warn('Storybook configured but no stories were discovered — falling through to other strategies');
+    } else if (runner === 'ladle') {
+      const found = await discoverLadleRoutesForConfig(config);
+      if (found && found.routes.length > 0) {
+        if (found.baseUrl) config.baseUrl = found.baseUrl;
+        logger.info(
+          `Ladle discovery returned ${found.routes.length} route(s)` +
+            (found.baseUrl ? ` (baseUrl → ${found.baseUrl})` : ''),
+        );
+        return found.routes;
+      }
+      logger.warn('Ladle configured but no stories were discovered — falling through to other strategies');
+    } else {
+      const found = await discoverHistoireRoutesForConfig(config);
+      if (found && found.routes.length > 0) {
+        if (found.baseUrl) config.baseUrl = found.baseUrl;
+        logger.info(
+          `Histoire discovery returned ${found.routes.length} route(s)` +
+            (found.baseUrl ? ` (baseUrl → ${found.baseUrl})` : ''),
+        );
+        return found.routes;
+      }
+      logger.warn('Histoire configured but no stories were discovered — falling through to other strategies');
     }
-    logger.warn('Storybook configured but no stories were discovered — falling through to other strategies');
   }
 
   // 3. Crawl if discover options are set

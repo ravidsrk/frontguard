@@ -26,6 +26,7 @@ import {
   filterAffectedRoutes,
   incompleteAnalysisReason,
 } from './resolver.js';
+import { pinnedDiffBase } from './diff-base.js';
 import { logger } from '../utils/logger.js';
 
 // ---------------------------------------------------------------------------
@@ -93,6 +94,11 @@ export async function smartFilter(
     return includeAll(routes, options.bypassReason);
   }
 
+  // --all-routes asks for every route without turning off capture stabilization.
+  if (config.includeAllRoutes) {
+    return includeAll(routes, 'all routes requested; capture settings unchanged');
+  }
+
   // Gate: smart rendering must be enabled
   if (!config.smartRender) {
     return includeAll(routes, 'smart rendering disabled');
@@ -103,11 +109,24 @@ export async function smartFilter(
     return includeAll(routes, 'no routes to filter');
   }
 
+  // A merge queue's origin/main is not the queued base. Without a pin, render
+  // every route instead of diffing the wrong branch. #306 selects a per-PR base.
+  if (process.env.GITHUB_EVENT_NAME === 'merge_group' && pinnedDiffBase() === null) {
+    return includeAll(
+      routes,
+      'merge_group has no FRONTGUARD_DIFF_BASE; rendering all routes',
+    );
+  }
+
   // Step 1: Detect changed files, including deletions
   let changedFiles: string[];
   let removedFiles: string[];
   try {
     const changed = getChangedPaths(process.cwd());
+    if (changed.pinnedDiffError) {
+      logger.warn(changed.pinnedDiffError);
+      return includeAll(routes, changed.pinnedDiffError);
+    }
     changedFiles = changed.present;
     removedFiles = changed.removed;
   } catch (err) {

@@ -30,7 +30,7 @@ Frontguard is organized as modular npm packages so you can adopt the exact level
 
 | Workflow | Package | When to Use It | Where Baselines Live |
 | :--- | :--- | :--- | :--- |
-| **1. Full-App & Sitemap CLI** | [`@frontguard/cli`](https://www.npmjs.com/package/@frontguard/cli) | Crawl or list routes in `frontguard.config.ts` (plus Storybook `/index.json`), capture multi-viewport screenshots, and gate PRs in CI. | `frontguard-baselines` git orphan branch (zero `main` branch binary bloat) |
+| **1. Full-App & Sitemap CLI** | [`@frontguard/cli`](https://www.npmjs.com/package/@frontguard/cli) | Crawl or list routes in `frontguard.config.ts` (plus optional Storybook `/index.json`, Ladle `meta.json`, or Histoire `histoire.json`), capture multi-viewport screenshots, and gate PRs in CI. | `frontguard-baselines` git orphan branch (zero `main` branch binary bloat) |
 | **2. In-Test Playwright Helper** | [`@frontguard/playwright`](https://www.npmjs.com/package/@frontguard/playwright) | Call `await visualTest(page, name, options)` directly inside existing `@playwright/test` spec files after login flows, modals, or mocked API responses. | `__visual_baselines__/` directory |
 | **3. AI Coding Agent Loop** | [`@frontguard/mcp`](https://www.npmjs.com/package/@frontguard/mcp) | Let Claude Code, Cursor, or Windsurf inspect visual regressions, spatial DOM diff clusters (`cluster.targetSelector`), and validate CSS patches over stdio. | Reads `./frontguard-report/report.json` locally (zero Cloud API key required) |
 
@@ -75,7 +75,7 @@ npm run dev
 Review the running app in your browser, capture baselines with `update-baselines`, then compare with `run`. Local comparison needs no `origin` remote:
 
 ```bash
-npx -p @frontguard/cli frontguard update-baselines
+npx -p @frontguard/cli frontguard update-baselines --confirm-baselines
 npx -p @frontguard/cli frontguard run
 ```
 
@@ -85,7 +85,25 @@ Only CI comparisons need the published orphan branch:
 git push origin frontguard-baselines
 ```
 
-`run` exits `0` when pages match, `1` on a regression or unaccepted new page, and `2` on a tool error. The default `threshold` is `0.1` (10% changed pixels), so a small visible change still passes — lower it (e.g. `0.01` = 1%) for stricter pages.
+`run` exits `0` when pages match, `1` on a regression or unaccepted new page, and `2` on a tool error. `update-baselines` and `run --update-baselines` also exit `2` and write nothing unless a human passes `--confirm-baselines`. Judge mode cannot supply that flag, and an advisory caption cannot set it. An agent setting `confirm_reviewed: true` on itself is not a human review. The default `threshold` is `0.1` (10% changed pixels), so a small visible change still passes — lower it (e.g. `0.01` = 1%) for stricter pages.
+
+### Merge queue
+
+Register the pull request check and the merge queue on one workflow, with the same job name. GitHub waits for that name on the queue:
+
+```yaml
+on: [pull_request, merge_group]
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+```
+
+A workflow-level `paths:` filter on that required check skips the job when the queue commit does not touch those paths, and the queue stays pending. Do not put `paths:` on a required Frontguard check.
+
+Queue runs compare against the shared latest `frontguard-baselines` branch until [#306](https://github.com/ravidsrk/frontguard/issues/306). They do not auto-pass. `update-baselines: true` on `merge_group` exits 2 and pushes nothing, even if `allow-baseline-writes` is `true`.
+
+Capture the PR head SHA (`github.event.pull_request.head.sha` on pull requests, `github.event.merge_group.head_sha` in the queue). Check out with `fetch-depth: 0`. smartFilter's `git diff <base>...HEAD` needs that base commit in the clone; `fetch-depth: 1` does not include it. On `merge_group` the Action passes `--all-routes` and, when the payload has one, sets `FRONTGUARD_DIFF_BASE` from `github.event.merge_group.base_sha`.
 
 > **Full documentation:** [frontguard.dev/docs](https://frontguard.dev/docs) · [Quick Start](https://frontguard.dev/docs/quick-start) · [CLI Configuration](https://frontguard.dev/docs/cli/configuration) · [Playwright API](https://frontguard.dev/docs/playwright/api) · [MCP Server](https://frontguard.dev/docs/integrations/mcp)
 
@@ -239,7 +257,7 @@ Add `@frontguard/mcp` to `.mcp.json` (Claude Code, Cursor, or Windsurf). In loca
 }
 ```
 
-Available MCP tools: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `promote_baseline`, `accept_baseline`, and `recent_runs`.
+Available MCP tools by default: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, and `recent_runs`. `promote_baseline` and `accept_baseline` are registered only when `FRONTGUARD_MCP_WRITES=1`. Local-report mode refuses promotion and does not write `frontguard-baselines`; the CLI command above is the local write. Cloud `approveRun` is not a production path.
 
 ### 6. Accessibility (WCAG), Performance Budgets & Script Drift Audits
 
@@ -275,7 +293,7 @@ export default {
 | `frontguard init [--ci] [--yes]`     | Generate a starter config; `--ci` also writes a GitHub Actions workflow                 |
 | `frontguard doctor`                  | Diagnose environment readiness (Node, Playwright, browsers, config, git)                |
 | `frontguard guide [topic] [--json]`  | Print offline reference guides (`setup`, `diffing`, `mcp`, `playwright`, `ci`)          |
-| `frontguard update-baselines`        | Accept current screenshots as new baselines                                             |
+| `frontguard update-baselines --confirm-baselines` | Accept current screenshots as new baselines. Exits 2 and writes nothing without the flag. |
 | `frontguard monitor`                 | Monitor live production URLs for visual regressions                                     |
 | `frontguard accept-fix <id>`         | Mark a suggested fix as accepted (improves future suggestions)                          |
 | `frontguard reject-fix <id>`         | Mark a suggested fix as rejected (negative training signal)                             |
@@ -295,6 +313,7 @@ export default {
 - `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
 - `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render
 - `--output <console|json>` — Emit human-readable console report or structured JSON to stdout
+- `--all-routes` — Render every discovered route. Skips smartFilter for this run and leaves animation freeze and font waiting on. The merge-queue Action passes it on `merge_group`.
 
 ### Sample CLI Output
 
@@ -357,7 +376,7 @@ packages/
 ├── cli/src/          # @frontguard/cli — discover → render → diff → report
 │   ├── cli/          # Commander entry (run, init, update-baselines, doctor, guide, monitor)
 │   ├── core/         # Pipeline orchestrator, types, config, 9-hook plugin system
-│   ├── discovery/    # Route discovery (crawler + filesystem + Storybook /index.json)
+│   ├── discovery/    # Route discovery (crawler + filesystem + optional Storybook, Ladle, Histoire indexes)
 │   ├── render/       # Playwright rendering engine + deterministic anti-flake gates
 │   ├── diff/         # Pixelmatch + SSIM / Chroma-SSIM / CW-SSIM + DOM cluster attribution
 │   ├── storage/      # Git orphan branch baselines (frontguard-baselines)

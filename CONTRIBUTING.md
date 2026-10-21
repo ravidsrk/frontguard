@@ -30,7 +30,7 @@ packages/
 │   ├── src/cli/                  # CLI entry + commands (init, run, doctor, render, monitor, …)
 │   ├── src/core/                 # Pipeline orchestrator, config, types, plugin system
 │   ├── src/diff/                 # Pixelmatch + SSIM + AI vision + fix verification
-│   ├── src/discovery/            # Route discovery (crawler, filesystem, storybook)
+│   ├── src/discovery/            # Route discovery (crawler, filesystem, storybook, ladle, histoire)
 │   ├── src/render/               # Playwright renderer + Docker-renderer adapter
 │   ├── src/sandbox/              # Local + Daytona fix-verification sandboxes
 │   ├── src/plugins/              # accessibility, perf-budgets, third-party, monitor, figma
