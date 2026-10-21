@@ -275,7 +275,7 @@ export function createAccessibilityPlugin(config: AccessibilityConfig = {}): Fro
       ctx.metadata.set(ACCESSIBILITY_RESULTS_KEY, [] as AccessibilityResult[]);
     },
 
-    async afterRender(screenshots: ScreenshotResult[], ctx: PluginContext): Promise<void> {
+    async afterRender(shots: ScreenshotResult[], ctx: PluginContext): Promise<void> {
       if (!axeAvailable) return;
       const axe = (await loadAxe()) as {
         default?: unknown;
@@ -292,7 +292,7 @@ export function createAccessibilityPlugin(config: AccessibilityConfig = {}): Fro
       // De-duplicate by route+viewport (browsers don't change a11y outcome).
       const seen = new Set<string>();
       const auditFailures: string[] = [];
-      for (const shot of screenshots) {
+      for (const shot of shots) {
         const key = `${shot.route.path}:${shot.viewport}`;
         if (seen.has(key)) continue;
         seen.add(key);

@@ -465,9 +465,9 @@ export function rendererBypassReason(
   const globalViewports =
     selection && selection.viewports.length > 0 ? new Set(selection.viewports) : null;
   const reasons = new Set<string>();
-  for (const [routePath, route] of Object.entries(manifest.routes)) {
-    if (selectedByPath && !selectedByPath.has(routePath)) continue;
-    const activeViewports = effectiveViewports(selectedByPath?.get(routePath), globalViewports);
+  for (const [rpath, route] of Object.entries(manifest.routes)) {
+    if (selectedByPath && !selectedByPath.has(rpath)) continue;
+    const activeViewports = effectiveViewports(selectedByPath?.get(rpath), globalViewports);
     if (!route?.snapshots) continue;
     for (const [snapshotKey, snapshot] of Object.entries(route.snapshots)) {
       if (activeViewports) {

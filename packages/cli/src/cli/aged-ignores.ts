@@ -25,7 +25,7 @@ function ruleLabel(rule: IgnoreRule): string {
   return rule.description ? `${base} (${rule.description})` : base;
 }
 
-function routePath(entry: RouteEntry): string {
+function rpath(entry: RouteEntry): string {
   return typeof entry === 'string' ? entry : entry.path;
 }
 
@@ -59,7 +59,7 @@ export function collectAgedIgnores(
   const aged: AgedIgnore[] = [];
   const undated: UndatedIgnore[] = [];
   const allShots = routes.map((entry) => ({
-    path: routePath(entry),
+    path: rpath(entry),
     viewports: routeViewports(entry, config),
   }));
 

@@ -290,17 +290,17 @@ export async function discoverRoutes(config: FrontguardConfig): Promise<Route[]>
 
         // Extract the path relative to base
         const currentParsed = new URL(currentUrl);
-        const routePath = currentParsed.pathname || '/';
+        const rpath = currentParsed.pathname || '/';
 
         // Add to discovered routes (deduplicate by path)
-        if (!routes.some((r) => r.path === routePath)) {
+        if (!routes.some((r) => r.path === rpath)) {
           const title = await page.title().catch(() => '');
           routes.push({
-            path: routePath,
-            label: title || routePath,
+            path: rpath,
+            label: title || rpath,
             discoveredVia: 'crawl',
           });
-          logger.debug(`Discovered route: ${routePath} (${title || 'no title'})`);
+          logger.debug(`Discovered route: ${rpath} (${title || 'no title'})`);
         }
 
         // Don't follow links at max depth

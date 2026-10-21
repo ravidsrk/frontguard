@@ -110,8 +110,8 @@ export function diffScriptInventory(
 // Persistence
 // ---------------------------------------------------------------------------
 
-function inventoryKey(routePath: string, viewport: number): string {
-  return `${routePath}@${viewport}`;
+function inventoryKey(rpath: string, viewport: number): string {
+  return `${rpath}@${viewport}`;
 }
 
 function loadInventory(historyDir: string): ScriptInventory {
@@ -149,7 +149,7 @@ export function createThirdPartyScriptPlugin(
   return {
     name: 'frontguard-third-party-scripts',
 
-    afterRender(screenshots: ScreenshotResult[], ctx: PluginContext): void {
+    afterRender(shots: ScreenshotResult[], ctx: PluginContext): void {
       const baseUrl = ctx.config.baseUrl;
       const previous = loadInventory(historyDir);
       const next: ScriptInventory = { ...previous };
@@ -157,7 +157,7 @@ export function createThirdPartyScriptPlugin(
 
       // De-duplicate by route+viewport (script set is browser-independent).
       const seen = new Set<string>();
-      for (const shot of screenshots) {
+      for (const shot of shots) {
         const key = inventoryKey(shot.route.path, shot.viewport);
         if (seen.has(key)) continue;
         seen.add(key);
