@@ -332,6 +332,39 @@ export class GitOrphanStorage implements BaselineStorage {
   }
 
   /**
+   * Read or write a text file beside the PNG. Omit `body` to read.
+   * A missing read returns null. `body` may be an empty string.
+   */
+  async textFile(
+    route: string,
+    viewport: number,
+    browser: BrowserEngine,
+    suffix: string,
+    body?: string,
+  ): Promise<string | null> {
+    this.ensureInitialized();
+    if (!/^\.(aria\.txt|json|md)$/.test(suffix)) throw new Error('Unknown text snapshot');
+    const path = baselinePath(route, viewport, browser).replace(/\.png$/, suffix);
+    if (body === undefined) {
+      if (this.readRef === null) return null;
+      try {
+        return this.git('show', `${this.readRef}:${path}`);
+      } catch (err) {
+        const output = gitErrorOutput(err);
+        if (/does not exist in|exists on disk, but not in/i.test(output)) return null;
+        throw err;
+      }
+    }
+    this.ensureWritable();
+    await this.writeToOrphanBranch((dir) => {
+      const full = join(dir, path);
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, body);
+    }, `text ${sanitizeRoutePath(route)}`);
+    return null;
+  }
+
+  /**
    * Write a baseline image to the orphan branch.
    *
    * Uses a temporary git worktree to safely modify the orphan branch

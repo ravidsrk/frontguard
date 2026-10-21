@@ -33,23 +33,8 @@ interface SqliteDatabase {
 }
 type SqliteConstructor = new (path: string) => SqliteDatabase;
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS fix_patterns (
-  id TEXT PRIMARY KEY,
-  category TEXT NOT NULL,
-  css_patch TEXT NOT NULL,
-  context_hash TEXT NOT NULL,
-  accepted INTEGER NOT NULL,
-  accept_count INTEGER NOT NULL DEFAULT 1,
-  confidence REAL NOT NULL,
-  created_at TEXT NOT NULL,
-  last_used_at TEXT,
-  route TEXT,
-  viewport INTEGER
-);
-CREATE INDEX IF NOT EXISTS idx_fix_patterns_ctx ON fix_patterns(context_hash, accepted);
-CREATE INDEX IF NOT EXISTS idx_fix_patterns_cat ON fix_patterns(category);
-`;
+const SCHEMA =
+  'CREATE TABLE IF NOT EXISTS fix_patterns (id TEXT PRIMARY KEY, category TEXT NOT NULL, css_patch TEXT NOT NULL, context_hash TEXT NOT NULL, accepted INTEGER NOT NULL, accept_count INTEGER NOT NULL DEFAULT 1, confidence REAL NOT NULL, created_at TEXT NOT NULL, last_used_at TEXT, route TEXT, viewport INTEGER); CREATE INDEX IF NOT EXISTS idx_fix_patterns_ctx ON fix_patterns(context_hash, accepted); CREATE INDEX IF NOT EXISTS idx_fix_patterns_cat ON fix_patterns(category);';
 
 /**
  * Computes a stable hash of the visual context for a diff. Two regressions
@@ -162,13 +147,7 @@ export class FixPatternDB {
     // acceptance; a rejection forces accepted=0 and leaves the count alone.
     this.db
       .prepare(
-        `INSERT INTO fix_patterns (id, category, css_patch, context_hash, accepted, accept_count, confidence, created_at, last_used_at, route, viewport)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           accepted = excluded.accepted,
-           accept_count = accept_count + CASE WHEN excluded.accepted = 1 THEN 1 ELSE 0 END,
-           confidence = excluded.confidence,
-           last_used_at = excluded.last_used_at`,
+        'INSERT INTO fix_patterns (id, category, css_patch, context_hash, accepted, accept_count, confidence, created_at, last_used_at, route, viewport) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET accepted = excluded.accepted, accept_count = accept_count + CASE WHEN excluded.accepted = 1 THEN 1 ELSE 0 END, confidence = excluded.confidence, last_used_at = excluded.last_used_at',
       )
       .run(
         id,
@@ -212,11 +191,7 @@ export class FixPatternDB {
     // for this context, so a single row can cross the reuse threshold.
     const row = this.db
       .prepare(
-        `SELECT css_patch AS cssPatch, category, accept_count AS n
-         FROM fix_patterns
-         WHERE context_hash = ? AND accepted = 1 AND accept_count >= ?
-         ORDER BY accept_count DESC, last_used_at DESC
-         LIMIT 1`,
+        'SELECT css_patch AS cssPatch, category, accept_count AS n FROM fix_patterns WHERE context_hash = ? AND accepted = 1 AND accept_count >= ? ORDER BY accept_count DESC, last_used_at DESC LIMIT 1',
       )
       .get(contextHash, minAccepted) as { cssPatch: string; category: FixCategory; n: number } | undefined;
     return row ? { cssPatch: row.cssPatch, category: row.category } : null;
@@ -252,9 +227,7 @@ export class FixPatternDB {
     if (!this.db) return 0;
     let count = 0;
     const stmt = this.db.prepare(
-      `INSERT INTO fix_patterns (id, category, css_patch, context_hash, accepted, confidence, created_at, route, viewport)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO NOTHING`,
+      'INSERT INTO fix_patterns (id, category, css_patch, context_hash, accepted, confidence, created_at, route, viewport) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING',
     );
     for (const p of patterns) {
       const res = stmt.run(
@@ -278,10 +251,7 @@ export class FixPatternDB {
     if (!this.db) return { total: 0, accepted: 0, rejected: 0 };
     const row = this.db
       .prepare(
-        `SELECT COUNT(*) AS total,
-                SUM(CASE WHEN accepted = 1 THEN 1 ELSE 0 END) AS accepted,
-                SUM(CASE WHEN accepted = 0 THEN 1 ELSE 0 END) AS rejected
-         FROM fix_patterns`,
+        'SELECT COUNT(*) AS total, SUM(CASE WHEN accepted = 1 THEN 1 ELSE 0 END) AS accepted, SUM(CASE WHEN accepted = 0 THEN 1 ELSE 0 END) AS rejected FROM fix_patterns',
       )
       .get() as { total: number; accepted: number | null; rejected: number | null };
     return {

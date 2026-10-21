@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Optional ARIA, JSON, and Markdown snapshots can be stored next to a PNG and diffed as text. A mismatch is reported on its own. It does not change `comparisonMethod` from pixelmatch and does not pass or fail a pixel regression. axe-core remains the accessibility plugin. Text diff is not a gate.
 - Add `frontguard ignores --older-than <days>`, which lists ignore rules whose `since` date is strictly older than that and the shots they cover. Shot coverage comes from configured routes. When routes are omitted, the command says coverage is unavailable and does not discover routes. The command does not remove a rule. The list follows one vendor account, not a consensus.
 - Add `frontguard prune-baselines`, which removes tip shots the full config no longer declares and can drop `frontguard-baselines` history that is not a merge-base ancestor. The default is a dry run. A route filter or a shard refuses.
 - Export CLI capture, compare, and baseline-write traces as OTLP/HTTP JSON when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Each span records a screenshot count and no URL, path, or image. This is separate from anonymous usage telemetry and from the cloud-api metrics exporter.

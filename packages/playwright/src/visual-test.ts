@@ -4,6 +4,8 @@ import type { VisualTestOptions, VisualTestResult } from './types.js';
 import { compareImages } from './diff.js';
 import { analyzeWithAI } from './ai.js';
 import { BaselineStorage } from './storage.js';
+import { recordTextSnapshots } from './text-snapshot.js';
+import type { TextSnapshotKind } from './types.js';
 
 function currentTestInfo(): TestInfo | undefined {
   try {
@@ -182,6 +184,8 @@ export async function visualTest(
   let currentBuffer: Buffer;
   let settled: boolean | undefined;
   let ariaSnapshot: string | undefined;
+  let jsonText: string | undefined;
+  let markdownText: string | undefined;
   try {
     // Mask elements
     if (opts.mask?.length) {
@@ -314,6 +318,8 @@ export async function visualTest(
         }
       }
     }
+    if (opts.textSnapshot?.json) jsonText = await readPageText(page, opts.textSnapshot.json);
+    if (opts.textSnapshot?.markdown) markdownText = await readPageText(page, opts.textSnapshot.markdown);
   } finally {
     if (hasMasks) {
       await page.evaluate(() => {
@@ -338,9 +344,16 @@ export async function visualTest(
   const current = Buffer.from(currentBuffer);
 
   const baselineKey = getBaselineKey(page, opts.selector ? `${name}__${opts.selector}` : name);
+  const textItems: Array<{ kind: TextSnapshotKind; ext: string; body: string }> = [];
+  if (ariaSnapshot !== undefined) textItems.push({ kind: 'aria', ext: '.aria.txt', body: ariaSnapshot });
+  if (jsonText !== undefined) textItems.push({ kind: 'json', ext: '.json', body: jsonText });
+  if (markdownText !== undefined) textItems.push({ kind: 'markdown', ext: '.md', body: markdownText });
 
   // Load or create baseline
   const baseline = storage.readBaseline(baselineKey);
+  const textSnapshots = textItems.length
+    ? recordTextSnapshots(storage, baselineKey, textItems, baseline === null || opts.update === true)
+    : undefined;
 
   if (baseline === null || opts.update) {
     storage.writeBaseline(baselineKey, current);
@@ -354,6 +367,7 @@ export async function visualTest(
       ...(settled !== undefined ? { settled } : {}),
       ...(blockedRequestsCount !== undefined ? { blockedRequestsCount } : {}),
       ...(ariaSnapshot !== undefined ? { ariaSnapshot } : {}),
+      ...(textSnapshots ? { textSnapshots } : {}),
     };
   }
 
@@ -472,6 +486,7 @@ export async function visualTest(
     ...(diff.clusters && diff.clusters.length > 0 ? { clusters: diff.clusters } : {}),
     ...(blockedRequestsCount !== undefined ? { blockedRequestsCount } : {}),
     ...(ariaSnapshot !== undefined ? { ariaSnapshot } : {}),
+    ...(textSnapshots ? { textSnapshots } : {}),
   };
 
   // AI analysis if enabled and diff detected
@@ -481,6 +496,20 @@ export async function visualTest(
   }
 
   return result;
+}
+
+async function readPageText(page: Page, selector: string): Promise<string> {
+  const locatorPage = page as Page & {
+    locator?: (selector: string) => {
+      textContent?: () => Promise<string | null>;
+      first?: () => { textContent?: () => Promise<string | null> };
+    };
+  };
+  if (typeof locatorPage.locator !== 'function') return '';
+  const raw = locatorPage.locator(selector);
+  const target = typeof raw.first === 'function' ? raw.first() : raw;
+  if (typeof target.textContent !== 'function') return '';
+  return (await target.textContent()) ?? '';
 }
 
 export async function expectVisual(

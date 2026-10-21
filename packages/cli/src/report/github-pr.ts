@@ -138,6 +138,8 @@ export class GitHubPRReporter implements Reporter {
       if (result.thirdPartyScripts && result.thirdPartyScripts.some((t) => t.added.length > 0 || t.removed.length > 0)) {
         sections.push(this.generateThirdPartyScriptsSection(result));
       }
+      const passingText = this.textSnapshotSection(result);
+      if (passingText) sections.push(passingText);
       sections.push(this.generateFooter(result));
       return sections.join('\n\n');
     }
@@ -162,6 +164,9 @@ export class GitHubPRReporter implements Reporter {
     if (newPages.length > 0) {
       sections.push(this.generateNewPagesSection(newPages, result.baselineUpdate === true));
     }
+
+    const textSection = this.textSnapshotSection(result);
+    if (textSection) sections.push(textSection);
 
     // Accessibility (Task 5.1)
     if (result.accessibility && result.accessibility.some((r) => r.violations.length > 0)) {
@@ -193,6 +198,17 @@ export class GitHubPRReporter implements Reporter {
     }
 
     return markdown;
+  }
+
+  private textSnapshotSection(result: RunResult): string | undefined {
+    if (!result.textSnapshots || result.textSnapshots.length === 0) return undefined;
+    const lines = ['## Text snapshots', '', 'These do not change the pixel result.', ''];
+    for (const row of result.textSnapshots) {
+      if (row.status === 'match') continue;
+      lines.push(`- \`${row.route}\` @ ${row.viewport}px [${row.browser}] ${row.kind}: ${row.status}`);
+    }
+    if (lines.length === 4) lines.push('- All captured text snapshots match.');
+    return lines.join('\n');
   }
 
   private generateHeader(result: RunResult): string {

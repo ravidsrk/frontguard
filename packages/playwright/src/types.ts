@@ -24,6 +24,11 @@ export interface VisualTestOptions {
   blockUrls?: string[];
   /** Capture a Playwright ARIA / accessibility tree snapshot alongside the visual test */
   captureAriaSnapshot?: boolean;
+  /**
+   * Optional JSON or Markdown text stored beside the PNG. A mismatch is
+   * reported and does not change `passed`.
+   */
+  textSnapshot?: { json?: string; markdown?: string };
   /** Custom baseline directory (default: __visual_baselines__) */
   baselineDir?: string;
   /** Update baselines instead of comparing */
@@ -55,6 +60,16 @@ export interface VisualTestResult {
   clusters?: PlaywrightDiffCluster[];
   blockedRequestsCount?: number;
   ariaSnapshot?: string;
+  /** Text files beside the PNG. They do not change `passed`. */
+  textSnapshots?: TextSnapshotDiff[];
+}
+
+export type TextSnapshotKind = 'aria' | 'json' | 'markdown';
+
+export interface TextSnapshotDiff {
+  kind: TextSnapshotKind;
+  status: 'match' | 'mismatch' | 'new';
+  path: string;
 }
 
 export interface CompareResult {

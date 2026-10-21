@@ -96,6 +96,7 @@ interface SerializedRunResult {
   diffs: SerializedDiff[];
   judgements?: RunResult['judgements'];
   accessibility?: RunResult['accessibility'];
+  textSnapshots?: RunResult['textSnapshots'];
   perf?: RunResult['perf'];
   thirdPartyScripts?: RunResult['thirdPartyScripts'];
   config: {
@@ -120,6 +121,7 @@ function serializeRunResult(result: RunResult): SerializedRunResult {
     diffs: result.diffs.map(serializeDiff),
     judgements: result.judgements,
     accessibility: result.accessibility,
+    textSnapshots: result.textSnapshots,
     perf: result.perf,
     thirdPartyScripts: result.thirdPartyScripts,
     config: {
