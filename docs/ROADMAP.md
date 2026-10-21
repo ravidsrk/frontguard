@@ -74,7 +74,7 @@ A bounded follow-up on **2026-10-20** checked the merged roadmap and open tracke
 3. **Frontguard's architectural position:**
    - **Pass/fail is deterministic.** `pixelmatch` controls exit codes `0 / 1 / 2`. A deterministic `ssimFallback` override applies when structural similarity clears `ssimThreshold: 0.98` and no severe local cluster exists.
    - **AI is advisory and grounded.** Vision models classify diffs after a pixel failure, attribute spatial diff clusters to DOM selectors, and propose CSS fixes that are re-rendered in an isolated sandbox. On the default compare path, model output never passes a failing pixel check or overwrites a baseline.
-     - *Known exception today:* experimental judge mode (`--mode judge --experimental`, which reads no baselines) turns failing model verdicts into exit `1`. [#286](https://github.com/ravidsrk/frontguard/issues/286) removes that.
+     - Experimental judge mode (`--mode judge --experimental`) reads no baselines. Its notes are advisory and do not set exit `1`. The protocol is [`docs/judge-protocol.md`](./judge-protocol.md). This repo has not published a Frontguard judge accuracy figure ([#286](https://github.com/ravidsrk/frontguard/issues/286)).
    - **Approval belongs to a human.** The shipped agent skill and the Action do not enforce that yet ([#287](https://github.com/ravidsrk/frontguard/issues/287)).
 
 4. **The follow-up found a route-selection gap.**

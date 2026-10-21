@@ -19,7 +19,8 @@
  * `docs/ROADMAP.md` records why an external model score is not a threshold
  * (WUICC-bench, arXiv:2607.01728; LLMShot, arXiv:2507.10062, including a
  * semantic-diff split of about 0.921 versus 0.079 across model sizes). Those
- * figures are not Frontguard detection accuracy.
+ * figures are not Frontguard detection accuracy. The protocol is
+ * `docs/judge-protocol.md`.
  *
  * @module diff/model-judge
  */
