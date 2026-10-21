@@ -40,8 +40,9 @@ export function imageKey(
 }
 
 /**
- * Newest set whose source commit is an ancestor of the merge base.
- * Sets must be newest-first. A shallow clone that cannot prove ancestry
+ * Newest published set whose source commit is an ancestor of the merge base.
+ * Sets must be newest-first. An unpublished stacked parent is skipped even
+ * when its commit is an ancestor. A shallow clone that cannot prove ancestry
  * does not invent an ancestor; it warns and falls through.
  */
 export function selectBaselineSet(
@@ -56,6 +57,7 @@ export function selectBaselineSet(
     : undefined;
 
   for (const set of setsNewestFirst) {
+    if (!set.onDefaultBranch) continue;
     const ancestry = options.isAncestorOfMergeBase(set.sourceCommitSha);
     if (ancestry === true) {
       return shallowNote ? { kind: 'ancestor', set, warning: shallowNote } : { kind: 'ancestor', set };
@@ -105,7 +107,8 @@ export function expectedImageSha256(input: {
       record.browser === input.browser &&
       record.mode === mode &&
       record.candidateSha256 === input.candidateSha256 &&
-      (baselineSha === undefined || record.baselineSha256 === baselineSha),
+      baselineSha !== undefined &&
+      record.baselineSha256 === baselineSha,
   );
   if (approval) return { sha256: approval.candidateSha256, source: 'approval' };
   if (baselineSha) return { sha256: baselineSha, source: 'baseline' };

@@ -54,6 +54,30 @@ describe('selectBaselineSet', () => {
     expect(selected.kind).toBe('no-baseline');
     if (selected.kind === 'no-baseline') expect(selected.warning).toMatch(/Shallow clone/);
   });
+
+  it('does not call unknown ancestry an ancestor', () => {
+    const selected = selectBaselineSet([mainSet], {
+      shallow: true,
+      isAncestorOfMergeBase: () => 'unknown',
+    });
+    expect(selected.kind).not.toBe('ancestor');
+    expect(selected.warning).toMatch(/Shallow clone/);
+  });
+
+  it('skips an unpublished stacked parent even when that parent is an ancestor', () => {
+    const unpublished: BaselineSetRef = {
+      id: 'pr-parent',
+      sourceCommitSha: 'parent',
+      onDefaultBranch: false,
+      images: { [key]: 'parent-png' },
+    };
+    const selected = selectBaselineSet([unpublished, mainSet], {
+      shallow: false,
+      isAncestorOfMergeBase: () => true,
+    });
+    expect(selected.kind).toBe('ancestor');
+    if (selected.kind === 'ancestor') expect(selected.set.id).toBe('main-1');
+  });
 });
 
 describe('expected image for two open pull requests', () => {
@@ -89,6 +113,19 @@ describe('expected image for two open pull requests', () => {
     expect(forA).toEqual({ sha256: 'pr-a-png', source: 'approval' });
     expect(forB).toEqual({ sha256: 'base-png', source: 'baseline' });
     expect(forB.sha256).not.toBe(approvalA.candidateSha256);
+  });
+
+  it('does not treat a missing baseline hash as a wildcard', () => {
+    const selected = expectedImageSha256({
+      baseline: null,
+      key,
+      approvals: [approvalA],
+      candidateSha256: 'pr-a-png',
+      route: '/',
+      viewport: 1440,
+      browser: 'chromium',
+    });
+    expect(selected).toEqual({ sha256: null, source: 'none' });
   });
 });
 
