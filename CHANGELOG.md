@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Pin Storybook to 8.6.19 so the production dependency audit clears GHSA-f2ph-cmg5-wxc8.
+- Refuse `frontguard update-baselines` when the accessibility plugin has `failOnViolation: true` and finds a violation at or above `impact`, or when an audit does not complete. The audit uses the same page URL, storage state, color scheme, viewport height, wait, and route actions as the capture. A Ladle or Histoire preview hosted under a directory is audited at that preview, not at the site root. A refused write is reported as not written and is not labeled accepted. The pixel status stays unchanged. A clean audit does not clear a pixel regression. An audit error on a compare run does not replace the pixel result.
 - Text comparison keeps the pixel result when capture or browser startup fails, and still refuses a baseline write on update. Text is read in the shot's browser after the same freeze, seed, block, and story-ready steps as the PNG. A stored snapshot is compared after one newline normalization, including leading spaces. A mismatch includes a short excerpt. `prune-baselines` removes the `.aria.txt`, `.json`, and `.md` siblings with the PNG.
 - Warn when a run's color scheme differs from the scheme stored on the baseline. The comparison still uses the same baseline file, and the warning does not change the exit code.
 - Prevent pull-request CI completions from changing or replacing main failure

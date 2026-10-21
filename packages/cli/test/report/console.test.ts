@@ -168,6 +168,23 @@ describe('ConsoleReporter', () => {
     expect(output).not.toContain('were not accepted as baselines');
   });
 
+  it('reports a refused baseline write without calling it accepted', () => {
+    const reporter = new ConsoleReporter();
+    const result = makeRunResult(
+      [makeDiff({ route: { path: '/new' }, status: 'new' })],
+      { baselineRefusal: 'Accessibility check failed: 1 violation(s). Baselines were not written.' },
+    );
+
+    reporter.onComplete(result);
+
+    const output = collectOutput(logSpy);
+    expect(output).toContain('BASELINES NOT WRITTEN');
+    expect(output).toContain('Baselines were not written.');
+    expect(output).not.toContain('BASELINES UPDATED');
+    expect(output).not.toContain('accepted and committed locally');
+    expect(output).not.toContain('frontguard update-baselines');
+  });
+
   // -----------------------------------------------------------------------
   // Regressions
   // -----------------------------------------------------------------------

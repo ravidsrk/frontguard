@@ -848,8 +848,16 @@ export interface TextSnapshotReport {
 }
 
 export interface RunResult {
-  /** True when this result records an explicit baseline-update operation. */
+  /**
+   * True when this result records a baseline update that wrote baselines.
+   * Absent when the write was refused.
+   */
   baselineUpdate?: boolean;
+  /**
+   * Set when a baseline update was refused. Reporters show this text and do
+   * not describe the screenshots as accepted. Pixel status stays unchanged.
+   */
+  baselineRefusal?: string;
   /** Aggregate summary counts. */
   summary: {
     /** Total number of route × viewport × browser combinations tested. */

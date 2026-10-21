@@ -1222,117 +1222,143 @@ async function writeUpdatedBaselines(
   }
   reporter.onStageComplete('render', `Captured ${screenshots.length} screenshot(s)`);
 
+  // The accessibility plugin's own cutoff is the block. Pixel status is not an input.
+  let baselineBlock: string | undefined;
+  let baselineA11y: AccessibilityResult[] | undefined;
   let textDone: { manager: PluginManager; ctx: PluginContext } | undefined;
-  const textPlugin = config.plugins?.find((p) => p.name === 'text-snapshot');
-  if (textPlugin) {
-    const mgr = new PluginManager();
-    mgr.register(textPlugin);
-    const md = new Map<string, unknown>();
-    md.set('tw', true);
-    const ctx = { config, logger, metadata: md };
+  const a11yPlugin = config.plugins?.find((plugin) => plugin.name === 'accessibility');
+  if (a11yPlugin) {
+    const manager = new PluginManager();
+    manager.register(a11yPlugin);
+    const metadata = new Map<string, unknown>();
+    metadata.set('accessibility:require-complete', true);
+    const ctx = { config, logger, metadata };
     try {
-      await mgr.setup(ctx);
-      await mgr.runHook('afterRender', screenshots, ctx);
-      textDone = { manager: mgr, ctx };
-    } finally {
-      await mgr.teardown();
-    }
-  }
-
-  // Init storage and write all baselines
-  const writeSpan = trace.start('frontguard.baseline_write');
-  reporter.onStageStart('compare', 'Writing baselines…');
-  const writeStart = performance.now();
-  const storage = new GitOrphanStorage(process.cwd(), { mode: 'update' });
-  await storage.init();
-
-  let written = 0;
-  let writeFailures = 0;
-  const writtenScreenshots: ScreenshotResult[] = [];
-
-  const isMockFn = (fn: unknown): boolean =>
-    typeof fn === 'function' && ('mock' in fn || '_isMockFunction' in fn);
-  const useBatchWrite =
-    typeof storage.writeBaselines === 'function' &&
-    (isMockFn(storage.writeBaselines) || !isMockFn(storage.writeBaseline));
-
-  if (useBatchWrite) {
-    const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
-    const manifest = stampBaselineManifest(existing, screenshots, config.colorScheme);
-
-    try {
-      await storage.writeBaselines(
-        screenshots.map((shot) => ({
-          route: shot.route.path,
-          viewport: shot.viewport,
-          browser: shot.browser,
-          buffer: shot.buffer,
-        })),
-        manifest,
-      );
-      for (const shot of screenshots) {
-        written++;
-        writtenScreenshots.push(shot);
-        reporter.onStageProgress(
-          'compare',
-          written,
-          screenshots.length,
-          `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
-        );
-      }
+      await manager.setup(ctx);
+      await manager.runHook('afterRender', screenshots, ctx);
     } catch (err) {
-      writeFailures = screenshots.length;
-      logger.error(
-        `Failed to write baselines: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      const message = err instanceof Error ? err.message : String(err);
+      if (!message.startsWith('Accessibility check failed:')) throw err;
+      baselineBlock = `${message} Baselines were not written.`;
+    } finally {
+      await manager.teardown();
     }
-  } else {
-    for (const shot of screenshots) {
-      try {
-        await storage.writeBaseline(
-          shot.route.path,
-          shot.viewport,
-          shot.browser,
-          shot.buffer,
-        );
-        written++;
-        writtenScreenshots.push(shot);
+    const stored = metadata.get('accessibility:results');
+    if (Array.isArray(stored) && stored.length > 0) baselineA11y = stored as AccessibilityResult[];
+  }
 
-        reporter.onStageProgress(
-          'compare',
-          written,
-          screenshots.length,
-          `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
-        );
-      } catch (err) {
-        writeFailures++;
-        logger.error(
-          `Failed to write baseline for ${shot.route.path}: ${err instanceof Error ? err.message : String(err)}`,
-        );
+  if (!baselineBlock) {
+    const textPlugin = config.plugins?.find((p) => p.name === 'text-snapshot');
+    if (textPlugin) {
+      const mgr = new PluginManager();
+      mgr.register(textPlugin);
+      const md = new Map<string, unknown>();
+      md.set('tw', true);
+      const textCtx = { config, logger, metadata: md };
+      try {
+        await mgr.setup(textCtx);
+        await mgr.runHook('afterRender', screenshots, textCtx);
+        textDone = { manager: mgr, ctx: textCtx };
+      } finally {
+        await mgr.teardown();
       }
     }
 
-    const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
-    const manifest = stampBaselineManifest(existing, writtenScreenshots, config.colorScheme);
-    await storage.writeManifest(manifest);
-  }
-  timing.compare = Math.round(performance.now() - writeStart);
+    // Init storage and write all baselines
+    const writeSpan = trace.start('frontguard.baseline_write');
+    reporter.onStageStart('compare', 'Writing baselines…');
+    const writeStart = performance.now();
+    const storage = new GitOrphanStorage(process.cwd(), { mode: 'update' });
+    await storage.init();
 
-  if (writeFailures > 0) {
-    writeSpan.end('error', { 'frontguard.shots': written });
-    reporter.onStageComplete(
-      'compare',
-      `Failed to write ${writeFailures} of ${screenshots.length} baseline${screenshots.length === 1 ? '' : 's'}`,
-    );
-    throw new Error(
-      `Failed to write ${writeFailures} of ${screenshots.length} baseline${screenshots.length === 1 ? '' : 's'}`,
-    );
-  }
+    let written = 0;
+    let writeFailures = 0;
+    const writtenScreenshots: ScreenshotResult[] = [];
 
-  writeSpan.end('ok', { 'frontguard.shots': written });
-  reporter.onStageComplete('compare', `Wrote ${written} baseline(s)`);
-  logger.info(`✅ Updated ${written} baseline(s) successfully`);
-  logger.info('To share these baselines with CI, run: git push origin frontguard-baselines');
+    const isMockFn = (fn: unknown): boolean =>
+      typeof fn === 'function' && ('mock' in fn || '_isMockFunction' in fn);
+    const useBatchWrite =
+      typeof storage.writeBaselines === 'function' &&
+      (isMockFn(storage.writeBaselines) || !isMockFn(storage.writeBaseline));
+
+    if (useBatchWrite) {
+      const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
+      const manifest = stampBaselineManifest(existing, screenshots, config.colorScheme);
+
+      try {
+        await storage.writeBaselines(
+          screenshots.map((shot) => ({
+            route: shot.route.path,
+            viewport: shot.viewport,
+            browser: shot.browser,
+            buffer: shot.buffer,
+          })),
+          manifest,
+        );
+        for (const shot of screenshots) {
+          written++;
+          writtenScreenshots.push(shot);
+          reporter.onStageProgress(
+            'compare',
+            written,
+            screenshots.length,
+            `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
+          );
+        }
+      } catch (err) {
+        writeFailures = screenshots.length;
+        logger.error(
+          `Failed to write baselines: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    } else {
+      for (const shot of screenshots) {
+        try {
+          await storage.writeBaseline(
+            shot.route.path,
+            shot.viewport,
+            shot.browser,
+            shot.buffer,
+          );
+          written++;
+          writtenScreenshots.push(shot);
+
+          reporter.onStageProgress(
+            'compare',
+            written,
+            screenshots.length,
+            `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
+          );
+        } catch (err) {
+          writeFailures++;
+          logger.error(
+            `Failed to write baseline for ${shot.route.path}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+
+      const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
+      const manifest = stampBaselineManifest(existing, writtenScreenshots, config.colorScheme);
+      await storage.writeManifest(manifest);
+    }
+    timing.compare = Math.round(performance.now() - writeStart);
+
+    if (writeFailures > 0) {
+      writeSpan.end('error', { 'frontguard.shots': written });
+      reporter.onStageComplete(
+        'compare',
+        `Failed to write ${writeFailures} of ${screenshots.length} baseline${screenshots.length === 1 ? '' : 's'}`,
+      );
+      throw new Error(
+        `Failed to write ${writeFailures} of ${screenshots.length} baseline${screenshots.length === 1 ? '' : 's'}`,
+      );
+    }
+
+    writeSpan.end('ok', { 'frontguard.shots': written });
+    reporter.onStageComplete('compare', `Wrote ${written} baseline(s)`);
+    logger.info(`✅ Updated ${written} baseline(s) successfully`);
+    logger.info('To share these baselines with CI, run: git push origin frontguard-baselines');
+  }
 
   timing.total = Math.round(performance.now() - totalStart);
   const result = {
@@ -1342,12 +1368,14 @@ async function writeUpdatedBaselines(
       totalStart,
       config,
     ),
-    baselineUpdate: true,
+    ...(baselineBlock ? { baselineRefusal: baselineBlock } : { baselineUpdate: true }),
+    ...(baselineA11y ? { accessibility: baselineA11y } : {}),
   };
   if (textDone) await textDone.manager.runHook('afterRun', result, textDone.ctx);
   reporter.onStageStart('report', 'Generating baseline update report…');
   await reporter.onComplete(result);
   reporter.onStageComplete('report', 'Done');
+  if (baselineBlock) throw new Error(baselineBlock);
   return result;
 }
 

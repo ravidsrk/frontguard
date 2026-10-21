@@ -450,6 +450,13 @@ export class ConsoleReporter implements Reporter {
   }
 
   private printNewPages(result: RunResult): void {
+    if (result.baselineRefusal) {
+      console.log(chalk.red.bold('  ✘ BASELINES NOT WRITTEN'));
+      console.log(chalk.red(`  ${result.baselineRefusal}`));
+      console.log('');
+      return;
+    }
+
     if (result.summary.newPages === 0) return;
 
     if (result.baselineUpdate) {

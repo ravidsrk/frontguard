@@ -5,7 +5,7 @@
 import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
-import { joinStoryUrl } from '../../src/discovery/story-url.js';
+import { joinStoryUrl, pageUrl } from '../../src/discovery/story-url.js';
 import { histoireSandboxPath } from '../../src/discovery/histoire.js';
 import { ladlePreviewPath } from '../../src/discovery/ladle.js';
 
@@ -26,6 +26,23 @@ function pageFor(url: URL): string | null {
   }
   return null;
 }
+
+describe('pageUrl', () => {
+  const base = 'https://example.com/components';
+
+  it('keeps a hosted Ladle or Histoire directory and leaves other routes on new URL', () => {
+    expect(pageUrl(base, '/?story=control--first&mode=preview', 'ladle')).toBe(
+      `${base}/?story=control--first&mode=preview`,
+    );
+    expect(pageUrl(base, '/__sandbox.html?storyId=button&variantId=primary', 'histoire')).toBe(
+      `${base}/__sandbox.html?storyId=button&variantId=primary`,
+    );
+    expect(pageUrl(base, '/pricing', 'config')).toBe('https://example.com/pricing');
+    expect(pageUrl(base, '/iframe.html?id=button--primary', 'storybook')).toBe(
+      'https://example.com/iframe.html?id=button--primary',
+    );
+  });
+});
 
 describe('hosted story preview URLs', () => {
   let server: Server;
