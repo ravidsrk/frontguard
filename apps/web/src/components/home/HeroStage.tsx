@@ -352,7 +352,7 @@ export function HeroStage() {
                       style={{
                         fontFamily: MONO,
                         ...s(
-                          "font-size: 11px; color: var(--danger); background: rgba(229,72,77,0.14); border: 1px solid rgba(229,72,77,0.4); padding: 2px 8px; border-radius: 3px;",
+                          "font-size: 11px; color: #ff8a8d; background: rgba(229,72,77,0.14); border: 1px solid rgba(229,72,77,0.4); padding: 2px 8px; border-radius: 3px;", // #ff8a8d is 7.2:1 on the composited chip; --danger is 4.15:1 at 11px
                         ),
                       }}
                     >
@@ -429,7 +429,7 @@ export function HeroStage() {
                   style={{
                     fontFamily: MONO,
                     ...s(
-                      "position: absolute; bottom: -21px; left: 0; font-size: 10px; color: var(--text-primary); background: var(--danger); padding: 1px 6px; border-radius: 3px; white-space: nowrap; font-weight: 600;",
+                      "position: absolute; bottom: -21px; left: 0; font-size: 10px; color: var(--bg); background: var(--danger); padding: 1px 6px; border-radius: 3px; white-space: nowrap; font-weight: 600;", // --bg on --danger is 5.0:1; --text-primary on --danger is 3.47:1 at 10px
                     ),
                   }}
                 >

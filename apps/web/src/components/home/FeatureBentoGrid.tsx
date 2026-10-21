@@ -71,6 +71,9 @@ export function FeatureBentoGrid() {
               </div>
 
               <pre
+                // overflow-x: auto is a scrollable region; tabindex makes it keyboard reachable
+                tabIndex={0}
+                aria-label={`${f.title} snippet`}
                 style={{
                   fontFamily: MONO,
                   ...s(
