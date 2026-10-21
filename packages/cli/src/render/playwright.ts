@@ -24,7 +24,7 @@ import type {
 } from '../core/types.js';
 import { logger } from '../utils/logger.js';
 import { cropToMaxHeight } from './crop.js';
-import { joinStoryUrl } from '../discovery/index-json.js';
+import { joinStoryUrl } from '../discovery/story-url.js';
 import { STORYBOOK_READY_SCRIPT } from '../discovery/storybook.js';
 import { captureStableScreenshot } from './stability.js';
 import {

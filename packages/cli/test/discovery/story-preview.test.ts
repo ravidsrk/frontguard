@@ -5,7 +5,7 @@
 import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
-import { joinStoryUrl } from '../../src/discovery/index-json.js';
+import { joinStoryUrl } from '../../src/discovery/story-url.js';
 import { histoireSandboxPath } from '../../src/discovery/histoire.js';
 import { ladlePreviewPath } from '../../src/discovery/ladle.js';
 
