@@ -263,7 +263,7 @@ Available MCP tools by default: `list_regressions`, `inspect_diff_cluster_dom`, 
 
 ### 6. Accessibility (WCAG), Performance Budgets & Script Drift Audits
 
-Frontguard ships a 9-hook plugin pipeline (`setup`, `beforeDiscover`, `afterDiscover`, `beforeRender`, `afterRender`, `afterCompare`, `afterRun`, `onError`, `teardown`) and built-in plugins for accessibility, performance budgets and third-party scripts. The accessibility plugin audits route/viewport pairs in fresh Chromium pages after screenshot capture:
+Frontguard ships a 9-hook plugin pipeline (`setup`, `beforeDiscover`, `afterDiscover`, `beforeRender`, `afterRender`, `afterCompare`, `afterRun`, `onError`, `teardown`) and built-in plugins for accessibility, performance budgets and third-party scripts. The accessibility plugin audits route/viewport pairs after screenshot capture. Its Chromium page uses the same storage state, color scheme, viewport height, wait, and route actions as the capture:
 
 ```typescript
 // frontguard.config.ts
@@ -285,7 +285,7 @@ export default {
 };
 ```
 
-`failOnViolation: true` also refuses `frontguard update-baselines` when a violation is at or above `impact`, including when the pixel status is not a regression. The report lists those violations beside the pixel result and does not change that status. A clean audit leaves a pixel regression as a regression.
+`failOnViolation: true` also refuses `frontguard update-baselines` when a violation is at or above `impact`, including when the pixel status is not a regression. The report lists those violations beside the pixel result, says the baselines were not written, and does not call them accepted. It does not change the pixel status. A clean audit leaves a pixel regression as a regression.
 
 ---
 

@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
     helpUrl: string;
     nodes: [];
   }>,
+  contextOptions: null as unknown,
+  pageCalls: [] as string[],
 }));
 
 vi.mock('../../src/render/playwright.js', () => ({ renderPages: mocks.renderPages }));
@@ -47,6 +49,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 vi.mock('@axe-core/playwright', () => ({
   default: class {
     async analyze() {
+      mocks.pageCalls.push('analyze');
       return { violations: mocks.violations, passes: [], incomplete: [] };
     }
   },
@@ -54,10 +57,28 @@ vi.mock('@axe-core/playwright', () => ({
 vi.mock('playwright', () => ({
   chromium: {
     launch: async () => ({
-      newContext: async () => ({
-        newPage: async () => ({ goto: async () => {} }),
-        close: async () => {},
-      }),
+      newContext: async (options: unknown) => {
+        mocks.contextOptions = options;
+        return {
+          newPage: async () => ({
+            goto: async (_url: string, opts: { timeout: number }) => {
+              mocks.pageCalls.push(`goto:${opts.timeout}`);
+            },
+            waitForSelector: async (selector: string, opts: { timeout: number }) => {
+              mocks.pageCalls.push(`wait:${selector}:${opts.timeout}`);
+            },
+            click: async (selector: string, opts: { timeout: number }) => {
+              mocks.pageCalls.push(`click:${selector}:${opts.timeout}`);
+            },
+            hover: async () => {},
+            fill: async () => {},
+            press: async () => {},
+            keyboard: { press: async () => {} },
+            waitForTimeout: async () => {},
+          }),
+          close: async () => {},
+        };
+      },
       close: async () => {},
     }),
   },
@@ -123,6 +144,8 @@ function reporter(): Reporter & { completed: ReturnType<typeof vi.fn> } {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.violations = [];
+  mocks.contextOptions = null;
+  mocks.pageCalls = [];
   mocks.renderPages.mockResolvedValue([screenshot()]);
   mocks.init.mockResolvedValue(undefined);
   mocks.writeBaseline.mockResolvedValue(undefined);
@@ -155,7 +178,45 @@ describe('updateBaselines accessibility block', () => {
     const reported = output.completed.mock.calls[0][0] as RunResult;
     expect(reported.diffs[0]?.status).toBe('new');
     expect(reported.summary.regressions).toBe(0);
+    expect(reported.baselineUpdate).toBeUndefined();
+    expect(reported.baselineRefusal).toBe(
+      'Accessibility check failed: 1 violation(s) at or above the configured impact threshold. Baselines were not written.',
+    );
     expect(reported.accessibility?.[0]?.violations[0]?.id).toBe('color-contrast');
+  });
+
+  it('audits with the same auth, color scheme, height, wait, and actions as capture', async () => {
+    mocks.renderPages.mockResolvedValue([
+      {
+        ...screenshot(),
+        route: {
+          path: '/account',
+          colorScheme: 'dark' as const,
+          waitForSelector: '#ready',
+          actions: [{ type: 'click' as const, selector: '#open' }],
+        },
+      },
+    ]);
+    const cfg = config({ failOnViolation: true });
+    cfg.auth = { storageState: 'state.json' };
+    cfg.colorScheme = 'light';
+    cfg.viewportHeight = 800;
+    cfg.pageTimeout = 12_000;
+
+    const result = await updateBaselines(cfg, reporter());
+
+    expect(result.baselineUpdate).toBe(true);
+    expect(mocks.contextOptions).toEqual({
+      viewport: { width: 1440, height: 800 },
+      storageState: 'state.json',
+      colorScheme: 'dark',
+    });
+    expect(mocks.pageCalls).toEqual([
+      'goto:12000',
+      'wait:#ready:12000',
+      'click:#open:12000',
+      'analyze',
+    ]);
   });
 
   it('writes when the violation is below the impact cutoff', async () => {

@@ -1350,7 +1350,7 @@ async function writeUpdatedBaselines(
       totalStart,
       config,
     ),
-    baselineUpdate: true,
+    ...(baselineBlock ? { baselineRefusal: baselineBlock } : { baselineUpdate: true }),
     ...(baselineA11y ? { accessibility: baselineA11y } : {}),
   };
   reporter.onStageStart('report', 'Generating baseline update report…');

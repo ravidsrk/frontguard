@@ -160,7 +160,7 @@ export class GitHubPRReporter implements Reporter {
     // New pages
     const newPages = result.diffs.filter((d) => d.status === 'new');
     if (newPages.length > 0) {
-      sections.push(this.generateNewPagesSection(newPages, result.baselineUpdate === true));
+      sections.push(this.generateNewPagesSection(newPages, result));
     }
 
     // Accessibility (Task 5.1)
@@ -200,7 +200,10 @@ export class GitHubPRReporter implements Reporter {
     let badge: string;
     let status: string;
 
-    if (result.baselineUpdate) {
+    if (result.baselineRefusal) {
+      badge = '🔴';
+      status = 'Baseline update refused';
+    } else if (result.baselineUpdate) {
       badge = '🟢';
       status = `${summary.total} baseline${summary.total !== 1 ? 's' : ''} explicitly accepted`;
     } else if (summary.errors > 0) {
@@ -503,17 +506,24 @@ export class GitHubPRReporter implements Reporter {
     ].join('\n');
   }
 
-  private generateNewPagesSection(newPages: DiffResult[], baselineUpdate: boolean): string {
+  private generateNewPagesSection(newPages: DiffResult[], result: RunResult): string {
     const lines: string[] = ['## 🆕 New Pages', ''];
 
     const pageList = newPages.map((d) => `- \`${d.route.path}\` @ ${d.viewport}px`);
     lines.push(...pageList);
     lines.push('');
-    lines.push(
-      baselineUpdate
-        ? '> These screenshots were explicitly accepted and committed to the local `frontguard-baselines` branch.'
-        : '> These pages have no accepted baseline yet. Review them, then run `frontguard update-baselines --confirm-baselines` to capture and accept fresh baselines.',
-    );
+    if (result.baselineRefusal) {
+      lines.push(`> Baselines were not written. ${result.baselineRefusal}`);
+      lines.push('> The pixel status is unchanged.');
+    } else if (result.baselineUpdate) {
+      lines.push(
+        '> These screenshots were explicitly accepted and committed to the local `frontguard-baselines` branch.',
+      );
+    } else {
+      lines.push(
+        '> These pages have no accepted baseline yet. Review them, then run `frontguard update-baselines --confirm-baselines` to capture and accept fresh baselines.',
+      );
+    }
 
     return lines.join('\n');
   }

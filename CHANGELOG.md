@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Refuse `frontguard update-baselines` when the accessibility plugin has `failOnViolation: true` and finds a violation at or above `impact`. The report lists those violations beside the pixel result and does not change that result's status. A clean audit does not clear a pixel regression.
+- Refuse `frontguard update-baselines` when the accessibility plugin has `failOnViolation: true` and finds a violation at or above `impact`. The audit uses the same storage state, color scheme, viewport height, wait, and route actions as the capture. A refused write is reported as not written and is not labeled accepted. The pixel status stays unchanged. A clean audit does not clear a pixel regression.
 - Warn when a run's color scheme differs from the scheme stored on the baseline. The comparison still uses the same baseline file, and the warning does not change the exit code.
 - Prevent pull-request CI completions from changing or replacing main failure
   alerts, including fork branches named `main`.

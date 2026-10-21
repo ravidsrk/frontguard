@@ -965,7 +965,7 @@ $ npx -p @frontguard/cli frontguard export-patterns &gt; .frontguard/shared-patt
       'OPTIONAL PLUGIN.',
       'The accessibility plugin depends on @axe-core/playwright and reports automated findings alongside a run.',
     )}${lead(
-      'Run automated axe-core accessibility checks alongside visual regression screenshots. The plugin audits captured route/viewport pairs in fresh Chromium pages after rendering.',
+      'Run automated axe-core accessibility checks alongside visual regression screenshots. The plugin audits captured route/viewport pairs in Chromium pages that use the same storage state, color scheme, viewport height, wait, and route actions as the capture.',
     )}${h2('Status')}${p(
       'Install the optional dependency and import the plugin from @frontguard/cli/plugins. Automated axe results do not establish WCAG conformance and do not replace keyboard or assistive-technology review.',
     )}${h2('Use')}${code(

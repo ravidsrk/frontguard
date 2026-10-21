@@ -24,9 +24,12 @@ import type {
   AccessibilityResult,
   AccessibilityViolation,
   AccessibilityImpact,
+  ColorScheme,
+  RouteAction,
   ScreenshotResult,
   RunResult,
 } from '../core/types.js';
+import { executeRouteActions } from '../render/route-actions.js';
 import { logger } from '../utils/logger.js';
 
 /** Metadata key under which a11y results are stored on the context. */
@@ -170,9 +173,19 @@ async function loadPlaywright(): Promise<typeof import('playwright') | null> {
   }
 }
 
+/** Page setup copied from capture so the audit sees the same signed-in, themed, acted-on page. */
+interface AuditPageSetup {
+  storageState?: string;
+  colorScheme?: ColorScheme;
+  viewportHeight?: number;
+  pageTimeout?: number;
+  waitForSelector?: string;
+  actions?: RouteAction[];
+}
+
 /**
- * Runs an axe audit against a single URL using a fresh Playwright page.
- * Exposed (non-exported) helper kept small for clarity.
+ * Runs an axe audit in a new Chromium page that uses the same storage state,
+ * color scheme, viewport height, wait, and route actions as capture.
  */
 async function auditUrl(
   AxeBuilder: new (args: { page: unknown }) => {
@@ -184,12 +197,32 @@ async function auditUrl(
   url: string,
   viewport: number,
   config: AccessibilityConfig,
+  setup: AuditPageSetup,
 ): Promise<RawAxeResults> {
   const browser = await pw.chromium.launch({ headless: true });
+  const timeoutMs = setup.pageTimeout ?? 30_000;
   try {
-    const context = await browser.newContext({ viewport: { width: viewport, height: 900 } });
+    const contextOptions: {
+      viewport: { width: number; height: number };
+      storageState?: string;
+      colorScheme?: ColorScheme;
+    } = {
+      viewport: { width: viewport, height: setup.viewportHeight ?? 720 },
+    };
+    if (setup.storageState) contextOptions.storageState = setup.storageState;
+    if (setup.colorScheme) contextOptions.colorScheme = setup.colorScheme;
+    const context = await browser.newContext(contextOptions);
     const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: timeoutMs });
+    if (setup.waitForSelector) {
+      await page.waitForSelector(setup.waitForSelector, {
+        state: 'visible',
+        timeout: timeoutMs,
+      });
+    }
+    if (setup.actions && setup.actions.length > 0) {
+      await executeRouteActions(page, setup.actions, timeoutMs);
+    }
     let builder = new AxeBuilder({ page });
     if (config.rules && builder.withRules) builder = builder.withRules(config.rules) as typeof builder;
     if (config.excludeRules && builder.disableRules) {
@@ -270,6 +303,14 @@ export function createAccessibilityPlugin(config: AccessibilityConfig = {}): Fro
             url,
             shot.viewport,
             config,
+            {
+              storageState: ctx.config.auth?.storageState,
+              colorScheme: shot.route.colorScheme ?? ctx.config.colorScheme,
+              viewportHeight: ctx.config.viewportHeight,
+              pageTimeout: ctx.config.pageTimeout,
+              waitForSelector: shot.route.waitForSelector,
+              actions: shot.route.actions,
+            },
           );
           results.push(parseAxeResults(raw, shot.route.path, shot.viewport, config));
         } catch (err) {

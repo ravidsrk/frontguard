@@ -108,6 +108,24 @@ describe('JSONReporter', () => {
     const parsed = JSON.parse(spy.mock.calls[0][0] as string);
 
     expect(parsed.baselineUpdate).toBe(true);
+    expect(parsed.baselineRefusal).toBeUndefined();
+    spy.mockRestore();
+  });
+
+  it('records a refused baseline write without marking it accepted', () => {
+    const reporter = new JSONReporter();
+    const result = makeRunResult(
+      [makeDiff({ status: 'new' })],
+      { baselineRefusal: 'Baselines were not written.' },
+    );
+
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    reporter.onComplete(result);
+    const parsed = JSON.parse(spy.mock.calls[0][0] as string);
+
+    expect(parsed.baselineUpdate).toBeUndefined();
+    expect(parsed.baselineRefusal).toBe('Baselines were not written.');
+    expect(parsed.diffs[0].status).toBe('new');
     spy.mockRestore();
   });
 

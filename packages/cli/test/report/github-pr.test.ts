@@ -289,6 +289,23 @@ describe('GitHubPRReporter', () => {
     expect(comment).not.toContain('no accepted baseline yet');
   });
 
+  it('reports a refused baseline write without calling it accepted', () => {
+    const reporter = new GitHubPRReporter();
+    const refusal = 'Accessibility check failed: 1 violation(s). Baselines were not written.';
+    const result = makeRunResult(
+      [makeDiff({ status: 'new', route: { path: '/blocked' } })],
+      { baselineRefusal: refusal },
+    );
+    const comment = reporter.generateComment(result);
+
+    expect(comment).toContain('Baseline update refused');
+    expect(comment).toContain('Baselines were not written.');
+    expect(comment).toContain('/blocked');
+    expect(comment).toContain('pixel status is unchanged');
+    expect(comment).not.toContain('explicitly accepted');
+    expect(comment).not.toContain('frontguard update-baselines');
+  });
+
   it('large results are truncated under 60KB', () => {
     const reporter = new GitHubPRReporter();
     // Generate many regression diffs with verbose AI analyses
