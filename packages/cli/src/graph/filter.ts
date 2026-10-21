@@ -5,8 +5,15 @@
  * which routes are affected by the current set of file changes, so only
  * those pages need to be re-rendered.
  *
- * This is purely an optimization — if anything fails, it falls back to
- * rendering ALL routes. Smart filter should never cause missed regressions.
+ * This is purely an optimization — if anything fails, or the graph cannot
+ * prove which routes are unaffected, it falls back to rendering ALL routes.
+ * Smart filter should never cause missed regressions.
+ *
+ * Incomplete analysis (render every route, and say why):
+ * - a deleted path, because its former dependents can no longer be walked
+ * - a `public/` or `static/` file, or an image/font no import edge names
+ * - a relative import in a changed file or route entry that did not resolve
+ * - a dependency walk that hit its file cap
  *
  * @module graph/filter
  */
@@ -15,8 +22,9 @@ import type { Route, FrontguardConfig } from '../core/types.js';
 import { buildDependencyGraph } from './parser.js';
 import {
   mapRoutesToFiles,
-  getChangedFiles,
+  getChangedPaths,
   filterAffectedRoutes,
+  incompleteAnalysisReason,
 } from './resolver.js';
 import { logger } from '../utils/logger.js';
 
@@ -85,17 +93,20 @@ export async function smartFilter(
     return includeAll(routes, 'no routes to filter');
   }
 
-  // Step 1: Detect changed files
+  // Step 1: Detect changed files, including deletions
   let changedFiles: string[];
+  let removedFiles: string[];
   try {
-    changedFiles = getChangedFiles(process.cwd());
+    const changed = getChangedPaths(process.cwd());
+    changedFiles = changed.present;
+    removedFiles = changed.removed;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.warn(`Could not detect changed files: ${msg}`);
     return includeAll(routes, `could not detect changed files: ${msg}`);
   }
 
-  if (changedFiles.length === 0) {
+  if (changedFiles.length === 0 && removedFiles.length === 0) {
     return includeAll(routes, 'no changes detected');
   }
 
@@ -137,6 +148,18 @@ export async function smartFilter(
     const msg = err instanceof Error ? err.message : String(err);
     logger.warn(`Dependency graph build failed: ${msg}`);
     return includeAll(routes, `dependency graph build failed: ${msg}`);
+  }
+
+  const gap = incompleteAnalysisReason({
+    changedFiles,
+    removedFiles,
+    graph,
+    entryFiles: allEntryFiles,
+    projectDir: process.cwd(),
+  });
+  if (gap) {
+    logger.warn(gap);
+    return includeAll(routes, gap);
   }
 
   // Step 4: Filter affected routes

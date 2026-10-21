@@ -96,7 +96,7 @@ Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on 
 - `--threshold <ratio>` — Changed-pixel ratio threshold (`0–1` scale; `0.01` = 1%)
 - `--wait-for-stability` — Wait for consecutive animation frames to converge before capturing
 - `--redact-sensitive` — Redact password, payment, and `[data-frontguard-redact]` inputs and scrub DOM snapshots before capture
-- `--color-scheme <scheme>` — Emulate `light` or `dark` `prefers-color-scheme`
+- `--color-scheme <scheme>` — Emulate `light` or `dark` `prefers-color-scheme`. This compares against the same baseline file as the default scheme until named capture modes exist.
 - `--freeze-time [timestamp]` — Freeze `Date.now()` / `new Date()` (boolean default, epoch ms, or ISO 8601 date string)
 - `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
 - `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render
@@ -207,7 +207,7 @@ export default {
 The supported path is the local CLI. Hosted cloud, MCP, GitHub App, and Docker Compose onboarding remain pre-release:
 
 - **Spatial diff clusters & DOM selector attribution** — Connected-component diff clusters report Chroma-SSIM, CW-SSIM, and `cluster.targetSelector` (the most-specific DOM selector at the cluster center).
-- **Optional AI analysis** — Multi-provider BYOK (`openai`, `anthropic`, `gemini`, plus custom OpenAI-compatible `baseUrl` for OpenRouter / Ollama / vLLM) can classify a pixel change on the default compare path; it does not change pass/fail and has no published accuracy benchmark. Experimental `frontguard run --mode judge --experimental` is a separate opt-in whose verdict is the model, not pixel diff.
+- **Optional AI analysis** — Multi-provider BYOK (`openai`, `anthropic`, `gemini`, plus custom OpenAI-compatible `baseUrl` for OpenRouter / Ollama / vLLM) can classify a pixel change on the default compare path; it does not change pass/fail and has no published accuracy benchmark. Experimental `frontguard run --mode judge --experimental` prints advisory notes only. A failing note does not set exit code 1, and a note of "no change" does not pass a pixel comparison. Exit 2 means the judge run could not complete. There is no published accuracy figure for this mode. `docs/ROADMAP.md` records the external studies (WUICC-bench, arXiv:2607.01728; LLMShot, arXiv:2507.10062, whose semantic-diff scalar splits about 0.921 versus 0.079 across model sizes). Those figures are not Frontguard detection accuracy, and a scalar is not a threshold.
 - **Experimental AI fixes** — `--generate-fixes` and `--verify-fixes` are separate opt-ins; unverified suggestions remain labeled for review.
 - **Fix-pattern database** — `accept-fix` / `reject-fix` / `export-patterns` train and share a local pattern store that the pipeline reuses before calling the AI.
 - **`frontguard doctor`** — environment diagnostics for sources of non-determinism (Node, Playwright/Chromium, browsers, config, git).

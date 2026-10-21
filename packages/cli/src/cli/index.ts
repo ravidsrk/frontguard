@@ -301,7 +301,7 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--experimental', 'Enable experimental features (required for --mode judge)')
     .option('--redact-sensitive', 'Mask password/credit-card/sensitive inputs before screenshot capture')
     .option('--wait-for-stability', 'Wait for consecutive frames to converge before screenshot capture')
-    .option('--color-scheme <scheme>', 'Emulate browser color scheme: light or dark')
+    .option('--color-scheme <scheme>', 'Emulate light or dark. Compares against the same baseline file as the default scheme')
     .option('--freeze-time [timestamp]', 'Freeze browser clock (Date/Date.now) to a fixed timestamp or ISO date')
     .option('--seed-random [seed]', 'Seed Math.random() with a deterministic PRNG (default seed: 42)')
     .option('--block-urls <patterns...>', 'Block noisy third-party URLs (glob or substring patterns)')
@@ -355,23 +355,24 @@ export async function main(argv?: string[]): Promise<number> {
             exitCode = 2;
             return;
           }
-          logger.warn('🧪 Judge mode (beta): evaluating against design intent — no baselines used.');
+          logger.warn(
+            '🧪 Judge mode (experimental): model notes are advisory and do not change the exit code. ' +
+              'Pixel comparison is the only pass/fail path. This mode does not read baselines.',
+          );
           const judgeResult = await runJudgePipeline(config, reporter);
           const js = judgeResult.summary;
           logger.info('');
           logger.info('─'.repeat(60));
           logger.info(
-            `Judge results: ${js.total} judged, ${js.passed} passed, ` +
-              `${js.regressions} failed, ${js.warnings} with warnings, ${js.errors} errors`,
+            `Judge notes: ${js.total} reviewed, ${js.passed} without notes, ` +
+              `${js.warnings} with notes, ${js.errors} errors`,
           );
           logger.info('─'.repeat(60));
           exitCode = comparisonExitCode(js);
           if (exitCode === 2) {
             logger.error('❌ Design evaluation could not complete');
-          } else if (exitCode === 1) {
-            logger.error(`❌ ${js.regressions} screenshot(s) failed the design bar`);
           } else {
-            logger.info('✅ All screenshots passed the design bar');
+            logger.info('Model notes are advisory and do not change the exit code.');
           }
           return;
         }
@@ -484,7 +485,7 @@ export async function main(argv?: string[]): Promise<number> {
     .option('-c, --config <path>', 'Config file path')
     .option('--redact-sensitive', 'Mask password/credit-card/sensitive inputs before screenshot capture')
     .option('--wait-for-stability', 'Wait for consecutive frames to converge before screenshot capture')
-    .option('--color-scheme <scheme>', 'Emulate browser color scheme: light or dark')
+    .option('--color-scheme <scheme>', 'Emulate light or dark. Compares against the same baseline file as the default scheme')
     .option('--freeze-time [timestamp]', 'Freeze browser clock (Date/Date.now) to a fixed timestamp or ISO date')
     .option('--seed-random [seed]', 'Seed Math.random() with a deterministic PRNG (default seed: 42)')
     .option('--block-urls <patterns...>', 'Block noisy third-party URLs (glob or substring patterns)')

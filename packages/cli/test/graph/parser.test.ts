@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { createTempDir, writeFiles } from '../fixtures/helpers.js';
-import { parseImports, buildDependencyGraph } from '../../src/graph/parser.js';
+import { parseImports, buildDependencyGraph, unresolvedRelativeImports } from '../../src/graph/parser.js';
 
 let cleanup: (() => void) | undefined;
 
@@ -71,6 +71,16 @@ describe('parseImports', () => {
   it('returns empty array for non-existent file', () => {
     const imports = parseImports('/nonexistent/file.ts');
     expect(imports).toHaveLength(0);
+  });
+
+  it('reports relative imports that do not resolve and skips bare specifiers', () => {
+    const tmp = createTempDir();
+    cleanup = tmp.cleanup;
+    writeFiles(tmp.dir, {
+      'index.ts': "import './missing';\nimport 'react';\n",
+    });
+    expect(unresolvedRelativeImports(`${tmp.dir}/index.ts`)).toEqual(['./missing']);
+    expect(unresolvedRelativeImports('/nonexistent/file.ts')).toEqual([]);
   });
 
   it('resolves index files', () => {

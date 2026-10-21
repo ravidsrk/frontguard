@@ -10,8 +10,16 @@
  *   frame for design compliance.
  *
  * No baseline images or snapshot directories are required — it works on the
- * very first run. This is an **experimental / beta** feature gated behind
- * `--mode judge`.
+ * very first run. This is an **experimental** feature gated behind
+ * `--mode judge --experimental`.
+ *
+ * Verdicts do not set exit codes 0 / 1 / 2. A note of "no change" does not pass
+ * a pixel comparison, and a failing note does not fail one. Exit 2 is only for
+ * a run that could not complete. The mode has no published accuracy figure;
+ * `docs/ROADMAP.md` records why an external model score is not a threshold
+ * (WUICC-bench, arXiv:2607.01728; LLMShot, arXiv:2507.10062, including a
+ * semantic-diff split of about 0.921 versus 0.079 across model sizes). Those
+ * figures are not Frontguard detection accuracy.
  *
  * @module diff/model-judge
  */

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { configSchema, detectSecrets, detectFramework, mergeConfigs } from '../../src/core/config.js';
+import { baselineStoragePath } from '../../src/storage/git-orphan.js';
 import { createTempDir, writeFiles } from '../fixtures/helpers.js';
 import { ZodError } from 'zod';
 
@@ -313,6 +314,55 @@ describe('judge config and mergeConfigs', () => {
         freezeTime: 'not-a-valid-date',
       }),
     ).toThrow(ZodError);
+  });
+});
+
+describe('baseline keys', () => {
+  it('stores light and dark captures of one path in the same file', () => {
+    const light = baselineStoragePath('/', 1440, 'chromium');
+    const dark = baselineStoragePath('/', 1440, 'chromium');
+    expect(light).toBe('baselines/_root/1440/chromium.png');
+    expect(dark).toBe(light);
+  });
+
+  it('rejects two route entries that share a path, viewport, and browser', () => {
+    expect(() => configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      routes: [
+        { path: '/', colorScheme: 'light' },
+        { path: '/', colorScheme: 'dark' },
+      ],
+    })).toThrow(/colorScheme=light/);
+    try {
+      configSchema.parse({
+        baseUrl: 'http://localhost:3000',
+        viewports: [1440],
+        browsers: ['chromium'],
+        routes: [
+          { path: '/', colorScheme: 'light' },
+          { path: '/', colorScheme: 'dark', label: 'home-dark' },
+        ],
+      });
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toBeInstanceOf(ZodError);
+      const message = (err as ZodError).issues.map((issue) => issue.message).join('\n');
+      expect(message).toContain('routes[0] "/" (colorScheme=light)');
+      expect(message).toContain('routes[1] "/" (colorScheme=dark, label=home-dark)');
+      expect(message).toContain('baselines/_root/1440/chromium.png');
+    }
+  });
+
+  it('allows the same path on viewports that do not overlap', () => {
+    const config = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      routes: [
+        { path: '/', viewport: [375] },
+        { path: '/', viewport: [1440] },
+      ],
+    });
+    expect(config.routes).toHaveLength(2);
+    expect(baselineStoragePath('/', 375, 'chromium')).not.toBe(baselineStoragePath('/', 1440, 'chromium'));
   });
 });
 

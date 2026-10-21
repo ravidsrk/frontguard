@@ -40,7 +40,8 @@ npx frontguard update-baselines --url http://localhost:3000
 # Compare current render against baseline (exit 0 = pass, 1 = regression/new, 2 = error)
 npx frontguard run --url http://localhost:3000 --wait-for-stability --redact-sensitive
 
-# Emulate dark mode and emit machine-readable JSON
+# Emulate dark mode and emit machine-readable JSON.
+# This uses the same baseline files as the default scheme until named capture modes exist.
 npx frontguard run --url http://localhost:3000 --color-scheme dark --output json
 ```
 

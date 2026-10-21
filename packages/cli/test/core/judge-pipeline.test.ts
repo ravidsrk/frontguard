@@ -6,6 +6,7 @@
  * caching, and summary mapping — is exercised without a browser or network.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { comparisonExitCode } from '../../src/cli/exit-code.js';
 import type {
   FrontguardConfig,
   Reporter,
@@ -114,7 +115,9 @@ describe('runJudgePipeline', () => {
     expect(result.judgements).toHaveLength(2);
     expect(result.summary.total).toBe(2);
     expect(result.summary.passed).toBe(1);
-    expect(result.summary.regressions).toBe(1); // failing verdict → regression
+    expect(result.summary.regressions).toBe(0);
+    expect(result.summary.warnings).toBe(1);
+    expect(comparisonExitCode(result.summary)).toBe(0);
     expect(reporter.events).toContain('done');
   });
 
@@ -133,7 +136,8 @@ describe('runJudgePipeline', () => {
     judgeScreenshot.mockResolvedValue(verdict('/', false, { error: 'API down', confidence: 0 }));
     const result = await runJudgePipeline(makeConfig({ routes: [{ path: '/' }] }), makeReporter());
     expect(result.summary.errors).toBe(1);
-    expect(result.summary.regressions).toBe(0); // errors are not regressions
+    expect(result.summary.regressions).toBe(0);
+    expect(comparisonExitCode(result.summary)).toBe(2);
   });
 
   it('turns rejected judge calls into errors instead of dropping them', async () => {

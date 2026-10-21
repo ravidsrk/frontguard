@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mapRoutesToFiles, filterAffectedRoutes } from '../../src/graph/resolver.js';
+import { mapRoutesToFiles, filterAffectedRoutes, incompleteAnalysisReason } from '../../src/graph/resolver.js';
+import { DependencyGraph } from '../../src/graph/parser.js';
 import { createTempDir, writeFiles } from '../fixtures/helpers.js';
 import type { Route } from '../../src/core/types.js';
 
@@ -220,5 +221,97 @@ describe('filterAffectedRoutes', () => {
 
     const result = filterAffectedRoutes(routes, changedFiles, graph, routeFileMap);
     expect(result).toHaveLength(0);
+  });
+});
+
+describe('incompleteAnalysisReason', () => {
+  const projectDir = '/project';
+  const empty = {
+    graph: new Map<string, Set<string>>(),
+    entryFiles: [] as string[],
+    projectDir,
+    removedFiles: [] as string[],
+  };
+
+  it('names a public asset changed beside a mapped route', () => {
+    const reason = incompleteAnalysisReason({
+      ...empty,
+      changedFiles: ['/project/public/brand.svg', '/project/app/about/page.tsx'],
+    });
+    expect(reason).toContain('public/brand.svg');
+    expect(reason).toContain('rendering all routes');
+  });
+
+  it('names an unimported image and a public font', () => {
+    expect(incompleteAnalysisReason({
+      ...empty,
+      changedFiles: ['/project/public/hero.png'],
+    })).toContain('public/hero.png');
+    expect(incompleteAnalysisReason({
+      ...empty,
+      changedFiles: ['/project/public/fonts/brand.woff2'],
+    })).toContain('public/fonts/brand.woff2');
+  });
+
+  it('names a removed file instead of ignoring it', () => {
+    const reason = incompleteAnalysisReason({
+      ...empty,
+      changedFiles: ['/project/app/about/page.tsx'],
+      removedFiles: ['/project/public/fonts/brand.woff2'],
+    });
+    expect(reason).toContain('removed file');
+    expect(reason).toContain('brand.woff2');
+  });
+
+  it('leaves a route-only source edit scoped', () => {
+    expect(incompleteAnalysisReason({
+      ...empty,
+      changedFiles: ['/project/app/about/page.tsx'],
+    })).toBeNull();
+  });
+
+  it('leaves an imported component image scoped and still expands a public url', () => {
+    const traced = new Map<string, Set<string>>([
+      ['/project/app/page.tsx', new Set([
+        '/project/components/logo.svg',
+        '/project/public/brand.svg',
+      ])],
+    ]);
+    expect(incompleteAnalysisReason({
+      ...empty,
+      graph: traced,
+      changedFiles: ['/project/components/logo.svg'],
+    })).toBeNull();
+    expect(incompleteAnalysisReason({
+      ...empty,
+      graph: traced,
+      changedFiles: ['/project/public/brand.svg'],
+    })).toContain('public/brand.svg');
+  });
+
+  it('names a truncated walk', () => {
+    const graph = new DependencyGraph();
+    graph.truncated = true;
+    expect(incompleteAnalysisReason({
+      ...empty,
+      graph,
+      changedFiles: ['/project/app/about/page.tsx'],
+    })).toContain('truncated');
+  });
+
+  it('names an unresolved import in a route entry that did not itself change', () => {
+    const dir = makeTempProject({
+      'app/page.tsx': "import './missing-widget';\n",
+      'app/about/page.tsx': 'export default function About() { return null; }\n',
+    });
+    const reason = incompleteAnalysisReason({
+      changedFiles: [`${dir}/app/about/page.tsx`],
+      removedFiles: [],
+      graph: new Map(),
+      entryFiles: [`${dir}/app/page.tsx`],
+      projectDir: dir,
+    });
+    expect(reason).toContain('./missing-widget');
+    expect(reason).toContain('app/page.tsx');
   });
 });

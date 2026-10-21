@@ -10,10 +10,15 @@
  */
 
 import { existsSync } from 'node:fs';
-import { join, resolve, basename } from 'node:path';
+import { join, resolve, basename, extname, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { logger } from '../utils/logger.js';
 import type { Route } from '../core/types.js';
+import {
+  DEPENDENCY_GRAPH_FILE_CAP,
+  DependencyGraph,
+  unresolvedRelativeImports,
+} from './parser.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -362,12 +367,18 @@ function gitDiff(projectDir: string, args: string[]): string[] {
  * 3. `git diff --name-only HEAD` — uncommitted changes
  * 4. `git diff --name-only --cached` — staged changes
  *
- * Resolves relative paths to absolute, filters to existing files only.
+ * Resolves relative paths to absolute. Missing paths are returned separately
+ * so a deletion is not treated as "no change".
  *
  * @param projectDir - Project root directory (must be inside a git repo)
- * @returns Array of absolute file paths that changed
+ * @returns Absolute paths that still exist, and absolute paths that were removed
  */
-export function getChangedFiles(projectDir: string): string[] {
+export interface ChangedPaths {
+  present: string[];
+  removed: string[];
+}
+
+export function getChangedPaths(projectDir: string): ChangedPaths {
   const resolvedDir = resolve(projectDir);
   const allFiles = new Set<string>();
 
@@ -405,17 +416,111 @@ export function getChangedFiles(projectDir: string): string[] {
     for (const f of stagedFiles) allFiles.add(f);
   }
 
-  // Resolve to absolute paths, keep only existing files
-  const resolved: string[] = [];
+  const present: string[] = [];
+  const removed: string[] = [];
   for (const relPath of allFiles) {
     const absPath = resolve(resolvedDir, relPath);
-    if (existsSync(absPath)) {
-      resolved.push(absPath);
+    if (existsSync(absPath)) present.push(absPath);
+    else removed.push(absPath);
+  }
+
+  logger.debug(`Git detected ${present.length} changed file(s), ${removed.length} removed`);
+  return { present, removed };
+}
+
+/** Existing changed files. Deletions are omitted; use {@link getChangedPaths} to see them. */
+export function getChangedFiles(projectDir: string): string[] {
+  return getChangedPaths(projectDir).present;
+}
+
+const STATIC_ASSET_EXTENSIONS = new Set([
+  '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.ico', '.bmp',
+  '.woff', '.woff2', '.ttf', '.otf', '.eot',
+]);
+
+const SOURCE_EXTENSIONS = new Set([
+  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.vue', '.svelte', '.css',
+]);
+
+function toProjectRelative(filePath: string, projectDir: string): string {
+  const root = resolve(projectDir);
+  const abs = resolve(filePath);
+  const prefix = root.endsWith(sep) ? root : root + sep;
+  const relative = abs.startsWith(prefix) ? abs.slice(prefix.length) : abs;
+  return relative.split(sep).join('/');
+}
+
+/** Public and static directories are addressed by URL, which the import graph does not record. */
+function isPublicOrStaticAsset(relativePath: string): boolean {
+  return /^(?:public|static)(?:\/|$)/.test(relativePath)
+    || /\/(?:public|static)\//.test(relativePath);
+}
+
+function graphImports(graph: Map<string, Set<string>>, filePath: string): boolean {
+  const abs = resolve(filePath);
+  for (const deps of graph.values()) {
+    if (deps.has(abs) || deps.has(filePath)) return true;
+  }
+  return false;
+}
+
+/**
+ * Why a changed set cannot prove which routes to skip.
+ *
+ * Returns null when the import graph is complete enough to scope the run.
+ * A string means every route must be rendered, and the string is the user-facing reason.
+ *
+ * Policy:
+ * - A removed path has no reverse edges left to walk.
+ * - A file under `public/` or `static/` can be referenced by URL (`src`, CSS `url()`)
+ *   without an import edge. An image or font that no parsed import names is the same gap.
+ * - A relative import that does not resolve, in a changed file or a route entry, means
+ *   the graph dropped an edge.
+ * - A walk that hit the file cap is not a complete graph.
+ */
+export function incompleteAnalysisReason(input: {
+  changedFiles: string[];
+  removedFiles: string[];
+  graph: Map<string, Set<string>>;
+  entryFiles: string[];
+  projectDir: string;
+}): string | null {
+  if (input.graph instanceof DependencyGraph && input.graph.truncated) {
+    return `dependency graph truncated at ${DEPENDENCY_GRAPH_FILE_CAP} files — rendering all routes`;
+  }
+
+  if (input.removedFiles.length > 0) {
+    const sample = input.removedFiles
+      .slice(0, 3)
+      .map((file) => toProjectRelative(file, input.projectDir))
+      .join(', ');
+    return `removed file(s) cannot be traced (${sample}) — rendering all routes`;
+  }
+
+  for (const file of input.changedFiles) {
+    const relative = toProjectRelative(file, input.projectDir);
+    const extension = extname(file).toLowerCase();
+    const publicAsset = isPublicOrStaticAsset(relative);
+    const unimportedAsset = STATIC_ASSET_EXTENSIONS.has(extension)
+      && !graphImports(input.graph, file);
+    if (publicAsset || unimportedAsset) {
+      return `untraced static asset ${relative} — rendering all routes`;
     }
   }
 
-  logger.debug(`Git detected ${resolved.length} changed file(s)`);
-  return resolved;
+  const sources = new Set<string>();
+  for (const file of [...input.entryFiles, ...input.changedFiles]) {
+    if (!SOURCE_EXTENSIONS.has(extname(file).toLowerCase())) continue;
+    if (!existsSync(file)) continue;
+    sources.add(resolve(file));
+  }
+  for (const file of sources) {
+    const missing = unresolvedRelativeImports(file);
+    if (missing.length === 0) continue;
+    return `unresolved import ${missing[0]} in ${toProjectRelative(file, input.projectDir)} — rendering all routes`;
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
