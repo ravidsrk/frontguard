@@ -1,0 +1,13 @@
+{
+  "/text": "site/text.html",
+  "/color": "site/color.html",
+  "/layout-desktop": "site/layout-desktop.html",
+  "/layout-mobile": "site/layout-mobile.html",
+  "/layout-two": "site/layout-two.html",
+  "/neighbour": "site/neighbour.html",
+  "/logo": "site/logo.html",
+  "/nuisance/animation": "site/nuisance/animation.html",
+  "/nuisance/font": "site/nuisance/font.html",
+  "/nuisance/caret": "site/nuisance/caret.html",
+  "/nuisance/scrollbar": "site/nuisance/scrollbar.html"
+}

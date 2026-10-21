@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "baseUrl": "http://127.0.0.1:55276",
+  "routes": [
+    "/",
+    "/about",
+    "/gallery",
+    "/brand"
+  ],
+  "viewports": [
+    1440
+  ],
+  "browsers": [
+    "chromium"
+  ],
+  "threshold": 0.1,
+  "smartRender": true,
+  "telemetry": false,
+  "workers": 1,
+  "outputDir": "/var/folders/65/nfjkpf196n5_xrwbkyrrgqrc0000gn/T/frontguard-validation-report"
+}

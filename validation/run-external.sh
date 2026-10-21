@@ -12,6 +12,20 @@
 # USAGE:
 #   ./validation/run-external.sh                # run all repos in repos.json
 #   ./validation/run-external.sh taxonomy       # run a single repo by "name"
+#   ./validation/run-external.sh --pixel        # #285: local fixtures + the five repos
+#
+# --pixel extends this harness. It does not replace it with a hosted runner.
+# Fixture and external JSON for that mode go to validation/results/pixel-285/
+# so the committed v0.2 JSON in validation/results/ is left alone.
+# FRONTGUARD_FILTER_SRC  checkout whose CLI is used for filtered-vs-full capture
+#                         (not switched; built from `git archive` in a temp dir).
+# FRONTGUARD_NODE_MODULES  node_modules used only to compile and resolve that build.
+#                         The symlink is created inside the temp dir and removed
+#                         at the end of --pixel.
+# FRONTGUARD_VALIDATION_BUDGET_SEC  external-repo time box (default 1200).
+# FRONTGUARD_PIXEL_BUILD_ONLY=1  build the pixel CLI and skip fixture captures
+#                         (used to re-measure one external repo without a second
+#                         fixture pass).
 #
 # REQUIREMENTS:
 #   - node (>=20) and npm/npx
@@ -32,7 +46,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOS_FILE="${SCRIPT_DIR}/repos.json"
 RESULTS_DIR="${SCRIPT_DIR}/results"
-FILTER="${1:-}" # optional repo name filter
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PIXEL_MODE=0
+FILTER=""
+if [[ "${1:-}" == "--pixel" ]]; then
+  PIXEL_MODE=1
+  FILTER="${2:-}"
+else
+  FILTER="${1:-}" # optional repo name filter
+fi
 
 # --- Cleanup state -----------------------------------------------------------
 WORK_DIR=""
@@ -240,9 +262,14 @@ run_repo() {
   local routes
   routes="$(echo "${routes_json}" | jq -r '.[]')"
 
-  # Resolve the frontguard binary (prefer a globally-linked one for hermeticity).
-  local FG_BIN="frontguard"
-  if ! command -v frontguard >/dev/null 2>&1; then
+  # Prefer an explicit binary (the --pixel build of this tree). Otherwise keep
+  # the historical resolution: a linked `frontguard`, then the published package.
+  local FG_BIN
+  if [[ -n "${FRONTGUARD_BIN:-}" ]]; then
+    FG_BIN="${FRONTGUARD_BIN}"
+  elif command -v frontguard >/dev/null 2>&1; then
+    FG_BIN="frontguard"
+  else
     FG_BIN="npx -p @frontguard/cli frontguard"
   fi
 
@@ -262,13 +289,25 @@ run_repo() {
       local base_url="${url%/}"
       local full_url="${base_url}${route}"
       echo "    [${pass_name}] • ${full_url}"
-      local result
+      # A non-zero exit still prints the run JSON (exit 1 is regressions).
+      # Replacing that stdout with an error envelope would hide the diffs.
+      local result status=0
       if result="$(${FG_BIN} run --url "${base_url}" --routes "${route}" ${extra_flag} --output json 2>>"${WORK_DIR}/frontguard.log")"; then
-        :
+        status=0
       else
-        echo "WARNING: frontguard ${pass_name} run failed for ${full_url}" >&2
+        status=$?
+      fi
+      if [[ -z "${result//[[:space:]]/}" ]]; then
+        echo "WARNING: frontguard ${pass_name} produced no JSON for ${full_url} (exit ${status})" >&2
         run_ok=0
-        result="{\"url\":\"${full_url}\",\"error\":\"frontguard run failed\"}"
+        result="{\"url\":\"${full_url}\",\"error\":\"frontguard run failed\",\"exitStatus\":${status}}"
+      elif ! jq -e . >/dev/null 2>&1 <<<"${result}"; then
+        echo "WARNING: frontguard ${pass_name} stdout was not JSON for ${full_url} (exit ${status})" >&2
+        run_ok=0
+        result="{\"url\":\"${full_url}\",\"error\":\"frontguard run failed\",\"exitStatus\":${status}}"
+      elif [[ "${status}" -ne 0 ]]; then
+        echo "WARNING: frontguard ${pass_name} exited ${status} for ${full_url} (JSON kept)" >&2
+        run_ok=0
       fi
       # --update-baselines exits 0 with no stdout — substitute a placeholder so
       # the per-repo JSON stays parseable.
@@ -348,24 +387,141 @@ run_repo() {
   return 0
 }
 
-# --- Main loop ---------------------------------------------------------------
-COUNT="$(jq 'length' "${REPOS_FILE}")"
-echo "Loaded ${COUNT} repos from ${REPOS_FILE}"
-[[ -n "${FILTER}" ]] && echo "Filtering to repo: ${FILTER}"
+# --- External repos ----------------------------------------------------------
+run_external_repos() {
+  local COUNT name repo url devCommand category routes_json
+  COUNT="$(jq 'length' "${REPOS_FILE}")"
+  echo "Loaded ${COUNT} repos from ${REPOS_FILE}"
+  [[ -n "${FILTER}" ]] && echo "Filtering to repo: ${FILTER}"
 
-for (( i = 0; i < COUNT; i++ )); do
-  name="$(jq -r ".[$i].name" "${REPOS_FILE}")"
-  if [[ -n "${FILTER}" ]] && [[ "${FILTER}" != "${name}" ]]; then
-    continue
+  for (( i = 0; i < COUNT; i++ )); do
+    name="$(jq -r ".[$i].name" "${REPOS_FILE}")"
+    if [[ -n "${FILTER}" ]] && [[ "${FILTER}" != "${name}" ]]; then
+      continue
+    fi
+    repo="$(jq -r ".[$i].repo" "${REPOS_FILE}")"
+    url="$(jq -r ".[$i].url" "${REPOS_FILE}")"
+    devCommand="$(jq -r ".[$i].devCommand" "${REPOS_FILE}")"
+    category="$(jq -r ".[$i].category" "${REPOS_FILE}")"
+    routes_json="$(jq -c ".[$i].routes" "${REPOS_FILE}")"
+
+    run_repo "${name}" "${repo}" "${url}" "${devCommand}" "${category}" "${routes_json}"
+  done
+}
+
+# Remove temp CLI builds (and the node_modules symlink inside them).
+cleanup_pixel_builds() {
+  local paths="$1"
+  [[ -f "${paths}" ]] || return 0
+  node -e '
+    const fs = require("node:fs");
+    const paths = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    for (const key of ["pixelTmp", "filterTmp"]) {
+      if (paths[key]) fs.rmSync(paths[key], { recursive: true, force: true });
+    }
+  ' "${paths}"
+}
+
+# #285 measurement. Local fixtures, then the same five repos, under a time box.
+# A repo that does not boot stays in the denominator. Output does not overwrite
+# validation/results/*.json from the v0.2 run.
+run_pixel_validation() {
+  local pixel_out="${SCRIPT_DIR}/results/pixel-285"
+  local budget="${FRONTGUARD_VALIDATION_BUDGET_SEC:-1200}"
+  local node_modules="${FRONTGUARD_NODE_MODULES:-}"
+  local filter_src="${FRONTGUARD_FILTER_SRC:-}"
+  mkdir -p "${pixel_out}/external"
+  # A full --pixel run replaces the event log. A fixture-only or
+  # single-repo rerun must keep the log from the five-repo attempt.
+  if [[ -z "${FILTER}" ]]; then
+    : >"${pixel_out}/external-events.log"
   fi
-  repo="$(jq -r ".[$i].repo" "${REPOS_FILE}")"
-  url="$(jq -r ".[$i].url" "${REPOS_FILE}")"
-  devCommand="$(jq -r ".[$i].devCommand" "${REPOS_FILE}")"
-  category="$(jq -r ".[$i].category" "${REPOS_FILE}")"
-  routes_json="$(jq -c ".[$i].routes" "${REPOS_FILE}")"
 
-  run_repo "${name}" "${repo}" "${url}" "${devCommand}" "${category}" "${routes_json}"
-done
+  if [[ -z "${node_modules}" || ! -d "${node_modules}/playwright" ]]; then
+    echo "WARNING: --pixel needs FRONTGUARD_NODE_MODULES pointing at an install with playwright" >&2
+    echo "SKIP build missing-node-modules" >>"${pixel_out}/external-events.log"
+    return 0
+  fi
 
-echo ""
-echo "All done. Results are in ${RESULTS_DIR}/"
+  # AI stays off on this pixel arm even if the parent shell has a provider key.
+  unset OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY GOOGLE_GENERATIVE_AI_API_KEY || true
+  export FRONTGUARD_TELEMETRY=0
+
+  echo "▶ local fixtures (seed 285) — AI off, Chromium only, threshold 0.1"
+  local runner_args=(
+    "${SCRIPT_DIR}/fixtures/run-local.mjs"
+    --out "${pixel_out}"
+    --repo-root "${REPO_ROOT}"
+    --node-modules "${node_modules}"
+  )
+  if [[ -n "${filter_src}" ]]; then
+    runner_args+=(--filter-src "${filter_src}")
+  fi
+  if [[ "${FRONTGUARD_PIXEL_BUILD_ONLY:-}" == "1" ]]; then
+    runner_args+=(--build-only)
+  fi
+  if ! node "${runner_args[@]}"; then
+    echo "WARNING: local fixture runner failed — external repos still run if the CLI built" >&2
+  fi
+
+  if [[ -f "${pixel_out}/cli-paths.json" ]]; then
+    FRONTGUARD_BIN="node $(node -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).pixelBin)' "${pixel_out}/cli-paths.json")"
+    export FRONTGUARD_BIN
+  fi
+
+  if [[ "${FILTER}" == "fixtures" ]]; then
+    echo "Fixture-only mode; external repos were not started."
+    cleanup_pixel_builds "${pixel_out}/cli-paths.json"
+    rm -f "${pixel_out}/cli-paths.json"
+    return 0
+  fi
+
+  if [[ -z "${FRONTGUARD_BIN:-}" ]]; then
+    echo "WARNING: no local CLI build — not running external repos with a different binary" >&2
+    return 0
+  fi
+
+  local saved_results="${RESULTS_DIR}"
+  RESULTS_DIR="${pixel_out}/external"
+  local started=$SECONDS
+  local COUNT i name
+  COUNT="$(jq 'length' "${REPOS_FILE}")"
+  echo "External repos: ${COUNT} in the denominator. Time box ${budget}s."
+  for (( i = 0; i < COUNT; i++ )); do
+    name="$(jq -r ".[$i].name" "${REPOS_FILE}")"
+    if [[ -n "${FILTER}" && "${FILTER}" != "${name}" ]]; then
+      continue
+    fi
+    if (( SECONDS - started >= budget )); then
+      echo "WARNING: external time box (${budget}s) reached — not attempting ${name}" >&2
+      echo "SKIP ${name} time-box" >>"${pixel_out}/external-events.log"
+      continue
+    fi
+    echo "START ${name}" >>"${pixel_out}/external-events.log"
+    run_repo \
+      "${name}" \
+      "$(jq -r ".[$i].repo" "${REPOS_FILE}")" \
+      "$(jq -r ".[$i].url" "${REPOS_FILE}")" \
+      "$(jq -r ".[$i].devCommand" "${REPOS_FILE}")" \
+      "$(jq -r ".[$i].category" "${REPOS_FILE}")" \
+      "$(jq -c ".[$i].routes" "${REPOS_FILE}")"
+    echo "DONE ${name}" >>"${pixel_out}/external-events.log"
+  done
+  RESULTS_DIR="${saved_results}"
+
+  node "${SCRIPT_DIR}/fixtures/summarize-external.mjs" --out "${pixel_out}" \
+    >"${pixel_out}/external-summary.json" || echo "WARNING: external summary failed" >&2
+  cleanup_pixel_builds "${pixel_out}/cli-paths.json"
+  rm -f "${pixel_out}/cli-paths.json"
+  echo ""
+  echo "Pixel validation output is in ${pixel_out}/"
+}
+
+# --- Main --------------------------------------------------------------------
+if [[ "${PIXEL_MODE}" == 1 ]]; then
+  run_pixel_validation
+else
+  run_external_repos
+  echo ""
+  echo "All done. Results are in ${RESULTS_DIR}/"
+fi

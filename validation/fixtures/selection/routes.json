@@ -1,0 +1,9 @@
+{
+  "/": "site/index.html",
+  "/about": "site/about.html",
+  "/gallery": "site/gallery.html",
+  "/brand": "site/brand.html",
+  "/logo.svg": "public/logo.svg",
+  "/bg.png": "public/bg.png",
+  "/fonts/brand.woff": "public/fonts/brand.woff"
+}
