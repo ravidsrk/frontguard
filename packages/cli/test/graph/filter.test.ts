@@ -104,18 +104,18 @@ describe('smartFilter', () => {
     expect(result.filtered).toEqual(routes);
     expect(result.skipped).toHaveLength(0);
     expect(result.reason).toMatch(/merge_group/);
-    expect(mockedGetChangedFiles).not.toHaveBeenCalled();
+    expect(mockedGetChangedPaths).not.toHaveBeenCalled();
   });
 
   it('keeps filtering on merge_group when FRONTGUARD_DIFF_BASE is set', async () => {
     process.env.GITHUB_EVENT_NAME = 'merge_group';
     process.env.FRONTGUARD_DIFF_BASE = 'abc123def';
     const routes = [route('/')];
-    mockedGetChangedFiles.mockReturnValue([]);
+    presentFiles([]);
 
     const result = await smartFilter(routes, makeConfig());
 
-    expect(mockedGetChangedFiles).toHaveBeenCalled();
+    expect(mockedGetChangedPaths).toHaveBeenCalled();
     expect(result.reason).toContain('no changes');
   });
 
