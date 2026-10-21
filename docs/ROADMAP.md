@@ -198,7 +198,7 @@ All actionable post-launch engineering work is tracked under parent issue [#283]
 
 ### Next — Give Humans, Not Agents, the Merge Gate
 
-10. **[#288](https://github.com/ravidsrk/frontguard/issues/288) — Block baseline updates on new serious `axe-core` violations.** Moved from Now: the block attaches to the approval channels #287, #305 and #306 define. It uses the real option names (`impact`, `failOnViolation`).
+10. **[#288](https://github.com/ravidsrk/frontguard/issues/288) — Block baseline updates on new serious `axe-core` violations.** `update-baselines` runs the existing accessibility plugin before it writes. `failOnViolation: true` refuses the write at or above `impact`, including when the pixel status is not a regression. The report lists the violations and leaves the pixel status unchanged. A clean audit does not clear a pixel regression. `frontguard review` (#305) must use this same refusal. Cloud `approveRun` stays off the production path (#306).
 11. **[#304](https://github.com/ravidsrk/frontguard/issues/304) — Run a verify-only full check in GitHub merge queues.**
     - Document `merge_group`.
     - On queue runs, render all routes and refuse writes.

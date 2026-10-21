@@ -60,7 +60,9 @@ function makeResult(): RunResult {
 describe('Accessibility reporting', () => {
   it('GitHub PR comment includes an accessibility section', () => {
     const comment = new GitHubPRReporter().generateComment(makeResult());
+    expect(comment).toContain('All 1 pages match baselines');
     expect(comment).toContain('♿ Accessibility');
+    expect(comment).not.toContain('## ❌ Regressions');
     expect(comment).toContain('color-contrast');
     expect(comment).toContain('serious');
     expect(comment).toContain('https://example.com/cc');

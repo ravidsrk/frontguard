@@ -11,8 +11,8 @@
  *   Playwright) is unavailable, the plugin warns once and skips — it never
  *   fails the run for a missing dependency.
  * - By default a11y violations are reported as warnings and do **not** fail the
- *   run. Set `failOnViolation: true` to make `serious`/`critical` violations
- *   fail the build.
+ *   run. Set `failOnViolation: true` to make violations at or above `impact`
+ *   fail the build. `update-baselines` uses that same throw and does not write.
  * - Results are stored on the plugin context metadata under
  *   {@link ACCESSIBILITY_RESULTS_KEY} so reporters can read them.
  *
