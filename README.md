@@ -261,7 +261,7 @@ Add `@frontguard/mcp` to `.mcp.json` (Claude Code, Cursor, or Windsurf). In loca
 }
 ```
 
-Available MCP tools by default: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, and `recent_runs`. `promote_baseline` and `accept_baseline` are registered only when `FRONTGUARD_MCP_WRITES=1`. Local-report mode refuses promotion and does not write `frontguard-baselines`; the CLI command above is the local write. Cloud `approveRun` is not a production path.
+Available MCP tools by default: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `recent_runs`, and `list_horizontal_overflow`. Horizontal overflow is a report. It does not change the exit code. `promote_baseline` and `accept_baseline` are registered only when `FRONTGUARD_MCP_WRITES=1`. Local-report mode refuses promotion and does not write `frontguard-baselines`; the CLI command above is the local write. Cloud `approveRun` is not a production path.
 
 ### 6. Accessibility (WCAG), Performance Budgets & Script Drift Audits
 

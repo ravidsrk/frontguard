@@ -224,7 +224,7 @@ export async function analyzeWithAI(
     const a11yContext = buildAccessibilityContext(context.accessibility);
     if (a11yContext) contextLines.push(wrapUntrusted('Accessibility findings (untrusted)', a11yContext));
   }
-  const contextText = contextLines.join('\n');
+  const cx = contextLines.join('\n');
 
   logger.debug(`Analyzing ${diff.route.path} @ ${diff.viewport}px with ${config.provider}/${model}`);
 
@@ -237,7 +237,7 @@ export async function analyzeWithAI(
           baselineB64,
           currentB64,
           diffB64,
-          contextText,
+          cx,
           SYSTEM_PROMPT,
           config.baseUrl,
         );
@@ -248,8 +248,8 @@ export async function analyzeWithAI(
           { data: currentB64, label: 'current' },
         ];
         if (diffB64) images.push({ data: diffB64, label: 'diff' });
-        const userText = contextText
-          ? `Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.\n\nContext:\n${contextText}`
+        const userText = cx
+          ? `Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.\n\nContext:\n${cx}`
           : 'Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.';
         return callGemini(apiKey, model, images, userText, config.baseUrl, SYSTEM_PROMPT);
       }
@@ -259,7 +259,7 @@ export async function analyzeWithAI(
         baselineB64,
         currentB64,
         diffB64,
-        contextText,
+        cx,
         SYSTEM_PROMPT,
         config.baseUrl,
       );
@@ -373,8 +373,8 @@ export async function callOpenAI(
       : `${rawBase.replace(/\/+$/, '')}/chat/completions`
     : 'https://api.openai.com/v1/chat/completions';
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const ct = new AbortController();
+  const timeout = setTimeout(() => ct.abort(), REQUEST_TIMEOUT_MS);
 
   try {
     const response = await fetch(endpoint, {
@@ -384,7 +384,7 @@ export async function callOpenAI(
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
-      signal: controller.signal,
+      signal: ct.signal,
     });
 
     if (!response.ok) {
@@ -492,8 +492,8 @@ export async function callAnthropic(
       : `${rawBase.replace(/\/+$/, '')}/messages`
     : 'https://api.anthropic.com/v1/messages';
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const ct = new AbortController();
+  const timeout = setTimeout(() => ct.abort(), REQUEST_TIMEOUT_MS);
 
   try {
     const response = await fetch(endpoint, {
@@ -504,7 +504,7 @@ export async function callAnthropic(
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify(body),
-      signal: controller.signal,
+      signal: ct.signal,
     });
 
     if (!response.ok) {
@@ -602,8 +602,8 @@ export async function callGemini(
     },
   };
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const ct = new AbortController();
+  const timeout = setTimeout(() => ct.abort(), REQUEST_TIMEOUT_MS);
 
   try {
     const response = await fetch(endpoint, {
@@ -612,7 +612,7 @@ export async function callGemini(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
-      signal: controller.signal,
+      signal: ct.signal,
     });
 
     if (!response.ok) {

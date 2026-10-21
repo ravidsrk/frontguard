@@ -39,6 +39,9 @@ import {
   inspectDiffClusterDom,
   inspectDiffClusterDomInputSchema,
   inspectDiffClusterDomOutputSchema,
+  listHorizontalOverflow,
+  listHorizontalOverflowInputSchema,
+  listHorizontalOverflowOutputSchema,
   listRegressions,
   listRegressionsInputSchema,
   listRegressionsOutputSchema,
@@ -57,7 +60,7 @@ const SERVER_NAME = '@frontguard/mcp';
 const SERVER_VERSION = '0.2.3';
 
 const READ_INSTRUCTIONS =
-  'Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, and `recent_runs` to browse history.';
+  'Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, `recent_runs` to browse history, and `list_horizontal_overflow` to list visible unclipped boxes past the right edge. Horizontal overflow does not change the pixel result.';
 
 /** Instructions match the tools this process actually registers. */
 export function serverInstructions(env: NodeJS.ProcessEnv = process.env): string {
@@ -155,6 +158,18 @@ export function createServer(): McpServer {
       outputSchema: listRegressionsOutputSchema,
     },
     async (args) => withCloudClient(async (client) => listRegressions(client, args)),
+  );
+
+  server.registerTool(
+    'list_horizontal_overflow',
+    {
+      ...readOnlyAnnotations('List horizontal overflow'),
+      description:
+        'List horizontal overflow from a run. A flagged row is a visible unclipped box past the right edge, with selector and pixels. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code.',
+      inputSchema: listHorizontalOverflowInputSchema,
+      outputSchema: listHorizontalOverflowOutputSchema,
+    },
+    async (args) => withCloudClient(async (client) => listHorizontalOverflow(client, args)),
   );
 
   server.registerTool(

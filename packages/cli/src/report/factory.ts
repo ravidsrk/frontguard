@@ -5,14 +5,14 @@ import { GitHubPRReporter } from './github-pr.js';
 import { JSONReporter } from './json.js';
 
 export function createReporter(format: string): Reporter {
-  let reporter: Reporter;
+  let rp: Reporter;
   switch (format) {
     case 'json':
-      reporter = new JSONReporter();
+      rp = new JSONReporter();
       break;
     case 'console':
     default:
-      reporter = new ConsoleReporter();
+      rp = new ConsoleReporter();
       break;
   }
 
@@ -25,8 +25,8 @@ export function createReporter(format: string): Reporter {
     process.env.GITHUB_REPOSITORY &&
     isPullRequest
   ) {
-    return new CompositeReporter([reporter, new GitHubPRReporter()]);
+    return new CompositeReporter([rp, new GitHubPRReporter()]);
   }
 
-  return reporter;
+  return rp;
 }

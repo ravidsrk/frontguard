@@ -127,8 +127,8 @@ Everything below ships in the published local-and-CI packages (`@frontguard/cli`
 - ✅ `visualTest()` and `expectVisual()` assertions with `__visual_baselines__/` storage, SSIM calculation, connected-component cluster extraction, DOM selector attribution, `mask` / `maskRegions`, `redactSensitive`, `freezeTime`, `seedRandom`, `blockUrls` and `waitForStable`. Optional `captureAriaSnapshot` and `textSnapshot` store a text file next to the PNG and diff it as text. A mismatch is reported on its own. It does not change `passed`, and axe-core remains the accessibility plugin ([#299](https://github.com/ravidsrk/frontguard/issues/299)).
 
 ### Agentic MCP Server (`@frontguard/mcp`)
-- ✅ A stdio JSON-RPC 2.0 server, built on `@modelcontextprotocol/sdk` `^1.32.1`, exposing seven tools with `outputSchema` and `structuredContent`:
-  - read tools: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch` (static, with a CSS policy) and `recent_runs`;
+- ✅ A stdio JSON-RPC 2.0 server, built on `@modelcontextprotocol/sdk` `^1.32.1`, exposing eight tools with `outputSchema` and `structuredContent`:
+  - read tools: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch` (static, with a CSS policy), `recent_runs`, and `list_horizontal_overflow` (report only; not an exit-code input);
   - write tools: `promote_baseline` (requires `confirm_reviewed: true` and refuses unconfirmed local-report orphan-branch overwrites) and `accept_baseline`.
 
   It works in both zero-cloud local `report.json` mode and Cloud API mode.
@@ -241,7 +241,7 @@ All actionable post-launch engineering work is tracked under parent issue [#283]
 24. **[#299](https://github.com/ravidsrk/frontguard/issues/299) — Add optional ARIA and non-image text snapshots that do not gate pixels.** Optional `captureAriaSnapshot` and `textSnapshot.json` / `textSnapshot.markdown` store a text file next to the PNG and diff it as text. A mismatch is reported on its own. It does not change `comparisonMethod` from pixelmatch and does not pass a pixel regression. axe-core remains the accessibility plugin. Text diff is not a gate.
 25. **[#308](https://github.com/ravidsrk/frontguard/issues/308) — Report horizontal viewport overflow without gating.**
     - `scrollWidth` vs `innerWidth`, plus visible unclipped elements past the right edge, taken from the same settled state as the screenshot.
-    - Never an exit-code input.
+    - Never an exit-code input. The HTML report, JSON output, and `list_horizontal_overflow` show it. Precision for `validation/fixtures/overflow` is in [`validation/results-overflow.md`](../validation/results-overflow.md). The advisory judge has no Frontguard accuracy on that set ([`docs/judge-protocol.md`](./judge-protocol.md)).
 26. **[#309](https://github.com/ravidsrk/frontguard/issues/309) — Add named capture modes with mode-keyed baselines (bet).**
     - Named bundles (`colorScheme`, `reducedMotion`, `forcedColors`, `contrast`, `locale`, `timezoneId`).
     - Emulation probed before each capture, and a projected capture count.

@@ -569,6 +569,11 @@ export interface ScreenshotResult {
   };
   /** Visible DOM element bounding boxes and computed styles extracted from the page. */
   domElements?: DOMElementBox[];
+  /**
+   * Horizontal overflow measured on this page immediately after the screenshot.
+   * Absent when the page could not be evaluated. Not a pixel result.
+   */
+  horizontalOverflow?: HorizontalOverflowMeasure;
   /** Number of network requests aborted via `blockUrls` rules during capture. */
   blockedRequestsCount?: number;
 }
@@ -837,6 +842,35 @@ export interface PerfReport {
   }>;
 }
 
+/** One visible element whose border box passes the viewport's right edge. */
+export interface HorizontalOverflowElement {
+  selector: string;
+  /** Pixels by which the border box passes `innerWidth`. */
+  overflowPx: number;
+}
+
+/**
+ * Page measurement taken in the screenshot's document.
+ * `scrollWidth > innerWidth` is recorded even when nothing is flagged.
+ */
+export interface HorizontalOverflowMeasure {
+  innerWidth: number;
+  scrollWidth: number;
+  elements: HorizontalOverflowElement[];
+}
+
+/**
+ * One route's horizontal overflow. `flagged` is true only when `elements`
+ * is non-empty. Reporters and the exit code must not treat an unflagged
+ * row, or any row, as a pixel failure.
+ */
+export interface HorizontalOverflowReport extends HorizontalOverflowMeasure {
+  route: string;
+  viewport: number;
+  browser: BrowserEngine;
+  flagged: boolean;
+}
+
 export interface TextSnapshotReport {
   route: string;
   viewport: number;
@@ -893,6 +927,12 @@ export interface RunResult {
    * axe-core remains the accessibility plugin.
    */
   textSnapshots?: TextSnapshotReport[];
+  /**
+   * Horizontal overflow from the capture page. A flagged row lists visible
+   * unclipped boxes past the right edge. It does not change pixel status
+   * or the exit code.
+   */
+  horizontalOverflow?: HorizontalOverflowReport[];
   /** Performance budget results, if the perf-budgets plugin ran. */
   perf?: PerfReport[];
   /** Third-party script inventory changes, if the third-party-scripts plugin ran. */

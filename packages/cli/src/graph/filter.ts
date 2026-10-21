@@ -119,7 +119,7 @@ export async function smartFilter(
   }
 
   // Step 1: Detect changed files, including deletions
-  let changedFiles: string[];
+  let cf: string[];
   let removedFiles: string[];
   try {
     const changed = getChangedPaths(process.cwd());
@@ -127,7 +127,7 @@ export async function smartFilter(
       logger.warn(changed.pinnedDiffError);
       return includeAll(routes, changed.pinnedDiffError);
     }
-    changedFiles = changed.present;
+    cf = changed.present;
     removedFiles = changed.removed;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -135,16 +135,16 @@ export async function smartFilter(
     return includeAll(routes, `could not detect changed files: ${msg}`);
   }
 
-  if (changedFiles.length === 0 && removedFiles.length === 0) {
+  if (cf.length === 0 && removedFiles.length === 0) {
     return includeAll(routes, 'no changes detected');
   }
 
-  logger.debug(`Changed files (${changedFiles.length}):`);
-  for (const f of changedFiles.slice(0, 10)) {
+  logger.debug(`Changed files (${cf.length}):`);
+  for (const f of cf.slice(0, 10)) {
     logger.debug(`  ${f}`);
   }
-  if (changedFiles.length > 10) {
-    logger.debug(`  ... and ${changedFiles.length - 10} more`);
+  if (cf.length > 10) {
+    logger.debug(`  ... and ${cf.length - 10} more`);
   }
 
   // Step 2: Map routes to their source files
@@ -180,7 +180,7 @@ export async function smartFilter(
   }
 
   const gap = incompleteAnalysisReason({
-    changedFiles,
+    changedFiles: cf,
     removedFiles,
     graph,
     entryFiles: allEntryFiles,
@@ -194,7 +194,7 @@ export async function smartFilter(
   // Step 4: Filter affected routes
   let affected: Route[];
   try {
-    affected = filterAffectedRoutes(routes, changedFiles, graph, routeFileMap);
+    affected = filterAffectedRoutes(routes, cf, graph, routeFileMap);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.warn(`Route filtering failed: ${msg}`);
@@ -208,14 +208,14 @@ export async function smartFilter(
   // Determine reason
   let reason: string;
   if (affected.length === routes.length) {
-    reason = `all ${routes.length} routes affected by ${changedFiles.length} changed file(s)`;
+    reason = `all ${routes.length} routes affected by ${cf.length} changed file(s)`;
   } else if (affected.length === 0) {
     // This shouldn't happen (routes with no mapping are always included),
     // but handle it gracefully — never miss a regression
     logger.warn('Smart filter produced 0 affected routes — falling back to all');
     return includeAll(routes, 'smart filter returned empty — rendering all as safety fallback');
   } else {
-    reason = `${affected.length}/${routes.length} routes affected by ${changedFiles.length} changed file(s)`;
+    reason = `${affected.length}/${routes.length} routes affected by ${cf.length} changed file(s)`;
   }
 
   logger.info(`Dependency graph: ${reason}`);

@@ -215,13 +215,13 @@ function safeReaddir(dir: string): string[] {
  * @param config - Optional config passed to factory functions.
  */
 export function extractPlugin(mod: unknown, config?: unknown): FrontguardPlugin {
-  const candidates: unknown[] = [];
+  const ks: unknown[] = [];
   const m = mod as Record<string, unknown>;
   if (m) {
-    candidates.push(m.default, m.plugin, m.createPlugin, m);
+    ks.push(m.default, m.plugin, m.createPlugin, m);
   }
 
-  for (const candidate of candidates) {
+  for (const candidate of ks) {
     if (!candidate) continue;
     if (typeof candidate === 'function') {
       const result = (candidate as (cfg?: unknown) => unknown)(config);

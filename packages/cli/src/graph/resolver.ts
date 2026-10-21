@@ -73,7 +73,7 @@ const GLOBAL_IMPACT_PATTERNS = [
 ];
 
 /** File extensions for route entry points across frameworks. */
-const PAGE_EXTENSIONS = ['.tsx', '.jsx', '.ts', '.js', '.vue', '.svelte'];
+const px = ['.tsx', '.jsx', '.ts', '.js', '.vue', '.svelte'];
 
 // ---------------------------------------------------------------------------
 // Framework Detection
@@ -138,7 +138,7 @@ function detectFramework(proj: string): FrameworkType[] {
  * Converts a route path to potential file system paths for different frameworks.
  */
 function getRouteCandidates(rpath: string, proj: string): string[] {
-  const candidates: string[] = [];
+  const ks: string[] = [];
   const norm = rpath === '/' ? '' : rpath.replace(/^\//, '');
   const frameworks = detectFramework(proj);
 
@@ -154,15 +154,15 @@ function getRouteCandidates(rpath: string, proj: string): string[] {
           if (!existsSync(appDir)) continue;
           const routeDir = norm ? join(appDir, norm) : appDir;
 
-          for (const ext of PAGE_EXTENSIONS) {
-            candidates.push(join(routeDir, `page${ext}`));
+          for (const ext of px) {
+            ks.push(join(routeDir, `page${ext}`));
           }
-          for (const ext of PAGE_EXTENSIONS) {
-            candidates.push(join(routeDir, `layout${ext}`));
+          for (const ext of px) {
+            ks.push(join(routeDir, `layout${ext}`));
           }
           // Root layout affects all routes
-          for (const ext of PAGE_EXTENSIONS) {
-            candidates.push(join(appDir, `layout${ext}`));
+          for (const ext of px) {
+            ks.push(join(appDir, `layout${ext}`));
           }
         }
         break;
@@ -178,21 +178,21 @@ function getRouteCandidates(rpath: string, proj: string): string[] {
           if (!existsSync(pagesDir)) continue;
 
           if (norm === '') {
-            for (const ext of PAGE_EXTENSIONS) {
-              candidates.push(join(pagesDir, `index${ext}`));
+            for (const ext of px) {
+              ks.push(join(pagesDir, `index${ext}`));
             }
           } else {
-            for (const ext of PAGE_EXTENSIONS) {
-              candidates.push(join(pagesDir, `${norm}${ext}`));
+            for (const ext of px) {
+              ks.push(join(pagesDir, `${norm}${ext}`));
             }
-            for (const ext of PAGE_EXTENSIONS) {
-              candidates.push(join(pagesDir, norm, `index${ext}`));
+            for (const ext of px) {
+              ks.push(join(pagesDir, norm, `index${ext}`));
             }
           }
           // _app and _document affect all routes
-          for (const ext of PAGE_EXTENSIONS) {
-            candidates.push(join(pagesDir, `_app${ext}`));
-            candidates.push(join(pagesDir, `_document${ext}`));
+          for (const ext of px) {
+            ks.push(join(pagesDir, `_app${ext}`));
+            ks.push(join(pagesDir, `_document${ext}`));
           }
         }
         break;
@@ -203,21 +203,21 @@ function getRouteCandidates(rpath: string, proj: string): string[] {
         if (!existsSync(routesDir)) break;
 
         if (norm === '') {
-          for (const ext of PAGE_EXTENSIONS) {
-            candidates.push(join(routesDir, `_index${ext}`));
+          for (const ext of px) {
+            ks.push(join(routesDir, `_index${ext}`));
           }
         } else {
           // Remix flat routes: /checkout/summary → checkout.summary
           const flatRoute = norm.replace(/\//g, '.');
-          for (const ext of PAGE_EXTENSIONS) {
-            candidates.push(join(routesDir, `${flatRoute}${ext}`));
-            candidates.push(join(routesDir, `${flatRoute}._index${ext}`));
-            candidates.push(join(routesDir, `${norm}${ext}`));
+          for (const ext of px) {
+            ks.push(join(routesDir, `${flatRoute}${ext}`));
+            ks.push(join(routesDir, `${flatRoute}._index${ext}`));
+            ks.push(join(routesDir, `${norm}${ext}`));
           }
         }
         // Root layout
-        for (const ext of PAGE_EXTENSIONS) {
-          candidates.push(join(proj, 'app', `root${ext}`));
+        for (const ext of px) {
+          ks.push(join(proj, 'app', `root${ext}`));
         }
         break;
       }
@@ -227,14 +227,14 @@ function getRouteCandidates(rpath: string, proj: string): string[] {
         if (!existsSync(routesDir)) break;
         const routeDir = norm ? join(routesDir, norm) : routesDir;
 
-        candidates.push(join(routeDir, '+page.svelte'));
-        candidates.push(join(routeDir, '+page.ts'));
-        candidates.push(join(routeDir, '+page.js'));
-        candidates.push(join(routeDir, '+page.server.ts'));
-        candidates.push(join(routeDir, '+page.server.js'));
-        candidates.push(join(routeDir, '+layout.svelte'));
+        ks.push(join(routeDir, '+page.svelte'));
+        ks.push(join(routeDir, '+page.ts'));
+        ks.push(join(routeDir, '+page.js'));
+        ks.push(join(routeDir, '+page.server.ts'));
+        ks.push(join(routeDir, '+page.server.js'));
+        ks.push(join(routeDir, '+layout.svelte'));
         // Root layout
-        candidates.push(join(routesDir, '+layout.svelte'));
+        ks.push(join(routesDir, '+layout.svelte'));
         break;
       }
 
@@ -243,18 +243,18 @@ function getRouteCandidates(rpath: string, proj: string): string[] {
         if (!existsSync(pagesDir)) break;
 
         if (norm === '') {
-          candidates.push(join(pagesDir, 'index.vue'));
+          ks.push(join(pagesDir, 'index.vue'));
         } else {
-          candidates.push(join(pagesDir, `${norm}.vue`));
-          candidates.push(join(pagesDir, norm, 'index.vue'));
+          ks.push(join(pagesDir, `${norm}.vue`));
+          ks.push(join(pagesDir, norm, 'index.vue'));
         }
 
         // Layouts
         const layoutsDir = join(proj, 'layouts');
         if (existsSync(layoutsDir)) {
-          candidates.push(join(layoutsDir, 'default.vue'));
+          ks.push(join(layoutsDir, 'default.vue'));
         }
-        candidates.push(join(proj, 'app.vue'));
+        ks.push(join(proj, 'app.vue'));
         break;
       }
 
@@ -271,15 +271,15 @@ function getRouteCandidates(rpath: string, proj: string): string[] {
         for (const dir of dirs) {
           if (!existsSync(dir)) continue;
           if (norm === '') {
-            for (const ext of PAGE_EXTENSIONS) {
-              candidates.push(join(dir, `index${ext}`));
+            for (const ext of px) {
+              ks.push(join(dir, `index${ext}`));
             }
           } else {
-            for (const ext of PAGE_EXTENSIONS) {
-              candidates.push(join(dir, `${norm}${ext}`));
+            for (const ext of px) {
+              ks.push(join(dir, `${norm}${ext}`));
             }
-            for (const ext of PAGE_EXTENSIONS) {
-              candidates.push(join(dir, norm, `index${ext}`));
+            for (const ext of px) {
+              ks.push(join(dir, norm, `index${ext}`));
             }
           }
         }
@@ -288,7 +288,7 @@ function getRouteCandidates(rpath: string, proj: string): string[] {
     }
   }
 
-  return candidates;
+  return ks;
 }
 
 /**
@@ -313,8 +313,8 @@ export function mapRoutesToFiles(
   logger.debug(`Detected framework(s): ${frameworks.join(', ')}`);
 
   for (const route of routes) {
-    const candidates = getRouteCandidates(route.path, proj);
-    const existing = candidates.filter((c) => existsSync(c));
+    const ks = getRouteCandidates(route.path, proj);
+    const existing = ks.filter((c) => existsSync(c));
     const unique = [...new Set(existing)];
 
     routeFileMap.set(route.path, unique);

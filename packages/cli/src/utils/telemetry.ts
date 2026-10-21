@@ -121,13 +121,13 @@ export async function sendTelemetry(
   };
 
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+    const ct = new AbortController();
+    const timer = setTimeout(() => ct.abort(), SEND_TIMEOUT_MS);
     await doFetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: controller.signal,
+      signal: ct.signal,
     }).catch(() => {
       /* network errors are ignored — telemetry must never break the CLI */
     });

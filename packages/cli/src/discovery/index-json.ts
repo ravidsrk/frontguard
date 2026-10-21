@@ -15,10 +15,10 @@ export function normalizeBase(url: string): string {
 export { joinStoryUrl } from './story-url.js';
 
 export async function fetchJson(url: string, timeoutMs: number, label: string): Promise<unknown | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const ct = new AbortController();
+  const timer = setTimeout(() => ct.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, { signal: ct.signal });
     if (!res.ok) {
       logger.debug(`${label} index fetch ${url} → ${res.status}`);
       return null;

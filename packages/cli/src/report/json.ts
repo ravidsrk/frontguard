@@ -98,6 +98,7 @@ interface SerializedRunResult {
   judgements?: RunResult['judgements'];
   accessibility?: RunResult['accessibility'];
   textSnapshots?: RunResult['textSnapshots'];
+  horizontalOverflow?: RunResult['horizontalOverflow'];
   perf?: RunResult['perf'];
   thirdPartyScripts?: RunResult['thirdPartyScripts'];
   config: {
@@ -124,6 +125,7 @@ function serializeRunResult(result: RunResult): SerializedRunResult {
     judgements: result.judgements,
     accessibility: result.accessibility,
     textSnapshots: result.textSnapshots,
+    ...(result.horizontalOverflow ? { horizontalOverflow: result.horizontalOverflow } : {}),
     perf: result.perf,
     thirdPartyScripts: result.thirdPartyScripts,
     config: {

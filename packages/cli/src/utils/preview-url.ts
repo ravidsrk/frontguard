@@ -154,12 +154,12 @@ export async function waitForUrl(
   url: string,
   options: WaitForUrlOptions = {},
 ): Promise<boolean> {
-  const maxAttempts = options.maxAttempts ?? 10;
+  const ma = options.maxAttempts ?? 10;
   const intervalMs = options.intervalMs ?? 15_000;
 
-  logger.info(`Waiting for ${url} to be ready (max ${maxAttempts} attempts, ${intervalMs / 1000}s interval)…`);
+  logger.info(`Waiting for ${url} to be ready (max ${ma} attempts, ${intervalMs / 1000}s interval)…`);
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  for (let attempt = 1; attempt <= ma; attempt++) {
     try {
       const response = await fetch(url, {
         method: 'HEAD',
@@ -167,22 +167,22 @@ export async function waitForUrl(
       });
 
       if (response.status >= 200 && response.status < 400) {
-        logger.info(`✓ URL is ready (HTTP ${response.status}) after attempt ${attempt}/${maxAttempts}`);
+        logger.info(`✓ URL is ready (HTTP ${response.status}) after attempt ${attempt}/${ma}`);
         return true;
       }
 
-      logger.debug(`Attempt ${attempt}/${maxAttempts}: HTTP ${response.status} — not ready yet`);
+      logger.debug(`Attempt ${attempt}/${ma}: HTTP ${response.status} — not ready yet`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      logger.debug(`Attempt ${attempt}/${maxAttempts}: ${msg}`);
+      logger.debug(`Attempt ${attempt}/${ma}: ${msg}`);
     }
 
-    if (attempt < maxAttempts) {
-      logger.info(`Waiting for deployment… attempt ${attempt}/${maxAttempts}`);
+    if (attempt < ma) {
+      logger.info(`Waiting for deployment… attempt ${attempt}/${ma}`);
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
   }
 
-  logger.warn(`URL ${url} did not respond after ${maxAttempts} attempts`);
+  logger.warn(`URL ${url} did not respond after ${ma} attempts`);
   return false;
 }

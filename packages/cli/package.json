@@ -20,7 +20,7 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && cp src/render/overflow-probe.js dist/overflow-probe.js",
     "dev": "tsup --watch",
     "test": "vitest run --pool=forks --exclude='test/e2e/**'",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",

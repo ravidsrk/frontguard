@@ -93,11 +93,11 @@ export function compareScreenshot(
   }
 
   // --- Decode PNGs -----------------------------------------------------------
-  let currentPng: PNG;
-  let baselinePng: PNG;
+  let cp: PNG;
+  let bp: PNG;
 
   try {
-    currentPng = PNG.sync.read(current.buffer);
+    cp = PNG.sync.read(current.buffer);
   } catch (err) {
     return errorResult(
       current,
@@ -106,7 +106,7 @@ export function compareScreenshot(
   }
 
   try {
-    baselinePng = PNG.sync.read(baseline);
+    bp = PNG.sync.read(baseline);
   } catch (err) {
     return errorResult(
       current,
@@ -119,22 +119,22 @@ export function compareScreenshot(
   let noteMsg: string | undefined;
 
   if (
-    currentPng.width !== baselinePng.width ||
-    currentPng.height !== baselinePng.height
+    cp.width !== bp.width ||
+    cp.height !== bp.height
   ) {
     noteMsg =
-      `Dimension mismatch: current=${currentPng.width}×${currentPng.height}, ` +
-      `baseline=${baselinePng.width}×${baselinePng.height}. ` +
+      `Dimension mismatch: current=${cp.width}×${cp.height}, ` +
+      `baseline=${bp.width}×${bp.height}. ` +
       `Images were padded to the larger dimensions for comparison.`;
-    const maxWidth = Math.max(currentPng.width, baselinePng.width);
-    const maxHeight = Math.max(currentPng.height, baselinePng.height);
+    const maxWidth = Math.max(cp.width, bp.width);
+    const maxHeight = Math.max(cp.height, bp.height);
 
-    currentPng = padToSize(currentPng, maxWidth, maxHeight);
-    baselinePng = padToSize(baselinePng, maxWidth, maxHeight);
+    cp = padToSize(cp, maxWidth, maxHeight);
+    bp = padToSize(bp, maxWidth, maxHeight);
   }
 
   // --- Run pixelmatch --------------------------------------------------------
-  const { width, height } = currentPng;
+  const { width, height } = cp;
   const totalPixels = width * height;
   const diffPng = new PNG({ width, height });
 
@@ -142,8 +142,8 @@ export function compareScreenshot(
   let wmax = 0;
   try {
     numDiffPixels = pixelmatch(
-      baselinePng.data,
-      currentPng.data,
+      bp.data,
+      cp.data,
       diffPng.data,
       width,
       height,
@@ -153,7 +153,7 @@ export function compareScreenshot(
     // stays on numDiffPixels from the call above. 16 and 64 are the fixtures'
     // split: a compact text edit is over 64, scattered speckle is under it.
     if (numDiffPixels > 0) {
-      wmax = pixelmatch(baselinePng.data, currentPng.data, null, width, height, {
+      wmax = pixelmatch(bp.data, cp.data, null, width, height, {
         ...PIXELMATCH_OPTIONS,
         windowSize: 16,
       });
@@ -224,7 +224,7 @@ export function compareScreenshot(
     if (ssimEnabled) {
       for (const cluster of clusters) {
         if (cluster.bbox.width * cluster.bbox.height <= 65536) {
-          const metrics = computeRegionSimilarity(baselinePng, currentPng, cluster.bbox);
+          const metrics = computeRegionSimilarity(bp, cp, cluster.bbox);
           cluster.chromaSSIM = metrics.chromaSSIM;
           cluster.cwSSIM = metrics.cwSSIM;
         }

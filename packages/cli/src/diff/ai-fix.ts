@@ -201,7 +201,7 @@ export async function generateFix(
     const capped = options.gitDiff.slice(0, 4000);
     contextLines.push(`\nGit diff that caused this change:\n${capped}`);
   }
-  const contextText = contextLines.join('\n');
+  const cx = contextLines.join('\n');
 
   logger.debug(`Generating fix for ${diff.route.path} @ ${diff.viewport}px with ${config.provider}`);
 
@@ -214,7 +214,7 @@ export async function generateFix(
           baselineB64,
           currentB64,
           diffB64,
-          contextText,
+          cx,
           FIX_SYSTEM_PROMPT,
           config.baseUrl,
         );
@@ -225,7 +225,7 @@ export async function generateFix(
           { data: currentB64, label: 'current' },
         ];
         if (diffB64) images.push({ data: diffB64, label: 'diff' });
-        const userText = `Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.\n\nContext:\n${contextText}`;
+        const userText = `Analyze these screenshots. Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.\n\nContext:\n${cx}`;
         return callGemini(apiKey, model, images, userText, config.baseUrl, FIX_SYSTEM_PROMPT);
       }
       return callAnthropic(
@@ -234,7 +234,7 @@ export async function generateFix(
         baselineB64,
         currentB64,
         diffB64,
-        contextText,
+        cx,
         FIX_SYSTEM_PROMPT,
         config.baseUrl,
       );

@@ -1,0 +1,14 @@
+{
+  "width": 800,
+  "height": 600,
+  "cases": [
+    { "file": "real.html", "flag": true, "selector": "[data-testid=\"wide\"]", "scrolls": true },
+    { "file": "body-axis.html", "flag": true, "selector": "[data-testid=\"axis\"]", "scrolls": true },
+    { "file": "clipped.html", "flag": false, "selector": "[data-testid=\"clipped\"]", "scrolls": false },
+    { "file": "clip.html", "flag": false, "selector": "[data-testid=\"clip\"]", "scrolls": false },
+    { "file": "ghost.html", "flag": false, "selector": "[data-testid=\"ghost\"]", "scrolls": true },
+    { "file": "faded.html", "flag": false, "selector": "[data-testid=\"faded\"]", "scrolls": true },
+    { "file": "inside.html", "flag": false, "selector": "[data-testid=\"inside\"]", "scrolls": false },
+    { "file": "fit.html", "flag": false, "selector": "[data-testid=\"fit\"]", "scrolls": false }
+  ]
+}
