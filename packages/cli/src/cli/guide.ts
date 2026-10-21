@@ -83,7 +83,7 @@ export default defineConfig({
 ## 2. Managing Baselines (\`frontguard-baselines\`)
 - Capture or update baselines:
   \`\`\`bash
-  npx @frontguard/cli update-baselines
+  npx @frontguard/cli update-baselines --confirm-baselines
   \`\`\`
 - Baselines are committed in a single batched worktree transaction to the \`frontguard-baselines\` Git orphan branch alongside \`manifest.json\` (which records SHA-256 digests and \`snapshots\` per viewport/browser). Byte-identical PNG blobs are skipped during writes to deduplicate Git object storage, and your working tree stays 100% free of binary PNG clutter.`,
   },
@@ -91,7 +91,7 @@ export default defineConfig({
     id: 'mcp',
     title: 'MCP Visual Cortex for Coding Agents',
     summary:
-      'Connect @frontguard/mcp to Claude Code, Cursor, Codex, or Antigravity and use the 7 Visual Cortex tools to inspect, fix, verify, and promote baselines.',
+      'Connect @frontguard/mcp to Claude Code, Cursor, Codex, or Antigravity and use the read tools to inspect, fix, and verify. Baseline writes stay with a human.',
     content: `# MCP Visual Cortex (\`@frontguard/mcp\`)
 
 ## 1. Register the MCP Server
@@ -115,9 +115,8 @@ Works against local CLI reports (\`./frontguard-report/report.json\` or \`FRONTG
 2. \`inspect_diff_cluster_dom\`: Inspect spatial \`DiffCluster\` bounding boxes, target CSS selectors, AI classification, and localized similarity metrics for a \`diff_id\`.
 3. \`get_suggested_fix\`: Retrieve the candidate CSS/HTML patch, confidence score, and verification status for a \`diff_id\`.
 4. \`verify_css_patch\`: Validate a candidate CSS patch against the target selector (checking balanced braces, selector alignment, and guarding against layout-destroying rules like \`display: none !important\` or external \`@import\`).
-5. \`promote_baseline\`: Promote reviewed baselines for a run (or specific subset of routes) with explicit \`confirm_reviewed: true\` safety gating.
-6. \`accept_baseline\`: Approve all baselines for a run ID.
-7. \`recent_runs\`: List recent visual test runs and their pass/regression counts.`,
+5. \`promote_baseline\` and \`accept_baseline\` are not part of the agent workflow. They are unregistered unless \`FRONTGUARD_MCP_WRITES=1\`. \`confirm_reviewed: true\` is UX only — an agent setting it is not a human review. Local-report mode refuses promotion. A human writes baselines with \`frontguard update-baselines --confirm-baselines\`. Cloud \`approveRun\` is not a production path.
+6. \`recent_runs\`: List recent visual test runs and their pass/regression counts.`,
   },
   {
     id: 'playwright',

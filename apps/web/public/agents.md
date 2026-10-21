@@ -27,7 +27,7 @@ Agents have two public integration paths (plus offline CLI reference via `frontg
 | `inspect_diff_cluster_dom` | `GET /v1/runs/:id` or local report            | Inspect connected-component diff clusters, Chroma/CW-SSIM scores, and intersecting DOM nodes for a `diffId`. |
 | `get_suggested_fix`        | `GET /v1/runs/:id` or local report            | Load the run behind a `diffId` and return the stored AI fix for that route, viewport, and browser.           |
 | `verify_css_patch`         | `GET /v1/runs/:id` or local report            | Validate a candidate CSS patch and target selector against the diff cluster's captured DOM snapshot.         |
-| `promote_baseline`         | Local baseline store (`frontguard-baselines`) | Promote a verified local screenshot into the local baseline store.                                           |
+| `promote_baseline`         | Local baseline store (`frontguard-baselines`) | Not registered unless `FRONTGUARD_MCP_WRITES=1`. Local-report mode refuses promotion and does not write baselines. |
 | `accept_baseline`          | `POST /v1/baselines/:runId/approve`           | Record run approval; screenshot promotion is not implemented yet.                                            |
 
 Useful REST routes for agent workflows:
@@ -50,7 +50,7 @@ For "on PR N, what regressed and how do we fix it?":
 1. Call `list_regressions` with `pr_id: N` and, when needed, `repo: "owner/name"` (or run `frontguard guide --json` for local CLI workflow reference, including deterministic render flags `--freeze-time`, `--seed-random`, `--block-urls`, `--wait-for-stability`, `--redact-sensitive`, and multi-provider BYOK via `openai`, `anthropic`, `gemini`, or a custom OpenAI-compatible `baseUrl`).
 2. For each returned `diffId`, call `inspect_diff_cluster_dom` and `get_suggested_fix`, then validate candidate CSS patches with `verify_css_patch`.
 3. Review the route, viewport, browser, classification, report URL, and suggested patch before editing code.
-4. For local runs, use `promote_baseline` or `frontguard update-baselines` after human review. Do not use `accept_baseline` to update production baselines until screenshot promotion is implemented; use the CLI or composite Action baseline workflow instead.
+4. Stop after the evidence above. Do not call `promote_baseline` or `accept_baseline`, and do not run an unconfirmed baseline write. A human reviews the report and runs `frontguard update-baselines --confirm-baselines`. `confirm_reviewed: true` is UX only and is not that review. Cloud `approveRun` is not a production path.
 
 ## Machine-readable companions
 

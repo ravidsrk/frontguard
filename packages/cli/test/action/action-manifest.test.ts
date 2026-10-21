@@ -387,7 +387,8 @@ describe('OPS-4: all GITHUB_OUTPUT writes use random-delimiter heredoc form', ()
     it(`${label}: keeps stderr out of the JSON capture file`, () => {
       const source = `${readAction(path)}\n${readAction(cliActionRunner)}`;
       expect(source).not.toMatch(/frontguard-result\.json 2>&1/);
-      expect(source).toContain('2>/tmp/frontguard-stderr.log');
+      expect(source).toContain('STDERR_LOG="/tmp/frontguard-stderr.log.$$"');
+      expect(source).toContain('2>"$STDERR_LOG"');
     });
 
     it(`${label}: surfaces run failures instead of silently passing`, () => {

@@ -119,7 +119,21 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
 
 Every tool returns JSON in the MCP `text` content channel; agents parse it directly.
 
-Tool `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `openWorldHint`) are untrusted hints and do not enforce anything. An untrusted server can lie. `promote_baseline` and `accept_baseline` also set `_meta["anthropic/requiresUserInteraction"]` so Claude Code prompts a person; that flag is a hint too. The control is [#287](https://github.com/ravidsrk/frontguard/issues/287): baseline writes stay off the agent's default path.
+Tool `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `openWorldHint`) are untrusted hints and do not enforce anything. An untrusted server can lie. When writes are enabled, `promote_baseline` and `accept_baseline` also set `_meta["anthropic/requiresUserInteraction"]` so Claude Code prompts a person; that flag is a hint too. The control is [#287](https://github.com/ravidsrk/frontguard/issues/287).
+
+## Baseline writes stay with a human
+
+The default server is read-only. `promote_baseline` and `accept_baseline` are not registered unless `FRONTGUARD_MCP_WRITES=1`. Reads (`list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `recent_runs`) work without that variable. When writes are enabled, those two tools keep the destructive annotations and the `requiresUserInteraction` flag above. Annotations still do not enforce anything.
+
+MCP promotion is refused in local-report mode. It does not write the `frontguard-baselines` branch. The local write is the CLI, and only with an explicit human flag:
+
+```bash
+npx -p @frontguard/cli frontguard update-baselines --confirm-baselines
+```
+
+`run --update-baselines` needs the same `--confirm-baselines` flag. Without it the CLI exits 2 and writes nothing. `--mode judge` cannot supply the flag, even if `--confirm-baselines` is also present, and an advisory caption cannot set it. `confirm_reviewed: true` is UX only. An agent setting `confirm_reviewed: true` on itself is not a human review.
+
+Cloud `approveRun` records approval metadata. It is not a production path. Do not point `FRONTGUARD_API_URL` at a production host. There is no hosted default.
 
 ## Example agent prompts
 
@@ -181,7 +195,7 @@ EOF
 cd /tmp/mcp-test && cat init.jsonl | node /path/to/frontguard/packages/mcp/dist/index.js
 ```
 
-Stdout should contain JSON-RPC `result` frames (including all 7 tools). Stderr
+Stdout should contain JSON-RPC `result` frames (the five read-only tools; `promote_baseline` and `accept_baseline` only when `FRONTGUARD_MCP_WRITES=1`). Stderr
 should show `frontguard-mcp v… starting on stdio`. Published `npx -y
 @frontguard/mcp@0.2.0` is the known before-state (empty stdout); verify against
 your local `dist/index.js` build instead.

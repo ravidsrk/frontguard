@@ -25,6 +25,7 @@ import { runInit } from './init.js';
 import { GUIDE_TOPICS, getGuideTopic, formatGuideIndex } from './guide.js';
 import { maybeRunInDocker } from './run.js';
 import { comparisonExitCode } from './exit-code.js';
+import { baselineWriteBlockReason } from './baseline-confirm.js';
 import { parseThresholdRatio } from './threshold.js';
 import { compareDiffToThreshold } from '../diff/threshold.js';
 import { sendTelemetry, isTelemetryEnabled, type TelemetryEvent } from '../utils/telemetry.js';
@@ -300,6 +301,10 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--verbose', 'Verbose output')
     .option('--debug', 'Debug output (includes Playwright traces)')
     .option('--update-baselines', 'Accept current screenshots as new baselines')
+    .option(
+      '--confirm-baselines',
+      'Human confirmation required with --update-baselines. Judge mode and an advisory caption cannot set this. An agent setting confirm_reviewed: true is not a human review.',
+    )
     .option('--generate-fixes', 'Generate AI-powered CSS fixes for regressions (requires AI)')
     .option('--verify-fixes', 'Verify generated fixes in a sandbox (implies --generate-fixes)')
     .option('--fix-sandbox <kind>', 'Sandbox for fix verification: local or daytona', 'local')
@@ -316,6 +321,17 @@ export async function main(argv?: string[]): Promise<number> {
       'Run inside the repository-source renderer image (not published; build recipe: https://frontguard.dev/docs/cross-os-rendering)',
     )
     .action(async (opts) => {
+      const writeBlock = baselineWriteBlockReason({
+        writing: opts.updateBaselines === true,
+        confirmBaselines: opts.confirmBaselines === true,
+        judgeMode: opts.mode === 'judge',
+      });
+      if (writeBlock) {
+        logger.error(writeBlock);
+        exitCode = 2;
+        return;
+      }
+
       // Failure telemetry stays disabled until a config has validated. This
       // prevents an unreadable `telemetry: false` config from leaking an event.
       let telemetryConfig: boolean | undefined = false;
@@ -418,7 +434,7 @@ export async function main(argv?: string[]): Promise<number> {
         } else if (summary.newPages > 0) {
           logger.error(
             `❌ ${summary.newPages} new screenshot(s) require review; ` +
-              'accept them with `frontguard update-baselines`',
+              'accept them with `frontguard update-baselines --confirm-baselines`',
           );
         } else {
           logger.info('✅ No regressions detected');
@@ -493,6 +509,11 @@ export async function main(argv?: string[]): Promise<number> {
   program
     .command('update-baselines')
     .description('Accept current screenshots as new baselines')
+    .option(
+      '--confirm-baselines',
+      'Human confirmation required before writing baselines. Judge mode and an advisory caption cannot set this. An agent setting confirm_reviewed: true is not a human review.',
+    )
+    .option('--mode <mode>', 'Run mode. judge cannot be combined with a baseline write.')
     .option('-u, --url <url>', 'Base URL to test')
     .option('-r, --routes <routes>', 'Comma-separated routes')
     .option('-c, --config <path>', 'Config file path')
@@ -505,6 +526,17 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--verbose', 'Verbose output')
     .option('--debug', 'Debug output')
     .action(async (opts) => {
+      const writeBlock = baselineWriteBlockReason({
+        writing: true,
+        confirmBaselines: opts.confirmBaselines === true,
+        judgeMode: opts.mode === 'judge',
+      });
+      if (writeBlock) {
+        logger.error(writeBlock);
+        exitCode = 2;
+        return;
+      }
+
       try {
         if (opts.debug) {
           setLogLevel('debug');

@@ -25,7 +25,11 @@ inputs:
     description: 'Path to frontguard.config.ts'
     required: false
   update-baselines:
-    description: 'Accept current screenshots as new baselines'
+    description: 'Accept current screenshots as new baselines. Refused on pull_request, pull_request_target, and merge_group unless allow-baseline-writes is the string true. push and workflow_dispatch may write when this is true. The Action passes --confirm-baselines only when the write is allowed.'
+    required: false
+    default: 'false'
+  allow-baseline-writes:
+    description: 'Human opt-in that allows update-baselines on pull_request, pull_request_target, and merge_group. Must be the string true. Not an agent default. Default is to refuse those events.'
     required: false
     default: 'false'
   github-token:
@@ -169,6 +173,8 @@ runs:
         IN_THRESHOLD: ${{ inputs.threshold }}
         IN_CONFIG: ${{ inputs.config }}
         IN_UPDATE_BASELINES: ${{ inputs.update-baselines }}
+        IN_EVENT_NAME: ${{ github.event_name }}
+        IN_ALLOW_BASELINE_WRITES: ${{ inputs.allow-baseline-writes }}
       run: bash "$GITHUB_ACTION_PATH/action-run.sh"
 
     - name: Upload Report

@@ -344,7 +344,7 @@ export function checkBaselineBranch(
     name: 'Baseline branch',
     status: 'warn',
     message: `'${branch}' not found`,
-    fix: 'Accept the initial state with `frontguard update-baselines`, then push the branch for CI.',
+    fix: 'Accept the initial state with `frontguard update-baselines --confirm-baselines`, then push the branch for CI.',
     critical: false,
   };
 }

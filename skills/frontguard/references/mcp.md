@@ -34,7 +34,7 @@
 | `inspect_diff_cluster_dom` | Inspect localized `DiffCluster` bounding boxes (`x, y, width, height`), grounded CSS target selectors, and AI suggested fixes |
 | `verify_css_patch` | Validate a candidate CSS patch (`target_selector`, `css_patch`) for balanced braces, selector alignment, and dangerous rules (`@import`, external `url()`, root `display: none !important`) |
 | `accept_suggestion` | Record acceptance of an AI-suggested fix |
-| `promote_baseline` | Promote reviewed screenshots in a run to become the new baseline (`confirm_reviewed: true`) |
+| `promote_baseline` | Not an agent step. Unregistered unless `FRONTGUARD_MCP_WRITES=1`. Local-report mode refuses it and does not write `frontguard-baselines`. `confirm_reviewed: true` is UX only, not a human review. |
 | `run_visual_check` | Trigger a new Frontguard visual check against a target URL |
 
 ## Recommended Agent Loop
@@ -43,4 +43,4 @@
 2. For each regression, call `inspect_diff_cluster_dom` with `{ "diff_id": "<diffId>" }` to inspect cluster coordinates and target selectors.
 3. Propose a minimal CSS/layout fix and validate it with `verify_css_patch` before editing source files.
 4. Re-run `npx frontguard run` to confirm `diffPercentage` drops below threshold.
-5. If the visual change is an intentional product update, call `promote_baseline` with `{ "run_id": "<runId>", "confirm_reviewed": true }`.
+5. Stop. Do not call `promote_baseline` or run an unconfirmed `update-baselines`. If the visual change is an intentional product update, tell a human to run `npx frontguard update-baselines --confirm-baselines`. Cloud `approveRun` is not a production path.
