@@ -90,3 +90,13 @@ The payload is a JSON POST with the fields listed above.
 ## Retention
 
 There is **no published retention period** for events received by the default collector. Opt in only if you accept that the HTTP peer may store the JSON fields above and connection metadata for an unspecified duration. Point `FRONTGUARD_TELEMETRY_ENDPOINT` at a collector you control if you need a documented TTL.
+
+## OpenTelemetry traces
+
+These traces are separate from the usage events above. The CLI posts them only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Unset means no export and no network call. `FRONTGUARD_TELEMETRY` does not turn them on.
+
+The exporter is a small `fetch` of OTLP/HTTP JSON. It does not use the `@opentelemetry/*` SDK. Root `package.json` overrides pin those packages because `@daytona/sdk` depends on them. `packages/cloud-api/src/otel/index.ts` is a separate hand-rolled metrics exporter for the cloud API. Do not set `OTEL_EXPORTER_OTLP_ENDPOINT` on a production cloud deploy from the CLI change. Traces do not decide pass or fail. pixelmatch still does.
+
+Spans are `frontguard.capture`, `frontguard.compare`, and `frontguard.baseline_write` when baselines are written. Each span can carry `frontguard.shots`, a count. The payload has no URL, path, DOM, screenshot, or error message. The service name is `frontguard-cli`.
+
+The POST goes to `<endpoint>/v1/traces`, or to the endpoint itself when it already ends in `/v1/traces`. Optional headers come from `OTEL_EXPORTER_OTLP_HEADERS` as comma-separated `key=value` pairs. The CLI waits at most 1.5 seconds, does not follow redirects, and ignores export failures.

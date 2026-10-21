@@ -402,6 +402,8 @@ When enabled, the CLI POSTs one JSON event to `https://telemetry.frontguard.dev/
 
 Full schema: [docs/telemetry.md](./docs/telemetry.md).
 
+Capture and compare traces are separate from those events. They are sent only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, as OTLP/HTTP JSON to that collector. Each span records a screenshot count and no URL, path, or image.
+
 ## Environment Variables
 
 ```bash
@@ -418,6 +420,10 @@ FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json
 FRONTGUARD_TELEMETRY=1
 FRONTGUARD_TELEMETRY_ENDPOINT=https://telemetry.frontguard.dev/v1/events
 DO_NOT_TRACK=1
+
+# Optional OTLP traces (off unless set; counts only, no screenshots)
+OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com
+OTEL_EXPORTER_OTLP_HEADERS=api-key=replace-me
 ```
 
 ## Documentation & Internal References

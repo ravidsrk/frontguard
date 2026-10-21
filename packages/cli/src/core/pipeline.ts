@@ -90,6 +90,7 @@ import { GitOrphanStorage } from '../storage/git-orphan.js';
 import { uploadImages } from '../storage/upload-stage.js';
 import { detectPreviewUrl, waitForUrl } from '../utils/preview-url.js';
 import { logger } from '../utils/logger.js';
+import { withCliTrace, type CliTrace } from '../utils/otel.js';
 import { PluginManager } from './plugins.js';
 
 // ---------------------------------------------------------------------------
@@ -385,6 +386,14 @@ export async function runPipeline(
   config: FrontguardConfig,
   reporter: Reporter,
 ): Promise<RunResult> {
+  return withCliTrace((trace) => runCapturedPipeline(config, reporter, trace));
+}
+
+async function runCapturedPipeline(
+  config: FrontguardConfig,
+  reporter: Reporter,
+  trace: CliTrace,
+): Promise<RunResult> {
   const totalStart = performance.now();
 
   const timing: RunTiming = {
@@ -583,6 +592,7 @@ export async function runPipeline(
     if (renderInput && renderInput.config) config = renderInput.config;
   }
 
+  const captureSpan = trace.start('frontguard.capture');
   reporter.onStageStart('render', `Capturing ${totalCombinations} screenshot(s)…`);
   try {
     const [captured, duration] = await timed(async () => {
@@ -604,10 +614,14 @@ export async function runPipeline(
     screenshots = captured;
     timing.render = duration;
     reporter.onStageComplete('render', `Captured ${screenshots.length} screenshot(s) in ${duration}ms`);
+    captureSpan.end(screenshots.length === 0 ? 'error' : 'ok', {
+      'frontguard.shots': screenshots.length,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`Render stage failed: ${msg}`);
     reporter.onStageComplete('render', `Failed: ${msg}`);
+    captureSpan.end('error', { 'frontguard.shots': screenshots.length });
   }
 
   // Plugin hook: afterRender — can modify screenshots before comparison
@@ -633,6 +647,7 @@ export async function runPipeline(
   // Track temp file paths for changed diffs so we can restore buffers for reporting
   const tempPaths = new Map<number, { baseline: string; current: string; diff: string }>();
 
+  const compareSpan = trace.start('frontguard.compare');
   reporter.onStageStart('compare', 'Comparing against baselines…');
   if (!comparisonStorage) {
     comparisonStorage = new GitOrphanStorage(process.cwd());
@@ -646,6 +661,7 @@ export async function runPipeline(
       const msg = err instanceof Error ? err.message : String(err);
       logger.error(`Baseline storage init failed: ${msg}`);
       reporter.onStageComplete('compare', `Failed: ${msg}`);
+      compareSpan.end('error', { 'frontguard.shots': 0 });
       throw err;
     }
   }
@@ -762,10 +778,12 @@ export async function runPipeline(
 
     timing.compare = duration;
     reporter.onStageComplete('compare', `Compared ${diffs.length} screenshot(s) in ${duration}ms`);
+    compareSpan.end('ok', { 'frontguard.shots': diffs.length });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`Compare stage failed: ${msg}`);
     reporter.onStageComplete('compare', `Failed: ${msg}`);
+    compareSpan.end('error', { 'frontguard.shots': diffs.length });
   }
 
   const fingerprintCheck = finishFingerprintCheck(
@@ -1124,6 +1142,14 @@ export async function updateBaselines(
   config: FrontguardConfig,
   reporter: Reporter,
 ): Promise<RunResult> {
+  return withCliTrace((trace) => writeUpdatedBaselines(config, reporter, trace));
+}
+
+async function writeUpdatedBaselines(
+  config: FrontguardConfig,
+  reporter: Reporter,
+  trace: CliTrace,
+): Promise<RunResult> {
   const totalStart = performance.now();
   const timing: RunTiming = {
     discovery: 0,
@@ -1145,8 +1171,13 @@ export async function updateBaselines(
   logger.info(`Rendering ${routes.length} route(s) for baseline update…`);
   reporter.onStageStart('render', `Capturing screenshots for ${routes.length} route(s)…`);
 
+  const captureSpan = trace.start('frontguard.capture');
   const [screenshots, renderDuration] = await timed(() => renderPages(routes, config));
   timing.render = renderDuration;
+  const captureFailed =
+    screenshots.length === 0 ||
+    screenshots.some((shot) => !Buffer.isBuffer(shot.buffer) || shot.buffer.length === 0);
+  captureSpan.end(captureFailed ? 'error' : 'ok', { 'frontguard.shots': screenshots.length });
   if (screenshots.length === 0) {
     reporter.onStageComplete('render', 'Failed: no screenshots were captured');
     throw new Error('Cannot update baselines: no screenshots were captured');
@@ -1167,6 +1198,7 @@ export async function updateBaselines(
   reporter.onStageComplete('render', `Captured ${screenshots.length} screenshot(s)`);
 
   // Init storage and write all baselines
+  const writeSpan = trace.start('frontguard.baseline_write');
   reporter.onStageStart('compare', 'Writing baselines…');
   const writeStart = performance.now();
   const storage = new GitOrphanStorage(process.cwd(), { mode: 'update' });
@@ -1245,6 +1277,7 @@ export async function updateBaselines(
   timing.compare = Math.round(performance.now() - writeStart);
 
   if (writeFailures > 0) {
+    writeSpan.end('error', { 'frontguard.shots': written });
     reporter.onStageComplete(
       'compare',
       `Failed to write ${writeFailures} of ${screenshots.length} baseline${screenshots.length === 1 ? '' : 's'}`,
@@ -1254,6 +1287,7 @@ export async function updateBaselines(
     );
   }
 
+  writeSpan.end('ok', { 'frontguard.shots': written });
   reporter.onStageComplete('compare', `Wrote ${written} baseline(s)`);
   logger.info(`✅ Updated ${written} baseline(s) successfully`);
   logger.info('To share these baselines with CI, run: git push origin frontguard-baselines');
@@ -1292,6 +1326,14 @@ export async function runJudgePipeline(
   config: FrontguardConfig,
   reporter: Reporter,
 ): Promise<RunResult> {
+  return withCliTrace((trace) => judgeCapturedPages(config, reporter, trace));
+}
+
+async function judgeCapturedPages(
+  config: FrontguardConfig,
+  reporter: Reporter,
+  trace: CliTrace,
+): Promise<RunResult> {
   const totalStart = performance.now();
   const timing: RunTiming = { discovery: 0, render: 0, compare: 0, ai: 0, total: 0 };
 
@@ -1328,16 +1370,21 @@ export async function runJudgePipeline(
 
   // Stage 2: RENDER --------------------------------------------------------
   let screenshots: ScreenshotResult[] = [];
+  const captureSpan = trace.start('frontguard.capture');
   reporter.onStageStart('render', `Capturing ${totalCombinations} screenshot(s)…`);
   try {
     const [captured, duration] = await timed(() => renderPages(routes, config));
     screenshots = captured;
     timing.render = duration;
     reporter.onStageComplete('render', `Captured ${screenshots.length} screenshot(s) in ${duration}ms`);
+    captureSpan.end(screenshots.length === 0 ? 'error' : 'ok', {
+      'frontguard.shots': screenshots.length,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`Render stage failed: ${msg}`);
     reporter.onStageComplete('render', `Failed: ${msg}`);
+    captureSpan.end('error', { 'frontguard.shots': screenshots.length });
   }
 
   if (screenshots.length === 0) {

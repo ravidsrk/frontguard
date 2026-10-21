@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Export CLI capture, compare, and baseline-write traces as OTLP/HTTP JSON when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Each span records a screenshot count and no URL, path, or image. This is separate from anonymous usage telemetry and from the cloud-api metrics exporter.
 - Add frame stability convergence and spatial motion attribution (`waitForStability` / `--wait-for-stability`) that polls consecutive frames until subpixel convergence and pinpoints `motionClusters` when animations fail to settle.
 - Add layout-preserving sensitive-DOM pixel and HTML snapshot redaction (`redactSensitive` / `--redact-sensitive`) across light DOM and open shadow roots for password, credit-card, OTP, and `[data-frontguard-redact]` elements.
 - Add declarative pre-capture route interactions (`actions`: `click`, `hover`, `fill`, `press`, `waitForSelector`, `wait`), `waitForSelector`, and `colorScheme` (`light` | `dark`) emulation per route and globally.

@@ -244,6 +244,8 @@ When enabled, the CLI POSTs one JSON event to `https://telemetry.frontguard.dev/
 
 Full schema: [telemetry.md](https://github.com/ravidsrk/frontguard/blob/main/docs/telemetry.md).
 
+Capture and compare traces are separate from those events. They are sent only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, as OTLP/HTTP JSON to that collector. Each span records a screenshot count and no URL, path, or image.
+
 ## License
 
 MIT
