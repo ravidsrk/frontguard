@@ -28,7 +28,10 @@ const EXTERNAL = [
 export default defineConfig([
   // CLI entry — gets shebang for bin
   {
-    entry: { 'cli/index': 'src/cli/index.ts' },
+    entry: {
+      'cli/index': 'src/cli/index.ts',
+      'cli/review-command': 'src/cli/review-command.ts',
+    },
     format: ['esm'],
     target: 'node18',
     dts: true,

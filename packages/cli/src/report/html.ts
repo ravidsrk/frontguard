@@ -11,6 +11,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Reporter, PipelineStage, RunResult, DiffResult } from '../core/types.js';
+import { loadReview } from '../cli/load-review.js';
 import { logger } from '../utils/logger.js';
 
 // ---------------------------------------------------------------------------
@@ -41,7 +42,7 @@ export class HTMLReporter implements Reporter {
   }
 
   async onComplete(result: RunResult): Promise<void> {
-    this.writeReport(result, result.config.outputDir);
+    await this.writeReport(result, result.config.outputDir);
     await this.delegate?.onComplete(result);
   }
 
@@ -121,7 +122,7 @@ ${renderTimingFooter(result)}
    * Falls back to inline base64 data URIs if the images directory cannot
    * be created (e.g. permission issues).
    */
-  writeReport(result: RunResult, outputDir: string): void {
+  writeReport(result: RunResult, outputDir: string): Promise<void> {
     mkdirSync(outputDir, { recursive: true });
 
     // Try to set up file-based image resolver
@@ -154,6 +155,11 @@ ${renderTimingFooter(result)}
     const reportPath = join(outputDir, 'report.html');
     writeFileSync(reportPath, html, 'utf-8');
     logger.info(`HTML report written to ${reportPath}`);
+    return loadReview()
+      .then((mod) => mod.writeReviewManifest(result, outputDir))
+      .catch(() => {
+        // A missing review module must not fail the HTML report.
+      });
   }
 }
 
