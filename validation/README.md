@@ -36,7 +36,20 @@ that number is to point it at diverse, real codebases and inspect the results.
 
 # Run a single repo by its "name"
 ./validation/run-external.sh taxonomy
+
+# #285 pixel arm: local seeded fixtures, then the same five repos.
+# Writes validation/results/pixel-285/ and does not replace this harness.
+FRONTGUARD_NODE_MODULES=/path/to/node_modules \
+FRONTGUARD_FILTER_SRC=/path/to/checkout-with-321 \
+  ./validation/run-external.sh --pixel
 ```
+
+`--pixel` is a measurement run, not an accuracy claim. Pixelmatch remains the
+only pass/fail signal. Recheck passes are not accuracy. The v0.2 0.0% figure,
+when cited, keeps its limits: two of five repos, Chromium, one macOS host, AI
+off, no true-positive arm, SSIM not exercised, CLI 0.2.0
+(`validation/results-v0.2.md`, 2026-06-20). See
+[`results-note-template.md`](./results-note-template.md).
 
 Each repo is cloned into an isolated temp directory, dependencies are installed,
 the dev server is started, Frontguard is run against every configured route, and

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>layout-desktop</title>
+<style>
+html, body { margin: 0; padding: 0; }
+.panel { display: none; height: 100vh; }
+@media (min-width: 1200px) { .panel { display: block; background: #147a14; } }
+.note { font: 16px/1.4 sans-serif; padding: 12px; }
+</style>
+</head>
+<body>
+<div class="panel" data-mutate="layout-desktop"></div>
+<p class="note">Desktop panel is display:none below 1200px.</p>
+</body>
+</html>

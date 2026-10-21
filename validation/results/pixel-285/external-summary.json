@@ -1,0 +1,93 @@
+{
+  "reposInDenominator": 5,
+  "rows": [
+    {
+      "name": "taxonomy",
+      "repo": "shadcn-ui/taxonomy",
+      "category": "Next.js app",
+      "outcome": "no-json",
+      "booted": false,
+      "recheckDiffs": 0,
+      "pass": 0,
+      "changed": 0,
+      "regression": 0,
+      "error": 0,
+      "ssimOverride": 0,
+      "pixelmatch": 0,
+      "browsers": []
+    },
+    {
+      "name": "tailwind-dashboard",
+      "repo": "shadcn-ui/next-template",
+      "category": "Tailwind dashboard",
+      "outcome": "booted",
+      "booted": true,
+      "recheckDiffs": 12,
+      "pass": 12,
+      "changed": 0,
+      "regression": 0,
+      "error": 0,
+      "ssimOverride": 0,
+      "pixelmatch": 12,
+      "browsers": [
+        "chromium"
+      ]
+    },
+    {
+      "name": "chakra-ui-docs",
+      "repo": "chakra-ui/chakra-ui-docs",
+      "category": "component library docs",
+      "outcome": "booted",
+      "booted": true,
+      "recheckDiffs": 9,
+      "pass": 9,
+      "changed": 0,
+      "regression": 0,
+      "error": 0,
+      "ssimOverride": 0,
+      "pixelmatch": 9,
+      "browsers": [
+        "chromium"
+      ]
+    },
+    {
+      "name": "medusa-storefront",
+      "repo": "medusajs/nextjs-starter-medusa",
+      "category": "e-commerce storefront",
+      "outcome": "no-json",
+      "booted": false,
+      "recheckDiffs": 0,
+      "pass": 0,
+      "changed": 0,
+      "regression": 0,
+      "error": 0,
+      "ssimOverride": 0,
+      "pixelmatch": 0,
+      "browsers": []
+    },
+    {
+      "name": "nextra-docs",
+      "repo": "shuding/nextra",
+      "category": "docs site",
+      "outcome": "no-json",
+      "booted": false,
+      "recheckDiffs": 0,
+      "pass": 0,
+      "changed": 0,
+      "regression": 0,
+      "error": 0,
+      "ssimOverride": 0,
+      "pixelmatch": 0,
+      "browsers": []
+    }
+  ],
+  "booted": 2,
+  "notBooted": 3,
+  "recheckRegression": 0,
+  "recheckChanged": 0,
+  "recheckDiffs": 21,
+  "ssimOverride": 0,
+  "browsers": [
+    "chromium"
+  ]
+}

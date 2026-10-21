@@ -1,0 +1,549 @@
+{
+  "name": "tailwind-dashboard",
+  "repo": "shadcn-ui/next-template",
+  "category": "Tailwind dashboard",
+  "baseUrl": "http://localhost:3000",
+  "timestamp": "2026-10-21T14:44:58Z",
+  "aiEnabled": false,
+  "baselineRuns": [
+    { "route": "/", "url": "http://localhost:3000/", "result": {
+  "baselineUpdate": true,
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 3,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 1115,
+    "compare": 867,
+    "ai": 0,
+    "total": 1983
+  },
+  "diffs": [
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} },
+    { "route": "/dashboard", "url": "http://localhost:3000/dashboard", "result": {
+  "baselineUpdate": true,
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 3,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 1081,
+    "compare": 810,
+    "ai": 0,
+    "total": 1892
+  },
+  "diffs": [
+    {
+      "route": "/dashboard",
+      "label": "/dashboard",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/dashboard",
+      "label": "/dashboard",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/dashboard",
+      "label": "/dashboard",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} },
+    { "route": "/dashboard/settings", "url": "http://localhost:3000/dashboard/settings", "result": {
+  "baselineUpdate": true,
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 3,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 930,
+    "compare": 747,
+    "ai": 0,
+    "total": 1677
+  },
+  "diffs": [
+    {
+      "route": "/dashboard/settings",
+      "label": "/dashboard/settings",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/dashboard/settings",
+      "label": "/dashboard/settings",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/dashboard/settings",
+      "label": "/dashboard/settings",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} },
+    { "route": "/dashboard/analytics", "url": "http://localhost:3000/dashboard/analytics", "result": {
+  "baselineUpdate": true,
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 3,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 949,
+    "compare": 764,
+    "ai": 0,
+    "total": 1713
+  },
+  "diffs": [
+    {
+      "route": "/dashboard/analytics",
+      "label": "/dashboard/analytics",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/dashboard/analytics",
+      "label": "/dashboard/analytics",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/dashboard/analytics",
+      "label": "/dashboard/analytics",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} }
+  ]
+  ,
+  "recheckRuns": [
+    { "route": "/", "url": "http://localhost:3000/", "result": {
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 0,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 943,
+    "compare": 128,
+    "ai": 0,
+    "total": 1801
+  },
+  "diffs": [
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} },
+    { "route": "/dashboard", "url": "http://localhost:3000/dashboard", "result": {
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 0,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 1100,
+    "compare": 118,
+    "ai": 0,
+    "total": 1956
+  },
+  "diffs": [
+    {
+      "route": "/dashboard",
+      "label": "/dashboard",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/dashboard",
+      "label": "/dashboard",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/dashboard",
+      "label": "/dashboard",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} },
+    { "route": "/dashboard/settings", "url": "http://localhost:3000/dashboard/settings", "result": {
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 0,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 929,
+    "compare": 134,
+    "ai": 0,
+    "total": 1859
+  },
+  "diffs": [
+    {
+      "route": "/dashboard/settings",
+      "label": "/dashboard/settings",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/dashboard/settings",
+      "label": "/dashboard/settings",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/dashboard/settings",
+      "label": "/dashboard/settings",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} },
+    { "route": "/dashboard/analytics", "url": "http://localhost:3000/dashboard/analytics", "result": {
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 0,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 964,
+    "compare": 129,
+    "ai": 0,
+    "total": 1844
+  },
+  "diffs": [
+    {
+      "route": "/dashboard/analytics",
+      "label": "/dashboard/analytics",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/dashboard/analytics",
+      "label": "/dashboard/analytics",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/dashboard/analytics",
+      "label": "/dashboard/analytics",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} }
+  ]
+}

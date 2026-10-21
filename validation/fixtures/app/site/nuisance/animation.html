@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>animation</title>
+<style>
+html, body { margin: 0; padding: 0; }
+@keyframes pulse { from { background: #123456; } to { background: #654321; } }
+.box { height: 100vh; animation: pulse 1200ms linear infinite; }
+</style>
+</head>
+<body>
+<div class="box" data-mutate="animation"></div>
+</body>
+</html>

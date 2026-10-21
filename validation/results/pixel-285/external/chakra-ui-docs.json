@@ -1,0 +1,482 @@
+{
+  "name": "chakra-ui-docs",
+  "repo": "chakra-ui/chakra-ui-docs",
+  "category": "component library docs",
+  "baseUrl": "http://localhost:3000",
+  "timestamp": "2026-10-21T14:45:56Z",
+  "aiEnabled": false,
+  "baselineRuns": [
+    { "route": "/", "url": "http://localhost:3000/", "result": {
+  "baselineUpdate": true,
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 3,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 15757,
+    "compare": 1072,
+    "ai": 0,
+    "total": 16829
+  },
+  "diffs": [
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} },
+    { "route": "/docs/components/button", "url": "http://localhost:3000/docs/components/button", "result": {
+  "baselineUpdate": true,
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 3,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 5876,
+    "compare": 861,
+    "ai": 0,
+    "total": 6738
+  },
+  "diffs": [
+    {
+      "route": "/docs/components/button",
+      "label": "/docs/components/button",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/docs/components/button",
+      "label": "/docs/components/button",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/docs/components/button",
+      "label": "/docs/components/button",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} },
+    { "route": "/docs/components/modal", "url": "http://localhost:3000/docs/components/modal", "result": {
+  "baselineUpdate": true,
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 3,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 4242,
+    "compare": 818,
+    "ai": 0,
+    "total": 5061
+  },
+  "diffs": [
+    {
+      "route": "/docs/components/modal",
+      "label": "/docs/components/modal",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/docs/components/modal",
+      "label": "/docs/components/modal",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/docs/components/modal",
+      "label": "/docs/components/modal",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} },
+    { "route": "/getting-started", "url": "http://localhost:3000/getting-started", "result": {
+  "baselineUpdate": true,
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 3,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 3281,
+    "compare": 904,
+    "ai": 0,
+    "total": 4185
+  },
+  "diffs": [
+    {
+      "route": "/getting-started",
+      "label": "/getting-started",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/getting-started",
+      "label": "/getting-started",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    },
+    {
+      "route": "/getting-started",
+      "label": "/getting-started",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "new",
+      "diffPercentage": 0,
+      "hasBaselineImage": false,
+      "hasCurrentImage": true,
+      "hasDiffImage": false
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} }
+  ]
+  ,
+  "recheckRuns": [
+    { "route": "/", "url": "http://localhost:3000/", "result": {"url":"http://localhost:3000/","error":"frontguard run failed"} },
+    { "route": "/docs/components/button", "url": "http://localhost:3000/docs/components/button", "result": {
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 0,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 6181,
+    "compare": 825,
+    "ai": 0,
+    "total": 7799
+  },
+  "diffs": [
+    {
+      "route": "/docs/components/button",
+      "label": "/docs/components/button",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/docs/components/button",
+      "label": "/docs/components/button",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/docs/components/button",
+      "label": "/docs/components/button",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} },
+    { "route": "/docs/components/modal", "url": "http://localhost:3000/docs/components/modal", "result": {
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 0,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 4352,
+    "compare": 800,
+    "ai": 0,
+    "total": 6013
+  },
+  "diffs": [
+    {
+      "route": "/docs/components/modal",
+      "label": "/docs/components/modal",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/docs/components/modal",
+      "label": "/docs/components/modal",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/docs/components/modal",
+      "label": "/docs/components/modal",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} },
+    { "route": "/getting-started", "url": "http://localhost:3000/getting-started", "result": {
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "regressions": 0,
+    "warnings": 0,
+    "newPages": 0,
+    "errors": 0
+  },
+  "timing": {
+    "discovery": 0,
+    "render": 3307,
+    "compare": 622,
+    "ai": 0,
+    "total": 4641
+  },
+  "diffs": [
+    {
+      "route": "/getting-started",
+      "label": "/getting-started",
+      "viewport": 375,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/getting-started",
+      "label": "/getting-started",
+      "viewport": 768,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    },
+    {
+      "route": "/getting-started",
+      "label": "/getting-started",
+      "viewport": 1440,
+      "browser": "chromium",
+      "status": "pass",
+      "diffPercentage": 0,
+      "hasBaselineImage": true,
+      "hasCurrentImage": false,
+      "hasDiffImage": false,
+      "comparisonMethod": "pixelmatch"
+    }
+  ],
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "viewports": [
+      375,
+      768,
+      1440
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "threshold": 0.1,
+    "outputDir": "./frontguard-report"
+  }
+} }
+  ]
+}

@@ -1,0 +1,2342 @@
+{
+  "seed": 285,
+  "aiEnabled": false,
+  "threshold": 0.1,
+  "viewports": [
+    375,
+    768,
+    1440
+  ],
+  "browsersConfigured": [
+    "chromium"
+  ],
+  "firefoxRan": false,
+  "webkitRan": false,
+  "os": {
+    "swVers": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434",
+    "arch": "arm64",
+    "node": "v24.20.0",
+    "platform": "darwin"
+  },
+  "pixelCli": {
+    "packageVersion": "0.2.3",
+    "versionOutput": "0.2.3",
+    "gitSha": "1e016b5866de0957a47c9ac51d91c7fa04250313",
+    "branch": "ravidsrk/285-pixel-validation",
+    "pixelmatchVersion": "7.2.0",
+    "containsUntracedStaticAsset": false
+  },
+  "filterCli": {
+    "packageVersion": "0.2.3",
+    "versionOutput": "0.2.3",
+    "gitSha": "5a775c4c55a4426c5e7f7175fd57113ccac25411",
+    "branch": "ravidsrk/now-shipped-correctness",
+    "containsUntracedStaticAsset": true
+  },
+  "filterError": null,
+  "browser": {
+    "launched": true,
+    "version": "156.0.8078.4",
+    "executablePath": "/Users/ravindra/Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+    "engine": "chromium"
+  },
+  "pixelError": null,
+  "pixel": {
+    "seed": 285,
+    "plan": {
+      "seed": 285,
+      "viewports": [
+        375,
+        768,
+        1440
+      ],
+      "operators": [
+        {
+          "id": "text",
+          "kind": "html-text",
+          "class": "observable",
+          "route": "/text",
+          "file": "site/text.html",
+          "expectedViewports": [
+            375,
+            768,
+            1440
+          ],
+          "bucket": 3,
+          "textChar": "#"
+        },
+        {
+          "id": "color",
+          "kind": "css-color",
+          "class": "observable",
+          "route": "/color",
+          "file": "site/color.html",
+          "expectedViewports": [
+            375,
+            768,
+            1440
+          ],
+          "bucket": 3,
+          "color": "#50b366"
+        },
+        {
+          "id": "layout-desktop",
+          "kind": "css-media",
+          "class": "observable",
+          "route": "/layout-desktop",
+          "file": "site/layout-desktop.html",
+          "expectedViewports": [
+            1440
+          ],
+          "bucket": 1,
+          "color": "#ca81f7"
+        },
+        {
+          "id": "layout-mobile",
+          "kind": "css-media",
+          "class": "observable",
+          "route": "/layout-mobile",
+          "file": "site/layout-mobile.html",
+          "expectedViewports": [
+            375
+          ],
+          "bucket": 1,
+          "color": "#61e80a"
+        },
+        {
+          "id": "layout-two",
+          "kind": "css-media",
+          "class": "observable",
+          "route": "/layout-two",
+          "file": "site/layout-two.html",
+          "expectedViewports": [
+            375,
+            768
+          ],
+          "bucket": 2,
+          "color": "#0ca87d"
+        },
+        {
+          "id": "neighbour",
+          "kind": "css-neighbour-shift",
+          "class": "neighbour-moving",
+          "route": "/neighbour",
+          "file": "site/neighbour.html",
+          "expectedViewports": [
+            375,
+            768,
+            1440
+          ],
+          "bucket": 3,
+          "marginPx": 231
+        },
+        {
+          "id": "logo",
+          "kind": "svg-fill",
+          "class": "observable",
+          "route": "/logo",
+          "file": "site/logo.html",
+          "expectedViewports": [
+            375,
+            768,
+            1440
+          ],
+          "bucket": 3,
+          "color": "#1529fb"
+        },
+        {
+          "id": "animation",
+          "kind": "css-animation",
+          "class": "nuisance",
+          "route": "/nuisance/animation",
+          "file": "site/nuisance/animation.html",
+          "expectedViewports": [],
+          "bucket": null,
+          "color": "#f15c90",
+          "durationMs": 1202
+        },
+        {
+          "id": "font-swap",
+          "kind": "css-font-swap",
+          "class": "nuisance",
+          "route": "/nuisance/font",
+          "file": "site/nuisance/font.html",
+          "expectedViewports": [],
+          "bucket": null,
+          "fontFamily": "\"Courier New\", monospace"
+        },
+        {
+          "id": "caret",
+          "kind": "html-caret",
+          "class": "nuisance",
+          "route": "/nuisance/caret",
+          "file": "site/nuisance/caret.html",
+          "expectedViewports": [],
+          "bucket": null
+        },
+        {
+          "id": "scrollbar",
+          "kind": "css-scrollbar",
+          "class": "nuisance",
+          "route": "/nuisance/scrollbar",
+          "file": "site/nuisance/scrollbar.html",
+          "expectedViewports": [],
+          "bucket": null,
+          "color": "#bd3b27"
+        }
+      ]
+    },
+    "updateBaselines": {
+      "exitStatus": 0,
+      "stdoutBytes": 1175,
+      "emittedRunJson": false,
+      "stderrTail": " Comparing — Writing baselines…\n  ℹ Creating orphan branch \"frontguard-baselines\" for baseline storage\nPreparing worktree (detached HEAD 0be09dc)\nSwitched to a new branch 'frontguard-baselines'\nPreparing worktree (checking out 'frontguard-baselines')\n✔ 🔍 Comparing — Wrote 33 baseline(s)\n  ℹ ✅ Updated 33 baseline(s) successfully\n  ℹ To share these baselines with CI, run: git push origin frontguard-baselines\n- 📄 Reporting — Generating baseline update report…\n  ℹ ✅ Baselines updated successfully\n"
+    },
+    "manifest": {
+      "present": true,
+      "keys": [
+        "schemaVersion",
+        "createdBy",
+        "updatedAt",
+        "routes"
+      ],
+      "fingerprintPresent": false,
+      "createdBy": "frontguard@0.2.3",
+      "schemaVersion": 1
+    },
+    "recheck": {
+      "exitStatus": 0,
+      "error": null,
+      "stdoutBytes": 10791,
+      "counts": {
+        "pass": 33,
+        "changed": 0,
+        "regression": 0,
+        "new": 0,
+        "error": 0,
+        "other": 0,
+        "ssimOverride": 0,
+        "pixelmatch": 33
+      },
+      "diffs": [
+        {
+          "route": "/text",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/text",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/text",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/color",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/color",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/color",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-desktop",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-desktop",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-desktop",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-mobile",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-mobile",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-mobile",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-two",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-two",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-two",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/neighbour",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/neighbour",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/neighbour",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/logo",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/logo",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/logo",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/animation",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/animation",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/animation",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/font",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/font",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/font",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/caret",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/caret",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/caret",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/scrollbar",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/scrollbar",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/scrollbar",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        }
+      ],
+      "filterReason": "smart rendering disabled (0ms)"
+    },
+    "mutated": {
+      "exitStatus": 1,
+      "error": null,
+      "stdoutBytes": 80975,
+      "parsed": true,
+      "counts": {
+        "pass": 8,
+        "changed": 6,
+        "regression": 19,
+        "new": 0,
+        "error": 0,
+        "other": 0,
+        "ssimOverride": 0,
+        "pixelmatch": 33
+      },
+      "diffs": [
+        {
+          "route": "/text",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 32.06825170175955,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": "Dimension mismatch: current=375×4202, baseline=1512×842. Images were padded to the larger dimensions for comparison."
+        },
+        {
+          "route": "/text",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 51.03122699733878,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": "Dimension mismatch: current=768×1682, baseline=1512×842. Images were padded to the larger dimensions for comparison."
+        },
+        {
+          "route": "/text",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 52.666421304946866,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": "Dimension mismatch: current=1440×1682, baseline=1512×842. Images were padded to the larger dimensions for comparison."
+        },
+        {
+          "route": "/color",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 100,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/color",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 100,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/color",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 100,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-desktop",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-desktop",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-desktop",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 90.22556390977444,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-mobile",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 90.22556390977444,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-mobile",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-mobile",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-two",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 90.22556390977444,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-two",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 90.22556390977444,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/layout-two",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/neighbour",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 52.5548729616989,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": "Dimension mismatch: current=375×879, baseline=375×720. Images were padded to the larger dimensions for comparison."
+        },
+        {
+          "route": "/neighbour",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 52.5573568448995,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": "Dimension mismatch: current=768×879, baseline=768×720. Images were padded to the larger dimensions for comparison."
+        },
+        {
+          "route": "/neighbour",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 52.55846289975983,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": "Dimension mismatch: current=1440×879, baseline=1440×720. Images were padded to the larger dimensions for comparison."
+        },
+        {
+          "route": "/logo",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 97.28851851851852,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/logo",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 97.45713975694444,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/logo",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 97.6286651234568,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/animation",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 100,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/animation",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 100,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/animation",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "regression",
+          "diffPercentage": 100,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/font",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "changed",
+          "diffPercentage": 4.192962962962963,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": 0.8823732545152438,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/font",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "changed",
+          "diffPercentage": 2.2294560185185186,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": 0.9394935145698513,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/font",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "changed",
+          "diffPercentage": 1.2823109567901234,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": 0.965954841056618,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/caret",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "changed",
+          "diffPercentage": 0.8096296296296296,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": 0.9572848931966266,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/caret",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "changed",
+          "diffPercentage": 0.5374710648148149,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": 0.9581550877037993,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/caret",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "changed",
+          "diffPercentage": 0.41628086419753085,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": 0.9674951730563653,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/scrollbar",
+          "viewport": 375,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/scrollbar",
+          "viewport": 768,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        },
+        {
+          "route": "/nuisance/scrollbar",
+          "viewport": 1440,
+          "browser": "chromium",
+          "status": "pass",
+          "diffPercentage": 0,
+          "comparisonMethod": "pixelmatch",
+          "ssimOverride": false,
+          "ssim": null,
+          "hasBaselineImage": true,
+          "error": null
+        }
+      ],
+      "filterReason": "smart rendering disabled (0ms)"
+    },
+    "operators": [
+      {
+        "id": "text",
+        "kind": "html-text",
+        "class": "observable",
+        "route": "/text",
+        "bucket": 3,
+        "expectedViewports": [
+          375,
+          768,
+          1440
+        ],
+        "outcome": "caught",
+        "caught": 3,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/text",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 32.06825170175955,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": "Dimension mismatch: current=375×4202, baseline=1512×842. Images were padded to the larger dimensions for comparison."
+          },
+          "768": {
+            "route": "/text",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 51.03122699733878,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": "Dimension mismatch: current=768×1682, baseline=1512×842. Images were padded to the larger dimensions for comparison."
+          },
+          "1440": {
+            "route": "/text",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 52.666421304946866,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": "Dimension mismatch: current=1440×1682, baseline=1512×842. Images were padded to the larger dimensions for comparison."
+          }
+        }
+      },
+      {
+        "id": "color",
+        "kind": "css-color",
+        "class": "observable",
+        "route": "/color",
+        "bucket": 3,
+        "expectedViewports": [
+          375,
+          768,
+          1440
+        ],
+        "outcome": "caught",
+        "caught": 3,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/color",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/color",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/color",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      },
+      {
+        "id": "layout-desktop",
+        "kind": "css-media",
+        "class": "observable",
+        "route": "/layout-desktop",
+        "bucket": 1,
+        "expectedViewports": [
+          1440
+        ],
+        "outcome": "caught",
+        "caught": 1,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/layout-desktop",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/layout-desktop",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/layout-desktop",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 90.22556390977444,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      },
+      {
+        "id": "layout-mobile",
+        "kind": "css-media",
+        "class": "observable",
+        "route": "/layout-mobile",
+        "bucket": 1,
+        "expectedViewports": [
+          375
+        ],
+        "outcome": "caught",
+        "caught": 1,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/layout-mobile",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 90.22556390977444,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/layout-mobile",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/layout-mobile",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      },
+      {
+        "id": "layout-two",
+        "kind": "css-media",
+        "class": "observable",
+        "route": "/layout-two",
+        "bucket": 2,
+        "expectedViewports": [
+          375,
+          768
+        ],
+        "outcome": "caught",
+        "caught": 2,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/layout-two",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 90.22556390977444,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/layout-two",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 90.22556390977444,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/layout-two",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      },
+      {
+        "id": "neighbour",
+        "kind": "css-neighbour-shift",
+        "class": "neighbour-moving",
+        "route": "/neighbour",
+        "bucket": 3,
+        "expectedViewports": [
+          375,
+          768,
+          1440
+        ],
+        "outcome": "caught",
+        "caught": 3,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/neighbour",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 52.5548729616989,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": "Dimension mismatch: current=375×879, baseline=375×720. Images were padded to the larger dimensions for comparison."
+          },
+          "768": {
+            "route": "/neighbour",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 52.5573568448995,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": "Dimension mismatch: current=768×879, baseline=768×720. Images were padded to the larger dimensions for comparison."
+          },
+          "1440": {
+            "route": "/neighbour",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 52.55846289975983,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": "Dimension mismatch: current=1440×879, baseline=1440×720. Images were padded to the larger dimensions for comparison."
+          }
+        }
+      },
+      {
+        "id": "logo",
+        "kind": "svg-fill",
+        "class": "observable",
+        "route": "/logo",
+        "bucket": 3,
+        "expectedViewports": [
+          375,
+          768,
+          1440
+        ],
+        "outcome": "caught",
+        "caught": 3,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/logo",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 97.28851851851852,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/logo",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 97.45713975694444,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/logo",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 97.6286651234568,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      },
+      {
+        "id": "animation",
+        "kind": "css-animation",
+        "class": "nuisance",
+        "route": "/nuisance/animation",
+        "bucket": null,
+        "expectedViewports": [],
+        "outcome": "nuisance",
+        "caught": 0,
+        "errors": 0,
+        "unexpected": [
+          375,
+          768,
+          1440
+        ],
+        "byViewport": {
+          "375": {
+            "route": "/nuisance/animation",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/nuisance/animation",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/nuisance/animation",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      },
+      {
+        "id": "font-swap",
+        "kind": "css-font-swap",
+        "class": "nuisance",
+        "route": "/nuisance/font",
+        "bucket": null,
+        "expectedViewports": [],
+        "outcome": "nuisance",
+        "caught": 0,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/nuisance/font",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 4.192962962962963,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.8823732545152438,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/nuisance/font",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 2.2294560185185186,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.9394935145698513,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/nuisance/font",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 1.2823109567901234,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.965954841056618,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      },
+      {
+        "id": "caret",
+        "kind": "html-caret",
+        "class": "nuisance",
+        "route": "/nuisance/caret",
+        "bucket": null,
+        "expectedViewports": [],
+        "outcome": "nuisance",
+        "caught": 0,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/nuisance/caret",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 0.8096296296296296,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.9572848931966266,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/nuisance/caret",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 0.5374710648148149,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.9581550877037993,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/nuisance/caret",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 0.41628086419753085,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.9674951730563653,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      },
+      {
+        "id": "scrollbar",
+        "kind": "css-scrollbar",
+        "class": "nuisance",
+        "route": "/nuisance/scrollbar",
+        "bucket": null,
+        "expectedViewports": [],
+        "outcome": "nuisance",
+        "caught": 0,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/nuisance/scrollbar",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/nuisance/scrollbar",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/nuisance/scrollbar",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      }
+    ],
+    "recallByViewportBucket": {
+      "1": {
+        "denominator": 2,
+        "caught": 2,
+        "partial": 0,
+        "missed": 0,
+        "error": 0
+      },
+      "2": {
+        "denominator": 1,
+        "caught": 1,
+        "partial": 0,
+        "missed": 0,
+        "error": 0
+      },
+      "3": {
+        "denominator": 4,
+        "caught": 4,
+        "partial": 0,
+        "missed": 0,
+        "error": 0
+      }
+    },
+    "nuisance": [
+      {
+        "id": "animation",
+        "kind": "css-animation",
+        "class": "nuisance",
+        "route": "/nuisance/animation",
+        "bucket": null,
+        "expectedViewports": [],
+        "outcome": "nuisance",
+        "caught": 0,
+        "errors": 0,
+        "unexpected": [
+          375,
+          768,
+          1440
+        ],
+        "byViewport": {
+          "375": {
+            "route": "/nuisance/animation",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/nuisance/animation",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/nuisance/animation",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      },
+      {
+        "id": "font-swap",
+        "kind": "css-font-swap",
+        "class": "nuisance",
+        "route": "/nuisance/font",
+        "bucket": null,
+        "expectedViewports": [],
+        "outcome": "nuisance",
+        "caught": 0,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/nuisance/font",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 4.192962962962963,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.8823732545152438,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/nuisance/font",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 2.2294560185185186,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.9394935145698513,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/nuisance/font",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 1.2823109567901234,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.965954841056618,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      },
+      {
+        "id": "caret",
+        "kind": "html-caret",
+        "class": "nuisance",
+        "route": "/nuisance/caret",
+        "bucket": null,
+        "expectedViewports": [],
+        "outcome": "nuisance",
+        "caught": 0,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/nuisance/caret",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 0.8096296296296296,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.9572848931966266,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/nuisance/caret",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 0.5374710648148149,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.9581550877037993,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/nuisance/caret",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "changed",
+            "diffPercentage": 0.41628086419753085,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": 0.9674951730563653,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      },
+      {
+        "id": "scrollbar",
+        "kind": "css-scrollbar",
+        "class": "nuisance",
+        "route": "/nuisance/scrollbar",
+        "bucket": null,
+        "expectedViewports": [],
+        "outcome": "nuisance",
+        "caught": 0,
+        "errors": 0,
+        "unexpected": [],
+        "byViewport": {
+          "375": {
+            "route": "/nuisance/scrollbar",
+            "viewport": 375,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "768": {
+            "route": "/nuisance/scrollbar",
+            "viewport": 768,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          "1440": {
+            "route": "/nuisance/scrollbar",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        }
+      }
+    ]
+  },
+  "selectionError": null,
+  "selection": {
+    "ran": true,
+    "viewports": [
+      1440
+    ],
+    "updateBaselinesEmittedRunJson": false,
+    "scenarios": [
+      {
+        "name": "about-only",
+        "changedFiles": [
+          "pages/about.js",
+          "site/about.html"
+        ],
+        "fullExit": 1,
+        "filteredExit": 1,
+        "fullError": null,
+        "filteredError": null,
+        "fullFilterReason": "smart rendering disabled (0ms)",
+        "filteredFilterReason": "1/4 routes affected by 2 changed file(s) (16ms)",
+        "fullRoutes": [
+          "/",
+          "/about",
+          "/brand",
+          "/gallery"
+        ],
+        "filteredRoutes": [
+          "/about"
+        ],
+        "observableRoutes": [
+          "/about"
+        ],
+        "omissionCount": 0,
+        "omissionDenominator": 1,
+        "omissions": [],
+        "fullDiffs": [
+          {
+            "route": "/",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/about",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/gallery",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/brand",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        ],
+        "filteredDiffs": [
+          {
+            "route": "/about",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        ]
+      },
+      {
+        "name": "svg-and-about",
+        "changedFiles": [
+          "pages/about.js",
+          "public/logo.svg",
+          "site/about.html"
+        ],
+        "fullExit": 1,
+        "filteredExit": 1,
+        "fullError": null,
+        "filteredError": null,
+        "fullFilterReason": "smart rendering disabled (0ms)",
+        "filteredFilterReason": "untraced static asset public/logo.svg — rendering all routes (16ms)",
+        "fullRoutes": [
+          "/",
+          "/about",
+          "/brand",
+          "/gallery"
+        ],
+        "filteredRoutes": [
+          "/",
+          "/about",
+          "/brand",
+          "/gallery"
+        ],
+        "observableRoutes": [
+          "/",
+          "/about"
+        ],
+        "omissionCount": 0,
+        "omissionDenominator": 2,
+        "omissions": [],
+        "fullDiffs": [
+          {
+            "route": "/",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 64.50366512345678,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/about",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/gallery",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/brand",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        ],
+        "filteredDiffs": [
+          {
+            "route": "/",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 64.50366512345678,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/about",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/gallery",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/brand",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        ]
+      },
+      {
+        "name": "css-background",
+        "changedFiles": [
+          "public/bg.png"
+        ],
+        "fullExit": 1,
+        "filteredExit": 1,
+        "fullError": null,
+        "filteredError": null,
+        "fullFilterReason": "smart rendering disabled (0ms)",
+        "filteredFilterReason": "untraced static asset public/bg.png — rendering all routes (20ms)",
+        "fullRoutes": [
+          "/",
+          "/about",
+          "/brand",
+          "/gallery"
+        ],
+        "filteredRoutes": [
+          "/",
+          "/about",
+          "/brand",
+          "/gallery"
+        ],
+        "observableRoutes": [
+          "/gallery"
+        ],
+        "omissionCount": 0,
+        "omissionDenominator": 1,
+        "omissions": [],
+        "fullDiffs": [
+          {
+            "route": "/",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/about",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/gallery",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/brand",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        ],
+        "filteredDiffs": [
+          {
+            "route": "/",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/about",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/gallery",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "regression",
+            "diffPercentage": 100,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/brand",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        ]
+      },
+      {
+        "name": "font-file",
+        "changedFiles": [
+          "public/fonts/brand.woff"
+        ],
+        "fullExit": 0,
+        "filteredExit": 0,
+        "fullError": null,
+        "filteredError": null,
+        "fullFilterReason": "smart rendering disabled (0ms)",
+        "filteredFilterReason": "untraced static asset public/fonts/brand.woff — rendering all routes (16ms)",
+        "fullRoutes": [
+          "/",
+          "/about",
+          "/brand",
+          "/gallery"
+        ],
+        "filteredRoutes": [
+          "/",
+          "/about",
+          "/brand",
+          "/gallery"
+        ],
+        "observableRoutes": [],
+        "omissionCount": 0,
+        "omissionDenominator": 0,
+        "omissions": [],
+        "fullDiffs": [
+          {
+            "route": "/",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/about",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/gallery",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/brand",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        ],
+        "filteredDiffs": [
+          {
+            "route": "/",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/about",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/gallery",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          },
+          {
+            "route": "/brand",
+            "viewport": 1440,
+            "browser": "chromium",
+            "status": "pass",
+            "diffPercentage": 0,
+            "comparisonMethod": "pixelmatch",
+            "ssimOverride": false,
+            "ssim": null,
+            "hasBaselineImage": true,
+            "error": null
+          }
+        ]
+      }
+    ],
+    "omissionCount": 0,
+    "omissionDenominator": 4
+  },
+  "antiFlakeRenders": null,
+  "consensusNote": "antiFlakeRenders was not set (CLI default 1). The multi-render consensus loop did not run, so no consensus disagreement was observed. The flaky status exists and was not assigned."
+}
