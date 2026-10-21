@@ -398,6 +398,24 @@ describe('fingerprint comparison', () => {
         viewports: [375, 1440],
       }),
     ).toContain('browser.version');
+
+    const overrideOnly = manifestFor(stale, ['/']);
+    const overrideSnapshots = overrideOnly.routes['/']?.snapshots;
+    if (!overrideSnapshots?.['1440/chromium']) throw new Error('fixture snapshot missing');
+    overrideSnapshots['390/chromium'] = overrideSnapshots['1440/chromium'];
+    delete overrideSnapshots['1440/chromium'];
+    expect(
+      rendererBypassReason(overrideOnly, ['chromium'], {
+        routes: [{ path: '/', viewport: [390] }, { path: '/' }],
+        viewports: [1440],
+      }),
+    ).toContain('browser.version');
+    expect(
+      rendererBypassReason(overrideOnly, ['chromium'], {
+        routes: [{ path: '/' }, { path: '/', viewport: [390] }],
+        viewports: [1440],
+      }),
+    ).toContain('browser.version');
   });
 });
 
