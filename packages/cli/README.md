@@ -179,7 +179,7 @@ export default {
 };
 ```
 
-`failOnViolation: true` also refuses `frontguard update-baselines` when a violation is at or above `impact`, including when the pixel status is not a regression, and when an audit does not complete. The audit uses the same storage state, color scheme, viewport height, wait, and route actions as the capture. The report lists those violations beside the pixel result, says the baselines were not written, and does not call them accepted. It does not change the pixel status. A clean audit leaves a pixel regression as a regression.
+`failOnViolation: true` also refuses `frontguard update-baselines` when a violation is at or above `impact`, including when the pixel status is not a regression, and when an audit does not complete. The audit uses the same page URL, storage state, color scheme, viewport height, wait, and route actions as the capture. A Ladle or Histoire preview hosted under a directory is audited at that preview, not at the site root. The report lists those violations beside the pixel result, says the baselines were not written, and does not call them accepted. It does not change the pixel status. A clean audit leaves a pixel regression as a regression.
 
 Optional text snapshots use `createTextSnapshotPlugin({ aria: true, json: "#payload", markdown: "article" })`. Each enabled kind writes a sibling of the PNG (`.aria.txt`, `.json`, or `.md`) and diffs it as text. A mismatch is reported on its own, with a short excerpt. It does not change `comparisonMethod` from pixelmatch and does not pass or fail a pixel regression. axe-core remains the accessibility plugin. Text diff is not a gate.
 
@@ -237,7 +237,7 @@ The supported path is the local CLI. Hosted cloud, MCP, GitHub App, and Docker C
 - **Fix-pattern database** — `accept-fix` / `reject-fix` / `export-patterns` train and share a local pattern store that the pipeline reuses before calling the AI.
 - **`frontguard doctor`** — environment diagnostics for sources of non-determinism (Node, Playwright/Chromium, browsers, config, git).
 - **`frontguard monitor`** — live production-URL monitoring with daemon polling, history, and webhook alerts.
-- **Accessibility + performance-budget plugins** — axe-core audits captured route/viewport pairs in Chromium pages that use the same storage state, color scheme, viewport height, wait, and route actions as the capture; performance budgets report LCP/CLS/TTFB evidence alongside visual diffs. Optional ARIA, JSON, and Markdown text snapshots are a separate plugin and do not replace axe-core or the pixel gate.
+- **Accessibility + performance-budget plugins** — axe-core audits captured route/viewport pairs in Chromium pages that use the same page URL, storage state, color scheme, viewport height, wait, and route actions as the capture; performance budgets report LCP/CLS/TTFB evidence alongside visual diffs. Optional ARIA, JSON, and Markdown text snapshots are a separate plugin and do not replace axe-core or the pixel gate.
 - **Inspectable artifacts** — HTML reports retain baseline/current/diff images; remote thumbnails require an explicit image-upload backend.
 
 See the [full CHANGELOG](https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md), [interactive documentation](https://frontguard.dev/docs), and [validation results](https://github.com/ravidsrk/frontguard/tree/main/validation). The published run used AI-disabled local comparisons and is not an AI-accuracy or cross-OS benchmark.

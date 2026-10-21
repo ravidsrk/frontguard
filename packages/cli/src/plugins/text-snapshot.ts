@@ -11,7 +11,7 @@
 import type { Browser, Page } from 'playwright';
 import type { FrontguardPlugin, PluginContext } from '../core/plugins.js';
 import type { BrowserEngine, ScreenshotResult, TextSnapshotReport } from '../core/types.js';
-import { joinStoryUrl } from '../discovery/story-url.js';
+import { pageUrl } from '../discovery/story-url.js';
 import { STORYBOOK_READY_SCRIPT } from '../discovery/storybook.js';
 import { executeRouteActions } from '../render/route-actions.js';
 import { GitOrphanStorage } from '../storage/git-orphan.js';
@@ -183,10 +183,7 @@ async function captureShot(
     }
     const page = await context.newPage();
     await freezeAndSeed(page, shot, ctx);
-    const storyRoute = shot.route.discoveredVia === 'ladle' || shot.route.discoveredVia === 'histoire';
-    const url = storyRoute
-      ? joinStoryUrl(ctx.config.baseUrl, shot.route.path)
-      : new URL(shot.route.path, ctx.config.baseUrl).href;
+    const url = pageUrl(ctx.config.baseUrl, shot.route.path, shot.route.discoveredVia);
     await page.goto(url, { waitUntil: 'networkidle', timeout: timeoutMs });
     if (shot.route.waitForSelector) {
       await page.waitForSelector(shot.route.waitForSelector, { state: 'visible', timeout: timeoutMs });

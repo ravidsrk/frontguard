@@ -29,6 +29,7 @@ import type {
   ScreenshotResult,
   RunResult,
 } from '../core/types.js';
+import { pageUrl } from '../discovery/story-url.js';
 import { executeRouteActions } from '../render/route-actions.js';
 import { logger } from '../utils/logger.js';
 
@@ -297,7 +298,7 @@ export function createAccessibilityPlugin(config: AccessibilityConfig = {}): Fro
         seen.add(key);
 
         try {
-          const url = new URL(shot.route.path, baseUrl).href;
+          const url = pageUrl(baseUrl, shot.route.path, shot.route.discoveredVia);
           const raw = await auditUrl(
             AxeBuilder as never,
             pw,
