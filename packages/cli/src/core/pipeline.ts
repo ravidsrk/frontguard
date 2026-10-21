@@ -1363,9 +1363,11 @@ export async function runJudgePipeline(
 }
 
 /**
- * Builds a {@link RunResult} from judge verdicts. Maps verdicts onto the
- * summary counts so existing reporters/exit-code logic keep working:
- * failing judgements count as `regressions`, error verdicts as `errors`.
+ * Builds a {@link RunResult} from judge verdicts.
+ *
+ * Model notes are advisory. A failing verdict increments `warnings` and leaves
+ * `regressions` at 0, so {@link comparisonExitCode} does not turn it into exit 1.
+ * A verdict that could not be produced increments `errors` and still exits 2.
  */
 function buildJudgeResult(
   judgements: JudgeResult[],
@@ -1376,7 +1378,7 @@ function buildJudgeResult(
   const errors = judgements.filter((j) => j.error).length;
   const failed = judgements.filter((j) => !j.pass && !j.error).length;
   const passed = judgements.filter((j) => j.pass).length;
-  const warnings = judgements.filter(
+  const warningPasses = judgements.filter(
     (j) => j.pass && j.issues.some((i) => i.severity === 'warning'),
   ).length;
 
@@ -1384,8 +1386,8 @@ function buildJudgeResult(
     summary: {
       total: judgements.length,
       passed,
-      regressions: failed,
-      warnings,
+      regressions: 0,
+      warnings: warningPasses + failed,
       newPages: 0,
       errors,
     },

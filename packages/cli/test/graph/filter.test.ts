@@ -17,7 +17,7 @@ vi.mock('../../src/graph/parser.js', () => ({
 }));
 
 vi.mock('../../src/graph/resolver.js', () => ({
-  getChangedFiles: vi.fn<(dir: string) => string[]>(),
+  getChangedPaths: vi.fn<(dir: string) => { present: string[]; removed: string[] }>(),
   mapRoutesToFiles: vi.fn<(routes: Route[], dir: string) => Map<string, string[]>>(),
   filterAffectedRoutes: vi.fn<(
     routes: Route[],
@@ -25,6 +25,7 @@ vi.mock('../../src/graph/resolver.js', () => ({
     graph: Map<string, Set<string>>,
     routeFileMap: Map<string, string[]>,
   ) => Route[]>(),
+  incompleteAnalysisReason: vi.fn(() => null),
 }));
 
 vi.mock('../../src/utils/logger.js', () => ({
@@ -33,9 +34,10 @@ vi.mock('../../src/utils/logger.js', () => ({
 
 // Import mocked modules so we can control their return values per test
 import { buildDependencyGraph } from '../../src/graph/parser.js';
-import { getChangedFiles, mapRoutesToFiles, filterAffectedRoutes } from '../../src/graph/resolver.js';
+import { getChangedPaths, mapRoutesToFiles, filterAffectedRoutes, incompleteAnalysisReason } from '../../src/graph/resolver.js';
 
-const mockedGetChangedFiles = vi.mocked(getChangedFiles);
+const mockedGetChangedPaths = vi.mocked(getChangedPaths);
+const mockedIncompleteAnalysis = vi.mocked(incompleteAnalysisReason);
 const mockedMapRoutesToFiles = vi.mocked(mapRoutesToFiles);
 const mockedBuildDependencyGraph = vi.mocked(buildDependencyGraph);
 const mockedFilterAffectedRoutes = vi.mocked(filterAffectedRoutes);
@@ -63,6 +65,10 @@ function makeConfig(overrides?: Partial<FrontguardConfig>): FrontguardConfig {
 
 function route(path: string): Route {
   return { path };
+}
+
+function presentFiles(files: string[]): void {
+  mockedGetChangedPaths.mockReturnValue({ present: files, removed: [] });
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +110,7 @@ describe('smartFilter', () => {
 
   it('returns all routes when no changed files detected', async () => {
     const routes = [route('/'), route('/pricing')];
-    mockedGetChangedFiles.mockReturnValue([]);
+    presentFiles([]);
 
     const result = await smartFilter(routes, makeConfig());
 
@@ -118,7 +124,7 @@ describe('smartFilter', () => {
 
   it('falls back to all routes when getChangedFiles throws', async () => {
     const routes = [route('/'), route('/about')];
-    mockedGetChangedFiles.mockImplementation(() => {
+    mockedGetChangedPaths.mockImplementation(() => {
       throw new Error('not a git repo');
     });
 
@@ -134,7 +140,7 @@ describe('smartFilter', () => {
 
   it('falls back to all routes when mapRoutesToFiles throws', async () => {
     const routes = [route('/')];
-    mockedGetChangedFiles.mockReturnValue(['/project/src/app/page.tsx']);
+    presentFiles(['/project/src/app/page.tsx']);
     mockedMapRoutesToFiles.mockImplementation(() => {
       throw new Error('permission denied');
     });
@@ -151,7 +157,7 @@ describe('smartFilter', () => {
 
   it('falls back to all routes when no route entry files are found', async () => {
     const routes = [route('/'), route('/about')];
-    mockedGetChangedFiles.mockReturnValue(['/project/src/utils.ts']);
+    presentFiles(['/project/src/utils.ts']);
 
     // All routes map to empty arrays (no files on disk)
     const fileMap = new Map<string, string[]>();
@@ -171,7 +177,7 @@ describe('smartFilter', () => {
 
   it('falls back to all routes when buildDependencyGraph throws', async () => {
     const routes = [route('/')];
-    mockedGetChangedFiles.mockReturnValue(['/project/src/app/page.tsx']);
+    presentFiles(['/project/src/app/page.tsx']);
 
     const fileMap = new Map<string, string[]>();
     fileMap.set('/', ['/project/src/app/page.tsx']);
@@ -193,7 +199,7 @@ describe('smartFilter', () => {
 
   it('falls back to all routes when filterAffectedRoutes throws', async () => {
     const routes = [route('/'), route('/about')];
-    mockedGetChangedFiles.mockReturnValue(['/project/src/utils.ts']);
+    presentFiles(['/project/src/utils.ts']);
 
     const fileMap = new Map<string, string[]>();
     fileMap.set('/', ['/project/src/app/page.tsx']);
@@ -219,7 +225,7 @@ describe('smartFilter', () => {
   it('includes only the route whose file is affected', async () => {
     const routes = [route('/'), route('/about'), route('/pricing')];
     const changedFiles = ['/project/src/app/about/page.tsx'];
-    mockedGetChangedFiles.mockReturnValue(changedFiles);
+    presentFiles(changedFiles);
 
     const fileMap = new Map<string, string[]>();
     fileMap.set('/', ['/project/src/app/page.tsx']);
@@ -247,7 +253,7 @@ describe('smartFilter', () => {
 
   it('reports all routes affected when every route matches', async () => {
     const routes = [route('/'), route('/about')];
-    mockedGetChangedFiles.mockReturnValue(['/project/src/layout.tsx']);
+    presentFiles(['/project/src/layout.tsx']);
 
     const fileMap = new Map<string, string[]>();
     fileMap.set('/', ['/project/src/app/page.tsx']);
@@ -272,7 +278,7 @@ describe('smartFilter', () => {
 
   it('falls back to all routes when filter returns empty (safety fallback)', async () => {
     const routes = [route('/'), route('/about')];
-    mockedGetChangedFiles.mockReturnValue(['/project/src/random.ts']);
+    presentFiles(['/project/src/random.ts']);
 
     const fileMap = new Map<string, string[]>();
     fileMap.set('/', ['/project/src/app/page.tsx']);
@@ -288,5 +294,26 @@ describe('smartFilter', () => {
 
     expect(result.filtered).toHaveLength(2);
     expect(result.reason).toContain('safety fallback');
+  });
+
+  it('renders every route when analysis is incomplete, even if a route was selected', async () => {
+    const routes = [route('/'), route('/about')];
+    mockedFilterAffectedRoutes.mockClear();
+    presentFiles(['/project/public/brand.svg', '/project/app/about/page.tsx']);
+    const fileMap = new Map<string, string[]>([
+      ['/', ['/project/app/page.tsx']],
+      ['/about', ['/project/app/about/page.tsx']],
+    ]);
+    mockedMapRoutesToFiles.mockReturnValue(fileMap);
+    mockedBuildDependencyGraph.mockReturnValue(new Map());
+    mockedIncompleteAnalysis.mockReturnValue('untraced static asset public/brand.svg — rendering all routes');
+    mockedFilterAffectedRoutes.mockReturnValue([route('/about')]);
+
+    const result = await smartFilter(routes, makeConfig());
+
+    expect(result.filtered.map((item) => item.path)).toEqual(['/', '/about']);
+    expect(result.skipped).toHaveLength(0);
+    expect(result.reason).toContain('untraced static asset');
+    expect(mockedFilterAffectedRoutes).not.toHaveBeenCalled();
   });
 });

@@ -54,6 +54,8 @@ export default defineConfig({
 });
 \`\`\`
 
+\`colorScheme\` and \`--color-scheme\` change emulation only. Until named capture modes exist, that run compares against the same baseline file as the default scheme (\`baselines/<route>/<viewport>/<browser>.png\`). Two route entries that share a path, viewport, and browser are a config error.
+
 ## 2. Automatic Route & Storybook Discovery
 - **Filesystem discovery**: Automatically detects Next.js App Router (including route groups and parallel slot filtering), Next.js Pages, Remix (\`_index\` and pathless layouts), SvelteKit, Astro, and Nuxt routes when \`routes\` is omitted.
 - **Crawler discovery**: Set \`discover: { startUrl: 'http://localhost:3000', maxDepth: 3, maxRoutes: 50, exclude: ['/admin/*'] }\`.

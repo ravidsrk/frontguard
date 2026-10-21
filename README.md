@@ -5,7 +5,7 @@
 [![npm: @frontguard/playwright](https://img.shields.io/npm/v/@frontguard/playwright?label=%40frontguard%2Fplaywright)](https://www.npmjs.com/package/@frontguard/playwright)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-**Local visual regression testing with reviewed git baselines, inspectable reports, and optional model-assisted analysis.** On the default compare path, pixel comparison is the pass/fail signal. Model classification is advisory and unmeasured. Experimental `frontguard run --mode judge --experimental` is a separate opt-in and is not that path.
+**Local visual regression testing with reviewed git baselines, inspectable reports, and optional model-assisted analysis.** On the default compare path, pixel comparison is the pass/fail signal. Model classification is advisory and unmeasured. Experimental `frontguard run --mode judge --experimental` is a separate opt-in and is not that path. Its notes are advisory. The protocol is [docs/judge-protocol.md](docs/judge-protocol.md).
 
 Frontguard gives frontend teams a local, inspectable screenshot comparison loop without requiring a hosted account.
 
@@ -290,7 +290,7 @@ export default {
 - `--threshold <ratio>` — Changed-pixel ratio threshold on a `0–1` scale (`0.01` = 1%)
 - `--wait-for-stability` — Wait for consecutive animation frames to converge before capturing
 - `--redact-sensitive` — Redact password, payment, and `[data-frontguard-redact]` inputs and scrub DOM snapshots before capture
-- `--color-scheme <scheme>` — Emulate `light` or `dark` `prefers-color-scheme`
+- `--color-scheme <scheme>` — Emulate `light` or `dark` `prefers-color-scheme`. This compares against the same baseline file as the default scheme until named capture modes exist.
 - `--freeze-time [timestamp]` — Freeze `Date.now()` / `new Date()` (boolean default, epoch ms, or ISO 8601 date string)
 - `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
 - `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render

@@ -92,10 +92,19 @@ function sanitizeRoutePath(route: string): string {
 /**
  * Builds the storage path for a baseline image within the orphan branch.
  *
- * Format: `baselines/<sanitized-route>/<viewport>/<browser>.png`
+ * Format: `baselines/<sanitized-route>/<viewport>/<browser>.png`.
+ * Color scheme, label, and pre-capture actions are not part of the key.
  */
-function baselinePath(route: string, viewport: number, browser: BrowserEngine): string {
+export function baselineStoragePath(
+  route: string,
+  viewport: number,
+  browser: BrowserEngine,
+): string {
   return `baselines/${sanitizeRoutePath(route)}/${viewport}/${browser}.png`;
+}
+
+function baselinePath(route: string, viewport: number, browser: BrowserEngine): string {
+  return baselineStoragePath(route, viewport, browser);
 }
 
 function gitErrorOutput(err: unknown): string {

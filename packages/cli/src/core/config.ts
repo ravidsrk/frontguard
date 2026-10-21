@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { baselineStoragePath } from "../storage/git-orphan.js";
 import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
@@ -192,6 +193,56 @@ const routeConfigSchema = z.object({
 
 /** A route entry — either a plain string path or a {@link routeConfigSchema}. */
 const routeEntrySchema = z.union([z.string().min(1), routeConfigSchema]);
+
+type BaselineKeyEntry =
+  | string
+  | { path: string; viewport?: number[]; colorScheme?: string; label?: string };
+
+function describeRouteEntry(index: number, entry: BaselineKeyEntry): string {
+  if (typeof entry === "string") return `routes[${index}] "${entry}"`;
+  const details = [
+    entry.colorScheme ? `colorScheme=${entry.colorScheme}` : "",
+    entry.label ? `label=${entry.label}` : "",
+  ].filter(Boolean);
+  const suffix = details.length > 0 ? ` (${details.join(", ")})` : "";
+  return `routes[${index}] "${entry.path}"${suffix}`;
+}
+
+/**
+ * Names two route entries that would write the same baseline file.
+ * The file key is path + viewport + browser. Color scheme, label, and actions
+ * are not part of it until named capture modes exist.
+ */
+export function duplicateBaselineKeyMessage(config: {
+  routes?: BaselineKeyEntry[];
+  viewports: number[];
+  browsers: Array<"chromium" | "firefox" | "webkit">;
+}): string | null {
+  const seen = new Map<string, string>();
+  for (const [index, entry] of (config.routes ?? []).entries()) {
+    const path = typeof entry === "string" ? entry : entry.path;
+    const viewports =
+      typeof entry === "string" || !entry.viewport?.length
+        ? config.viewports
+        : entry.viewport;
+    const description = describeRouteEntry(index, entry);
+    for (const viewport of viewports) {
+      for (const browser of config.browsers) {
+        const file = baselineStoragePath(path, viewport, browser);
+        const previous = seen.get(file);
+        if (previous) {
+          return (
+            `${previous} and ${description} share baseline file ${file}. ` +
+            "Color scheme, label, and actions do not get their own file yet, " +
+            "so give the entries different paths or viewports."
+          );
+        }
+        seen.set(file, description);
+      }
+    }
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Main Config Schema
@@ -384,6 +435,10 @@ export const configSchema = z.object({
   waitForStability: z
     .union([z.boolean(), stabilityConfigSchema])
     .optional(),
+}).superRefine((config, ctx) => {
+  const message = duplicateBaselineKeyMessage(config);
+  if (!message) return;
+  ctx.addIssue({ code: "custom", message, path: ["routes"] });
 });
 
 /** Inferred Zod output type — should match `FrontguardConfig`. */

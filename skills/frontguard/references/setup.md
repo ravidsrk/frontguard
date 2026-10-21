@@ -34,7 +34,7 @@ export default defineConfig({
     intervalMs: 100,
     maxUnstableRatio: 0.0005, // 0.05% frame-to-frame stability convergence threshold
   },
-  colorScheme: 'light',       // Global default: 'light' | 'dark'
+  colorScheme: 'light',       // Emulation only. Same baseline file as the default scheme.
   routes: [
     '/',
     '/pricing',

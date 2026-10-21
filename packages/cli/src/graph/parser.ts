@@ -15,8 +15,11 @@ import { resolve, dirname, extname, join } from 'node:path';
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Maximum files to visit during graph traversal (prevents runaway builds). */
-const MAX_GRAPH_FILES = 10_000;
+/**
+ * Maximum files to visit during graph traversal (prevents runaway builds).
+ * A walk that stops here is incomplete: callers must render every route.
+ */
+export const DEPENDENCY_GRAPH_FILE_CAP = 10_000;
 
 /** Extensions to try when resolving extensionless import specifiers. */
 const TRY_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.css', '.module.css', '.vue', '.svelte'];
@@ -136,6 +139,49 @@ function resolveImportPath(specifier: string, fromDir: string): string | null {
 // Core API
 // ---------------------------------------------------------------------------
 
+function readSource(filePath: string): string | null {
+  try {
+    return readFileSync(filePath, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+/** Import and require specifiers in source order, including ones that do not resolve. */
+function rawSpecifiersFromSource(source: string, filePath: string): string[] {
+  const rawSpecifiers: string[] = [];
+  const ext = extname(filePath).toLowerCase();
+  const isCssFile = ext === '.css' || ext === '.module.css';
+  const hasJsImport = /(?:^|[^@])import\s+/m.test(source);
+  const hasRequire = source.includes('require(');
+  const hasCssImport = source.includes('@import');
+  const looksLikeCss = isCssFile || (hasCssImport && !hasJsImport && !hasRequire);
+
+  if (looksLikeCss) {
+    CSS_IMPORT_RE.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = CSS_IMPORT_RE.exec(source)) !== null) {
+      rawSpecifiers.push(match[1]);
+    }
+    return rawSpecifiers;
+  }
+
+  ESM_IMPORT_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = ESM_IMPORT_RE.exec(source)) !== null) {
+    rawSpecifiers.push(match[1]);
+  }
+  REQUIRE_RE.lastIndex = 0;
+  while ((match = REQUIRE_RE.exec(source)) !== null) {
+    rawSpecifiers.push(match[1]);
+  }
+  DYNAMIC_IMPORT_RE.lastIndex = 0;
+  while ((match = DYNAMIC_IMPORT_RE.exec(source)) !== null) {
+    rawSpecifiers.push(match[1]);
+  }
+  return rawSpecifiers;
+}
+
 /**
  * Parses a source file and returns all resolved absolute import paths.
  *
@@ -151,67 +197,39 @@ function resolveImportPath(specifier: string, fromDir: string): string | null {
  * @returns Array of absolute paths this file imports
  */
 export function parseImports(filePath: string): string[] {
-  let source: string;
-  try {
-    source = readFileSync(filePath, 'utf-8');
-  } catch {
-    // File not found or unreadable — graceful degradation
-    return [];
-  }
+  const source = readSource(filePath);
+  if (source === null) return [];
 
   const fromDir = dirname(filePath);
-  const rawSpecifiers: string[] = [];
-
-  // Determine if this is a CSS file (by extension or content heuristic)
-  const ext = extname(filePath).toLowerCase();
-  const isCssFile = ext === '.css' || ext === '.module.css';
-
-  // For CSS files, only look for @import
-  // For JS/TS files, look for all import types
-  const hasJsImport = /(?:^|[^@])import\s+/m.test(source);
-  const hasRequire = source.includes('require(');
-  const hasCssImport = source.includes('@import');
-  const looksLikeCss = isCssFile || (hasCssImport && !hasJsImport && !hasRequire);
-
-  if (looksLikeCss) {
-    CSS_IMPORT_RE.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = CSS_IMPORT_RE.exec(source)) !== null) {
-      rawSpecifiers.push(match[1]);
-    }
-  } else {
-    // ESM imports
-    ESM_IMPORT_RE.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = ESM_IMPORT_RE.exec(source)) !== null) {
-      rawSpecifiers.push(match[1]);
-    }
-
-    // require() calls
-    REQUIRE_RE.lastIndex = 0;
-    while ((match = REQUIRE_RE.exec(source)) !== null) {
-      rawSpecifiers.push(match[1]);
-    }
-
-    // Dynamic import()
-    DYNAMIC_IMPORT_RE.lastIndex = 0;
-    while ((match = DYNAMIC_IMPORT_RE.exec(source)) !== null) {
-      rawSpecifiers.push(match[1]);
-    }
-  }
-
-  // Resolve specifiers to absolute paths, skipping bare specifiers
   const resolved: string[] = [];
-  for (const specifier of rawSpecifiers) {
+  for (const specifier of rawSpecifiersFromSource(source, filePath)) {
     if (isBareSpecifier(specifier)) continue;
-
     const absPath = resolveImportPath(specifier, fromDir);
-    if (absPath) {
-      resolved.push(absPath);
-    }
+    if (absPath) resolved.push(absPath);
   }
-
   return [...new Set(resolved)];
+}
+
+/**
+ * Relative or absolute specifiers in `filePath` that did not resolve to a file.
+ * Bare package specifiers are ignored. An unreadable file returns an empty list.
+ */
+export function unresolvedRelativeImports(filePath: string): string[] {
+  const source = readSource(filePath);
+  if (source === null) return [];
+
+  const fromDir = dirname(filePath);
+  const missing: string[] = [];
+  for (const specifier of rawSpecifiersFromSource(source, filePath)) {
+    if (isBareSpecifier(specifier)) continue;
+    if (!resolveImportPath(specifier, fromDir)) missing.push(specifier);
+  }
+  return [...new Set(missing)];
+}
+
+/** Forward import map plus a flag when the walk stopped at {@link DEPENDENCY_GRAPH_FILE_CAP}. */
+export class DependencyGraph extends Map<string, Set<string>> {
+  truncated = false;
 }
 
 /**
@@ -221,7 +239,8 @@ export function parseImports(filePath: string): string[] {
  * a map of every file to the set of files it imports.
  *
  * - Tracks visited files to handle circular dependencies
- * - Caps at 10,000 files to prevent runaway traversals
+ * - Caps at {@link DEPENDENCY_GRAPH_FILE_CAP} files to prevent runaway traversals.
+ *   `truncated` is set when files remain queued, so the result is not a complete graph.
  * - Returns forward edge map: file → set of files it imports
  *
  * @param entryFiles - Absolute paths to start BFS from
@@ -231,8 +250,8 @@ export function parseImports(filePath: string): string[] {
 export function buildDependencyGraph(
   entryFiles: string[],
   _projectDir: string,
-): Map<string, Set<string>> {
-  const graph = new Map<string, Set<string>>();
+): DependencyGraph {
+  const graph = new DependencyGraph();
   const visited = new Set<string>();
   const queue: string[] = [];
 
@@ -247,8 +266,10 @@ export function buildDependencyGraph(
 
   // BFS traversal
   while (queue.length > 0) {
-    // Cap check
-    if (graph.size >= MAX_GRAPH_FILES) break;
+    if (graph.size >= DEPENDENCY_GRAPH_FILE_CAP) {
+      graph.truncated = true;
+      break;
+    }
 
     const current = queue.shift()!;
     const imports = parseImports(current);
