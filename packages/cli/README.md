@@ -149,10 +149,12 @@ export default {
     // baseUrl: "https://openrouter.ai/api/v1", // OpenRouter, Ollama, or vLLM
   },
 
-  // Ignore dynamic content
-  ignore: [{ selector: ".dynamic-timestamp" }],
+  // Ignore dynamic content. `since` is the date the rule was added.
+  ignore: [{ selector: ".dynamic-timestamp", since: "2026-01-01" }],
 };
 ```
+
+`frontguard ignores --older-than <days>` lists rules whose `since` date is strictly older than that, and the shots they cover. The list follows one vendor account, not a consensus. The command does not remove a rule. A model, a prompt, or a flake heuristic does not either. Add `since` as `YYYY-MM-DD` for a rule to be counted.
 
 ### 2. Built-in Plugins (WCAG Accessibility, Performance Budgets & Script Drift)
 

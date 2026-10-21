@@ -110,6 +110,7 @@ const ignoreRuleSchema = z
       })
       .optional(),
     description: z.string().optional(),
+    since: z.iso.date().optional(),
   })
   .refine((r) => r.selector || r.rect, {
     message: "IgnoreRule must have selector or rect",
