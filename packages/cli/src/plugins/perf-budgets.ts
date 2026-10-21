@@ -222,8 +222,8 @@ function _formatMetric(value: number | undefined, unit: string): string {
   return `${value.toFixed(2)}`;
 }
 
-function metricKey(routePath: string, viewport: number): string {
-  return `${routePath}@${viewport}`;
+function metricKey(rpath: string, viewport: number): string {
+  return `${rpath}@${viewport}`;
 }
 
 /**
@@ -312,8 +312,8 @@ export function createPerfBudgetPlugin(config: PerfBudgetConfig): FrontguardPlug
     },
 
     // ----- afterRender -----
-    afterRender(screenshots: ScreenshotResult[], ctx: PluginContext): void {
-      for (const shot of screenshots) {
+    afterRender(shots: ScreenshotResult[], ctx: PluginContext): void {
+      for (const shot of shots) {
         const metrics = extractMetricsFromSnapshot(shot.domSnapshot);
         if (metrics) {
           const key = metricKey(shot.route.path, shot.viewport);

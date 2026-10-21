@@ -137,7 +137,7 @@ function persistBufferToTemp(
  * Read an image buffer back from a temp file path.
  * Returns undefined if path is empty or the file doesn't exist.
  */
-function readBufferFromTemp(filePath: string): Buffer | undefined {
+function readTemp(filePath: string): Buffer | undefined {
   if (!filePath) return undefined;
   try {
     return readFileSync(filePath);
@@ -580,7 +580,7 @@ async function runCapturedPipeline(
   // -----------------------------------------------------------------------
   // Stage 3: RENDER
   // -----------------------------------------------------------------------
-  let screenshots: ScreenshotResult[] = [];
+  let shots: ScreenshotResult[] = [];
 
   // Plugin hook: beforeRender — can modify routes or config per-render
   {
@@ -611,25 +611,25 @@ async function runCapturedPipeline(
       return results;
     });
 
-    screenshots = captured;
+    shots = captured;
     timing.render = duration;
-    reporter.onStageComplete('render', `Captured ${screenshots.length} screenshot(s) in ${duration}ms`);
-    captureSpan.end(screenshots.length === 0 ? 'error' : 'ok', {
-      'frontguard.shots': screenshots.length,
+    reporter.onStageComplete('render', `Captured ${shots.length} screenshot(s) in ${duration}ms`);
+    captureSpan.end(shots.length === 0 ? 'error' : 'ok', {
+      'frontguard.shots': shots.length,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`Render stage failed: ${msg}`);
     reporter.onStageComplete('render', `Failed: ${msg}`);
-    captureSpan.end('error', { 'frontguard.shots': screenshots.length });
+    captureSpan.end('error', { 'frontguard.shots': shots.length });
   }
 
   // Plugin hook: afterRender — can modify screenshots before comparison
-  if (screenshots.length > 0) {
-    screenshots = await pluginManager.runHook('afterRender', screenshots, pluginCtx);
+  if (shots.length > 0) {
+    shots = await pluginManager.runHook('afterRender', shots, pluginCtx);
   }
 
-  if (screenshots.length === 0) {
+  if (shots.length === 0) {
     logger.error('No screenshots were captured — cannot proceed with comparison');
     const emptyResult = buildResult([], timing, totalStart, config);
     await reporter.onComplete(emptyResult);
@@ -686,7 +686,7 @@ async function runCapturedPipeline(
     const [, duration] = await timed(async () => {
       let completed = 0;
       const batchResults = await processBatched(
-        screenshots,
+        shots,
         COMPARE_BATCH_SIZE,
         async (shot, i) => {
           let diff: DiffResult;
@@ -768,7 +768,7 @@ async function runCapturedPipeline(
           reporter.onStageProgress(
             'compare',
             completed,
-            screenshots.length,
+            shots.length,
             `${shot.route.path} @ ${shot.viewport}px → ${diff.status} (${diff.diffPercentage.toFixed(2)}%)`,
           );
 
@@ -823,7 +823,7 @@ async function runCapturedPipeline(
   }
 
   // Free the screenshots array — all data has been extracted
-  screenshots = [];
+  shots = [];
 
   // Plugin hook: afterCompare — can modify diff results or add custom analysis
   // Runs before buffer disposal so plugins (e.g. Figma compliance) can read diff.currentImage.
@@ -857,25 +857,25 @@ async function runCapturedPipeline(
   // -----------------------------------------------------------------------
   if (config.ai) {
     // Restore image buffers from temp for changed diffs so AI can analyze them
-    const changedDiffsWithIndices: Array<{ diff: DiffResult; index: number }> = [];
+    const aiDiffs: Array<{ diff: DiffResult; index: number }> = [];
     for (let i = 0; i < diffs.length; i++) {
       const d = diffs[i];
       if (d.status === 'changed' || d.status === 'regression') {
         // Restore buffers from temp so AI can access the images
         const paths = tempPaths.get(i);
         if (paths) {
-          d.baselineImage = readBufferFromTemp(paths.baseline);
-          d.currentImage = readBufferFromTemp(paths.current);
-          d.diffImage = readBufferFromTemp(paths.diff);
+          d.baselineImage = readTemp(paths.baseline);
+          d.currentImage = readTemp(paths.current);
+          d.diffImage = readTemp(paths.diff);
         }
-        changedDiffsWithIndices.push({ diff: d, index: i });
+        aiDiffs.push({ diff: d, index: i });
       }
     }
 
-    if (changedDiffsWithIndices.length > 0) {
+    if (aiDiffs.length > 0) {
       reporter.onStageStart(
         'analyze',
-        `Analyzing ${changedDiffsWithIndices.length} change(s) with ${config.ai.provider}/${config.ai.model} (batch size: ${AI_BATCH_SIZE})…`,
+        `Analyzing ${aiDiffs.length} change(s) with ${config.ai.provider}/${config.ai.model} (batch size: ${AI_BATCH_SIZE})…`,
       );
 
       const aiConfig = config.ai;
@@ -896,7 +896,7 @@ async function runCapturedPipeline(
       try {
         const [analysisOutcomes, duration] = await timed(async () => {
           return processBatched(
-            changedDiffsWithIndices,
+            aiDiffs,
             AI_BATCH_SIZE,
             async ({ diff }) => {
               const accessibility = a11yByKey.get(`${diff.route.path}@${diff.viewport}`);
@@ -913,7 +913,7 @@ async function runCapturedPipeline(
               reporter.onStageProgress(
                 'analyze',
                 completed,
-                changedDiffsWithIndices.length,
+                aiDiffs.length,
                 `${diff.route.path} → ${analysis.classification} (${(analysis.confidence * 100).toFixed(0)}%)`,
               );
 
@@ -928,7 +928,7 @@ async function runCapturedPipeline(
           if (outcome.status === 'fulfilled') continue;
 
           analysisFailures++;
-          const diff = changedDiffsWithIndices[i]?.diff;
+          const diff = aiDiffs[i]?.diff;
           const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
           if (diff) {
             diff.status = 'error';
@@ -937,7 +937,7 @@ async function runCapturedPipeline(
             reporter.onStageProgress(
               'analyze',
               completed,
-              changedDiffsWithIndices.length,
+              aiDiffs.length,
               `${diff.route.path} → error`,
             );
           }
@@ -948,12 +948,12 @@ async function runCapturedPipeline(
           logger.error(`AI analysis failed for ${analysisFailures} change(s)`);
           reporter.onStageComplete(
             'analyze',
-            `Analyzed ${changedDiffsWithIndices.length - analysisFailures} change(s); ${analysisFailures} failed in ${duration}ms`,
+            `Analyzed ${aiDiffs.length - analysisFailures} change(s); ${analysisFailures} failed in ${duration}ms`,
           );
         } else {
           reporter.onStageComplete(
             'analyze',
-            `Analyzed ${changedDiffsWithIndices.length} change(s) in ${duration}ms`,
+            `Analyzed ${aiDiffs.length} change(s) in ${duration}ms`,
           );
         }
       } catch (err) {
@@ -963,7 +963,7 @@ async function runCapturedPipeline(
       }
 
       // Free AI buffers again after analysis — they'll be restored for reporting
-      for (const { diff } of changedDiffsWithIndices) {
+      for (const { diff } of aiDiffs) {
         disposeBuffers(diff);
       }
     } else {
@@ -983,9 +983,9 @@ async function runCapturedPipeline(
       if (d.aiAnalysis?.classification === 'regression') {
         const paths = tempPaths.get(i);
         if (paths) {
-          d.baselineImage = readBufferFromTemp(paths.baseline);
-          d.currentImage = readBufferFromTemp(paths.current);
-          d.diffImage = readBufferFromTemp(paths.diff);
+          d.baselineImage = readTemp(paths.baseline);
+          d.currentImage = readTemp(paths.current);
+          d.diffImage = readTemp(paths.diff);
         }
         regressionDiffs.push({ diff: d, index: i });
       }
@@ -1076,9 +1076,9 @@ async function runCapturedPipeline(
       const paths = tempPaths.get(idx)!;
       const diff = diffs[idx];
       if (!diff) continue;
-      diff.baselineImage = readBufferFromTemp(paths.baseline);
-      diff.currentImage = readBufferFromTemp(paths.current);
-      diff.diffImage = readBufferFromTemp(paths.diff);
+      diff.baselineImage = readTemp(paths.baseline);
+      diff.currentImage = readTemp(paths.current);
+      diff.diffImage = readTemp(paths.diff);
     }
   }
 
@@ -1197,17 +1197,17 @@ async function writeUpdatedBaselines(
   reporter.onStageStart('render', `Capturing screenshots for ${routes.length} route(s)…`);
 
   const captureSpan = trace.start('frontguard.capture');
-  const [screenshots, renderDuration] = await timed(() => renderPages(routes, config));
+  const [shots, renderDuration] = await timed(() => renderPages(routes, config));
   timing.render = renderDuration;
   const captureFailed =
-    screenshots.length === 0 ||
-    screenshots.some((shot) => !Buffer.isBuffer(shot.buffer) || shot.buffer.length === 0);
-  captureSpan.end(captureFailed ? 'error' : 'ok', { 'frontguard.shots': screenshots.length });
-  if (screenshots.length === 0) {
+    shots.length === 0 ||
+    shots.some((shot) => !Buffer.isBuffer(shot.buffer) || shot.buffer.length === 0);
+  captureSpan.end(captureFailed ? 'error' : 'ok', { 'frontguard.shots': shots.length });
+  if (shots.length === 0) {
     reporter.onStageComplete('render', 'Failed: no screenshots were captured');
     throw new Error('Cannot update baselines: no screenshots were captured');
   }
-  const failedCaptures = screenshots.filter(
+  const failedCaptures = shots.filter(
     (shot) => !Buffer.isBuffer(shot.buffer) || shot.buffer.length === 0,
   );
   if (failedCaptures.length > 0) {
@@ -1220,7 +1220,7 @@ async function writeUpdatedBaselines(
       `Cannot update baselines: ${failureCount} capture${failureCount === 1 ? '' : 's'} failed`,
     );
   }
-  reporter.onStageComplete('render', `Captured ${screenshots.length} screenshot(s)`);
+  reporter.onStageComplete('render', `Captured ${shots.length} screenshot(s)`);
 
   // The accessibility plugin's own cutoff is the block. Pixel status is not an input.
   let baselineBlock: string | undefined;
@@ -1235,7 +1235,7 @@ async function writeUpdatedBaselines(
     const ctx = { config, logger, metadata };
     try {
       await manager.setup(ctx);
-      await manager.runHook('afterRender', screenshots, ctx);
+      await manager.runHook('afterRender', shots, ctx);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (!message.startsWith('Accessibility check failed:')) throw err;
@@ -1257,7 +1257,7 @@ async function writeUpdatedBaselines(
       const textCtx = { config, logger, metadata: md };
       try {
         await mgr.setup(textCtx);
-        await mgr.runHook('afterRender', screenshots, textCtx);
+        await mgr.runHook('afterRender', shots, textCtx);
         textDone = { manager: mgr, ctx: textCtx };
       } finally {
         await mgr.teardown();
@@ -1283,11 +1283,11 @@ async function writeUpdatedBaselines(
 
     if (useBatchWrite) {
       const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
-      const manifest = stampBaselineManifest(existing, screenshots, config.colorScheme);
+      const manifest = stampBaselineManifest(existing, shots, config.colorScheme);
 
       try {
         await storage.writeBaselines(
-          screenshots.map((shot) => ({
+          shots.map((shot) => ({
             route: shot.route.path,
             viewport: shot.viewport,
             browser: shot.browser,
@@ -1295,24 +1295,24 @@ async function writeUpdatedBaselines(
           })),
           manifest,
         );
-        for (const shot of screenshots) {
+        for (const shot of shots) {
           written++;
           writtenScreenshots.push(shot);
           reporter.onStageProgress(
             'compare',
             written,
-            screenshots.length,
+            shots.length,
             `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
           );
         }
       } catch (err) {
-        writeFailures = screenshots.length;
+        writeFailures = shots.length;
         logger.error(
           `Failed to write baselines: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     } else {
-      for (const shot of screenshots) {
+      for (const shot of shots) {
         try {
           await storage.writeBaseline(
             shot.route.path,
@@ -1326,7 +1326,7 @@ async function writeUpdatedBaselines(
           reporter.onStageProgress(
             'compare',
             written,
-            screenshots.length,
+            shots.length,
             `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
           );
         } catch (err) {
@@ -1347,10 +1347,10 @@ async function writeUpdatedBaselines(
       writeSpan.end('error', { 'frontguard.shots': written });
       reporter.onStageComplete(
         'compare',
-        `Failed to write ${writeFailures} of ${screenshots.length} baseline${screenshots.length === 1 ? '' : 's'}`,
+        `Failed to write ${writeFailures} of ${shots.length} baseline${shots.length === 1 ? '' : 's'}`,
       );
       throw new Error(
-        `Failed to write ${writeFailures} of ${screenshots.length} baseline${screenshots.length === 1 ? '' : 's'}`,
+        `Failed to write ${writeFailures} of ${shots.length} baseline${shots.length === 1 ? '' : 's'}`,
       );
     }
 
@@ -1363,7 +1363,7 @@ async function writeUpdatedBaselines(
   timing.total = Math.round(performance.now() - totalStart);
   const result = {
     ...buildResult(
-      screenshots.map((shot) => createNewPageResult(shot)),
+      shots.map((shot) => createNewPageResult(shot)),
       timing,
       totalStart,
       config,
@@ -1440,40 +1440,40 @@ async function judgeCapturedPages(
   const totalCombinations = routes.length * config.viewports.length * config.browsers.length;
 
   // Stage 2: RENDER --------------------------------------------------------
-  let screenshots: ScreenshotResult[] = [];
+  let shots: ScreenshotResult[] = [];
   const captureSpan = trace.start('frontguard.capture');
   reporter.onStageStart('render', `Capturing ${totalCombinations} screenshot(s)…`);
   try {
     const [captured, duration] = await timed(() => renderPages(routes, config));
-    screenshots = captured;
+    shots = captured;
     timing.render = duration;
-    reporter.onStageComplete('render', `Captured ${screenshots.length} screenshot(s) in ${duration}ms`);
-    captureSpan.end(screenshots.length === 0 ? 'error' : 'ok', {
-      'frontguard.shots': screenshots.length,
+    reporter.onStageComplete('render', `Captured ${shots.length} screenshot(s) in ${duration}ms`);
+    captureSpan.end(shots.length === 0 ? 'error' : 'ok', {
+      'frontguard.shots': shots.length,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`Render stage failed: ${msg}`);
     reporter.onStageComplete('render', `Failed: ${msg}`);
-    captureSpan.end('error', { 'frontguard.shots': screenshots.length });
+    captureSpan.end('error', { 'frontguard.shots': shots.length });
   }
 
-  if (screenshots.length === 0) {
+  if (shots.length === 0) {
     const empty = buildJudgeResult([], timing, totalStart, config);
     await reporter.onComplete(empty);
     return empty;
   }
 
   // Stage 3: JUDGE ---------------------------------------------------------
-  reporter.onStageStart('analyze', `Judging ${screenshots.length} screenshot(s) with ${config.ai.provider}/${config.ai.model}…`);
+  reporter.onStageStart('analyze', `Judging ${shots.length} screenshot(s) with ${config.ai.provider}/${config.ai.model}…`);
   const judgements: JudgeResult[] = [];
   const judgeConfig = config.judge;
 
   // Cache Figma references per route (share in-flight promise across concurrent viewports).
   const referenceCache = new Map<string, Promise<Buffer | null>>();
-  async function referenceFor(routePath: string): Promise<Buffer | undefined> {
+  async function referenceFor(rpath: string): Promise<Buffer | undefined> {
     if (!judgeConfig?.figmaFileKey || !judgeConfig.figmaPages) return undefined;
-    let pending = referenceCache.get(routePath);
+    let pending = referenceCache.get(rpath);
     if (!pending) {
       pending = fetchDesignReference(
         {
@@ -1481,23 +1481,23 @@ async function judgeCapturedPages(
           pages: judgeConfig.figmaPages,
           scale: judgeConfig.figmaScale,
         },
-        routePath,
+        rpath,
       );
-      referenceCache.set(routePath, pending);
+      referenceCache.set(rpath, pending);
     }
     const resolved = await pending;
     return resolved ?? undefined;
   }
 
   const [judgeOutcomes, judgeDuration] = await timed(async () => {
-    return processBatched(screenshots, AI_BATCH_SIZE, async (shot, index) => {
+    return processBatched(shots, AI_BATCH_SIZE, async (shot, index) => {
       const figmaReference = await referenceFor(shot.route.path);
       const verdict = await judgeScreenshot(shot, { ai: config.ai!, figmaReference });
       judgements.push(verdict);
       reporter.onStageProgress(
         'analyze',
         index + 1,
-        screenshots.length,
+        shots.length,
         `${shot.route.path} @ ${shot.viewport}px → ${verdict.pass ? 'pass' : 'fail'}`,
       );
     });
@@ -1508,7 +1508,7 @@ async function judgeCapturedPages(
     if (outcome.status === 'fulfilled') continue;
 
     judgeFailures++;
-    const shot = screenshots[i];
+    const shot = shots[i];
     if (!shot) continue;
     const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
     judgements.push({
@@ -1524,7 +1524,7 @@ async function judgeCapturedPages(
     reporter.onStageProgress(
       'analyze',
       i + 1,
-      screenshots.length,
+      shots.length,
       `${shot.route.path} @ ${shot.viewport}px → error`,
     );
   }

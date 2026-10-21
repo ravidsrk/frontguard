@@ -85,40 +85,40 @@ type FrameworkType = 'nextjs-app' | 'nextjs-pages' | 'remix' | 'sveltekit' | 'nu
  * Detects the frontend framework in use by checking for characteristic
  * directory structures.
  */
-function detectFramework(projectDir: string): FrameworkType[] {
+function detectFramework(proj: string): FrameworkType[] {
   const frameworks: FrameworkType[] = [];
 
   // Next.js App Router
   if (
-    existsSync(join(projectDir, 'app')) ||
-    existsSync(join(projectDir, 'src', 'app'))
+    existsSync(join(proj, 'app')) ||
+    existsSync(join(proj, 'src', 'app'))
   ) {
     frameworks.push('nextjs-app');
   }
 
   // Next.js Pages Router
   if (
-    existsSync(join(projectDir, 'pages')) ||
-    existsSync(join(projectDir, 'src', 'pages'))
+    existsSync(join(proj, 'pages')) ||
+    existsSync(join(proj, 'src', 'pages'))
   ) {
     frameworks.push('nextjs-pages');
   }
 
   // Remix
-  if (existsSync(join(projectDir, 'app', 'routes'))) {
+  if (existsSync(join(proj, 'app', 'routes'))) {
     frameworks.push('remix');
   }
 
   // SvelteKit
-  if (existsSync(join(projectDir, 'src', 'routes'))) {
+  if (existsSync(join(proj, 'src', 'routes'))) {
     frameworks.push('sveltekit');
   }
 
   // Nuxt
   if (
-    existsSync(join(projectDir, 'pages')) &&
-    (existsSync(join(projectDir, 'nuxt.config.ts')) ||
-      existsSync(join(projectDir, 'nuxt.config.js')))
+    existsSync(join(proj, 'pages')) &&
+    (existsSync(join(proj, 'nuxt.config.ts')) ||
+      existsSync(join(proj, 'nuxt.config.js')))
   ) {
     frameworks.push('nuxt');
   }
@@ -137,22 +137,22 @@ function detectFramework(projectDir: string): FrameworkType[] {
 /**
  * Converts a route path to potential file system paths for different frameworks.
  */
-function getRouteCandidates(routePath: string, projectDir: string): string[] {
+function getRouteCandidates(rpath: string, proj: string): string[] {
   const candidates: string[] = [];
-  const normalizedPath = routePath === '/' ? '' : routePath.replace(/^\//, '');
-  const frameworks = detectFramework(projectDir);
+  const norm = rpath === '/' ? '' : rpath.replace(/^\//, '');
+  const frameworks = detectFramework(proj);
 
   for (const framework of frameworks) {
     switch (framework) {
       case 'nextjs-app': {
         const appDirs = [
-          join(projectDir, 'app'),
-          join(projectDir, 'src', 'app'),
+          join(proj, 'app'),
+          join(proj, 'src', 'app'),
         ];
 
         for (const appDir of appDirs) {
           if (!existsSync(appDir)) continue;
-          const routeDir = normalizedPath ? join(appDir, normalizedPath) : appDir;
+          const routeDir = norm ? join(appDir, norm) : appDir;
 
           for (const ext of PAGE_EXTENSIONS) {
             candidates.push(join(routeDir, `page${ext}`));
@@ -170,23 +170,23 @@ function getRouteCandidates(routePath: string, projectDir: string): string[] {
 
       case 'nextjs-pages': {
         const pagesDirs = [
-          join(projectDir, 'pages'),
-          join(projectDir, 'src', 'pages'),
+          join(proj, 'pages'),
+          join(proj, 'src', 'pages'),
         ];
 
         for (const pagesDir of pagesDirs) {
           if (!existsSync(pagesDir)) continue;
 
-          if (normalizedPath === '') {
+          if (norm === '') {
             for (const ext of PAGE_EXTENSIONS) {
               candidates.push(join(pagesDir, `index${ext}`));
             }
           } else {
             for (const ext of PAGE_EXTENSIONS) {
-              candidates.push(join(pagesDir, `${normalizedPath}${ext}`));
+              candidates.push(join(pagesDir, `${norm}${ext}`));
             }
             for (const ext of PAGE_EXTENSIONS) {
-              candidates.push(join(pagesDir, normalizedPath, `index${ext}`));
+              candidates.push(join(pagesDir, norm, `index${ext}`));
             }
           }
           // _app and _document affect all routes
@@ -199,33 +199,33 @@ function getRouteCandidates(routePath: string, projectDir: string): string[] {
       }
 
       case 'remix': {
-        const routesDir = join(projectDir, 'app', 'routes');
+        const routesDir = join(proj, 'app', 'routes');
         if (!existsSync(routesDir)) break;
 
-        if (normalizedPath === '') {
+        if (norm === '') {
           for (const ext of PAGE_EXTENSIONS) {
             candidates.push(join(routesDir, `_index${ext}`));
           }
         } else {
           // Remix flat routes: /checkout/summary → checkout.summary
-          const flatRoute = normalizedPath.replace(/\//g, '.');
+          const flatRoute = norm.replace(/\//g, '.');
           for (const ext of PAGE_EXTENSIONS) {
             candidates.push(join(routesDir, `${flatRoute}${ext}`));
             candidates.push(join(routesDir, `${flatRoute}._index${ext}`));
-            candidates.push(join(routesDir, `${normalizedPath}${ext}`));
+            candidates.push(join(routesDir, `${norm}${ext}`));
           }
         }
         // Root layout
         for (const ext of PAGE_EXTENSIONS) {
-          candidates.push(join(projectDir, 'app', `root${ext}`));
+          candidates.push(join(proj, 'app', `root${ext}`));
         }
         break;
       }
 
       case 'sveltekit': {
-        const routesDir = join(projectDir, 'src', 'routes');
+        const routesDir = join(proj, 'src', 'routes');
         if (!existsSync(routesDir)) break;
-        const routeDir = normalizedPath ? join(routesDir, normalizedPath) : routesDir;
+        const routeDir = norm ? join(routesDir, norm) : routesDir;
 
         candidates.push(join(routeDir, '+page.svelte'));
         candidates.push(join(routeDir, '+page.ts'));
@@ -239,47 +239,47 @@ function getRouteCandidates(routePath: string, projectDir: string): string[] {
       }
 
       case 'nuxt': {
-        const pagesDir = join(projectDir, 'pages');
+        const pagesDir = join(proj, 'pages');
         if (!existsSync(pagesDir)) break;
 
-        if (normalizedPath === '') {
+        if (norm === '') {
           candidates.push(join(pagesDir, 'index.vue'));
         } else {
-          candidates.push(join(pagesDir, `${normalizedPath}.vue`));
-          candidates.push(join(pagesDir, normalizedPath, 'index.vue'));
+          candidates.push(join(pagesDir, `${norm}.vue`));
+          candidates.push(join(pagesDir, norm, 'index.vue'));
         }
 
         // Layouts
-        const layoutsDir = join(projectDir, 'layouts');
+        const layoutsDir = join(proj, 'layouts');
         if (existsSync(layoutsDir)) {
           candidates.push(join(layoutsDir, 'default.vue'));
         }
-        candidates.push(join(projectDir, 'app.vue'));
+        candidates.push(join(proj, 'app.vue'));
         break;
       }
 
       case 'generic':
       default: {
         const dirs = [
-          join(projectDir, 'src', 'pages'),
-          join(projectDir, 'src', 'views'),
-          join(projectDir, 'src', 'routes'),
-          join(projectDir, 'pages'),
-          join(projectDir, 'views'),
+          join(proj, 'src', 'pages'),
+          join(proj, 'src', 'views'),
+          join(proj, 'src', 'routes'),
+          join(proj, 'pages'),
+          join(proj, 'views'),
         ];
 
         for (const dir of dirs) {
           if (!existsSync(dir)) continue;
-          if (normalizedPath === '') {
+          if (norm === '') {
             for (const ext of PAGE_EXTENSIONS) {
               candidates.push(join(dir, `index${ext}`));
             }
           } else {
             for (const ext of PAGE_EXTENSIONS) {
-              candidates.push(join(dir, `${normalizedPath}${ext}`));
+              candidates.push(join(dir, `${norm}${ext}`));
             }
             for (const ext of PAGE_EXTENSIONS) {
-              candidates.push(join(dir, normalizedPath, `index${ext}`));
+              candidates.push(join(dir, norm, `index${ext}`));
             }
           }
         }
@@ -305,15 +305,15 @@ function getRouteCandidates(routePath: string, projectDir: string): string[] {
  */
 export function mapRoutesToFiles(
   routes: Route[],
-  projectDir: string,
+  proj: string,
 ): Map<string, string[]> {
   const routeFileMap = new Map<string, string[]>();
-  const frameworks = detectFramework(projectDir);
+  const frameworks = detectFramework(proj);
 
   logger.debug(`Detected framework(s): ${frameworks.join(', ')}`);
 
   for (const route of routes) {
-    const candidates = getRouteCandidates(route.path, projectDir);
+    const candidates = getRouteCandidates(route.path, proj);
     const existing = candidates.filter((c) => existsSync(c));
     const unique = [...new Set(existing)];
 
@@ -343,10 +343,10 @@ export function mapRoutesToFiles(
  * injection. src/storage/git-orphan.ts already does it this way.
  */
 /** Changed paths, or null when git exits non-zero. An empty diff is `[]`, not null. */
-function gitDiff(projectDir: string, args: string[]): string[] | null {
+function gitDiff(proj: string, args: string[]): string[] | null {
   try {
     const output = execFileSync('git', args, {
-      cwd: projectDir,
+      cwd: proj,
       encoding: 'utf-8',
       timeout: 10_000,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -391,10 +391,10 @@ export interface ChangedPaths {
 }
 
 export function getChangedPaths(
-  projectDir: string,
+  proj: string,
   env: NodeJS.ProcessEnv = process.env,
 ): ChangedPaths {
-  const resolvedDir = resolve(projectDir);
+  const resolvedDir = resolve(proj);
   const allFiles = new Set<string>();
   const pinnedBase = pinnedDiffBase(env);
 
@@ -456,10 +456,10 @@ export function getChangedPaths(
 
 /** Existing changed files. Deletions are omitted; use {@link getChangedPaths} to see them. */
 export function getChangedFiles(
-  projectDir: string,
+  proj: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string[] {
-  return getChangedPaths(projectDir, env).present;
+  return getChangedPaths(proj, env).present;
 }
 
 const STATIC_ASSET_EXTENSIONS = new Set([
@@ -471,8 +471,8 @@ const SOURCE_EXTENSIONS = new Set([
   '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.vue', '.svelte', '.css',
 ]);
 
-function toProjectRelative(filePath: string, projectDir: string): string {
-  const root = resolve(projectDir);
+function toProjectRelative(filePath: string, proj: string): string {
+  const root = resolve(proj);
   const abs = resolve(filePath);
   const prefix = root.endsWith(sep) ? root : root + sep;
   const relative = abs.startsWith(prefix) ? abs.slice(prefix.length) : abs;
@@ -565,9 +565,9 @@ export function incompleteAnalysisReason(input: {
  * Checks if a file path matches a global-impact pattern.
  * Returns the matched pattern name, or null if no match.
  */
-function isGlobalImpactFile(filePath: string, projectDir: string): string | null {
-  const relative = filePath.startsWith(projectDir)
-    ? filePath.slice(projectDir.length + 1)
+function isGlobalImpactFile(filePath: string, proj: string): string | null {
+  const relative = filePath.startsWith(proj)
+    ? filePath.slice(proj.length + 1)
     : basename(filePath);
 
   const fileBasename = basename(filePath);
@@ -664,11 +664,11 @@ export function filterAffectedRoutes(
   graph: Map<string, Set<string>>,
   routeFileMap: Map<string, string[]>,
 ): Route[] {
-  const projectDir = process.cwd();
+  const proj = process.cwd();
 
   // Check for global impact files first — if any match, ALL routes are affected
   for (const file of changedFiles) {
-    const globalPattern = isGlobalImpactFile(file, projectDir);
+    const globalPattern = isGlobalImpactFile(file, proj);
     if (globalPattern) {
       logger.info(
         `Global impact file changed: ${globalPattern} — all routes affected`,

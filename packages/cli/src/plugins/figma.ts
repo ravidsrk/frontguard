@@ -253,7 +253,7 @@ export function createFigmaPlugin(config: FigmaConfig): FrontguardPlugin {
     // afterRender — fetch Figma exports for matching screenshots
     // ------------------------------------------------------------------
     async afterRender(
-      screenshots: ScreenshotResult[],
+      shots: ScreenshotResult[],
       _ctx: PluginContext,
     ): Promise<void> {
       if (!pluginCtx) return;
@@ -265,7 +265,7 @@ export function createFigmaPlugin(config: FigmaConfig): FrontguardPlugin {
       // Collect unique (route, viewport) combos that match a Figma page
       const toFetch = new Map<string, { nodeId: string; viewport: number; routePath: string }>();
 
-      for (const shot of screenshots) {
+      for (const shot of shots) {
         const nodeId = config.pages[shot.route.path];
         if (!nodeId) continue;
 
