@@ -1230,6 +1230,7 @@ async function writeUpdatedBaselines(
     const manager = new PluginManager();
     manager.register(a11yPlugin);
     const metadata = new Map<string, unknown>();
+    metadata.set('accessibility:require-complete', true);
     const ctx = { config, logger, metadata };
     try {
       await manager.setup(ctx);

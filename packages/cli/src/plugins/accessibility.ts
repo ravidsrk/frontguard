@@ -290,6 +290,7 @@ export function createAccessibilityPlugin(config: AccessibilityConfig = {}): Fro
 
       // De-duplicate by route+viewport (browsers don't change a11y outcome).
       const seen = new Set<string>();
+      const auditFailures: string[] = [];
       for (const shot of screenshots) {
         const key = `${shot.route.path}:${shot.viewport}`;
         if (seen.has(key)) continue;
@@ -314,6 +315,7 @@ export function createAccessibilityPlugin(config: AccessibilityConfig = {}): Fro
           );
           results.push(parseAxeResults(raw, shot.route.path, shot.viewport, config));
         } catch (err) {
+          auditFailures.push(`${shot.route.path}@${shot.viewport}`);
           logger.debug(
             `Accessibility audit failed for ${shot.route.path}@${shot.viewport}: ${
               err instanceof Error ? err.message : String(err)
@@ -338,8 +340,20 @@ export function createAccessibilityPlugin(config: AccessibilityConfig = {}): Fro
             `Accessibility check failed: ${failing} violation(s) at or above the configured impact threshold.`,
           );
         }
-      } else {
+      } else if (auditFailures.length === 0) {
         logger.debug('Accessibility: no violations found');
+      }
+
+      // Compare runs keep going so a pixel result still stands. Baseline writes
+      // require every captured page to finish the audit.
+      if (
+        config.failOnViolation &&
+        ctx.metadata.get('accessibility:require-complete') === true &&
+        auditFailures.length > 0
+      ) {
+        throw new Error(
+          `Accessibility check failed: ${auditFailures.length} audit(s) did not complete.`,
+        );
       }
     },
 

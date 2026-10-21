@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   }>,
   contextOptions: null as unknown,
   pageCalls: [] as string[],
+  failUrls: [] as string[],
 }));
 
 vi.mock('../../src/render/playwright.js', () => ({ renderPages: mocks.renderPages }));
@@ -61,8 +62,9 @@ vi.mock('playwright', () => ({
         mocks.contextOptions = options;
         return {
           newPage: async () => ({
-            goto: async (_url: string, opts: { timeout: number }) => {
+            goto: async (url: string, opts: { timeout: number }) => {
               mocks.pageCalls.push(`goto:${opts.timeout}`);
+              if (mocks.failUrls.includes(url)) throw new Error('navigation failed');
             },
             waitForSelector: async (selector: string, opts: { timeout: number }) => {
               mocks.pageCalls.push(`wait:${selector}:${opts.timeout}`);
@@ -146,6 +148,7 @@ beforeEach(() => {
   mocks.violations = [];
   mocks.contextOptions = null;
   mocks.pageCalls = [];
+  mocks.failUrls = [];
   mocks.renderPages.mockResolvedValue([screenshot()]);
   mocks.init.mockResolvedValue(undefined);
   mocks.writeBaseline.mockResolvedValue(undefined);
@@ -244,6 +247,36 @@ describe('updateBaselines accessibility block', () => {
     expect(output.completed).toHaveBeenCalledWith(result);
   });
 
+  it('refuses a write when an audit does not complete', async () => {
+    mocks.renderPages.mockResolvedValue([
+      screenshot(),
+      { ...screenshot(), route: { path: '/account' } },
+    ]);
+    mocks.failUrls = ['http://localhost:3000/account'];
+    const output = reporter();
+
+    await expect(updateBaselines(config({ failOnViolation: true }), output)).rejects.toThrow(
+      'Accessibility check failed: 1 audit(s) did not complete. Baselines were not written.',
+    );
+
+    expect(mocks.init).not.toHaveBeenCalled();
+    expect(mocks.writeBaseline).not.toHaveBeenCalled();
+    const reported = output.completed.mock.calls[0][0] as RunResult;
+    expect(reported.baselineUpdate).toBeUndefined();
+    expect(reported.baselineRefusal).toMatch(/audit\(s\) did not complete/);
+    expect(reported.diffs.every((diff) => diff.status === 'new')).toBe(true);
+  });
+
+  it('writes when an audit errors and failOnViolation is off', async () => {
+    mocks.failUrls = ['http://localhost:3000/'];
+
+    const result = await updateBaselines(config({ failOnViolation: false }), reporter());
+
+    expect(mocks.writeBaseline).toHaveBeenCalledOnce();
+    expect(result.baselineUpdate).toBe(true);
+    expect(result.diffs[0]?.status).toBe('new');
+  });
+
   it('writes when the audit is clean', async () => {
     const result = await updateBaselines(config({ failOnViolation: true }), reporter());
 
@@ -260,6 +293,17 @@ describe('pixelmatch regression with an accessibility plugin', () => {
     expect(result.diffs[0]?.status).toBe('regression');
     expect(result.summary.regressions).toBe(1);
     expect(comparisonExitCode(result.summary)).toBe(1);
+  });
+
+  it('keeps a pixel regression when the audit errors', async () => {
+    mocks.failUrls = ['http://localhost:3000/'];
+
+    const result = await runPipeline(config({ failOnViolation: true }), reporter());
+
+    expect(result.diffs[0]?.status).toBe('regression');
+    expect(result.summary.regressions).toBe(1);
+    expect(comparisonExitCode(result.summary)).toBe(1);
+    expect(result.baselineUpdate).toBeUndefined();
   });
 
   it('lists a violation beside a pixel regression without changing that status', async () => {

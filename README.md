@@ -285,7 +285,7 @@ export default {
 };
 ```
 
-`failOnViolation: true` also refuses `frontguard update-baselines` when a violation is at or above `impact`, including when the pixel status is not a regression. The report lists those violations beside the pixel result, says the baselines were not written, and does not call them accepted. It does not change the pixel status. A clean audit leaves a pixel regression as a regression.
+`failOnViolation: true` also refuses `frontguard update-baselines` when a violation is at or above `impact`, including when the pixel status is not a regression, and when an audit does not complete. The report lists those violations beside the pixel result, says the baselines were not written, and does not call them accepted. It does not change the pixel status. A clean audit leaves a pixel regression as a regression.
 
 ---
 
