@@ -15,6 +15,7 @@ import { getMemoryStore, resetMemoryStore } from '../src/db/factory.js';
 import { getMemoryScreenshotStore, resetMemoryScreenshotStore } from '../src/storage/screenshots.js';
 import type { Run } from '../src/types.js';
 import { allocateDemoUserId } from '../src/auth/demo-user.js';
+import { recordDeadLetter } from '../src/dead-letter.js';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -424,6 +425,73 @@ describe('erasure races a finished run', () => {
       expect(await store.commitFinishedRun(second, makeRun('run-new', 'fresh'))).toBe('written');
       expect((await store.getRun('run-new'))?.reportHtml).toBe('fresh');
       expect(await store.accountWritesClosed(first)).toBe(true);
+    },
+  );
+
+  it.each(['sqlite', 'memory'] as const)(
+    'holds the %s dead letter inside the finished-run write until erasure can delete it',
+    async (kind) => {
+      const store = await openStore(kind);
+      await store.createUser({ id: 'fixture-a', plan: 'free', createdAt: '2026-01-01T00:00:00Z' });
+      const failed = makeRun('run-fail', '');
+      failed.status = 'failed';
+      failed.error = 'sandbox exploded';
+      await store.createRun(failed, 'fixture-a');
+
+      let releaseRecord!: () => void;
+      const recordGate = new Promise<void>((resolve) => {
+        releaseRecord = resolve;
+      });
+      let recording = false;
+      const original = store.recordBackgroundFailure.bind(store);
+      store.recordBackgroundFailure = async (failure) => {
+        recording = true;
+        await recordGate;
+        return original(failure);
+      };
+
+      const commit = store.commitFinishedRun('fixture-a', failed, async () => {
+        await recordDeadLetter(store, {
+          kind: 'run',
+          sourceId: failed.id,
+          userId: 'fixture-a',
+          error: failed.error ?? 'background run failed',
+        });
+      });
+
+      while (!recording) await new Promise((resolve) => setTimeout(resolve, 5));
+      let erased = false;
+      const erase = store.eraseAccount('fixture-a').then((result) => {
+        erased = true;
+        return result;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(erased).toBe(false);
+
+      releaseRecord();
+      expect(await commit).toBe('written');
+      expect((await erase).erased).toBe(true);
+      expect(await store.listBackgroundFailures({ kind: 'run', sourceId: failed.id })).toEqual([]);
+      expect(await store.getUser('fixture-a')).toBeNull();
+    },
+  );
+
+  it.each(['sqlite', 'memory'] as const)(
+    'does not recreate a %s dead letter after the user row is gone',
+    async (kind) => {
+      const store = await openStore(kind);
+      await store.createUser({ id: 'fixture-a', plan: 'free', createdAt: '2026-01-01T00:00:00Z' });
+      expect((await store.eraseAccount('fixture-a')).erased).toBe(true);
+      await store.recordBackgroundFailure({
+        id: 'late-failure',
+        kind: 'run',
+        sourceId: 'run-fail',
+        userId: 'fixture-a',
+        error: 'sandbox exploded',
+        attempt: 1,
+        createdAt: '2026-01-02T00:00:00Z',
+      });
+      expect(await store.listBackgroundFailures({ sourceId: 'run-fail' })).toEqual([]);
     },
   );
 });

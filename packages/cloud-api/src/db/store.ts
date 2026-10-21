@@ -161,9 +161,14 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
   /**
    * Persist a finished run. While erasure has closed writes and the account
    * still exists, park the payload and apply it if writes reopen. Skip when
-   * the account is already gone.
+   * the account is already gone. `afterWritten` runs in the same per-user
+   * queue as the update, before another mutation for this user can start.
    */
-  commitFinishedRun(userId: string, run: Run): Promise<FinishedRunCommit>;
+  commitFinishedRun(
+    userId: string,
+    run: Run,
+    afterWritten?: () => Promise<void>,
+  ): Promise<FinishedRunCommit>;
 
   // API keys
   createApiKey(key: ApiKeyRecord): Promise<void>;
@@ -322,7 +327,11 @@ export class InMemoryStore implements Store {
   async accountWriteLockClosedAt(userId: string): Promise<string | null> {
     return this.closedWrites.get(userId) ?? null;
   }
-  async commitFinishedRun(userId: string, run: Run): Promise<FinishedRunCommit> {
+  async commitFinishedRun(
+    userId: string,
+    run: Run,
+    afterWritten?: () => Promise<void>,
+  ): Promise<FinishedRunCommit> {
     return withUserMutation(userId, async () => {
       if (!(await this.getUser(userId))) {
         this.pendingRunUpdates.delete(run.id);
@@ -338,6 +347,7 @@ export class InMemoryStore implements Store {
       if (!this.closedWrites.has(userId)) {
         this.pendingRunUpdates.delete(run.id);
         await this.updateRun(run.id, run);
+        await afterWritten?.();
         return 'written';
       }
       return 'pending';
@@ -787,6 +797,7 @@ export class InMemoryStore implements Store {
 
   // Background failures (OPS-3) ----------------------------------------------
   async recordBackgroundFailure(failure: BackgroundFailure): Promise<void> {
+    if (failure.userId && !this.users.has(failure.userId)) return;
     this.backgroundFailures.push({ ...failure, context: failure.context ? { ...failure.context } : undefined });
   }
   async listBackgroundFailures(opts: ListBackgroundFailuresOptions = {}): Promise<BackgroundFailure[]> {

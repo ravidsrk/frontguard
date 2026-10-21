@@ -217,7 +217,11 @@ export class D1Store implements Store {
       .first<{ closed_at: string }>();
     return row?.closed_at ?? null;
   }
-  async commitFinishedRun(userId: string, run: Run): Promise<FinishedRunCommit> {
+  async commitFinishedRun(
+    userId: string,
+    run: Run,
+    afterWritten?: () => Promise<void>,
+  ): Promise<FinishedRunCommit> {
     return withUserMutation(userId, async () => {
       const saved = await this.savePendingRunUpdate(userId, run);
       const user = await this.getUser(userId);
@@ -228,6 +232,7 @@ export class D1Store implements Store {
       if (!(await this.accountWritesClosed(userId))) {
         await this.updateRun(run.id, run);
         await this.deletePendingRunUpdate(run.id);
+        await afterWritten?.();
         return 'written';
       }
       if (!saved) await this.savePendingRunUpdate(userId, run, true);
@@ -960,7 +965,8 @@ export class D1Store implements Store {
     await this.db
       .prepare(
         `INSERT INTO background_failures (id, kind, source_id, user_id, error, attempt, context, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?
+         WHERE ? IS NULL OR EXISTS (SELECT 1 FROM users WHERE id = ?)`,
       )
       .bind(
         failure.id,
@@ -971,6 +977,8 @@ export class D1Store implements Store {
         failure.attempt,
         failure.context ? JSON.stringify(failure.context) : null,
         failure.createdAt,
+        failure.userId ?? null,
+        failure.userId ?? null,
       )
       .run();
   }

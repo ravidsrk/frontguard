@@ -569,8 +569,8 @@ app.post("/v1/run", async (c) => {
       // Screenshots were reserved at submit time (COST-1).
       // A closed erasure lock parks the finished run and applies it if writes
       // reopen. A finished erasure skips the write so this cannot recreate rows.
-      const committed = await store.commitFinishedRun(userId, run);
-      if (committed === "written" && run.status === "failed") {
+      await store.commitFinishedRun(userId, run, async () => {
+        if (run.status !== "failed") return;
         await recordDeadLetter(store, {
           kind: "run",
           sourceId: runId,
@@ -578,7 +578,7 @@ app.post("/v1/run", async (c) => {
           error: run.error ?? "background run failed",
           attempt: 1,
         });
-      }
+      });
       // Complete the originating GitHub Check Run, if this run came from CI.
       if (run.github) void completeCheckRun(c.env ?? {}, run);
       // Export OTLP metrics (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
