@@ -43,9 +43,11 @@ Frontguard is organized as modular npm packages so you can adopt the exact level
 ### Step 1: Install Chromium & Initialize Config
 
 ```bash
-# One-time per machine: install the Chromium browser Frontguard uses to render pages
-# (--with-deps installs Linux system packages; on macOS the dependency
-# warning is safe to ignore.)
+# One-time per machine: install the Chromium build that matches this package.
+# GitHub-hosted runner images update browsers on their own, and that drift
+# flaked screenshot tests (https://x.com/karlhorky/status/2082458846031696091).
+# --with-deps installs Linux system packages; on macOS the dependency
+# warning is safe to ignore.
 npx -p @frontguard/cli playwright install --with-deps chromium
 
 # Generate frontguard.config.ts (--yes skips prompts).
@@ -85,7 +87,7 @@ Only CI comparisons need the published orphan branch:
 git push origin frontguard-baselines
 ```
 
-`run` exits `0` when pages match, `1` on a regression or unaccepted new page, and `2` on a tool error. `update-baselines` and `run --update-baselines` also exit `2` and write nothing unless a human passes `--confirm-baselines`. Judge mode cannot supply that flag, and an advisory caption cannot set it. An agent setting `confirm_reviewed: true` on itself is not a human review. The default `threshold` is `0.1` (10% changed pixels), so a small visible change still passes — lower it (e.g. `0.01` = 1%) for stricter pages.
+`run` exits `0` when pages match, `1` on a regression or unaccepted new page, and `2` on a tool error. `update-baselines` and `run --update-baselines` also exit `2` and write nothing unless a human passes `--confirm-baselines`. Judge mode cannot supply that flag, and an advisory caption cannot set it. An agent setting `confirm_reviewed: true` on itself is not a human review. The default `threshold` is `0.1`, which means 10% of pixels. The pixelmatch color distance on the comparison is a separate `0.1` on a 0–1 scale where 1 is black versus white. Playwright's per-pixel default is `0.2`. A compact text or icon edit fails when any 16×16 window contains more than 64 differing pixels. Scattered speckle under that count stays inside the default gate.
 
 ### Merge queue
 

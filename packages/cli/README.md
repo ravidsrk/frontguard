@@ -31,9 +31,11 @@ npx -p @frontguard/cli frontguard run --url http://localhost:3000
 **Prerequisites:** Node.js 22+, a git repository, and an `origin` remote if CI should compare against published baselines.
 
 ```bash
-# One-time per machine: install the Chromium browser Frontguard uses to render pages
-# (--with-deps installs Linux system packages; on macOS the dependency
-# warning is safe to ignore.)
+# One-time per machine: install the Chromium build that matches this package.
+# GitHub-hosted runner images update browsers on their own, and that drift
+# flaked screenshot tests (https://x.com/karlhorky/status/2082458846031696091).
+# --with-deps installs Linux system packages; on macOS the dependency
+# warning is safe to ignore.
 npx -p @frontguard/cli playwright install --with-deps chromium
 
 # Generate frontguard.config.ts (--yes skips prompts).
@@ -69,7 +71,7 @@ Only CI comparisons need the published orphan branch:
 git push origin frontguard-baselines
 ```
 
-Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on your `PATH` and you can drop the `npx -p @frontguard/cli` prefix (e.g. `frontguard run`). `run` exits `0` when pages match, `1` on a regression or unaccepted new page, and `2` on a tool error. `update-baselines` and `run --update-baselines` exit `2` and write nothing without `--confirm-baselines`. Judge mode cannot supply that flag, and an advisory caption cannot set it. An agent setting `confirm_reviewed: true` on itself is not a human review. MCP promotion is refused in local-report mode; this CLI command is the local write. Cloud `approveRun` is not a production path. The default `threshold` is `0.1` (10% changed pixels), so a small visible change still passes — lower it for stricter pages.
+Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on your `PATH` and you can drop the `npx -p @frontguard/cli` prefix (e.g. `frontguard run`). `run` exits `0` when pages match, `1` on a regression or unaccepted new page, and `2` on a tool error. `update-baselines` and `run --update-baselines` exit `2` and write nothing without `--confirm-baselines`. Judge mode cannot supply that flag, and an advisory caption cannot set it. An agent setting `confirm_reviewed: true` on itself is not a human review. MCP promotion is refused in local-report mode; this CLI command is the local write. Cloud `approveRun` is not a production path. The default `threshold` is `0.1`, which means 10% of pixels. The pixelmatch color distance on the comparison is a separate `0.1` on a 0–1 scale where 1 is black versus white. Playwright's per-pixel default is `0.2`. A compact text or icon edit fails when any 16×16 window contains more than 64 differing pixels. Scattered speckle under that count stays inside the default gate.
 
 ---
 

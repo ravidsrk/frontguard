@@ -137,17 +137,27 @@ export function compareImages(
   const diff = new PNG({ width, height });
   const totalPixels = width * height;
 
+  // Color distance 0.1 is per pixel. The caller's `threshold` is a fraction of
+  // the image. windowSize is a second call so the fraction keeps the total count.
+  const colorOptions = { threshold: 0.1, includeAA: false } as const;
   const mismatchCount = pixelmatch(
     baselineData,
     currentData,
     diff.data,
     width,
     height,
-    { threshold: 0.1 }
+    colorOptions,
   );
+  const windowMax =
+    mismatchCount === 0
+      ? 0
+      : pixelmatch(baselineData, currentData, null, width, height, {
+          ...colorOptions,
+          windowSize: 16,
+        });
 
   const diffPercentage = totalPixels > 0 ? mismatchCount / totalPixels : 0;
-  const passed = diffPercentage <= threshold;
+  const passed = diffPercentage <= threshold && windowMax <= 64;
 
   // Compute SSIM
   const ssim = computeSSIM(baselineData, currentData, width, height);

@@ -191,7 +191,7 @@ describe('currentFingerprint', () => {
     expect(fingerprint.frontguard).toBe(CLI_VERSION);
     expect(fingerprint.playwright).toBe(playwrightVersion);
     expect(fingerprint.pixelmatch.version).toBe(pixelmatchVersion);
-    expect(fingerprint.pixelmatch.version.startsWith('7.')).toBe(true);
+    expect(fingerprint.pixelmatch.version.startsWith('8.')).toBe(true);
     expect(fingerprint.pixelmatch.options).toEqual({ threshold: 0.1, includeAA: false });
     expect(PIXELMATCH_OPTIONS).toEqual({ threshold: 0.1, includeAA: false });
     expect(fingerprint.screenshot).toEqual({ fullPage: true, type: 'png' });
@@ -221,7 +221,7 @@ describe('fingerprint comparison', () => {
       pixelmatch: {
         ...current.pixelmatch,
         version: '7.0.0-baseline',
-        options: { threshold: 0.2, includeAA: true },
+        options: { ...current.pixelmatch.options, threshold: 0.2, includeAA: true },
       },
       os: current.os === 'linux' ? 'darwin' : 'linux',
     };

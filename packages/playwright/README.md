@@ -118,7 +118,7 @@ test('checkout flow', async ({ page }) => {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `threshold` | `number` | `0.01` | Max pixel diff as fraction (0-1). 0.01 = 1% |
+| `threshold` | `number` | `0.01` | Whole-image changed-pixel fraction (0.01 = 1%). The pixelmatch color distance is a separate 0.1. Playwright's own per-pixel default is 0.2. A 16×16 window with more than 64 differing pixels fails. |
 | `selector` | `string` | `undefined` | Optional CSS selector to capture a single element/component bounding box instead of the full page |
 | `fullPage` | `boolean` | `true` | Capture full page vs viewport only |
 | `mask` | `string[]` | `[]` | CSS selectors to hide before screenshot |

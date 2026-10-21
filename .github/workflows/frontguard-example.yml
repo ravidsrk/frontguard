@@ -56,7 +56,12 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        # @frontguard/cli@0.2.2 depends on this exact Playwright release.
+        # Screenshot runs install the browser build that matches the package
+        # doing the capture. GitHub-hosted runner images update browsers on
+        # their own, and that drift flaked screenshot tests
+        # (https://x.com/karlhorky/status/2082458846031696091).
+        # This fixture captures with published @frontguard/cli@0.2.2, whose
+        # Playwright dependency is 1.61.0.
         run: npm exec --yes --package="playwright@1.61.0" -- playwright install --with-deps chromium
 
       - name: Validate manual controls

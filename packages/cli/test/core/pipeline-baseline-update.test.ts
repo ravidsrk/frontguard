@@ -147,7 +147,7 @@ describe('updateBaselines', () => {
                   screenshot: { fullPage: true, type: 'png' },
                   captureRunner: 'routes',
                   pixelmatch: expect.objectContaining({
-                    version: expect.stringMatching(/^7\./),
+                    version: expect.stringMatching(/^8\./),
                     options: { threshold: 0.1, includeAA: false },
                   }),
                   browser: expect.objectContaining({

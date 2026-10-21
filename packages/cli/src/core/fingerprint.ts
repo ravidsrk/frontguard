@@ -6,9 +6,8 @@
  * untrusted. Schema 1 manifests have no fingerprint: they still load, warn
  * once, and do not fail strict mode.
  *
- * Pixelmatch stays the only pass/fail signal. Do not upgrade it here (#284).
- * That upgrade should show up as a comparator change on the first run that
- * already has a fingerprint.
+ * Pixelmatch stays the only pass/fail signal. The installed major is part of
+ * this fingerprint, so the first compare after a pixelmatch upgrade shows it.
  *
  * @module core/fingerprint
  */
@@ -35,9 +34,10 @@ const require = createRequire(import.meta.url);
 export const BASELINE_SCHEMA_VERSION = 2;
 
 /**
- * Options passed to pixelmatch for the pass/fail comparison.
- * These are the values previously inlined in `diff/pixel.ts`.
- * Changing them is a comparator change and bypasses smart filtering.
+ * Color options passed to pixelmatch.
+ * `threshold` is the per-pixel OKLab HyAB distance (0–1, where 1 is black
+ * versus white). It is not the config fraction of pixels.
+ * Changing these values is a comparator change and bypasses smart filtering.
  */
 export const PIXELMATCH_OPTIONS = {
   threshold: 0.1,

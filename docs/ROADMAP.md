@@ -186,8 +186,10 @@ All actionable post-launch engineering work is tracked under parent issue [#283]
    - Cover mixed image, font and CSS-background edits; explain incomplete-analysis fallbacks.
    - Retain scoping for proven route-only edits. Lands before #285's selection validation.
 8. **[#284](https://github.com/ravidsrk/frontguard/issues/284) — Measure small-text misses under the 10% pixel budget and adopt `pixelmatch` 8 as the same gate.**
-   - Every surveyed runner defaults to 0–4 differing pixels.
-   - The upgrade covers both packages (`^7.2.0` in each), decides a dimension-mismatch rule, and expects about ±3% count shifts.
+   - Both packages depend on `pixelmatch` `^8.0.0`. The 10% whole-image budget stays. A 16×16 window fails above 64 differing pixels.
+   - A dimension mismatch is padded, then judged by that same gate.
+   - WebdriverIO's about ±3% count shift is their corpus. This repo does not publish a rate from it.
+   - Screenshot runs install the Playwright browser build that matches the capturing package ([@karlhorky](https://x.com/karlhorky/status/2082458846031696091)).
 9. **[#285](https://github.com/ravidsrk/frontguard/issues/285) — Re-run pixel validation on the current tree with true-positive fixtures.**
    - HTML/CSS mutation operators, with recall bucketed by how many viewports show the change.
    - Seeded neighbour-moving faults, nuisance fixtures drawn from UI flaky-test causes, and the #303 fingerprint recorded.

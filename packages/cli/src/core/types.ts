@@ -914,7 +914,7 @@ export interface RendererFingerprint {
   deviceScaleFactor: number;
   pixelmatch: {
     version: string;
-    /** Options object passed to pixelmatch for the pass/fail comparison. */
+    /** Color options passed to pixelmatch for the whole-image count. */
     options: { threshold: number; includeAA: boolean };
   };
   /** Screenshot options passed to the capture call. */

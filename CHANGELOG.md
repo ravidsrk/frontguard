@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Compare with pixelmatch 8 (`@frontguard/cli` and `@frontguard/playwright`). The config `threshold` of `0.1` is still 10% of pixels. The pixelmatch color distance stays a separate `0.1`, and Playwright's per-pixel default of `0.2` is a third number. A 16×16 window with more than 64 differing pixels fails, so a compact text or icon edit fails while scattered speckle does not. A dimension mismatch is padded and then judged by that same gate.
 - Pin Playwright to `1.64.1` and align the rendering images and browser test
   dependency. The Chromium upgrade comparison is recorded in
   [the dependency review](docs/reviews/dependency-cleanup-2026-10-20.md).
