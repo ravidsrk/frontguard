@@ -18,22 +18,33 @@ interface RunResult {
   stderr: string;
   args: string;
   pushed: boolean;
+  diffBase: string;
+  summary: string;
 }
 
-function runAction(env: Record<string, string>): RunResult {
+function runAction(
+  env: Record<string, string>,
+  stub: { exitCode?: number; regressions?: number } = {},
+): RunResult {
   const dir = mkdtempSync(join(tmpdir(), 'frontguard-action-guard-'));
   const binDir = join(dir, 'bin');
   const argsPath = join(dir, 'args');
   const pushPath = join(dir, 'pushed');
   const outputPath = join(dir, 'output');
+  const basePath = join(dir, 'diff-base');
+  const summaryPath = join(dir, 'summary.md');
   mkdirSync(binDir);
+  const regressions = stub.regressions ?? 0;
+  const exitCode = stub.exitCode ?? 0;
   writeFileSync(
     join(binDir, 'frontguard'),
     `#!/usr/bin/env bash
 printf '%s\\n' "$@" > "$CAPTURE_ARGS"
+printf '%s\\n' "\${FRONTGUARD_DIFF_BASE:-}" > "$CAPTURE_BASE"
 mkdir -p custom-report
 printf '<html></html>' > custom-report/report.html
-printf '%s\\n' '{"summary":{"total":1,"regressions":0,"newPages":0,"errors":0},"config":{"outputDir":"./custom-report"}}'
+printf '%s\\n' '{"summary":{"total":1,"regressions":${regressions},"newPages":0,"errors":0},"config":{"outputDir":"./custom-report"}}'
+exit ${exitCode}
 `,
   );
   writeFileSync(
@@ -52,9 +63,11 @@ exec "$REAL_GIT" "$@"
   const baseEnv = {
     PATH: `${binDir}:${process.env.PATH ?? ''}`,
     CAPTURE_ARGS: argsPath,
+    CAPTURE_BASE: basePath,
     PUSH_LOG: pushPath,
     REAL_GIT: realGit,
     GITHUB_OUTPUT: outputPath,
+    GITHUB_STEP_SUMMARY: summaryPath,
     GITHUB_WORKSPACE: dir,
     IN_URL: '',
     IN_ROUTES: '',
@@ -87,8 +100,10 @@ exec "$REAL_GIT" "$@"
 
   const args = exists(argsPath) ? readFileSync(argsPath, 'utf8') : '';
   const pushed = exists(pushPath);
+  const diffBase = exists(basePath) ? readFileSync(basePath, 'utf8').trim() : '';
+  const summary = exists(summaryPath) ? readFileSync(summaryPath, 'utf8') : '';
   rmSync(dir, { recursive: true, force: true });
-  return { status, stdout, stderr, args, pushed };
+  return { status, stdout, stderr, args, pushed, diffBase, summary };
 }
 
 function exists(path: string): boolean {
@@ -114,19 +129,30 @@ describe('action baseline write guard', () => {
     expect(result.pushed).toBe(false);
   });
 
-  it.each(['pull_request_target', 'merge_group'])(
-    'refuses update-baselines on %s unless allow-baseline-writes is true',
-    (eventName) => {
-      const refused = runAction({
-        IN_UPDATE_BASELINES: 'true',
-        IN_EVENT_NAME: eventName,
-        IN_ALLOW_BASELINE_WRITES: 'yes',
-      });
-      expect(refused.status).toBe(2);
-      expect(refused.pushed).toBe(false);
-      expect(refused.args).toBe('');
-    },
-  );
+  it('refuses update-baselines on pull_request_target unless allow-baseline-writes is true', () => {
+    const refused = runAction({
+      IN_UPDATE_BASELINES: 'true',
+      IN_EVENT_NAME: 'pull_request_target',
+      IN_ALLOW_BASELINE_WRITES: 'yes',
+    });
+    expect(refused.status).toBe(2);
+    expect(refused.pushed).toBe(false);
+    expect(refused.args).toBe('');
+  });
+
+  it('refuses update-baselines on merge_group even when allow-baseline-writes is true', () => {
+    const refused = runAction({
+      IN_UPDATE_BASELINES: 'true',
+      IN_EVENT_NAME: 'merge_group',
+      IN_ALLOW_BASELINE_WRITES: 'true',
+      IN_MERGE_GROUP_BASE_SHA: 'abc123',
+    });
+    expect(refused.status).toBe(2);
+    expect(refused.stderr).toMatch(/Queue runs never write/);
+    expect(refused.pushed).toBe(false);
+    expect(refused.args).toBe('');
+    expect(refused.summary).toBe('');
+  });
 
   it('passes --confirm-baselines and pushes when a pull_request opts in', () => {
     const result = runAction({
@@ -163,5 +189,49 @@ describe('action baseline write guard', () => {
     expect(result.args).not.toContain('--confirm-baselines');
     expect(result.args).not.toContain('--update-baselines');
     expect(result.pushed).toBe(false);
+  });
+
+  it('renders every route on merge_group and does not push', () => {
+    const result = runAction({
+      IN_UPDATE_BASELINES: 'false',
+      IN_EVENT_NAME: 'merge_group',
+      IN_ALLOW_BASELINE_WRITES: 'true',
+      IN_MERGE_GROUP_BASE_SHA: 'deadbeef',
+    });
+    expect(result.status).toBe(0);
+    expect(result.args).toContain('--all-routes');
+    expect(result.args).not.toContain('--update-baselines');
+    expect(result.args).not.toContain('--confirm-baselines');
+    expect(result.diffBase).toBe('deadbeef');
+    expect(result.pushed).toBe(false);
+    expect(result.summary).toBe('');
+  });
+
+  it('writes a queued regression to the job summary and exits 1', () => {
+    const result = runAction(
+      {
+        IN_UPDATE_BASELINES: 'false',
+        IN_EVENT_NAME: 'merge_group',
+        IN_MERGE_GROUP_BASE_SHA: 'deadbeef',
+      },
+      { regressions: 2, exitCode: 1 },
+    );
+    expect(result.status).toBe(1);
+    expect(result.pushed).toBe(false);
+    expect(result.summary).toMatch(/no pull request number/);
+    expect(result.summary).toContain('regressions: 2');
+  });
+
+  it('exits 2 on a tool error without pushing', () => {
+    const result = runAction(
+      {
+        IN_UPDATE_BASELINES: 'false',
+        IN_EVENT_NAME: 'merge_group',
+      },
+      { exitCode: 2 },
+    );
+    expect(result.status).toBe(2);
+    expect(result.pushed).toBe(false);
+    expect(result.summary).toBe('');
   });
 });

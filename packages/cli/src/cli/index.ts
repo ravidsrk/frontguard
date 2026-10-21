@@ -174,6 +174,10 @@ export async function buildConfig(
     }
   }
 
+  if (opts.allRoutes === true) {
+    config.smartRender = false;
+  }
+
   if (opts.blockUrls !== undefined) {
     if (Array.isArray(opts.blockUrls)) {
       config.blockUrls = (opts.blockUrls as string[])
@@ -301,6 +305,7 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--verbose', 'Verbose output')
     .option('--debug', 'Debug output (includes Playwright traces)')
     .option('--update-baselines', 'Accept current screenshots as new baselines')
+    .option('--all-routes', 'Render every discovered route. Disables smartFilter for this run.')
     .option(
       '--confirm-baselines',
       'Human confirmation required with --update-baselines. Judge mode and an advisory caption cannot set this. An agent setting confirm_reviewed: true is not a human review.',

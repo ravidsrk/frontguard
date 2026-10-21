@@ -87,6 +87,24 @@ git push origin frontguard-baselines
 
 `run` exits `0` when pages match, `1` on a regression or unaccepted new page, and `2` on a tool error. `update-baselines` and `run --update-baselines` also exit `2` and write nothing unless a human passes `--confirm-baselines`. Judge mode cannot supply that flag, and an advisory caption cannot set it. An agent setting `confirm_reviewed: true` on itself is not a human review. The default `threshold` is `0.1` (10% changed pixels), so a small visible change still passes — lower it (e.g. `0.01` = 1%) for stricter pages.
 
+### Merge queue
+
+Register the pull request check and the merge queue on one workflow, with the same job name. GitHub waits for that name on the queue:
+
+```yaml
+on: [pull_request, merge_group]
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+```
+
+A workflow-level `paths:` filter on that required check skips the job when the queue commit does not touch those paths, and the queue stays pending. Do not put `paths:` on a required Frontguard check.
+
+Queue runs compare against the shared latest `frontguard-baselines` branch until [#306](https://github.com/ravidsrk/frontguard/issues/306). They do not auto-pass. `update-baselines: true` on `merge_group` exits 2 and pushes nothing, even if `allow-baseline-writes` is `true`.
+
+Capture the PR head SHA (`github.event.pull_request.head.sha` on pull requests, `github.event.merge_group.head_sha` in the queue). Check out with `fetch-depth: 0`. smartFilter's `git diff <base>...HEAD` needs that base commit in the clone; `fetch-depth: 1` does not include it. On `merge_group` the Action passes `--all-routes` and, when the payload has one, sets `FRONTGUARD_DIFF_BASE` from `github.event.merge_group.base_sha`.
+
 > **Full documentation:** [frontguard.dev/docs](https://frontguard.dev/docs) · [Quick Start](https://frontguard.dev/docs/quick-start) · [CLI Configuration](https://frontguard.dev/docs/cli/configuration) · [Playwright API](https://frontguard.dev/docs/playwright/api) · [MCP Server](https://frontguard.dev/docs/integrations/mcp)
 
 ---
@@ -295,6 +313,7 @@ export default {
 - `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
 - `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render
 - `--output <console|json>` — Emit human-readable console report or structured JSON to stdout
+- `--all-routes` — Render every discovered route. Disables smartFilter for this run. The merge-queue Action passes it on `merge_group`.
 
 ### Sample CLI Output
 

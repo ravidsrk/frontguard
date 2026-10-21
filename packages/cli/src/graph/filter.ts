@@ -26,6 +26,7 @@ import {
   filterAffectedRoutes,
   incompleteAnalysisReason,
 } from './resolver.js';
+import { pinnedDiffBase } from './diff-base.js';
 import { logger } from '../utils/logger.js';
 
 // ---------------------------------------------------------------------------
@@ -91,6 +92,15 @@ export async function smartFilter(
   // Gate: need routes to filter
   if (routes.length === 0) {
     return includeAll(routes, 'no routes to filter');
+  }
+
+  // A merge queue's origin/main is not the queued base. Without a pin, render
+  // every route instead of diffing the wrong branch. #306 selects a per-PR base.
+  if (process.env.GITHUB_EVENT_NAME === 'merge_group' && pinnedDiffBase() === null) {
+    return includeAll(
+      routes,
+      'merge_group has no FRONTGUARD_DIFF_BASE; rendering all routes',
+    );
   }
 
   // Step 1: Detect changed files, including deletions

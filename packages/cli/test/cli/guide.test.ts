@@ -81,4 +81,11 @@ describe('buildConfig CLI flags for stability, redaction, and colorScheme', () =
     expect(config.waitForStability).toBe(true);
     expect(config.colorScheme).toBe('dark');
   });
+
+  it('disables smartFilter when --all-routes is set', async () => {
+    const enabled = await buildConfig({ url: 'http://localhost:3000' });
+    const disabled = await buildConfig({ url: 'http://localhost:3000', allRoutes: true });
+    expect(enabled.smartRender).toBe(true);
+    expect(disabled.smartRender).toBe(false);
+  });
 });

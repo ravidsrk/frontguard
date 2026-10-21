@@ -25,16 +25,21 @@ if [ -n "$IN_THRESHOLD" ] && ! echo "$IN_THRESHOLD" | grep -Eq '^[0-9]+(\.[0-9]+
   exit 1
 fi
 
-# pull_request, pull_request_target, and merge_group do not write baselines
-# unless allow-baseline-writes is the string "true". That override is a human
-# opt-in, not an agent default. push and workflow_dispatch may write when
+# pull_request and pull_request_target do not write baselines unless
+# allow-baseline-writes is the string "true". That override is a human
+# opt-in, not an agent default. merge_group never writes, even when the
+# override is set. push and workflow_dispatch may write when
 # update-baselines is true. --confirm-baselines is passed only then.
 BASELINE_EVENT="${IN_EVENT_NAME:-}"
 BASELINE_OVERRIDE="${IN_ALLOW_BASELINE_WRITES:-}"
 WRITE_BASELINES=0
 if [ "${IN_UPDATE_BASELINES:-}" = "true" ]; then
   case "$BASELINE_EVENT" in
-    pull_request|pull_request_target|merge_group)
+    merge_group)
+      echo "Refusing update-baselines on merge_group. Queue runs never write baselines, even if allow-baseline-writes is true. No baselines were written and nothing was pushed." >&2
+      exit 2
+      ;;
+    pull_request|pull_request_target)
       if [ "$BASELINE_OVERRIDE" = "true" ]; then
         WRITE_BASELINES=1
       else
@@ -56,6 +61,14 @@ if [ -n "$IN_BROWSERS" ]; then CMD+=(--browsers "$IN_BROWSERS"); fi
 if [ -n "$IN_THRESHOLD" ]; then CMD+=(--threshold "$IN_THRESHOLD"); fi
 if [ -n "$IN_CONFIG" ]; then CMD+=(--config "$IN_CONFIG"); fi
 if [ "$WRITE_BASELINES" -eq 1 ]; then CMD+=(--update-baselines --confirm-baselines); fi
+if [ "$BASELINE_EVENT" = "merge_group" ]; then CMD+=(--all-routes); fi
+# Pin smartFilter when the queue payload includes a base. --all-routes still
+# renders every route; the pin is for any later diff that does not disable it.
+MERGE_BASE="${IN_MERGE_GROUP_BASE_SHA:-}"
+case "$MERGE_BASE" in
+  ""|-*|*[[:space:]]*) ;;
+  *) export FRONTGUARD_DIFF_BASE="$MERGE_BASE" ;;
+esac
 CMD+=(--output json)
 
 # Unique files so parallel Action tests do not clobber one shared /tmp path.
@@ -111,7 +124,7 @@ if [ "$RUN_FAILED" -eq 1 ]; then
   write_github_output status "error"
   write_github_output regressions ""
   echo "Frontguard run failed (exit=$RUN_EXIT) or produced unsafe/non-parseable JSON" >&2
-  exit 1
+  exit 2
 fi
 
 write_github_output regressions "$REGRESSIONS"
@@ -120,25 +133,36 @@ write_github_output report-path "$REPORT_PATH"
 if [ "$RUN_EXIT" -eq 2 ] || [ "$ERRORS" -gt 0 ] || [ "$TOTAL" -eq 0 ]; then
   write_github_output status "error"
   echo "Frontguard comparison could not complete (exit=$RUN_EXIT, errors=$ERRORS, total=$TOTAL)" >&2
-  exit 1
+  exit 2
 fi
 
 if [ "$REGRESSIONS" -gt 0 ] || { [ "$IN_UPDATE_BASELINES" != "true" ] && [ "$NEW_PAGES" -gt 0 ]; }; then
   write_github_output status "fail"
+  if [ "$BASELINE_EVENT" = "merge_group" ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    {
+      echo "### Frontguard merge queue"
+      echo
+      echo "Queued comparison has no pull request number, so this result is in the job summary instead of a PR comment."
+      echo
+      echo "- regressions: ${REGRESSIONS}"
+      echo "- new pages: ${NEW_PAGES}"
+      echo "- report: ${REPORT_PATH}"
+    } >> "$GITHUB_STEP_SUMMARY"
+  fi
   exit 1
 fi
 
 if [ "$RUN_EXIT" -ne 0 ]; then
   write_github_output status "error"
   echo "Frontguard exited unexpectedly with code $RUN_EXIT" >&2
-  exit 1
+  exit 2
 fi
 
 if [ "$WRITE_BASELINES" -eq 1 ]; then
   if ! git push origin frontguard-baselines; then
     write_github_output status "error"
     echo "Frontguard updated baselines locally but could not publish frontguard-baselines" >&2
-    exit 1
+    exit 2
   fi
 fi
 

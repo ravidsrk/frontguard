@@ -840,7 +840,9 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
         ['pull-requests: write', 'Optional PR summary comments', 'Allows posting or updating the markdown diff summary table on the Pull Request.'],
       ],
     )}${h2('Baseline updates')}${p(
-      'Updated baselines still require the workflow to push frontguard-baselines in explicit update mode. Do not infer that the public v0 ref has passed this journey until the external smoke test is recorded.',
+      'Updated baselines still require the workflow to push frontguard-baselines in explicit update mode. Do not infer that the public v0 ref has passed this journey until the external smoke test is recorded. merge_group never writes baselines, even when allow-baseline-writes is true, and the Action renders every route for that event.',
+    )}${p(
+      'Use on: [pull_request, merge_group] with an identical job name. A workflow-level paths: filter on a required check leaves the queue pending. Queue runs compare against the shared latest baseline until #306. Capture the PR head SHA and check out with fetch-depth: 0, which is the history smartFilter needs for git diff base...HEAD.',
     )}${p(
       'For a copy-ready GitHub Actions workflow using the published CLI today, see ' +
         a('/docs/guides/github-actions', 'Guides: GitHub Actions') +
@@ -1395,6 +1397,27 @@ jobs:
           git push origin frontguard-baselines:frontguard-baselines`,
     )}${h2('Composite Action')}${p(
       'The generated workflow and the repository composite Action are separate surfaces. The public Action remains pre-release pending an external consumer smoke test.',
+    )}${h2('Merge queue')}${p(
+      'Register pull_request and merge_group on the same workflow with an identical job name. GitHub waits for that name before merging the queue.',
+    )}${code(
+      '.github/workflows/frontguard.yml: pull request and merge queue',
+      `on: [pull_request, merge_group]
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # smartFilter diffs base...HEAD. fetch-depth: 1 does not contain
+          # that base commit. Capture the PR head SHA so the checkout is the
+          # pull request head, not an unexpected merge ref.
+          fetch-depth: 0
+          ref: \${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}`,
+    )}${p(
+      'A workflow-level paths: filter on that required check skips the job when the queue commit does not touch those paths, and the queue stays pending. Do not put paths: on a required Frontguard check.',
+    )}${p(
+      'Queue runs compare against the shared latest frontguard-baselines branch until #306. They do not auto-pass. update-baselines on merge_group exits 2 and pushes nothing, even when allow-baseline-writes is true. On merge_group the Action passes --all-routes and sets FRONTGUARD_DIFF_BASE from github.event.merge_group.base_sha when that SHA is present. A queued regression still exits 1 and is written to the job summary, because the payload has no pull request number.',
     )}`,
   ),
 

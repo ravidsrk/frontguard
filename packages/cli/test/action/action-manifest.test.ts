@@ -212,6 +212,13 @@ describe('Action launch contract', () => {
     expect(runner.indexOf('if [ "$RUN_EXIT" -eq 2 ]')).toBeLessThan(
       runner.indexOf('if [ "$REGRESSIONS" -gt 0 ]'),
     );
+    const toolError = runner.slice(
+      runner.indexOf('if [ "$RUN_FAILED" -eq 1 ]'),
+      runner.indexOf('if [ "$REGRESSIONS" -gt 0 ]'),
+    );
+    expect(toolError).toContain('exit 2');
+    expect(toolError).not.toContain('exit 1');
+    expect(runner).toContain('exit 1');
   });
 
   it.each([
