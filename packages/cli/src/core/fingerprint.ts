@@ -396,29 +396,43 @@ function bothPresentAndDiffer(baseline: unknown, current: unknown): boolean {
 }
 
 /**
+ * Widths this run will capture for one route. A nonempty per-route override
+ * replaces the global list; an empty override does not.
+ */
+function effectiveViewports(
+  route: { viewport?: readonly number[] } | undefined,
+  globalViewports: ReadonlySet<number> | null,
+): ReadonlySet<number> | null {
+  if (route?.viewport && route.viewport.length > 0) return new Set(route.viewport);
+  return globalViewports;
+}
+
+/**
  * Why smart filtering must render every route, or undefined when the baseline
  * browser build and pixelmatch options still match this process.
- * A missing fingerprint does not bypass scoping.
+ * A missing fingerprint does not bypass scoping. Retired routes and widths
+ * outside the effective capture set do not either.
  */
 export function rendererBypassReason(
   manifest: BaselineManifest | null | undefined,
   browsers: readonly string[],
   selection?: {
-    routes: readonly { path: string }[];
+    routes: readonly { path: string; viewport?: readonly number[] }[];
     viewports: readonly number[];
   },
 ): string | undefined {
   if (!manifest?.routes) return undefined;
   const active = new Set(browsers);
-  const activeRoutes =
+  const selectedByPath =
     selection && selection.routes.length > 0
-      ? new Set(selection.routes.map((route) => route.path))
+      ? new Map(selection.routes.map((route) => [route.path, route]))
       : null;
-  const activeViewports =
+  const globalViewports =
     selection && selection.viewports.length > 0 ? new Set(selection.viewports) : null;
   const reasons = new Set<string>();
   for (const [routePath, route] of Object.entries(manifest.routes)) {
-    if (activeRoutes && !activeRoutes.has(routePath)) continue;
+    if (selectedByPath && !selectedByPath.has(routePath)) continue;
+    const activeViewports = effectiveViewports(selectedByPath?.get(routePath), globalViewports);
     if (!route?.snapshots) continue;
     for (const [snapshotKey, snapshot] of Object.entries(route.snapshots)) {
       if (activeViewports) {

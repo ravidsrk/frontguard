@@ -340,6 +340,40 @@ describe('fingerprint comparison', () => {
       }),
     ).toContain('browser.version');
   });
+
+  it('treats a route viewport override as an active fingerprint', () => {
+    const current = currentFingerprint('chromium', 'routes');
+    const stale: RendererFingerprint = {
+      ...current,
+      browser: { ...current.browser, version: '0.0.0-override' },
+    };
+    const manifest = manifestFor(stale, ['/']);
+    const snapshots = manifest.routes['/']?.snapshots;
+    if (!snapshots?.['1440/chromium']) throw new Error('fixture snapshot missing');
+    snapshots['390/chromium'] = snapshots['1440/chromium'];
+    delete snapshots['1440/chromium'];
+
+    expect(
+      rendererBypassReason(manifest, ['chromium'], {
+        routes: [{ path: '/', viewport: [390] }],
+        viewports: [1440],
+      }),
+    ).toContain('browser.version');
+
+    expect(
+      rendererBypassReason(manifest, ['chromium'], {
+        routes: [{ path: '/' }],
+        viewports: [1440],
+      }),
+    ).toBeUndefined();
+
+    expect(
+      rendererBypassReason(manifest, ['chromium'], {
+        routes: [{ path: '/', viewport: [] }],
+        viewports: [1440],
+      }),
+    ).toBeUndefined();
+  });
 });
 
 describe('pipeline fingerprint policy', () => {
