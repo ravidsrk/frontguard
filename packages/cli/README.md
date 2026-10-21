@@ -154,7 +154,7 @@ export default {
 };
 ```
 
-`frontguard ignores --older-than <days>` lists rules whose `since` date is strictly older than that, and the shots they cover. The list follows one vendor account, not a consensus. The command does not remove a rule. A model, a prompt, or a flake heuristic does not either. Add `since` as `YYYY-MM-DD` for a rule to be counted.
+`frontguard ignores --older-than <days>` lists rules whose `since` date is strictly older than that, and the shots they cover. The list follows one vendor account, not a consensus. The command does not remove a rule. A model, a prompt, or a flake heuristic does not either. Add `since` as `YYYY-MM-DD` for a rule to be counted. Shot coverage comes from configured `routes` only. When `routes` is omitted, the command says coverage is unavailable and does not discover Storybook, crawl, or filesystem routes.
 
 ### 2. Built-in Plugins (WCAG Accessibility, Performance Budgets & Script Drift)
 

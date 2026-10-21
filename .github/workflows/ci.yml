@@ -111,7 +111,7 @@ jobs:
         #   call stays inside 220KB because the fingerprint records only the
         #   color options. The aged-ignore list (#298) compacts the Storybook
         #   ready script and measures the library entry at 219250 bytes and
-        #   the published bin at 395351 bytes. No dependency is inlined.
+        #   the published bin at 395561 bytes. No dependency is inlined.
         # dist/cli/index.js  — the actual published bin (bin.frontguard). This
         #   was previously UNGATED, so the artifact users install could grow
         #   without limit while CI guarded only the library entry. The same

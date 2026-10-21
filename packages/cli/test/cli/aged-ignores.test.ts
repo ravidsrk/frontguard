@@ -53,6 +53,34 @@ describe('aged ignore rules', () => {
     expect(listed.undated).toEqual([]);
   });
 
+  it('states that shot coverage is unavailable when discovery is on and routes are omitted', () => {
+    const listed = collectAgedIgnores(
+      config({
+        routes: undefined,
+        discover: { startUrl: 'http://localhost:3000', maxDepth: 2, maxRoutes: 20, exclude: [] },
+        storybook: { url: 'http://127.0.0.1:6006' },
+        ignore: [{ selector: '.ads', since: '2020-01-01' }],
+      }),
+      30,
+      NOW,
+    );
+    expect(listed.shotsKnown).toBe(false);
+    expect(listed.aged).toEqual([
+      {
+        scope: 'global',
+        label: '.ads',
+        since: '2020-01-01',
+        ageDays: utcAgeDays('2020-01-01', NOW),
+        shots: [],
+      },
+    ]);
+    const text = formatAgedIgnores(listed, 30);
+    expect(text).toContain('.ads');
+    expect(text).toContain('Shot coverage is unavailable');
+    expect(text).toContain('does not discover Storybook, crawl, or filesystem routes');
+    expect(text).not.toContain('@');
+  });
+
   it('keeps a rule that is exactly the threshold age off the list', () => {
     const listed = collectAgedIgnores(
       config({ ignore: [{ selector: '.ads', since: '2026-01-01' }] }),

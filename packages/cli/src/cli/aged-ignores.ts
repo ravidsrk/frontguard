@@ -53,8 +53,9 @@ export function collectAgedIgnores(
   config: FrontguardConfig,
   olderThanDays: number,
   now: Date,
-): { aged: AgedIgnore[]; undated: UndatedIgnore[] } {
+): { aged: AgedIgnore[]; undated: UndatedIgnore[]; shotsKnown: boolean } {
   const routes = config.routes ?? [];
+  const shotsKnown = routes.length > 0;
   const aged: AgedIgnore[] = [];
   const undated: UndatedIgnore[] = [];
   const allShots = routes.map((entry) => ({
@@ -88,16 +89,21 @@ export function collectAgedIgnores(
     const targets = [{ path: entry.path, viewports: routeViewports(entry, config) }];
     for (const rule of entry.ignore) consider(entry.path, rule, targets);
   }
-  return { aged, undated };
+  return { aged, undated, shotsKnown };
 }
 
 export function formatAgedIgnores(
-  result: { aged: AgedIgnore[]; undated: UndatedIgnore[] },
+  result: { aged: AgedIgnore[]; undated: UndatedIgnore[]; shotsKnown: boolean },
   olderThanDays: number,
 ): string {
   const lines = [
     `Ignore rules older than ${olderThanDays} days. One vendor account asked for this list. This command does not remove a rule.`,
   ];
+  if (!result.shotsKnown) {
+    lines.push(
+      'Shot coverage is unavailable. This command reads configured routes and does not discover Storybook, crawl, or filesystem routes.',
+    );
+  }
   if (result.aged.length === 0) lines.push('No dated ignore rule is older than that.');
   for (const hit of result.aged) {
     lines.push(`${hit.scope}  ${hit.label}  since ${hit.since} (${hit.ageDays} days)`);

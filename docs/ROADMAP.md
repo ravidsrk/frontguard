@@ -237,7 +237,7 @@ All actionable post-launch engineering work is tracked under parent issue [#283]
 22. **[#295](https://github.com/ravidsrk/frontguard/issues/295) — Design S3-backed baseline storage only after the `cloud-api` gates.**
     - Blocked by #293, #290, #306 and #303.
     - Distinct from `imageUpload`, which already uploads PR diff thumbnails.
-23. **[#298](https://github.com/ravidsrk/frontguard/issues/298) — Surface aged ignore masks for a human to drop.** One vendor account asked for this. `frontguard ignores --older-than <days>` lists rules whose `since` date is older than that, and the shots they cover. Removing a rule is a config edit. No model, prompt, or flake heuristic removes a mask.
+23. **[#298](https://github.com/ravidsrk/frontguard/issues/298) — Surface aged ignore masks for a human to drop.** One vendor account asked for this. `frontguard ignores --older-than <days>` lists rules whose `since` date is older than that, and the shots they cover. Shot coverage comes from configured routes. When routes are omitted, the command says coverage is unavailable and does not discover Storybook, crawl, or filesystem routes. Removing a rule is a config edit. No model, prompt, or flake heuristic removes a mask.
 24. **[#299](https://github.com/ravidsrk/frontguard/issues/299) — Add optional ARIA and non-image text snapshots that do not gate pixels.** Reuses `@frontguard/playwright`'s existing ARIA capture: add storage and diffing, then CLI capture.
 25. **[#308](https://github.com/ravidsrk/frontguard/issues/308) — Report horizontal viewport overflow without gating.**
     - `scrollWidth` vs `innerWidth`, plus visible unclipped elements past the right edge, taken from the same settled state as the screenshot.
