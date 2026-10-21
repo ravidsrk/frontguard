@@ -71,11 +71,16 @@ function pageProbe() {
 
   function holdsFixed(style) {
     if (style.transform !== 'none' || style.filter !== 'none') return true;
+    // `translate`, `rotate`, and `scale` contain fixed boxes even when the
+    // computed `transform` stays `none`.
+    if (style.translate && style.translate !== 'none') return true;
+    if (style.rotate && style.rotate !== 'none') return true;
+    if (style.scale && style.scale !== 'none') return true;
     const backdrop = style.backdropFilter || style.webkitBackdropFilter;
     if (backdrop && backdrop !== 'none') return true;
     if (style.perspective && style.perspective !== 'none') return true;
     if (listed(style.contain, ['paint', 'layout', 'strict', 'content'])) return true;
-    if (listed(style.willChange, ['transform', 'filter', 'perspective', 'contain'])) return true;
+    if (listed(style.willChange, ['transform', 'translate', 'rotate', 'scale', 'filter', 'perspective', 'contain'])) return true;
     return Boolean(style.containerType && style.containerType !== 'normal');
   }
 
