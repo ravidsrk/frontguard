@@ -174,6 +174,20 @@ export default {
 
 ---
 
+## Story discovery
+
+Story discovery is off unless you set it. Default route discovery stays the crawler and the filesystem scan. Explicit `routes` still win. When a story runner is set, Frontguard uses one of them, in this order: Storybook, then Ladle, then Histoire. Discovered stories are ordinary routes on the same pixelmatch path. A 1px difference is not auto-approved.
+
+Storybook 7 is read from `/stories.json`. Storybook 8, 9, 10, and 11 alpha serve the same `/index.json` entries index, so they share one parser. Point `storybook.url` at the running server. Each story is captured at `/iframe.html?id=<story>&viewMode=story`.
+
+Ladle is read from its own `meta.json`: a `stories` object keyed by story id, with `name`, `levels`, `locStart`, `locEnd`, `filePath`, and `meta`. Set `ladle.dir` to a local build (Ladle's default output folder is `build`) or `ladle.url` to a server such as `http://localhost:61000`. Each story opens at `/?story=<id>&mode=preview` and the capture waits for `[data-storyloaded]`. `meta.frontguard` is a Frontguard annotation inside Ladle's `meta` object and accepts the same overrides as Storybook `parameters.frontguard`.
+
+Histoire is read from `histoire.json` while its native visual testing is still unreleased. The file has a `stories` array. Each story has `id`, `title`, and `variants` of `{ id, title }`, plus optional `group` and `docsOnly`. Set `histoire.dir` to a local build (Histoire's default output folder is `.histoire/dist`) or `histoire.url` to that build. Each variant opens at `/__sandbox.html?storyId=<id>&variantId=<id>`. Docs-only stories are skipped.
+
+`FRONTGUARD_CAPTURE_RUNNER` or config `captureRunner` records which runner produced the baselines. If that name differs from the runner selected above, Frontguard logs that baselines from the previous runner are not comparable. An Argos maintainer reported that a Storybook runner switch made 16 of 22 shots 1px wider or taller (https://x.com/gregberge_/status/2110303101538451874). That figure is a vendor measurement, not a Frontguard statistic. Pixelmatch stays the pass/fail gate. Which runner wrote each baseline file is tracked separately.
+
+---
+
 ## Sample CLI Output
 
 ```

@@ -35,6 +35,36 @@ const invalidTypeError =
   (issue: z.core.$ZodRawIssue): string | undefined =>
     issue.code === "invalid_type" ? message : undefined;
 
+/**
+ * Optional Ladle or Histoire block. An empty object stays off. Filters or a
+ * timeout without `url` or `dir` are a config error. Storybook stays on its
+ * own schema, which still requires `url`.
+ */
+function storyIndexSchema(name: "ladle" | "histoire") {
+  return z
+    .object({
+      url: z
+        .url({
+          error: `Config error at \`${name}.url\`: expected a valid URL`,
+        })
+        .optional(),
+      dir: z.string().min(1).optional(),
+      stories: z.array(z.string().min(1)).optional(),
+      exclude: z.array(z.string().min(1)).optional(),
+      fetchTimeoutMs: z.number().int().positive().optional(),
+    })
+    .superRefine((value, ctx) => {
+      const hasTarget = Boolean(value.url || value.dir);
+      const hasNotes =
+        value.stories !== undefined ||
+        value.exclude !== undefined ||
+        value.fetchTimeoutMs !== undefined;
+      if (!hasTarget && hasNotes) {
+        ctx.addIssue(`Config error at \`${name}\`: url or dir is required`);
+      }
+    });
+}
+
 /** Zod schema for route-discovery options. */
 const discoverSchema = z.object({
   startUrl: z.string().min(1, "discover.startUrl must not be empty"),
@@ -362,6 +392,18 @@ export const configSchema = z.object({
       projectRoot: z.string().min(1).optional(),
     })
     .optional(),
+
+  /** Ladle integration. Off unless `url` or `dir` is set. */
+  ladle: storyIndexSchema("ladle").optional(),
+
+  /** Histoire integration. Off unless `url` or `dir` is set. */
+  histoire: storyIndexSchema("histoire").optional(),
+
+  /**
+   * Runner recorded for the baselines under comparison. A mismatch with the
+   * selected story runner logs a warning and does not approve any pixels.
+   */
+  captureRunner: z.enum(["storybook", "ladle", "histoire"]).optional(),
 
   /** Judge mode configuration (optional Figma design references). */
   judge: z

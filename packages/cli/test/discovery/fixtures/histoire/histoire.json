@@ -1,0 +1,24 @@
+{
+  "stories": [
+    {
+      "id": "src-components-button-story-vue",
+      "title": "Button",
+      "group": "Components",
+      "docsOnly": false,
+      "relativePath": "src/components/Button.story.vue",
+      "variants": [
+        { "id": "primary", "title": "Primary" },
+        { "id": "disabled", "title": "Disabled" }
+      ]
+    },
+    {
+      "id": "src-components-button-docs",
+      "title": "Button docs",
+      "group": "Components",
+      "docsOnly": true,
+      "relativePath": "src/components/Button.docs.md",
+      "variants": [{ "id": "docs", "title": "Docs" }]
+    }
+  ],
+  "markdownFiles": []
+}

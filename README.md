@@ -30,7 +30,7 @@ Frontguard is organized as modular npm packages so you can adopt the exact level
 
 | Workflow | Package | When to Use It | Where Baselines Live |
 | :--- | :--- | :--- | :--- |
-| **1. Full-App & Sitemap CLI** | [`@frontguard/cli`](https://www.npmjs.com/package/@frontguard/cli) | Crawl or list routes in `frontguard.config.ts` (plus Storybook `/index.json`), capture multi-viewport screenshots, and gate PRs in CI. | `frontguard-baselines` git orphan branch (zero `main` branch binary bloat) |
+| **1. Full-App & Sitemap CLI** | [`@frontguard/cli`](https://www.npmjs.com/package/@frontguard/cli) | Crawl or list routes in `frontguard.config.ts` (plus optional Storybook `/index.json`, Ladle `meta.json`, or Histoire `histoire.json`), capture multi-viewport screenshots, and gate PRs in CI. | `frontguard-baselines` git orphan branch (zero `main` branch binary bloat) |
 | **2. In-Test Playwright Helper** | [`@frontguard/playwright`](https://www.npmjs.com/package/@frontguard/playwright) | Call `await visualTest(page, name, options)` directly inside existing `@playwright/test` spec files after login flows, modals, or mocked API responses. | `__visual_baselines__/` directory |
 | **3. AI Coding Agent Loop** | [`@frontguard/mcp`](https://www.npmjs.com/package/@frontguard/mcp) | Let Claude Code, Cursor, or Windsurf inspect visual regressions, spatial DOM diff clusters (`cluster.targetSelector`), and validate CSS patches over stdio. | Reads `./frontguard-report/report.json` locally (zero Cloud API key required) |
 
@@ -357,7 +357,7 @@ packages/
 ├── cli/src/          # @frontguard/cli — discover → render → diff → report
 │   ├── cli/          # Commander entry (run, init, update-baselines, doctor, guide, monitor)
 │   ├── core/         # Pipeline orchestrator, types, config, 9-hook plugin system
-│   ├── discovery/    # Route discovery (crawler + filesystem + Storybook /index.json)
+│   ├── discovery/    # Route discovery (crawler + filesystem + optional Storybook, Ladle, Histoire indexes)
 │   ├── render/       # Playwright rendering engine + deterministic anti-flake gates
 │   ├── diff/         # Pixelmatch + SSIM / Chroma-SSIM / CW-SSIM + DOM cluster attribution
 │   ├── storage/      # Git orphan branch baselines (frontguard-baselines)
