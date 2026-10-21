@@ -679,6 +679,8 @@ async function runCapturedPipeline(
   }
 
   const fingerprintAccum = createFingerprintAccum();
+  const schemeNotes: string[] = [];
+  const seenSchemes = new Set<string>();
 
   try {
     const [, duration] = await timed(async () => {
@@ -725,6 +727,24 @@ async function runCapturedPipeline(
                 manifestReadable,
                 shot,
               );
+              if (manifestReadable && baselineManifest) {
+                const stored =
+                  baselineManifest.routes?.[shot.route.path]?.snapshots?.[
+                    `${shot.viewport}/${shot.browser}`
+                  ]?.colorScheme;
+                const current = shot.route.colorScheme ?? config.colorScheme ?? 'light';
+                const pair = `${stored}:${current}`;
+                if (
+                  (stored === 'light' || stored === 'dark') &&
+                  stored !== current &&
+                  !seenSchemes.has(pair)
+                ) {
+                  seenSchemes.add(pair);
+                  schemeNotes.push(
+                    `${shot.route.path} @ ${shot.viewport}px [${shot.browser}] ${stored} vs ${current}`,
+                  );
+                }
+              }
               // Compare against existing baseline using the effective threshold
               diff = compareScreenshot(shot, baseline, effectiveThreshold, {
                 enabled: config.ssimFallback,
@@ -795,6 +815,11 @@ async function runCapturedPipeline(
   }
   if (fingerprintCheck.missing) {
     logger.warn(missingFingerprintWarning());
+  }
+  if (schemeNotes.length > 0) {
+    logger.warn(
+      `Color scheme differs (${schemeNotes.join('; ')}). Not a pixel failure; same baseline file.`,
+    );
   }
 
   // Free the screenshots array — all data has been extracted
@@ -1216,7 +1241,7 @@ async function writeUpdatedBaselines(
 
   if (useBatchWrite) {
     const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
-    const manifest = stampBaselineManifest(existing, screenshots);
+    const manifest = stampBaselineManifest(existing, screenshots, config.colorScheme);
 
     try {
       await storage.writeBaselines(
@@ -1271,7 +1296,7 @@ async function writeUpdatedBaselines(
     }
 
     const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
-    const manifest = stampBaselineManifest(existing, writtenScreenshots);
+    const manifest = stampBaselineManifest(existing, writtenScreenshots, config.colorScheme);
     await storage.writeManifest(manifest);
   }
   timing.compare = Math.round(performance.now() - writeStart);

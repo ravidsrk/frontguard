@@ -931,6 +931,12 @@ export interface BaselineSnapshot {
   sha256: string;
   updatedAt: string;
   fingerprint?: RendererFingerprint;
+  /**
+   * Color scheme this snapshot was captured with.
+   * Absent on snapshots written before the field existed.
+   * Not part of the baseline path until named modes exist.
+   */
+  colorScheme?: ColorScheme;
 }
 
 /** Result of comparing a baseline fingerprint with the current runtime. */
