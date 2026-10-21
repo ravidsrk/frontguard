@@ -84,6 +84,20 @@ export interface UsageRecord {
   screenshotsCount: number;
 }
 
+/** Deletes object-store bytes for one owned run during account erasure. */
+export interface RunBlobDeleter {
+  deleteRun(userId: string, runId: string): Promise<void>;
+}
+
+/** Result of erasing one account. Counts are what that account owned before deletion. */
+export interface AccountErasureResult {
+  erased: boolean;
+  userId: string;
+  runs: number;
+  baselines: number;
+  reports: number;
+}
+
 /** Options for {@link Store.listRuns}. */
 export interface ListRunsOptions {
   /** Cap on the number of runs returned (default 50). */
@@ -120,6 +134,12 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
   getUserByGithubId(githubId: string): Promise<User | null>;
   updateUserPlan(id: string, plan: string): Promise<void>;
   updateUserIdentity(id: string, patch: { email?: string; githubLogin?: string }): Promise<void>;
+  /**
+   * Deletes one account and the baselines, reports, and other rows it owns.
+   * Other accounts are left intact. Blob deletion is best-effort and runs
+   * before the rows disappear. Does not touch accounts that do not match `userId`.
+   */
+  eraseAccount(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult>;
 
   // API keys
   createApiKey(key: ApiKeyRecord): Promise<void>;
@@ -243,6 +263,77 @@ export class InMemoryStore implements Store {
     if (!u) return;
     if (patch.email !== undefined) u.email = patch.email;
     if (patch.githubLogin !== undefined) u.githubLogin = patch.githubLogin;
+  }
+
+  async eraseAccount(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
+    const user = this.users.get(userId);
+    if (!user) return { erased: false, userId, runs: 0, baselines: 0, reports: 0 };
+
+    const ownedIds: string[] = [];
+    let baselines = 0;
+    let reports = 0;
+    for (const [id, entry] of this.runs) {
+      if (entry.userId !== userId) continue;
+      ownedIds.push(id);
+      if (entry.run.reportHtml) reports++;
+      baselines += (this.screenshots.get(id) ?? []).filter((shot) => shot.type === 'baseline').length;
+    }
+    if (blobs) {
+      for (const id of ownedIds) {
+        try {
+          await blobs.deleteRun(userId, id);
+        } catch {
+          // Object deletion must not keep the account row.
+        }
+      }
+    }
+    for (const id of ownedIds) {
+      await this.deleteRun(id, userId);
+      this.runVersions.delete(id);
+    }
+
+    this.approvals = this.approvals.filter((approval) => approval.reviewerUserId !== userId);
+    this.decisions = this.decisions.filter((decision) => decision.userId !== userId);
+    for (const [hash, key] of this.apiKeys) {
+      if (key.userId === userId) this.apiKeys.delete(hash);
+    }
+    for (const key of [...this.usage.keys()]) {
+      if (key.startsWith(`${userId}:`)) this.usage.delete(key);
+    }
+    for (const key of [...this.usageAlertState.keys()]) {
+      if (key.startsWith(`${userId}:`)) this.usageAlertState.delete(key);
+    }
+    for (const [id, mask] of this.masks) {
+      if (mask.userId === userId) this.masks.delete(id);
+    }
+
+    const monitorIds = [...this.monitors.values()].filter((monitor) => monitor.userId === userId).map((monitor) => monitor.id);
+    for (const id of monitorIds) {
+      this.monitors.delete(id);
+      this.monitorVersions.delete(id);
+      this.alertState.delete(id);
+    }
+    const monitorIdSet = new Set(monitorIds);
+    this.monitorRuns = this.monitorRuns.filter(
+      (run) => run.userId !== userId && !monitorIdSet.has(run.monitorId),
+    );
+    for (const [key, member] of this.members) {
+      if (member.userId === userId) this.members.delete(key);
+    }
+    this.activity = this.activity.filter((entry) => entry.userId !== userId);
+    if (user.email) {
+      const email = user.email.toLowerCase();
+      for (const [token, invitation] of this.invitations) {
+        if (invitation.email && invitation.email.toLowerCase() === email) this.invitations.delete(token);
+      }
+    }
+    const ownedIdSet = new Set(ownedIds);
+    this.backgroundFailures = this.backgroundFailures.filter(
+      (failure) =>
+        failure.userId !== userId && !ownedIdSet.has(failure.sourceId) && !monitorIdSet.has(failure.sourceId),
+    );
+    this.users.delete(userId);
+    return { erased: true, userId, runs: ownedIds.length, baselines, reports };
   }
 
   async createApiKey(key: ApiKeyRecord): Promise<void> {

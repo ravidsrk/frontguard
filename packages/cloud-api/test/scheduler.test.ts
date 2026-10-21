@@ -37,18 +37,21 @@ describe('scheduler', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it('runMonitor updates last-run status (no Daytona → simulated new_baseline = no alerts)', async () => {
+  it('runMonitor records an error when no comparison ran (no Daytona)', async () => {
     const store = getMemoryStore();
     const monitor = makeMonitor();
     await store.createMonitor(monitor);
     const now = new Date('2026-01-01T12:00:00Z');
 
-    const { alerts } = await runMonitor({}, store, monitor, now);
-    // Simulated processor yields new_baseline (diff 0) → no alerts.
-    expect(alerts).toEqual([]);
+    const { alerts, run } = await runMonitor({}, store, monitor, now);
+    expect(run.status).toBe('error');
+    expect(run.attempts).toBe(2);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].kind).toBe('error');
+    expect(alerts[0].message).toMatch(/comparison/);
     const updated = await store.getMonitor('m1');
     expect(updated?.lastRunAt).toBe(now.toISOString());
-    expect(updated?.lastStatus).toBe('passed');
+    expect(updated?.lastStatus).toBe('error');
   });
 
   it('persists a monitor run history record', async () => {
@@ -59,12 +62,12 @@ describe('scheduler', () => {
 
     const { run } = await runMonitor({}, store, monitor, now);
     expect(run.monitorId).toBe('m1');
-    expect(run.status).toBe('passed');
-    expect(run.attempts).toBe(1);
+    expect(run.status).toBe('error');
+    expect(run.attempts).toBe(2);
 
     const history = await store.listMonitorRuns('m1');
     expect(history).toHaveLength(1);
-    expect(history[0].status).toBe('passed');
+    expect(history[0].status).toBe('error');
   });
 
   it('meters usage against the owner for each monitor run', async () => {
@@ -123,7 +126,8 @@ describe('scheduler', () => {
 
     const result = await runScheduledChecks({}, now);
     expect(result.checked).toBe(1);
-    expect(result.errors).toBe(0);
+    // The due monitor ran, then failed closed because nothing was compared.
+    expect(result.errors).toBe(1);
 
     // The due monitor's lastRunAt advanced; the fresh one did not.
     expect((await store.getMonitor('due'))?.lastRunAt).toBe(now.toISOString());
@@ -166,7 +170,7 @@ describe('scheduler', () => {
     expect((await store.getMonitor('due'))?.lastRunAt).toBe('2026-01-01T10:00:00Z');
   });
 
-  it('dispatches alerts when regressions are detected', async () => {
+  it('dispatches an error alert when the check does not compare', async () => {
     const store = getMemoryStore();
     const monitor = makeMonitor({ alerts: { slack: 'https://hook' } });
     await store.createMonitor(monitor);
@@ -179,9 +183,10 @@ describe('scheduler', () => {
     }) as unknown as typeof fetch;
 
     const { alerts } = await runMonitor({}, store, monitor, now, fakeFetch);
-    // Simulated processor returns new_baseline → no alerts/dispatch.
-    expect(alerts).toEqual([]);
-    expect(slackCalls).toBe(0);
+    // No comparison is a check failure, so the error alert is dispatched.
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].kind).toBe('error');
+    expect(slackCalls).toBe(1);
   });
 
   it('REL-2: tick 1 establishes baseline from current screenshots; tick 2 detects regression', async () => {

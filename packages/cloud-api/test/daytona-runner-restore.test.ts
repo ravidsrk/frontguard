@@ -15,11 +15,13 @@ import { describe, it, expect, vi } from 'vitest';
 // from ever loading.
 const h = vi.hoisted(() => {
   const calls: string[] = [];
+  const uploads = new Map<string, string>();
   const sandbox = {
     getUserHomeDir: async () => '/home/daytona',
     fs: {
-      uploadFile: async (_bytes: unknown, path: string) => {
+      uploadFile: async (bytes: Buffer | Uint8Array, path: string) => {
         calls.push(`upload:${path}`);
+        uploads.set(path, Buffer.from(bytes).toString('utf8'));
       },
       downloadFile: async (path: string) => {
         calls.push(`download:${path}`);
@@ -35,7 +37,7 @@ const h = vi.hoisted(() => {
       },
     },
   };
-  return { calls, sandbox };
+  return { calls, uploads, sandbox };
 });
 
 vi.mock('@daytona/sdk', () => ({
@@ -164,5 +166,69 @@ describe('executeInSandbox — restore happens before the run (cloud-1)', () => 
     const seedIdx = idx((c) => c.startsWith('exec:') && c.includes('--orphan frontguard-baselines'));
     expect(seedIdx).toBeGreaterThan(baselineUploadIdx);
     expect(seedIdx).toBeLessThan(runIdx);
+
+    const runCmd = h.calls.find((c) => c.startsWith('exec:frontguard run'));
+    expect(runCmd).toBe(
+      'exec:frontguard run --config /home/daytona/frontguard.config.json --output json',
+    );
+    expect(runCmd).not.toContain('--reporter');
+    const config = JSON.parse(h.uploads.get('/home/daytona/frontguard.config.json') ?? '{}') as {
+      outputDir?: string;
+    };
+    expect(config.outputDir).toBe('/home/daytona/output');
+  });
+
+  it('parses CLI json diffs from stdout when results.json is absent', async () => {
+    h.calls.length = 0;
+    const originalExec = h.sandbox.process.executeCommand;
+    const originalDownload = h.sandbox.fs.downloadFile;
+    h.sandbox.process.executeCommand = async (cmd: string) => {
+      h.calls.push(`exec:${cmd}`);
+      if (cmd.startsWith('frontguard run')) {
+        return {
+          result: JSON.stringify({
+            diffs: [
+              {
+                route: '/',
+                viewport: 1440,
+                browser: 'chromium',
+                status: 'pass',
+                diffPercentage: 0,
+                comparisonMethod: 'pixelmatch',
+              },
+            ],
+          }),
+        };
+      }
+      return { result: '' };
+    };
+    h.sandbox.fs.downloadFile = async (path: string) => {
+      h.calls.push(`download:${path}`);
+      if (path.endsWith('report.html')) return Buffer.from('<html>compared</html>');
+      throw new Error('not found');
+    };
+    try {
+      const out = await executeInSandbox({
+        url: 'https://shop.example.com',
+        routes: [{ path: '/' }],
+        viewports: [1440],
+        browsers: ['chromium'],
+        threshold: 0.01,
+        daytonaApiKey: 'dt_key',
+      });
+      expect(out.results).toEqual([
+        expect.objectContaining({
+          route: '/',
+          status: 'pass',
+          comparisonMethod: 'pixelmatch',
+        }),
+      ]);
+      const runCmd = h.calls.find((c) => c.startsWith('exec:frontguard run'));
+      expect(runCmd).not.toContain('--reporter');
+      expect(runCmd).toContain('--output json');
+    } finally {
+      h.sandbox.process.executeCommand = originalExec;
+      h.sandbox.fs.downloadFile = originalDownload;
+    }
   });
 });

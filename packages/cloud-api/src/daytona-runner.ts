@@ -74,6 +74,8 @@ export interface RunResult {
     classification?: string;
     explanation?: string;
     timestamp: string;
+    /** Set when the CLI diffed this route against a baseline image. */
+    comparisonMethod?: 'byte-identical' | 'pixelmatch';
     /** AI-generated fix emitted by the CLI report, when present. */
     suggestedFix?: SuggestedFix;
   }>;
@@ -87,6 +89,109 @@ export interface RunResult {
 // Snapshot name — pre-baked sandbox with Playwright + Frontguard installed
 // ---------------------------------------------------------------------------
 const FRONTGUARD_SNAPSHOT = 'frontguard-playwright-v1';
+
+/**
+ * CLI invocation for a sandbox run.
+ *
+ * `frontguard run` accepts `--output console|json` and has no `--reporter`
+ * flag. `--output json` prints the run document on stdout; the HTML reporter
+ * always writes `report.html` under `config.outputDir`. Passing `--reporter`
+ * or a directory to `--output` makes the CLI exit before it compares.
+ */
+export function sandboxRunCommand(configPath: string): string {
+  return `frontguard run --config ${configPath} --output json`;
+}
+
+function commandOutput(execResult: unknown): string {
+  if (typeof execResult === 'string') return execResult;
+  if (execResult && typeof execResult === 'object' && 'result' in execResult) {
+    const result = (execResult as { result?: unknown }).result;
+    return typeof result === 'string' ? result : '';
+  }
+  return '';
+}
+
+function comparisonMethodOf(value: unknown): 'byte-identical' | 'pixelmatch' | undefined {
+  return value === 'pixelmatch' || value === 'byte-identical' ? value : undefined;
+}
+
+function suggestedFixOf(value: unknown): SuggestedFix | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const fix = value as Record<string, unknown>;
+  if (typeof fix.fixType !== 'string' || typeof fix.patch !== 'string') return undefined;
+  return {
+    fixType: fix.fixType,
+    category: typeof fix.category === 'string' ? fix.category : '',
+    patch: fix.patch,
+    confidence: typeof fix.confidence === 'number' ? fix.confidence : 0,
+    explanation: typeof fix.explanation === 'string' ? fix.explanation : '',
+    ...(typeof fix.target === 'string' ? { target: fix.target } : {}),
+  };
+}
+
+function resultFromRecord(row: Record<string, unknown>): RunResult['results'][number] | null {
+  if (typeof row.route !== 'string' || typeof row.viewport !== 'number') return null;
+  const ai = row.aiAnalysis;
+  const aiClassification =
+    ai && typeof ai === 'object' && typeof (ai as { classification?: unknown }).classification === 'string'
+      ? (ai as { classification: string }).classification
+      : undefined;
+  const aiExplanation =
+    ai && typeof ai === 'object' && typeof (ai as { explanation?: unknown }).explanation === 'string'
+      ? (ai as { explanation: string }).explanation
+      : undefined;
+  const comparisonMethod = comparisonMethodOf(row.comparisonMethod);
+  const suggestedFix = suggestedFixOf(row.suggestedFix);
+  return {
+    route: row.route,
+    viewport: row.viewport,
+    browser: typeof row.browser === 'string' ? row.browser : 'chromium',
+    status: typeof row.status === 'string' ? row.status : 'error',
+    diffPercentage: typeof row.diffPercentage === 'number' ? row.diffPercentage : 0,
+    ...(typeof row.classification === 'string'
+      ? { classification: row.classification }
+      : aiClassification
+        ? { classification: aiClassification }
+        : {}),
+    ...(typeof row.explanation === 'string'
+      ? { explanation: row.explanation }
+      : aiExplanation
+        ? { explanation: aiExplanation }
+        : {}),
+    timestamp: typeof row.timestamp === 'string' ? row.timestamp : new Date().toISOString(),
+    ...(comparisonMethod ? { comparisonMethod } : {}),
+    ...(suggestedFix ? { suggestedFix } : {}),
+  };
+}
+
+/**
+ * Parses either a legacy JSON array of result rows or the CLI `--output json`
+ * document (`{ diffs: [...] }`). Returns an empty list when the text is not a
+ * run payload — callers must not treat that as a successful comparison.
+ */
+export function parseSandboxCliOutput(text: string): RunResult['results'] {
+  const trimmed = text.trim();
+  const start = trimmed.search(/[[{]/);
+  if (start === -1) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed.slice(start));
+  } catch {
+    return [];
+  }
+  const rows = Array.isArray(parsed)
+    ? parsed
+    : parsed && typeof parsed === 'object' && Array.isArray((parsed as { diffs?: unknown }).diffs)
+      ? (parsed as { diffs: unknown[] }).diffs
+      : [];
+  const results: RunResult['results'] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const mapped = resultFromRecord(row as Record<string, unknown>);
+    if (mapped) results.push(mapped);
+  }
+  return results;
+}
 
 // ---------------------------------------------------------------------------
 // Execute a Frontguard run inside a Daytona sandbox
@@ -165,18 +270,20 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
       );
     }
 
-    // Build frontguard config
+    const configPath = `${homeDir}/frontguard.config.json`;
+    const outputDir = `${homeDir}/output`;
+
+    // Build frontguard config. outputDir is where the HTML reporter writes
+    // report.html and images. `--output` on the CLI is the stdout format.
     const config = {
       baseUrl: request.url,
       routes: request.routes,
       viewports: request.viewports,
       browsers: request.browsers || ['chromium'],
       threshold: request.threshold ?? 0.01,
+      outputDir,
       ...(request.ai ? { ai: request.ai } : {}),
     };
-
-    const configPath = `${homeDir}/frontguard.config.json`;
-    const outputDir = `${homeDir}/output`;
 
     // Restore prior baselines from R2 into the sandbox and seed them into the
     // CLI's git orphan branch BEFORE the run, so regressions can be detected
@@ -202,25 +309,26 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
     // GitOrphanStorage(process.cwd()) resolves the repo we seeded above.
     const startTime = Date.now();
     const execResult = await sandbox.process.executeCommand(
-      `frontguard run --config ${configPath} --reporter json --reporter html --output ${outputDir}`,
+      sandboxRunCommand(configPath),
       homeDir,
       undefined,
       300, // 5 min max
     );
     const duration = Date.now() - startTime;
 
-    // Read JSON results from sandbox
+    // Prefer a results file when one exists. The current CLI writes the run
+    // document to stdout (`--output json`) and does not create results.json;
+    // an empty file must not hide that stdout payload.
     let results: RunResult['results'] = [];
     try {
       const jsonBuffer = await sandbox.fs.downloadFile(`${outputDir}/results.json`);
-      results = JSON.parse(jsonBuffer.toString());
+      results = parseSandboxCliOutput(jsonBuffer.toString());
     } catch {
-      // JSON file not available — try parsing stdout
-      try {
-        results = JSON.parse(execResult.result || '[]');
-      } catch {
-        // Neither available — return empty
-      }
+      results = [];
+    }
+    if (results.length === 0) {
+      const fromStdout = parseSandboxCliOutput(commandOutput(execResult));
+      if (fromStdout.length > 0) results = fromStdout;
     }
 
     // Read HTML report from sandbox

@@ -10,6 +10,18 @@ import type { BaselineRestore } from './daytona-runner.js';
  */
 export type ScreenshotSink = (screenshots: PendingScreenshot[]) => Promise<void>;
 
+/** Statuses that mean a route was diffed against a baseline. `new` / `new_baseline` are not comparisons. */
+const COMPARISON_STATUSES = new Set(['pass', 'changed', 'regression', 'unchanged', 'warning', 'flaky']);
+
+/** Error recorded when a run ends without a baseline comparison. Such a run is never `completed`. */
+export const NO_COMPARISON_ERROR = 'Run finished without a baseline comparison';
+
+/** True when one sandbox result is a baseline diff, not a first capture or an error. */
+export function isBaselineComparison(result: { status?: string; comparisonMethod?: string }): boolean {
+  if (result.comparisonMethod === 'pixelmatch' || result.comparisonMethod === 'byte-identical') return true;
+  return result.status != null && COMPARISON_STATUSES.has(result.status);
+}
+
 /** Subset of the Worker env that `processRun` reads. */
 export interface ProcessorEnv {
   DAYTONA_API_KEY?: string;
@@ -23,8 +35,10 @@ export interface ProcessorEnv {
  * Process a visual regression run.
  *
  * When `env.DAYTONA_API_KEY` is set, spins up an ephemeral Daytona sandbox
- * with Playwright and runs real screenshots. Otherwise, falls back to
- * baseline-marker results (for dev/testing).
+ * with Playwright and runs real screenshots. The run is `completed` only when
+ * at least one result is a baseline comparison. Otherwise it is `failed`.
+ * With no Daytona key there is nothing to compare, so the run is `failed`
+ * rather than reported `completed`.
  *
  * Workers do not expose Node's env globals, so the secret is read from the
  * Worker binding the caller passes in.
@@ -81,6 +95,15 @@ export async function processRun(
         // null (mcp-2).
         ...(r.suggestedFix ? { suggestedFix: r.suggestedFix } : {}),
       }));
+
+      // Empty output and first-capture markers are not comparisons. The old
+      // path still set `completed` after a CLI invocation that never diffed.
+      if (!sandboxResult.results.some((r) => isBaselineComparison(r))) {
+        run.status = 'failed';
+        run.error = NO_COMPARISON_ERROR;
+        return;
+      }
+
       run.completedAt = new Date().toISOString();
 
       if (onScreenshots && sandboxResult.screenshots?.length) {
@@ -97,10 +120,8 @@ export async function processRun(
         run.reportHtml = generateReportHtml(run);
       }
     } else {
-      // No Daytona configured — emit a baseline-marker result per
-      // route×viewport so the CLI/dashboard can show the run completed.
-      // The actual diff comes from the sandbox path above; we never fake a
-      // diff percentage here.
+      // No sandbox, so nothing was diffed against a baseline. Record the
+      // marker the caller would have seen, but do not report the run completed.
       const results: RunResult[] = [];
       for (const route of run.routes) {
         for (const viewport of run.viewports) {
@@ -114,8 +135,9 @@ export async function processRun(
         }
       }
       run.results = results;
-      run.completedAt = new Date().toISOString();
-      run.reportHtml = generateReportHtml(run);
+      run.status = 'failed';
+      run.error = NO_COMPARISON_ERROR;
+      return;
     }
 
     run.status = 'completed';

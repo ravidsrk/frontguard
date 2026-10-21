@@ -14,7 +14,7 @@ import type { Run } from '../src/types.js';
 const executeInSandbox = vi.fn();
 vi.mock('../src/daytona-runner.js', () => ({ executeInSandbox }));
 
-import { processRun } from '../src/processor.js';
+import { NO_COMPARISON_ERROR, processRun } from '../src/processor.js';
 
 function makeRun(overrides: Partial<Run> = {}): Run {
   return {
@@ -35,16 +35,16 @@ describe('processRun — simulated branch (no Daytona)', () => {
     executeInSandbox.mockReset();
   });
 
-  it('produces a new_baseline result per route×viewport and completes', async () => {
+  it('does not mark a run completed when Daytona is unset', async () => {
     const run = makeRun();
     await processRun(run, {});
-    expect(run.status).toBe('completed');
+    expect(run.status).not.toBe('completed');
+    expect(run.status).toBe('failed');
+    expect(run.error).toBe(NO_COMPARISON_ERROR);
     expect(run.results).toHaveLength(4); // 2 routes × 2 viewports
     expect(run.results!.every((r) => r.status === 'new_baseline')).toBe(true);
     expect(run.results!.every((r) => r.diffPercentage === 0)).toBe(true);
-    expect(run.reportHtml).toBeTruthy();
-    expect(run.reportUrl).toBe('/v1/reports/run_1');
-    expect(run.completedAt).toBeTruthy();
+    expect(run.reportUrl).toBeFalsy();
     expect(executeInSandbox).not.toHaveBeenCalled();
   });
 
@@ -64,7 +64,8 @@ describe('processRun — simulated branch (no Daytona)', () => {
       const run = makeRun({ viewports: [1440], routes: [{ path: '/' }] });
       await processRun(run, {});
       expect(executeInSandbox).not.toHaveBeenCalled();
-      expect(run.status).toBe('completed');
+      expect(run.status).toBe('failed');
+      expect(run.error).toBe(NO_COMPARISON_ERROR);
     } finally {
       if (prev === undefined) delete process.env.DAYTONA_API_KEY;
       else process.env.DAYTONA_API_KEY = prev;
@@ -108,6 +109,34 @@ describe('processRun — Daytona branch', () => {
     expect(run.reportHtml).toBeTruthy();
     // result without timestamp gets one assigned
     expect(run.results![0].timestamp).toBeTruthy();
+  });
+
+  it('does not mark a run completed when the sandbox returns no comparison', async () => {
+    executeInSandbox.mockResolvedValue({
+      results: [],
+      reportHtml: '<p>No report generated</p>',
+    });
+    const run = makeRun();
+    await processRun(run, { DAYTONA_API_KEY: 'dt_key' });
+    expect(run.status).not.toBe('completed');
+    expect(run.status).toBe('failed');
+    expect(run.error).toBe(NO_COMPARISON_ERROR);
+    expect(run.reportUrl).toBeFalsy();
+  });
+
+  it('does not mark a run completed when every result is a new baseline', async () => {
+    executeInSandbox.mockResolvedValue({
+      results: [
+        { route: '/', viewport: 1440, status: 'new', diffPercentage: 0, timestamp: 't1' },
+        { route: '/pricing', viewport: 1440, status: 'new_baseline', diffPercentage: 0, timestamp: 't1' },
+      ],
+      reportHtml: '<html>first capture</html>',
+    });
+    const run = makeRun();
+    await processRun(run, { DAYTONA_API_KEY: 'dt_key' });
+    expect(run.status).not.toBe('completed');
+    expect(run.status).toBe('failed');
+    expect(run.error).toBe(NO_COMPARISON_ERROR);
   });
 
   it('marks the run failed when the sandbox throws', async () => {

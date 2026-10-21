@@ -224,10 +224,10 @@ describe('GET /v1/reports/:id', () => {
     await new Promise((r) => setTimeout(r, 100));
 
     const reportRes = await request(`/v1/reports/${id}`);
-    // Should be 200 with HTML content
-    expect(reportRes.status).toBe(200);
-    const html = await reportRes.text();
-    expect(html).toContain('<!DOCTYPE html>');
+    // No Daytona key means the run never compared, so it is not completed.
+    expect(reportRes.status).toBe(202);
+    const body = await reportRes.json();
+    expect(body.status).toBe('failed');
   });
 });
 

@@ -719,6 +719,20 @@ app.post("/v1/baselines/:runId/approve", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// DELETE /v1/account — Erase the calling account
+//
+// Deletes the user and the baselines, reports, and other rows that account
+// owns. A different account's rows are not deleted. This does not deploy.
+// ---------------------------------------------------------------------------
+app.delete("/v1/account", async (c) => {
+  const store = c.get("store");
+  const userId = c.get("userId");
+  const blobs = getScreenshotStore(c.env?.SCREENSHOTS as R2Bucket | undefined);
+  const result = await store.eraseAccount(userId, blobs);
+  return c.json(result);
+});
+
+// ---------------------------------------------------------------------------
 // DELETE /v1/runs/:id — Delete a run
 // ---------------------------------------------------------------------------
 app.delete("/v1/runs/:id", async (c) => {

@@ -160,7 +160,8 @@ describe('runScheduledChecks — overlapping ticks (CONC-3)', () => {
     ]);
 
     expect(tickA.processed + tickB.processed).toBe(1);
-    expect(processSpy).toHaveBeenCalledTimes(1);
+    // One monitor execution. processRun fails closed (no comparison) and is retried once.
+    expect(processSpy).toHaveBeenCalledTimes(2);
 
     const monitor = await store.getMonitor('m1');
     expect(monitor?.lastRunAt).toBe(now.toISOString());
@@ -182,6 +183,7 @@ describe('runScheduledChecks — overlapping ticks (CONC-3)', () => {
     await runScheduledChecks({}, new Date('2026-01-01T12:00:00Z'));
     await runScheduledChecks({}, new Date('2026-01-01T12:06:00Z'));
 
-    expect(processSpy).toHaveBeenCalledTimes(2);
+    // Two ticks, and each check retries once because the run did not compare.
+    expect(processSpy).toHaveBeenCalledTimes(4);
   });
 });

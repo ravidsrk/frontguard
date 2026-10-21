@@ -16,6 +16,8 @@ import type {
   UsageAlertState,
   ScreenshotDecision,
   ListRunsOptions,
+  AccountErasureResult,
+  RunBlobDeleter,
 } from './store.js';
 import type { Monitor, MonitorRun, MonitorRunStatus, MonitorAlertState } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
@@ -163,6 +165,90 @@ export class D1Store implements Store {
         .bind(patch.githubLogin, id)
         .run();
     }
+  }
+
+  async eraseAccount(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
+    const user = await this.getUser(userId);
+    if (!user) return { erased: false, userId, runs: 0, baselines: 0, reports: 0 };
+
+    const { results: runRows } = await this.db
+      .prepare(`SELECT id, report_html FROM runs WHERE user_id = ?`)
+      .bind(userId)
+      .all<{ id: string; report_html: string | null }>();
+    const runIds = runRows.map((row) => row.id);
+    const reports = runRows.filter((row) => row.report_html != null && row.report_html !== '').length;
+    const baselineRow = await this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM screenshots WHERE type = 'baseline' AND run_id IN (SELECT id FROM runs WHERE user_id = ?)`,
+      )
+      .bind(userId)
+      .first<{ n: number | bigint }>();
+    const baselines = Number(baselineRow?.n ?? 0);
+
+    if (blobs) {
+      for (const id of runIds) {
+        try {
+          await blobs.deleteRun(userId, id);
+        } catch {
+          // Object deletion must not keep the account row.
+        }
+      }
+    }
+
+    const statements: D1PreparedStatement[] = [
+      this.db
+        .prepare(
+          `DELETE FROM background_failures
+           WHERE user_id = ?
+              OR source_id IN (SELECT id FROM runs WHERE user_id = ?)
+              OR source_id IN (SELECT id FROM monitors WHERE user_id = ?)`,
+        )
+        .bind(userId, userId, userId),
+      this.db
+        .prepare(
+          `DELETE FROM screenshot_decisions
+           WHERE user_id = ? OR run_id IN (SELECT id FROM runs WHERE user_id = ?)`,
+        )
+        .bind(userId, userId),
+      this.db
+        .prepare(
+          `DELETE FROM baseline_approvals
+           WHERE reviewer_user_id = ? OR run_id IN (SELECT id FROM runs WHERE user_id = ?)`,
+        )
+        .bind(userId, userId),
+      this.db
+        .prepare(`DELETE FROM run_attachments WHERE run_id IN (SELECT id FROM runs WHERE user_id = ?)`)
+        .bind(userId),
+      this.db
+        .prepare(`DELETE FROM screenshots WHERE run_id IN (SELECT id FROM runs WHERE user_id = ?)`)
+        .bind(userId),
+      this.db.prepare(`DELETE FROM runs WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM api_keys WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM usage WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM usage_alert_state WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM masks WHERE user_id = ?`).bind(userId),
+      this.db
+        .prepare(`DELETE FROM monitor_alert_state WHERE monitor_id IN (SELECT id FROM monitors WHERE user_id = ?)`)
+        .bind(userId),
+      this.db
+        .prepare(
+          `DELETE FROM monitor_runs WHERE user_id = ? OR monitor_id IN (SELECT id FROM monitors WHERE user_id = ?)`,
+        )
+        .bind(userId, userId),
+      this.db.prepare(`DELETE FROM monitors WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM team_members WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM team_activity WHERE user_id = ?`).bind(userId),
+    ];
+    if (user.email) {
+      statements.push(
+        this.db
+          .prepare(`DELETE FROM team_invitations WHERE email IS NOT NULL AND lower(email) = lower(?)`)
+          .bind(user.email),
+      );
+    }
+    statements.push(this.db.prepare(`DELETE FROM users WHERE id = ?`).bind(userId));
+    await this.db.batch(statements);
+    return { erased: true, userId, runs: runIds.length, baselines, reports };
   }
 
   async createApiKey(key: ApiKeyRecord): Promise<void> {
