@@ -24,6 +24,7 @@ import type {
 } from '../core/types.js';
 import { logger } from '../utils/logger.js';
 import { cropToMaxHeight } from './crop.js';
+import { joinStoryUrl } from '../discovery/index-json.js';
 import { STORYBOOK_READY_SCRIPT } from '../discovery/storybook.js';
 import { captureStableScreenshot } from './stability.js';
 import {
@@ -343,7 +344,10 @@ export async function executeTask(
     }
 
     // --- Navigate --------------------------------------------------------------
-    const url = new URL(task.route.path, config.baseUrl).href;
+    const url =
+      task.route.discoveredVia === 'ladle' || task.route.discoveredVia === 'histoire'
+        ? joinStoryUrl(config.baseUrl, task.route.path)
+        : new URL(task.route.path, config.baseUrl).href;
     logger.debug(`Navigating to ${url} [${task.browser} ${task.viewport}px]`);
 
     const response = await page.goto(url, {
