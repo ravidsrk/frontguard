@@ -109,7 +109,12 @@ jobs:
         #   was previously UNGATED, so the artifact users install could grow
         #   without limit while CI guarded only the library entry. The same
         #   two features move the bin from 341733 bytes on that main to about
-        #   363KB combined, so the ceiling is 380KB.
+        #   363KB combined, so that ceiling was 380KB. On b962ed1 the bin
+        #   was 367223 bytes. Rebased onto 90724b2, this command measures
+        #   the library entry at 219124 bytes (ceiling stays 220KB) and the
+        #   published bin at 388970 bytes. prune-baselines (#290) is the
+        #   growth past 380KB, so the bin ceiling is 400KB. No dependency
+        #   is inlined, and identifiers are not minified.
         run: |
           check() {
             local path="$1" budget="$2" label="$3"
@@ -123,7 +128,7 @@ jobs:
           }
           status=0
           check packages/cli/dist/index.js     220000 "library entry" || status=1
-          check packages/cli/dist/cli/index.js 380000 "published bin" || status=1
+          check packages/cli/dist/cli/index.js 400000 "published bin" || status=1
           exit $status
 
   audit:

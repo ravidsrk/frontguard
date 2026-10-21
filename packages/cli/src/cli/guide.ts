@@ -88,7 +88,12 @@ export default defineConfig({
   \`\`\`bash
   npx @frontguard/cli update-baselines --confirm-baselines
   \`\`\`
-- Baselines are committed in a single batched worktree transaction to the \`frontguard-baselines\` Git orphan branch alongside \`manifest.json\` (which records SHA-256 digests and \`snapshots\` per viewport/browser). Byte-identical PNG blobs are skipped during writes to deduplicate Git object storage, and your working tree stays 100% free of binary PNG clutter.`,
+- Baselines are committed in a single batched worktree transaction to the \`frontguard-baselines\` Git orphan branch alongside \`manifest.json\` (which records SHA-256 digests and \`snapshots\` per viewport/browser). Byte-identical PNG blobs are skipped during writes to deduplicate Git object storage, and your working tree stays 100% free of binary PNG clutter.
+- Prune shots the full config no longer declares, and drop history that is not a merge-base ancestor. The default is a dry run. \`--routes\`, \`--shard\`, and \`FRONTGUARD_SHARD\` refuse, because those runs do not see every baseline. See \`docs/baselines.md\`.
+  \`\`\`bash
+  npx @frontguard/cli prune-baselines
+  npx @frontguard/cli prune-baselines --apply
+  \`\`\``,
   },
   {
     id: 'mcp',
