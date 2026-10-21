@@ -1,0 +1,42 @@
+{
+  "about": {
+    "homepage": "https://www.ladle.dev",
+    "github": "https://github.com/tajo/ladle",
+    "version": 1
+  },
+  "stories": {
+    "control--first": {
+      "name": "First",
+      "levels": ["Control"],
+      "locStart": 12,
+      "locEnd": 12,
+      "filePath": "src/control.stories.tsx",
+      "meta": {}
+    },
+    "control--threshold": {
+      "name": "Threshold",
+      "levels": ["Control"],
+      "locStart": 20,
+      "locEnd": 24,
+      "filePath": "src/control.stories.tsx",
+      "meta": {
+        "frontguard": {
+          "label": "Control threshold",
+          "threshold": 0.02,
+          "viewports": [768],
+          "ignore": [{ "selector": ".clock" }]
+        }
+      }
+    },
+    "control--skipped": {
+      "name": "Skipped",
+      "levels": ["Control"],
+      "locStart": 30,
+      "locEnd": 30,
+      "filePath": "src/control.stories.tsx",
+      "meta": {
+        "frontguard": { "skip": true }
+      }
+    }
+  }
+}

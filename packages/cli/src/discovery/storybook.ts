@@ -1,8 +1,9 @@
 /**
  * Route discovery via Storybook story indexes.
  *
- * Connects to a running Storybook instance (8.x via `/index.json`, 7.x via
- * `/stories.json`), enumerates its stories, and produces one {@link Route}
+ * Connects to a running Storybook instance (`/index.json` for Storybook 8, 9,
+ * 10, and 11 alpha, which share that entries index, or `/stories.json` for
+ * 7.x), enumerates its stories, and produces one {@link Route}
  * per story. Each route targets the Storybook preview iframe so the renderer
  * can navigate directly to a single story without the surrounding manager UI.
  *
@@ -26,6 +27,7 @@
 
 import type { FrontguardConfig, Route } from '../core/types.js';
 import { logger } from '../utils/logger.js';
+import { matchesAny } from './story-match.js';
 import {
   resolveStoryFrontguardParameters,
   type StoryFrontguardParameters,
@@ -46,8 +48,8 @@ export type { StoryFrontguardParameters };
 export interface StorybookConfig {
   /**
    * Base URL of the running Storybook server (e.g. `http://localhost:6006`).
-   * Frontguard will fetch `/index.json` (Storybook 8) or `/stories.json`
-   * (Storybook 7) from this origin to enumerate stories.
+   * Frontguard will fetch `/index.json` (Storybook 8, 9, 10, and 11 alpha)
+   * or `/stories.json` (Storybook 7) from this origin to enumerate stories.
    */
   url: string;
   /**
@@ -79,7 +81,7 @@ export interface StorybookConfig {
 // Index Schemas (intentionally permissive — we only read a few fields)
 // ---------------------------------------------------------------------------
 
-/** Shape of a single story entry in `index.json` (Storybook 8). */
+/** Shape of a single story entry in `index.json` (Storybook 8 through 11 alpha). */
 interface RawStoryEntry {
   id: string;
   title?: string;
@@ -93,7 +95,7 @@ interface RawStoryEntry {
   };
 }
 
-/** Storybook 8: `/index.json` payload. */
+/** `/index.json` payload. Storybook 8, 9, 10, and 11 alpha serve this entries index. */
 interface StorybookIndexV5 {
   v: number;
   entries: Record<string, RawStoryEntry>;
@@ -103,60 +105,6 @@ interface StorybookIndexV5 {
 interface StorybookStoriesV3 {
   v: number;
   stories: Record<string, RawStoryEntry>;
-}
-
-// ---------------------------------------------------------------------------
-// Matching Helpers
-// ---------------------------------------------------------------------------
-
-/** True if the pattern is `*` or `**` (match everything). */
-function isWildcard(pattern: string): boolean {
-  return pattern === '*' || pattern === '**';
-}
-
-/**
- * Glob-ish matcher: `*` matches any run of characters that isn't `/`,
- * `**` matches anything (including `/`). Anchored to the full string.
- */
-function globMatch(pattern: string, candidate: string): boolean {
-  if (isWildcard(pattern)) return true;
-
-  // Escape regex specials, then re-introduce ** and * as wildcards.
-  const escaped = pattern
-    .replace(/[\\.+^${}()|[\]]/g, '\\$&')
-    .replace(/\*\*/g, '::DOUBLESTAR::')
-    .replace(/\*/g, '[^/]*')
-    .replace(/::DOUBLESTAR::/g, '.*')
-    .replace(/\?/g, '.');
-  try {
-    return new RegExp(`^${escaped}$`, 'i').test(candidate);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * True when a story matches any of the supplied patterns.
- *
- * A pattern matches when ANY of these is true:
- *   - it equals the story id (`button--primary`)
- *   - it is a glob over `title/name` (`Forms/Input/*`)
- *   - it is a prefix of the title (`Forms/Input`)
- */
-function matchesAny(story: { id: string; title?: string; name?: string }, patterns: string[]): boolean {
-  if (patterns.length === 0) return false;
-  const title = story.title ?? '';
-  const titleAndName = `${title}/${story.name ?? ''}`;
-  for (const raw of patterns) {
-    const pattern = raw.trim();
-    if (!pattern) continue;
-    if (pattern === story.id) return true;
-    if (globMatch(pattern, story.id)) return true;
-    if (globMatch(pattern, title)) return true;
-    if (globMatch(pattern, titleAndName)) return true;
-    if (title.toLowerCase().startsWith(pattern.toLowerCase())) return true;
-  }
-  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,10 +144,10 @@ async function fetchJson(url: string, timeoutMs: number): Promise<unknown | null
 /**
  * Fetch the story index from a running Storybook.
  *
- * Tries `/index.json` first (Storybook 8 and 7.6+ generators), then falls
- * back to `/stories.json` (Storybook 7.x and earlier). Returns the
- * normalized entry map plus the detected major version, or `null` if both
- * endpoints fail.
+ * Tries `/index.json` first. Storybook 8, 9, 10, and 11 alpha serve the same
+ * entries document, so they share this parser. The index does not name a
+ * major version; `storybookMajor: 8` means that entries index. Falls back to
+ * `/stories.json` (Storybook 7). Returns `null` if both endpoints fail.
  *
  * Exported for testability — tests can serve fixtures over a static file
  * server and feed the URL in.
@@ -210,7 +158,7 @@ export async function fetchStorybookIndex(
 ): Promise<{ entries: Record<string, RawStoryEntry>; storybookMajor: 7 | 8 } | null> {
   const base = normalizeBase(baseUrl);
 
-  // Storybook 8 (and recent 7.6+) — /index.json
+  // /index.json — Storybook 8, 9, 10, and 11 alpha (same entries shape)
   const v5 = await fetchJson(`${base}/index.json`, timeoutMs);
   if (v5 && typeof v5 === 'object' && 'entries' in v5) {
     const parsed = v5 as StorybookIndexV5;
@@ -278,7 +226,11 @@ function applyStoryParameters(route: Route, params: StoryFrontguardParameters | 
 export interface StorybookDiscoveryResult {
   /** All routes corresponding to capturable stories. */
   routes: Route[];
-  /** Detected Storybook major version (7 or 8). */
+  /**
+   * Index family. `8` is the `/index.json` entries index shared by Storybook
+   * 8, 9, 10, and 11 alpha. `7` is `/stories.json`. The file does not carry
+   * a major version, so this stays `7 | 8`.
+   */
   storybookMajor: 7 | 8;
   /** Number of entries skipped because `type === 'docs'`. */
   docsSkipped: number;
@@ -308,7 +260,7 @@ export async function discoverStorybookStories(
   if (!fetched) {
     logger.warn(
       `Could not fetch Storybook index at ${sbConfig.url}. ` +
-        'Is Storybook running? Frontguard tried /index.json (Storybook 8) and /stories.json (Storybook 7).',
+        'Is Storybook running? Frontguard tried /index.json (Storybook 8, 9, 10, and 11 alpha) and /stories.json (Storybook 7).',
     );
     return null;
   }

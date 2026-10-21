@@ -59,7 +59,10 @@ export default defineConfig({
 ## 2. Automatic Route & Storybook Discovery
 - **Filesystem discovery**: Automatically detects Next.js App Router (including route groups and parallel slot filtering), Next.js Pages, Remix (\`_index\` and pathless layouts), SvelteKit, Astro, and Nuxt routes when \`routes\` is omitted.
 - **Crawler discovery**: Set \`discover: { startUrl: 'http://localhost:3000', maxDepth: 3, maxRoutes: 50, exclude: ['/admin/*'] }\`.
-- **Storybook 7/8/9**: Set \`storybook: { url: 'http://localhost:6006', stories: ['Components/*'] }\` to enumerate stories from \`/index.json\` and await each story's \`play()\` function before capture.
+- **Storybook**: Set \`storybook: { url: 'http://localhost:6006', stories: ['Components/*'] }\`. Storybook 7 is read from \`/stories.json\`. Storybook 8, 9, 10, and 11 alpha share \`/index.json\`, so they use the same parser. The renderer awaits each story's \`play()\` function before capture.
+- **Ladle** (off unless set): \`ladle: { dir: 'build' }\` or \`ladle: { url: 'http://localhost:61000' }\` reads \`meta.json\`. Stories open at \`/?story=<id>&mode=preview\` and wait for \`[data-storyloaded]\`.
+- **Histoire** (off unless set): \`histoire: { dir: '.histoire/dist' }\` reads \`histoire.json\`. Each variant opens at \`/__sandbox.html?storyId=&variantId=\`.
+- **Runner switch**: \`FRONTGUARD_CAPTURE_RUNNER\` or \`captureRunner\` logs a warning when it names a different runner than the one above. Baselines from the previous runner are not comparable. An Argos maintainer reported a Storybook runner switch made 16 of 22 shots 1px wider or taller (https://x.com/gregberge_/status/2110303101538451874). That figure is a vendor measurement, not a Frontguard statistic. Pixelmatch stays the pass/fail gate.
 
 ## 3. Sensitive-DOM Redaction, Frame Convergence & Deterministic Anti-Flake Controls
 - \`redactSensitive: true\` (or an array of custom CSS selectors) masks \`input[type="password"]\`, credit-card \`autocomplete="cc-*"\` fields, one-time codes, and \`[data-frontguard-redact]\` elements in both screenshots and serialized \`domSnapshot\` HTML while preserving exact box geometry.

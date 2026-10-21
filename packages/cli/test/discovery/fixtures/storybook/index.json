@@ -1,0 +1,37 @@
+{
+  "v": 5,
+  "entries": {
+    "components-button--primary": {
+      "id": "components-button--primary",
+      "title": "Components/Button",
+      "name": "Primary",
+      "importPath": "./src/components/Button.stories.tsx",
+      "componentPath": "./src/components/Button.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "type": "story",
+      "subtype": "story",
+      "exportName": "Primary"
+    },
+    "components-button--primary:click": {
+      "id": "components-button--primary:click",
+      "title": "Components/Button",
+      "name": "Click",
+      "importPath": "./src/components/Button.stories.tsx",
+      "tags": ["dev", "test"],
+      "type": "story",
+      "subtype": "test",
+      "exportName": "Click",
+      "parent": "components-button--primary",
+      "parentName": "Primary"
+    },
+    "components-button--docs": {
+      "id": "components-button--docs",
+      "title": "Components/Button",
+      "name": "Docs",
+      "importPath": "./src/components/Button.mdx",
+      "storiesImports": ["./src/components/Button.stories.tsx"],
+      "tags": ["dev", "test", "manifest", "autodocs"],
+      "type": "docs"
+    }
+  }
+}
