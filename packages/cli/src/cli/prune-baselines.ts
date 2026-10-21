@@ -8,6 +8,7 @@ import { loadConfig } from '../core/config.js';
 import type { FrontguardConfig } from '../core/types.js';
 import {
   applyBaselinePrune,
+  baselineBranchState,
   declaredTargetKeys,
   formatPrunePlan,
   isMergeBaseAncestor,
@@ -62,6 +63,13 @@ export async function runPruneBaselines(options: {
     config = await loadConfig(options.configPath);
   } finally {
     process.chdir(previous);
+  }
+
+  if (baselineBranchState(options.cwd) === 'remote-only') {
+    write(
+      'Refusing to prune: frontguard-baselines exists only as origin/frontguard-baselines. Fetch it into a local branch before pruning. This command does not rewrite the remote.',
+    );
+    return 2;
   }
 
   const commits = readBaselineCommits(options.cwd);

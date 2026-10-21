@@ -8,10 +8,10 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { parseBaselineManifest } from '../core/fingerprint.js';
 import type { BaselineManifest, RouteEntry } from '../core/types.js';
 import { baselineStoragePath } from './git-orphan.js';
@@ -43,6 +43,8 @@ export interface BaselineHistoryCommit {
 export interface PrunePlan {
   blockedReason?: string;
   staleSkippedReason?: string;
+  /** Tip the plan was read from. Apply refuses if the branch no longer points here. */
+  tipId?: string;
   staleShots: PruneShot[];
   dropCommitIds: string[];
   keepCommitIdsOldestFirst: string[];
@@ -163,7 +165,22 @@ export function manifestWithoutStaleShots<T extends BaselineManifest>(
   const routes: BaselineManifest['routes'] = { ...(manifest.routes ?? {}) };
   for (const [route, info] of Object.entries(routes)) {
     if (!info) continue;
-    const snapshots = { ...(info.snapshots ?? {}) };
+    const originalSnapshots = info.snapshots ?? {};
+    if (Object.keys(originalSnapshots).length === 0) {
+      const browsers = info.browsers?.length ? info.browsers : ['chromium'];
+      const viewports = info.viewports ?? [];
+      const kept = viewports.filter((viewport) =>
+        browsers.some((browser) => !staleKeys.has(targetKey({ route, viewport, browser }))),
+      );
+      if (kept.length === viewports.length) continue;
+      if (kept.length === 0) {
+        delete routes[route];
+        continue;
+      }
+      routes[route] = { ...info, viewports: kept };
+      continue;
+    }
+    const snapshots = { ...originalSnapshots };
     for (const key of Object.keys(snapshots)) {
       const slash = key.indexOf('/');
       if (slash <= 0) continue;
@@ -295,12 +312,17 @@ export function planBaselinePrune(input: {
     if (!commit) continue;
     for (const record of commit.approvalRecords) keptRecordKeys.add(recordKey(record));
   }
-  rescue((commit) =>
-    commit.approvalRecords.some((record) => !keptRecordKeys.has(recordKey(record))),
-  );
-  for (const id of keep) {
-    const commit = byId.get(id);
-    if (!commit) continue;
+  // One kept copy of a record is enough. Update the set as this walk keeps
+  // commits, or every duplicate of the same approval stays reachable.
+  for (const commit of input.commitsNewestFirst) {
+    if (keep.has(commit.id)) continue;
+    const missingRecord = commit.approvalRecords.some(
+      (record) => !keptRecordKeys.has(recordKey(record)),
+    );
+    if (!missingRecord) continue;
+    keep.add(commit.id);
+    keptForApproval.push(commit.id);
+    for (const hash of hashesOf(commit)) reachableNow.add(hash);
     for (const record of commit.approvalRecords) keptRecordKeys.add(recordKey(record));
   }
   reachableNow = reachable();
@@ -343,6 +365,7 @@ export function planBaselinePrune(input: {
   return {
     blockedReason,
     staleSkippedReason: blockedReason ? undefined : staleSkippedReason,
+    tipId: blockedReason ? undefined : tip.id,
     staleShots: blockedReason ? [] : staleShots,
     dropCommitIds: blockedReason ? [] : dropCommitIds,
     keepCommitIdsOldestFirst: blockedReason ? [] : keepCommitIdsOldestFirst,
@@ -421,7 +444,45 @@ function pathMissing(err: unknown): boolean {
   const error = err as { message?: string; stderr?: string | Buffer; status?: number };
   const stderr = Buffer.isBuffer(error.stderr) ? error.stderr.toString('utf8') : (error.stderr ?? '');
   const text = `${error.message ?? ''}\n${stderr}`;
-  return /does not exist in|exists on disk, but not in|invalid object name/i.test(text);
+  return /does not exist in|exists on disk, but not in|invalid object name|unknown revision or path not in the working tree/i.test(
+    text,
+  );
+}
+
+function refExists(repoDir: string, ref: string): boolean {
+  try {
+    gitText(repoDir, ['show-ref', '--verify', '--quiet', ref]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Local branch, remote-tracking ref only, or neither. Prune never creates the branch. */
+export function baselineBranchState(
+  repoDir: string,
+  branch = BRANCH,
+): 'local' | 'remote-only' | 'absent' {
+  if (refExists(repoDir, `refs/heads/${branch}`)) return 'local';
+  if (refExists(repoDir, `refs/remotes/origin/${branch}`)) return 'remote-only';
+  return 'absent';
+}
+
+/**
+ * Stale shots whose PNG path is not also the path of a shot that stays.
+ * Sanitized routes can collide (`/foo?a` and `/foo_a`), and deleting the shared
+ * file would remove the kept baseline.
+ */
+export function staleFilesToDelete(
+  stale: readonly PruneShot[],
+  retained: readonly PruneShot[],
+): PruneShot[] {
+  const retainedPaths = new Set(retained.map((shot) => storagePath(shot)));
+  return stale.filter((shot) => !retainedPaths.has(storagePath(shot)));
+}
+
+function storagePath(shot: PruneShot): string {
+  return baselineStoragePath(shot.route, shot.viewport, shot.browser as 'chromium');
 }
 
 function showOptional(repoDir: string, spec: string): string | null {
@@ -439,6 +500,7 @@ function showOptional(repoDir: string, spec: string): string | null {
 }
 
 export function readBaselineCommits(repoDir: string, branch = BRANCH): BaselineHistoryCommit[] {
+  if (!refExists(repoDir, `refs/heads/${branch}`)) return [];
   let listed: string;
   try {
     listed = gitText(repoDir, ['rev-list', '--parents', branch]);
@@ -450,19 +512,29 @@ export function readBaselineCommits(repoDir: string, branch = BRANCH): BaselineH
 
   const newestFirst = listed.split('\n').filter(Boolean);
   const commits: BaselineHistoryCommit[] = [];
+  const blobDigest = new Map<string, string>();
   for (const line of newestFirst) {
     const [id, ...parents] = line.split(/\s+/);
     if (!id) continue;
     const manifestRaw = showOptional(repoDir, `${id}:manifest.json`);
     const manifest = manifestRaw === null ? null : parseBaselineManifest(manifestRaw);
     const shots = shotsFromManifest(manifest);
-    const hashes = new Set(shots.map((shot) => shot.sha256).filter((hash) => hash.length > 0));
-    const files = gitText(repoDir, ['ls-tree', '-r', '--name-only', id])
-      .split('\n')
-      .filter((file) => file.startsWith('baselines/') && file.endsWith('.png'));
-    for (const file of files) {
-      const bytes = gitBuffer(repoDir, ['show', `${id}:${file}`]);
-      hashes.add(createHash('sha256').update(bytes).digest('hex'));
+    const hashes = new Set<string>();
+    const tree = gitText(repoDir, ['ls-tree', '-r', id]);
+    for (const entry of tree.split('\n')) {
+      if (entry.length === 0) continue;
+      const tab = entry.indexOf('\t');
+      if (tab < 0) continue;
+      const file = entry.slice(tab + 1);
+      if (!file.startsWith('baselines/') || !file.endsWith('.png')) continue;
+      const oid = entry.slice(0, tab).split(/\s+/)[2];
+      if (!oid) continue;
+      let digest = blobDigest.get(oid);
+      if (!digest) {
+        digest = createHash('sha256').update(gitBuffer(repoDir, ['cat-file', 'blob', oid])).digest('hex');
+        blobDigest.set(oid, digest);
+      }
+      hashes.add(digest);
     }
     const approvalRaw = showOptional(repoDir, `${id}:approvals.json`);
     if (approvalRaw !== null) {
@@ -511,6 +583,14 @@ export function mergeBaseCommit(repoDir: string): string {
   return gitText(repoDir, ['rev-parse', 'HEAD']);
 }
 
+function repositoryIsShallow(repoDir: string): boolean {
+  try {
+    return gitText(repoDir, ['rev-parse', '--is-shallow-repository']) === 'true';
+  } catch {
+    return true;
+  }
+}
+
 export function isMergeBaseAncestor(
   repoDir: string,
   sourceCommitSha: string,
@@ -527,7 +607,42 @@ export function isMergeBaseAncestor(
     return true;
   } catch (err) {
     const status = (err as { status?: number }).status;
-    return status === 1 ? false : 'unknown';
+    if (status !== 1) return 'unknown';
+    // A shallow clone can contain the source object while omitting the
+    // commits between it and the merge base. Exit 1 is not proof it is safe
+    // to drop. Unknown ancestry stays reachable.
+    return repositoryIsShallow(repoDir) ? 'unknown' : false;
+  }
+}
+
+function commitTree(repoDir: string, tree: string, parent: string | undefined, message: string): string {
+  const args = [
+    '-c',
+    'user.name=Frontguard',
+    '-c',
+    'user.email=frontguard@local',
+    '-c',
+    'commit.gpgsign=false',
+    'commit-tree',
+    tree,
+  ];
+  if (parent) args.push('-p', parent);
+  args.push('-F', '-');
+  return execFileSync('git', args, {
+    cwd: repoDir,
+    encoding: 'utf8',
+    input: message.endsWith('\n') ? message : `${message}\n`,
+    maxBuffer: GIT_MAX_BUFFER,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  }).trim();
+}
+
+/** Fails if `branch` is no longer `expected`. A newer baseline write is left in place. */
+function compareAndSwap(repoDir: string, branch: string, next: string, expected: string): void {
+  try {
+    gitText(repoDir, ['update-ref', `refs/heads/${branch}`, next, expected]);
+  } catch {
+    throw new Error(`Refusing to prune: ${branch} moved while the plan was being applied.`);
   }
 }
 
@@ -535,7 +650,8 @@ function rewriteKeptCommits(
   repoDir: string,
   branch: string,
   keepCommitIdsOldestFirst: readonly string[],
-): void {
+  expectedTip: string,
+): string {
   let parent: string | undefined;
   for (const id of keepCommitIdsOldestFirst) {
     const tree = gitText(repoDir, ['rev-parse', `${id}^{tree}`]);
@@ -544,51 +660,34 @@ function rewriteKeptCommits(
       encoding: 'utf8',
       maxBuffer: GIT_MAX_BUFFER,
     });
-    const messagePath = join(tmpdir(), `frontguard-prune-message-${id.slice(0, 12)}`);
-    writeFileSync(messagePath, message.endsWith('\n') ? message : `${message}\n`);
-    try {
-      const args = [
-        '-c',
-        'user.name=Frontguard',
-        '-c',
-        'user.email=frontguard@local',
-        '-c',
-        'commit.gpgsign=false',
-        'commit-tree',
-        tree,
-      ];
-      if (parent) args.push('-p', parent);
-      args.push('-F', messagePath);
-      parent = gitText(repoDir, args);
-    } finally {
-      rmSync(messagePath, { force: true });
-    }
+    parent = commitTree(repoDir, tree, parent, message);
   }
-  if (!parent) return;
-  gitText(repoDir, ['update-ref', `refs/heads/${branch}`, parent]);
+  if (!parent) return expectedTip;
+  compareAndSwap(repoDir, branch, parent, expectedTip);
+  return parent;
 }
 
 function removeStaleShots(
   repoDir: string,
   branch: string,
   stale: readonly PruneShot[],
+  expectedTip: string,
 ): void {
   if (stale.length === 0) return;
-  const worktree = join(tmpdir(), `frontguard-prune-${randomBytes(6).toString('hex')}`);
-  gitText(repoDir, ['worktree', 'add', '--detach', worktree, branch]);
+  const scratch = mkdtempSync(join(tmpdir(), 'frontguard-prune-'));
+  const worktree = join(scratch, 'wt');
+  gitText(repoDir, ['worktree', 'add', '--detach', worktree, expectedTip]);
   try {
     const manifestRaw = showOptional(worktree, 'HEAD:manifest.json');
     const manifest = manifestRaw === null ? null : parseBaselineManifest(manifestRaw);
     if (!manifest) {
       throw new Error('The baseline tip has no manifest.json. Refusing to delete shots.');
     }
-    for (const shot of stale) {
-      const relative = baselineStoragePath(
-        shot.route,
-        shot.viewport,
-        shot.browser as 'chromium',
-      );
-      gitText(worktree, ['rm', '-f', '--ignore-unmatch', '--', relative]);
+    const tipShots = shotsFromManifest(manifest);
+    const staleKeys = new Set(stale.map((shot) => targetKey(shot)));
+    const retained = tipShots.filter((shot) => !staleKeys.has(targetKey(shot)));
+    for (const shot of staleFilesToDelete(stale, retained)) {
+      gitText(worktree, ['rm', '-f', '--ignore-unmatch', '--', storagePath(shot)]);
     }
     const next = manifestWithoutStaleShots(manifest, stale);
     writeFileSync(join(worktree, 'manifest.json'), `${JSON.stringify(next, null, 2)}\n`);
@@ -614,7 +713,7 @@ function removeStaleShots(
       'Remove baseline shots the config no longer declares',
     ]);
     const tip = gitText(worktree, ['rev-parse', 'HEAD']);
-    gitText(repoDir, ['update-ref', `refs/heads/${branch}`, tip]);
+    compareAndSwap(repoDir, branch, tip, expectedTip);
   } finally {
     try {
       gitText(repoDir, ['worktree', 'remove', worktree, '--force']);
@@ -626,7 +725,13 @@ function removeStaleShots(
         // A leftover worktree entry is reported by the next git command.
       }
     }
+    rmSync(scratch, { recursive: true, force: true });
   }
+}
+
+function branchIsCheckedOut(repoDir: string, branch: string): boolean {
+  const porcelain = gitText(repoDir, ['worktree', 'list', '--porcelain']);
+  return porcelain.split('\n').some((line) => line === `branch refs/heads/${branch}`);
 }
 
 /**
@@ -642,19 +747,21 @@ export function applyBaselinePrune(
     throw new Error(plan.blockedReason ?? 'Refusing to prune approved image bytes.');
   }
   if (plan.dropCommitIds.length === 0 && plan.staleShots.length === 0) return;
-
-  let checkedOut = '';
-  try {
-    checkedOut = gitText(repoDir, ['symbolic-ref', '--short', 'HEAD']);
-  } catch {
-    checkedOut = '';
+  if (!plan.tipId) {
+    throw new Error('Refusing to prune without the planned baseline tip.');
   }
-  if (checkedOut === branch) {
-    throw new Error(`Refusing to rewrite ${branch} while it is checked out.`);
+  if (branchIsCheckedOut(repoDir, branch)) {
+    throw new Error(`Refusing to rewrite ${branch} while it is checked out in a worktree.`);
   }
 
+  const current = gitText(repoDir, ['rev-parse', `refs/heads/${branch}`]);
+  if (current !== plan.tipId) {
+    throw new Error(`Refusing to prune: ${branch} moved after the plan was read.`);
+  }
+
+  let expected = plan.tipId;
   if (plan.dropCommitIds.length > 0) {
-    rewriteKeptCommits(repoDir, branch, plan.keepCommitIdsOldestFirst);
+    expected = rewriteKeptCommits(repoDir, branch, plan.keepCommitIdsOldestFirst, expected);
   }
-  removeStaleShots(repoDir, branch, plan.staleShots);
+  removeStaleShots(repoDir, branch, plan.staleShots, expected);
 }

@@ -1,15 +1,19 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GitOrphanStorage } from '../../src/storage/git-orphan.js';
 import {
+  applyBaselinePrune,
   declaredTargetKeys,
   formatPrunePlan,
   manifestWithoutStaleShots,
+  isMergeBaseAncestor,
   planBaselinePrune,
+  readBaselineCommits,
+  staleFilesToDelete,
   type BaselineHistoryCommit,
   type PruneShot,
 } from '../../src/storage/prune-baselines.js';
@@ -173,6 +177,57 @@ describe('planBaselinePrune', () => {
     });
     expect(result.blockedReason).toMatch(/not linear/);
   });
+
+  it('keeps one copy of a repeated approval record', () => {
+    const record = { baselineSha256: 'keep-hash', candidateSha256: 'candidate' };
+    const result = plan({
+      commitsNewestFirst: [
+        commit({
+          id: 'tip',
+          source: 'main',
+          hashes: ['keep-hash', 'candidate'],
+          shots: [keep],
+        }),
+        commit({
+          id: 'newer',
+          source: 'feature',
+          hashes: ['keep-hash', 'candidate'],
+          records: [record],
+        }),
+        commit({
+          id: 'older',
+          source: 'feature',
+          hashes: ['keep-hash', 'candidate'],
+          records: [record],
+        }),
+      ],
+    });
+    expect(result.keptForApproval).toEqual(['newer']);
+    expect(result.dropCommitIds).toEqual(['older']);
+    expect(result.blockedReason).toBeUndefined();
+  });
+
+  it('keeps a second commit when it holds a different approval record', () => {
+    const result = plan({
+      commitsNewestFirst: [
+        commit({ id: 'tip', source: 'main', hashes: ['keep-hash', 'a', 'b'], shots: [keep] }),
+        commit({
+          id: 'one',
+          source: 'feature',
+          hashes: ['keep-hash', 'a'],
+          records: [{ baselineSha256: 'keep-hash', candidateSha256: 'a' }],
+        }),
+        commit({
+          id: 'two',
+          source: 'feature',
+          hashes: ['keep-hash', 'b'],
+          records: [{ baselineSha256: 'keep-hash', candidateSha256: 'b' }],
+        }),
+      ],
+    });
+    expect(result.keptForApproval).toEqual(['one', 'two']);
+    expect(result.dropCommitIds).toEqual([]);
+  });
 });
 
 describe('manifestWithoutStaleShots', () => {
@@ -208,6 +263,41 @@ describe('manifestWithoutStaleShots', () => {
     expect(next.note).toBe('keep-me');
     expect(next.routes['/gone']).toBeUndefined();
     expect(next.routes['/keep']?.snapshots?.['1440/chromium']?.sha256).toBe('keep-hash');
+  });
+
+  it('keeps a schema-1 route that has no snapshots and is not stale', () => {
+    const manifest = {
+      schemaVersion: 1,
+      createdBy: 'test',
+      updatedAt: '2026-10-21T00:00:00.000Z',
+      routes: {
+        '/keep': {
+          viewports: [1440],
+          browsers: ['chromium' as BrowserEngine],
+          lastUpdated: '2026-10-21T00:00:00.000Z',
+          sha256: 'keep-hash',
+        },
+        '/gone': {
+          viewports: [375, 1440],
+          browsers: ['chromium' as BrowserEngine],
+          lastUpdated: '2026-10-21T00:00:00.000Z',
+          sha256: 'gone-hash',
+        },
+      },
+    } as BaselineManifest;
+
+    const next = manifestWithoutStaleShots(manifest, [shot('/gone', 375, 'gone-hash')]);
+    expect(next.routes['/keep']?.viewports).toEqual([1440]);
+    expect(next.routes['/keep']?.snapshots).toBeUndefined();
+    expect(next.routes['/gone']?.viewports).toEqual([1440]);
+  });
+});
+
+describe('staleFilesToDelete', () => {
+  it('does not delete a PNG shared by a route that stays', () => {
+    const stale = [shot('/foo?a', 1440, 'old')];
+    const retained = [shot('/foo_a', 1440, 'new')];
+    expect(staleFilesToDelete(stale, retained)).toEqual([]);
   });
 });
 
@@ -358,6 +448,33 @@ describe('prune-baselines git history', () => {
     expect(git('rev-parse', '--abbrev-ref', 'HEAD')).toBe('main');
   }, 30_000);
 
+  it('treats a missing local branch as nothing to prune', async () => {
+    const lines: string[] = [];
+    const code = await runPruneBaselines({
+      cwd: repoDir,
+      apply: true,
+      configPath: 'frontguard.config.json',
+      stdout: (text) => lines.push(text),
+    });
+    expect(code).toBe(0);
+    expect(lines.join('\n')).toContain('Nothing to prune.');
+    expect(git('branch', '--list', 'frontguard-baselines')).toBe('');
+  });
+
+  it('refuses a remote-only baseline branch', async () => {
+    git('update-ref', 'refs/remotes/origin/frontguard-baselines', git('rev-parse', 'HEAD'));
+    const lines: string[] = [];
+    const code = await runPruneBaselines({
+      cwd: repoDir,
+      apply: true,
+      configPath: 'frontguard.config.json',
+      stdout: (text) => lines.push(text),
+    });
+    expect(code).toBe(2);
+    expect(lines.join('\n')).toMatch(/origin\/frontguard-baselines/);
+    expect(git('branch', '--list', 'frontguard-baselines')).toBe('');
+  });
+
   it('refuses --routes and FRONTGUARD_SHARD before reading a config', async () => {
     const lines: string[] = [];
     const code = await runPruneBaselines({
@@ -371,5 +488,190 @@ describe('prune-baselines git history', () => {
     expect(lines.join('\n')).toMatch(/--routes/);
     expect(lines.join('\n')).toMatch(/shard/);
     expect(git('branch', '--list', 'frontguard-baselines')).toBe('');
+  });
+
+  it('refuses to apply after the branch moves', async () => {
+    const mainSha = git('rev-parse', 'HEAD');
+    await writeBaselines(mainSha, [
+      { route: '/keep', buffer: keepBytes },
+      { route: '/gone', buffer: goneV1 },
+    ]);
+    const commits = readBaselineCommits(repoDir);
+    const plan = planBaselinePrune({
+      commitsNewestFirst: commits,
+      declared: new Set(['/keep\u00001440\u0000chromium']),
+      declaredComplete: true,
+      discoveryIncomplete: false,
+      isMergeBaseAncestor: (source) => source === mainSha,
+      filtered: false,
+      sharded: false,
+    });
+    const moved = Buffer.from('keep-moved');
+    await writeBaselines(mainSha, [
+      { route: '/keep', buffer: moved },
+      { route: '/gone', buffer: goneV1 },
+    ]);
+    const tip = git('rev-parse', 'frontguard-baselines');
+    expect(() => applyBaselinePrune(repoDir, plan)).toThrow(/moved/);
+    expect(git('rev-parse', 'frontguard-baselines')).toBe(tip);
+    const storage = new GitOrphanStorage(repoDir);
+    await storage.init();
+    expect((await storage.readBaseline('/keep', 1440, 'chromium'))?.equals(moved)).toBe(true);
+  });
+
+  it('refuses while another worktree has the baseline branch checked out', async () => {
+    const mainSha = git('rev-parse', 'HEAD');
+    await writeBaselines(mainSha, [
+      { route: '/keep', buffer: keepBytes },
+      { route: '/gone', buffer: goneV1 },
+    ]);
+    const tip = git('rev-parse', 'frontguard-baselines');
+    const plan = planBaselinePrune({
+      commitsNewestFirst: readBaselineCommits(repoDir),
+      declared: new Set(['/keep\u00001440\u0000chromium']),
+      declaredComplete: true,
+      discoveryIncomplete: false,
+      isMergeBaseAncestor: (source) => source === mainSha,
+      filtered: false,
+      sharded: false,
+    });
+    const wt = mkdtempSync(join(tmpdir(), 'fg-prune-wt-'));
+    git('worktree', 'add', '--quiet', wt, 'frontguard-baselines');
+    try {
+      expect(() => applyBaselinePrune(repoDir, plan)).toThrow(/worktree/);
+      expect(git('rev-parse', 'frontguard-baselines')).toBe(tip);
+    } finally {
+      git('worktree', 'remove', '--force', wt);
+      rmSync(wt, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a PNG whose sanitized path is shared with a stale route', async () => {
+    writeFileSync(
+      join(repoDir, 'frontguard.config.json'),
+      `${JSON.stringify({
+        baseUrl: 'http://127.0.0.1:3000',
+        routes: ['/foo_a'],
+        viewports: [1440],
+        browsers: ['chromium'],
+      })}\n`,
+    );
+    const kept = Buffer.from('foo-a-bytes');
+    await writeBaselines(git('rev-parse', 'HEAD'), [
+      { route: '/foo?a', buffer: Buffer.from('foo-query-bytes') },
+      { route: '/foo_a', buffer: kept },
+    ]);
+    const code = await runPruneBaselines({
+      cwd: repoDir,
+      apply: true,
+      configPath: 'frontguard.config.json',
+      stdout: () => undefined,
+    });
+    expect(code).toBe(0);
+    const storage = new GitOrphanStorage(repoDir);
+    await storage.init();
+    expect((await storage.readBaseline('/foo_a', 1440, 'chromium'))?.equals(kept)).toBe(true);
+    const manifest = git('show', 'frontguard-baselines:manifest.json');
+    expect(manifest).not.toContain('/foo?a');
+    expect(manifest).toContain('/foo_a');
+  });
+
+  it('does not treat a manifest digest as proof the PNG bytes exist', async () => {
+    const mainSha = git('rev-parse', 'HEAD');
+    git('checkout', '-b', 'side', '--quiet');
+    writeFileSync(join(repoDir, 'side.txt'), 'side\n');
+    git('add', '-A');
+    git('commit', '--quiet', '-m', 'side');
+    const sideSha = git('rev-parse', 'HEAD');
+    git('checkout', 'main', '--quiet');
+    const bytesA = Buffer.from('approved-bytes');
+    const bytesB = Buffer.from('current-bytes');
+    await writeBaselines(sideSha, [{ route: '/keep', buffer: bytesA }]);
+    const sideBaseline = git('rev-parse', 'frontguard-baselines');
+    await writeBaselines(mainSha, [{ route: '/keep', buffer: bytesB }]);
+    const wt = mkdtempSync(join(tmpdir(), 'fg-lie-'));
+    git('worktree', 'add', '--detach', '--quiet', wt, 'frontguard-baselines');
+    try {
+      const manifestPath = join(wt, 'manifest.json');
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as BaselineManifest;
+      const claimed = digest(bytesA);
+      const route = manifest.routes['/keep'];
+      if (!route?.snapshots) throw new Error('missing snapshot');
+      route.sha256 = claimed;
+      route.snapshots['1440/chromium'] = {
+        ...route.snapshots['1440/chromium'],
+        sha256: claimed,
+        updatedAt: '2026-10-21T00:00:00.000Z',
+      };
+      writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+      writeFileSync(
+        join(wt, 'approvals.json'),
+        `${JSON.stringify([{ baselineSha256: claimed, candidateSha256: claimed }])}\n`,
+      );
+      execFileSync('git', ['add', '-A'], { cwd: wt, stdio: 'pipe' });
+      execFileSync('git', ['-c', 'commit.gpgsign=false', 'commit', '-m', 'claim old hash'], {
+        cwd: wt,
+        stdio: 'pipe',
+      });
+      const lied = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: wt, encoding: 'utf8' }).trim();
+      git('update-ref', 'refs/heads/frontguard-baselines', lied);
+    } finally {
+      git('worktree', 'remove', '--force', wt);
+      rmSync(wt, { recursive: true, force: true });
+    }
+
+    const commits = readBaselineCommits(repoDir);
+    expect(commits[0]?.imageHashes).toContain(digest(bytesB));
+    expect(commits[0]?.imageHashes).not.toContain(digest(bytesA));
+    const plan = planBaselinePrune({
+      commitsNewestFirst: commits,
+      declared: new Set(['/keep\u00001440\u0000chromium']),
+      declaredComplete: true,
+      discoveryIncomplete: false,
+      isMergeBaseAncestor: (source) => source === mainSha,
+      filtered: false,
+      sharded: false,
+    });
+    expect(plan.dropCommitIds).not.toContain(sideBaseline);
+    expect(plan.keptForApproval).toContain(sideBaseline);
+  });
+
+  it('treats a shallow negative ancestry check as unknown', () => {
+    writeFileSync(join(repoDir, 'source.txt'), 'source\n');
+    git('add', '-A');
+    git('commit', '--quiet', '-m', 'source');
+    const source = git('rev-parse', 'HEAD');
+    writeFileSync(join(repoDir, 'middle.txt'), 'middle\n');
+    git('add', '-A');
+    git('commit', '--quiet', '-m', 'middle');
+    writeFileSync(join(repoDir, 'tip.txt'), 'tip\n');
+    git('add', '-A');
+    git('commit', '--quiet', '-m', 'tip');
+    const mergeBase = git('rev-parse', 'HEAD');
+    const unrelated = git('commit-tree', git('rev-parse', 'HEAD^{tree}'), '-m', 'unrelated');
+
+    expect(isMergeBaseAncestor(repoDir, source, mergeBase)).toBe(true);
+    expect(isMergeBaseAncestor(repoDir, unrelated, mergeBase)).toBe(false);
+
+    git('update-ref', 'refs/heads/old', source);
+    const shallowDir = mkdtempSync(join(tmpdir(), 'fg-prune-shallow-'));
+    try {
+      execFileSync('git', ['clone', '--quiet', '--depth', '1', `file://${repoDir}`, shallowDir], {
+        stdio: 'pipe',
+      });
+      execFileSync('git', ['fetch', '--quiet', '--depth', '1', 'origin', 'old'], {
+        cwd: shallowDir,
+        stdio: 'pipe',
+      });
+      const shallowHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: shallowDir,
+        encoding: 'utf8',
+      }).trim();
+      expect(shallowHead).toBe(mergeBase);
+      expect(isMergeBaseAncestor(shallowDir, source, shallowHead)).toBe('unknown');
+      expect(isMergeBaseAncestor(shallowDir, shallowHead, shallowHead)).toBe(true);
+    } finally {
+      rmSync(shallowDir, { recursive: true, force: true });
+    }
   });
 });
