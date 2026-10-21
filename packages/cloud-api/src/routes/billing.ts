@@ -14,6 +14,7 @@
 import { Hono } from 'hono';
 import type { Bindings } from '../db/factory.js';
 import { getStore } from '../db/factory.js';
+import { allocateDemoUserId } from '../auth/demo-user.js';
 import { hashKey } from '../auth/keys.js';
 import { isProduction } from '../db/factory.js';
 import { getPlan } from '../billing/plans.js';
@@ -76,7 +77,7 @@ async function resolveUser(env: BillingEnv | undefined, apiKey: string | undefin
     const rec = await store.getApiKey(await hashKey(apiKey));
     return rec?.userId ?? null;
   }
-  const userId = `demo:${await hashKey(apiKey)}`;
+  const userId = await allocateDemoUserId(store, apiKey);
   if (!(await store.getUser(userId))) {
     await store.createUser({ id: userId, plan: 'free', createdAt: new Date().toISOString() });
   }

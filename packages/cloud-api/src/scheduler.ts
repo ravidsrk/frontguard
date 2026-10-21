@@ -197,7 +197,7 @@ async function attemptCheck(
   };
 
   await processRun(run, env, onScreenshots, baselineRestore);
-  await store.updateRun(run.id, run);
+  await store.commitFinishedRun(monitor.userId, run);
 
   const screenshotRefs = buildMonitorScreenshotRefs(
     monitor.routes,

@@ -271,4 +271,20 @@ CREATE TABLE IF NOT EXISTS background_failures (
 );
 CREATE INDEX IF NOT EXISTS idx_background_failures_source ON background_failures(kind, source_id);
 CREATE INDEX IF NOT EXISTS idx_background_failures_created ON background_failures(created_at);
+
+-- Account erasure write lock ----------------------------------------------
+-- Set before blob deletion so a run still in flight does not put new PNGs.
+CREATE TABLE IF NOT EXISTS account_write_locks (
+  user_id TEXT PRIMARY KEY,
+  closed_at TEXT NOT NULL
+);
+
+-- Finished runs parked while an erasure lock is held. Applied if writes reopen.
+CREATE TABLE IF NOT EXISTS pending_run_updates (
+  run_id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pending_run_updates_user ON pending_run_updates(user_id);
 `;

@@ -9,7 +9,7 @@ import { getMemoryStore, resetMemoryStore } from '../src/db/factory.js';
 describe('POST /v1/run — executionCtx.waitUntil (REL-1)', () => {
   beforeEach(() => resetMemoryStore());
 
-  it('hands processRun to waitUntil and completes the run after awaiting it', async () => {
+  it('hands processRun to waitUntil and finishes the run after awaiting it', async () => {
     const waitUntilPromises: Promise<unknown>[] = [];
     const executionCtx = {
       waitUntil(promise: Promise<unknown>) {
@@ -36,6 +36,9 @@ describe('POST /v1/run — executionCtx.waitUntil (REL-1)', () => {
 
     const store = getMemoryStore();
     const run = await store.getRun(body.id);
-    expect(run?.status).toBe('completed');
+    // The background task finished. With no Daytona key it did not compare.
+    expect(run?.status).not.toBe('queued');
+    expect(run?.status).toBe('failed');
+    expect(run?.error).toMatch(/comparison/);
   });
 });

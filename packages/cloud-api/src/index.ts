@@ -18,6 +18,7 @@ import {
 import { apiRateLimiter } from "./rate-limit.js";
 import { currentMonth, type Store } from "./db/store.js";
 import { hashKey } from "./auth/keys.js";
+import { allocateDemoUserId } from "./auth/demo-user.js";
 import { authRoutes } from "./routes/auth.js";
 import { keyRoutes } from "./routes/keys.js";
 import { screenshotRoutes } from "./routes/screenshots.js";
@@ -225,7 +226,8 @@ app.use("/v1/*", async (c, next) => {
     await store.touchApiKey(keyHash, new Date().toISOString());
   } else {
     // Dev / tests: accept any token and scope data to a per-token demo user.
-    userId = `demo:${await hashKey(apiKey)}`;
+    // After erasure the old id stays locked, so the same token gets a new id.
+    userId = await allocateDemoUserId(store, apiKey);
     if (!(await store.getUser(userId))) {
       await store.createUser({
         id: userId,
@@ -565,8 +567,10 @@ app.post("/v1/run", async (c) => {
     })
     .finally(async () => {
       // Screenshots were reserved at submit time (COST-1).
-      await store.updateRun(runId, run);
-      if (run.status === "failed") {
+      // A closed erasure lock parks the finished run and applies it if writes
+      // reopen. A finished erasure skips the write so this cannot recreate rows.
+      await store.commitFinishedRun(userId, run, async () => {
+        if (run.status !== "failed") return;
         await recordDeadLetter(store, {
           kind: "run",
           sourceId: runId,
@@ -574,7 +578,7 @@ app.post("/v1/run", async (c) => {
           error: run.error ?? "background run failed",
           attempt: 1,
         });
-      }
+      });
       // Complete the originating GitHub Check Run, if this run came from CI.
       if (run.github) void completeCheckRun(c.env ?? {}, run);
       // Export OTLP metrics (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
@@ -716,6 +720,20 @@ app.post("/v1/baselines/:runId/approve", async (c) => {
   await store.updateRun(id, { baselinesApproved: true });
   await promoteRunCurrentScreenshotsToBaseline(store, id);
   return c.json({ approved: true, runId: id });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /v1/account — Erase the calling account
+//
+// Deletes the user and the baselines, reports, and other rows that account
+// owns. A different account's rows are not deleted. This does not deploy.
+// ---------------------------------------------------------------------------
+app.delete("/v1/account", async (c) => {
+  const store = c.get("store");
+  const userId = c.get("userId");
+  const blobs = getScreenshotStore(c.env?.SCREENSHOTS as R2Bucket | undefined);
+  const result = await store.eraseAccount(userId, blobs);
+  return c.json(result);
 });
 
 // ---------------------------------------------------------------------------

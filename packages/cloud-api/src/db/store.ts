@@ -12,6 +12,8 @@
  */
 
 import type { Run, RunResult } from '../types.js';
+import { erasureBlockedBySoleOwnership } from './account-erasure.js';
+import { withUserMutation } from './account-writes.js';
 import type { Monitor, MonitorRun, MonitorAlertState, MonitorStore } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
 import type {
@@ -84,6 +86,26 @@ export interface UsageRecord {
   screenshotsCount: number;
 }
 
+/** Deletes object-store bytes for one owned run during account erasure. */
+export interface RunBlobDeleter {
+  deleteRun(userId: string, runId: string): Promise<void>;
+}
+
+/** Result of erasing one account. Counts are what that account owned before deletion. */
+export interface AccountErasureResult {
+  erased: boolean;
+  userId: string;
+  runs: number;
+  baselines: number;
+  reports: number;
+  /**
+   * Why the account was left in place. Omitted when `erased` is true.
+   * `sole-owner` means another member would be left with nobody who can grant owner.
+   * `blob-delete-failed` means object bytes may still exist, so the rows were kept.
+   */
+  reason?: 'sole-owner' | 'blob-delete-failed';
+}
+
 /** Options for {@link Store.listRuns}. */
 export interface ListRunsOptions {
   /** Cap on the number of runs returned (default 50). */
@@ -120,6 +142,33 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
   getUserByGithubId(githubId: string): Promise<User | null>;
   updateUserPlan(id: string, plan: string): Promise<void>;
   updateUserIdentity(id: string, patch: { email?: string; githubLogin?: string }): Promise<void>;
+  /**
+   * Deletes one account and the baselines, reports, and other rows it owns.
+   * Other accounts are left intact. Closes writes, then deletes blobs, then
+   * deletes rows. A blob-delete failure keeps the account so a later call can
+   * retry. Refuses when the user is the only owner of a team that still has
+   * another member. Does not touch accounts that do not match `userId`.
+   */
+  eraseAccount(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult>;
+  /** Stop new screenshot writes for this account until erasure finishes or reopens. */
+  closeAccountWrites(userId: string): Promise<void>;
+  /** Allow screenshot writes again after an erasure attempt that kept the account. */
+  reopenAccountWrites(userId: string): Promise<void>;
+  /** True while an erasure attempt has closed writes and has not reopened them. */
+  accountWritesClosed(userId: string): Promise<boolean>;
+  /** When the write lock was closed, or null while writes are open. */
+  accountWriteLockClosedAt(userId: string): Promise<string | null>;
+  /**
+   * Persist a finished run. While erasure has closed writes and the account
+   * still exists, park the payload and apply it if writes reopen. Skip when
+   * the account is already gone. `afterWritten` runs in the same per-user
+   * queue as the update, before another mutation for this user can start.
+   */
+  commitFinishedRun(
+    userId: string,
+    run: Run,
+    afterWritten?: () => Promise<void>,
+  ): Promise<FinishedRunCommit>;
 
   // API keys
   createApiKey(key: ApiKeyRecord): Promise<void>;
@@ -185,6 +234,9 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
   listScreenshotDecisions(runId: string): Promise<ScreenshotDecision[]>;
 }
 
+/** What happened to a finished run that raced an account erasure. */
+export type FinishedRunCommit = 'written' | 'pending' | 'skipped';
+
 // ---------------------------------------------------------------------------
 // In-memory implementation (default — dev & tests)
 // ---------------------------------------------------------------------------
@@ -201,6 +253,10 @@ export class InMemoryStore implements Store {
   private monitorClaimLocks = new Map<string, Promise<void>>();
 
   private users = new Map<string, User>();
+  /** Accounts whose screenshot writes must no-op until erasure reopens or finishes. */
+  private closedWrites = new Map<string, string>();
+  /** Finished runs waiting for an erasure lock to reopen. */
+  private pendingRunUpdates = new Map<string, { userId: string; run: Run }>();
   private apiKeys = new Map<string, ApiKeyRecord>();
   private runs = new Map<string, { run: Run; userId: string }>();
   private runVersions = new Map<string, number>();
@@ -243,6 +299,171 @@ export class InMemoryStore implements Store {
     if (!u) return;
     if (patch.email !== undefined) u.email = patch.email;
     if (patch.githubLogin !== undefined) u.githubLogin = patch.githubLogin;
+  }
+
+  async eraseAccount(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
+    return withUserMutation(userId, () => this.eraseAccountUnlocked(userId, blobs));
+  }
+
+  async closeAccountWrites(userId: string): Promise<void> {
+    this.closedWrites.set(userId, new Date().toISOString());
+  }
+  async reopenAccountWrites(userId: string): Promise<void> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await this.flushPendingRunUpdates(userId);
+      if (!this.hasPendingRunUpdate(userId)) {
+        this.closedWrites.delete(userId);
+        await this.flushPendingRunUpdates(userId);
+        return;
+      }
+    }
+    await this.flushPendingRunUpdates(userId);
+    this.closedWrites.delete(userId);
+    await this.flushPendingRunUpdates(userId);
+  }
+  async accountWritesClosed(userId: string): Promise<boolean> {
+    return this.closedWrites.has(userId);
+  }
+  async accountWriteLockClosedAt(userId: string): Promise<string | null> {
+    return this.closedWrites.get(userId) ?? null;
+  }
+  async commitFinishedRun(
+    userId: string,
+    run: Run,
+    afterWritten?: () => Promise<void>,
+  ): Promise<FinishedRunCommit> {
+    return withUserMutation(userId, async () => {
+      if (!(await this.getUser(userId))) {
+        this.pendingRunUpdates.delete(run.id);
+        return 'skipped';
+      }
+      if (this.closedWrites.has(userId)) {
+        this.pendingRunUpdates.set(run.id, { userId, run: { ...run } });
+      }
+      if (!(await this.getUser(userId))) {
+        this.pendingRunUpdates.delete(run.id);
+        return 'skipped';
+      }
+      if (!this.closedWrites.has(userId)) {
+        this.pendingRunUpdates.delete(run.id);
+        await this.updateRun(run.id, run);
+        await afterWritten?.();
+        return 'written';
+      }
+      return 'pending';
+    });
+  }
+
+  private hasPendingRunUpdate(userId: string): boolean {
+    for (const pending of this.pendingRunUpdates.values()) {
+      if (pending.userId === userId) return true;
+    }
+    return false;
+  }
+
+  private async flushPendingRunUpdates(userId: string): Promise<void> {
+    const pending = [...this.pendingRunUpdates.entries()].filter(([, item]) => item.userId === userId);
+    for (const [runId, item] of pending) {
+      if (this.pendingRunUpdates.get(runId) !== item) continue;
+      this.pendingRunUpdates.delete(runId);
+      await this.updateRun(runId, item.run);
+    }
+  }
+
+  private dropPendingRunUpdates(userId: string): void {
+    for (const [runId, item] of this.pendingRunUpdates) {
+      if (item.userId === userId) this.pendingRunUpdates.delete(runId);
+    }
+  }
+
+  private async eraseAccountUnlocked(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
+    const user = this.users.get(userId);
+    if (!user) return { erased: false, userId, runs: 0, baselines: 0, reports: 0 };
+
+    const memberships = [...this.members.values()].map((member) => ({
+      teamId: member.teamId,
+      userId: member.userId,
+      role: member.role,
+    }));
+    if (erasureBlockedBySoleOwnership(userId, memberships)) {
+      return { erased: false, userId, runs: 0, baselines: 0, reports: 0, reason: 'sole-owner' };
+    }
+
+    const ownedIds: string[] = [];
+    let baselines = 0;
+    let reports = 0;
+    for (const [id, entry] of this.runs) {
+      if (entry.userId !== userId) continue;
+      ownedIds.push(id);
+      if (entry.run.reportHtml) reports++;
+      baselines += (this.screenshots.get(id) ?? []).filter((shot) => shot.type === 'baseline').length;
+    }
+    await this.closeAccountWrites(userId);
+    if (blobs) {
+      try {
+        for (const id of ownedIds) {
+          await blobs.deleteRun(userId, id);
+        }
+      } catch {
+        await this.reopenAccountWrites(userId);
+        return {
+          erased: false,
+          userId,
+          runs: ownedIds.length,
+          baselines,
+          reports,
+          reason: 'blob-delete-failed',
+        };
+      }
+    }
+    for (const id of ownedIds) {
+      await this.deleteRun(id, userId);
+      this.runVersions.delete(id);
+    }
+
+    this.approvals = this.approvals.filter((approval) => approval.reviewerUserId !== userId);
+    this.decisions = this.decisions.filter((decision) => decision.userId !== userId);
+    for (const [hash, key] of this.apiKeys) {
+      if (key.userId === userId) this.apiKeys.delete(hash);
+    }
+    for (const key of [...this.usage.keys()]) {
+      if (key.startsWith(`${userId}:`)) this.usage.delete(key);
+    }
+    for (const key of [...this.usageAlertState.keys()]) {
+      if (key.startsWith(`${userId}:`)) this.usageAlertState.delete(key);
+    }
+    for (const [id, mask] of this.masks) {
+      if (mask.userId === userId) this.masks.delete(id);
+    }
+
+    const monitorIds = [...this.monitors.values()].filter((monitor) => monitor.userId === userId).map((monitor) => monitor.id);
+    for (const id of monitorIds) {
+      this.monitors.delete(id);
+      this.monitorVersions.delete(id);
+      this.alertState.delete(id);
+    }
+    const monitorIdSet = new Set(monitorIds);
+    this.monitorRuns = this.monitorRuns.filter(
+      (run) => run.userId !== userId && !monitorIdSet.has(run.monitorId),
+    );
+    for (const [key, member] of this.members) {
+      if (member.userId === userId) this.members.delete(key);
+    }
+    this.activity = this.activity.filter((entry) => entry.userId !== userId);
+    if (user.email) {
+      const email = user.email.toLowerCase();
+      for (const [token, invitation] of this.invitations) {
+        if (invitation.email && invitation.email.toLowerCase() === email) this.invitations.delete(token);
+      }
+    }
+    const ownedIdSet = new Set(ownedIds);
+    this.backgroundFailures = this.backgroundFailures.filter(
+      (failure) =>
+        failure.userId !== userId && !ownedIdSet.has(failure.sourceId) && !monitorIdSet.has(failure.sourceId),
+    );
+    this.dropPendingRunUpdates(userId);
+    this.users.delete(userId);
+    return { erased: true, userId, runs: ownedIds.length, baselines, reports };
   }
 
   async createApiKey(key: ApiKeyRecord): Promise<void> {
@@ -576,6 +797,7 @@ export class InMemoryStore implements Store {
 
   // Background failures (OPS-3) ----------------------------------------------
   async recordBackgroundFailure(failure: BackgroundFailure): Promise<void> {
+    if (failure.userId && !this.users.has(failure.userId)) return;
     this.backgroundFailures.push({ ...failure, context: failure.context ? { ...failure.context } : undefined });
   }
   async listBackgroundFailures(opts: ListBackgroundFailuresOptions = {}): Promise<BackgroundFailure[]> {
@@ -793,6 +1015,8 @@ export class InMemoryStore implements Store {
   /** Test helper: wipe all data. */
   clear(): void {
     this.users.clear();
+    this.closedWrites.clear();
+    this.pendingRunUpdates.clear();
     this.apiKeys.clear();
     this.runs.clear();
     this.screenshots.clear();

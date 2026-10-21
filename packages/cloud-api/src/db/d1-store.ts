@@ -16,7 +16,12 @@ import type {
   UsageAlertState,
   ScreenshotDecision,
   ListRunsOptions,
+  AccountErasureResult,
+  FinishedRunCommit,
+  RunBlobDeleter,
 } from './store.js';
+import { erasureBlockedBySoleOwnership } from './account-erasure.js';
+import { withUserMutation } from './account-writes.js';
 import type { Monitor, MonitorRun, MonitorRunStatus, MonitorAlertState } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
 import type {
@@ -163,6 +168,228 @@ export class D1Store implements Store {
         .bind(patch.githubLogin, id)
         .run();
     }
+  }
+
+  async eraseAccount(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
+    return withUserMutation(userId, () => this.eraseAccountUnlocked(userId, blobs));
+  }
+
+  async closeAccountWrites(userId: string): Promise<void> {
+    const closedAt = new Date().toISOString();
+    await this.db
+      .prepare(
+        `INSERT INTO account_write_locks (user_id, closed_at) VALUES (?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET closed_at = excluded.closed_at`,
+      )
+      .bind(userId, closedAt)
+      .run();
+  }
+  async reopenAccountWrites(userId: string): Promise<void> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await this.flushPendingRunUpdates(userId);
+      const res = await this.db
+        .prepare(
+          `DELETE FROM account_write_locks WHERE user_id = ?
+           AND NOT EXISTS (SELECT 1 FROM pending_run_updates WHERE user_id = ?)`,
+        )
+        .bind(userId, userId)
+        .run();
+      if ((res.meta?.changes ?? 0) > 0 || !(await this.accountWritesClosed(userId))) {
+        await this.flushPendingRunUpdates(userId);
+        return;
+      }
+    }
+    await this.flushPendingRunUpdates(userId);
+    await this.db.prepare(`DELETE FROM account_write_locks WHERE user_id = ?`).bind(userId).run();
+    await this.flushPendingRunUpdates(userId);
+  }
+  async accountWritesClosed(userId: string): Promise<boolean> {
+    const row = await this.db
+      .prepare(`SELECT user_id FROM account_write_locks WHERE user_id = ?`)
+      .bind(userId)
+      .first<{ user_id: string }>();
+    return row != null;
+  }
+  async accountWriteLockClosedAt(userId: string): Promise<string | null> {
+    const row = await this.db
+      .prepare(`SELECT closed_at FROM account_write_locks WHERE user_id = ?`)
+      .bind(userId)
+      .first<{ closed_at: string }>();
+    return row?.closed_at ?? null;
+  }
+  async commitFinishedRun(
+    userId: string,
+    run: Run,
+    afterWritten?: () => Promise<void>,
+  ): Promise<FinishedRunCommit> {
+    return withUserMutation(userId, async () => {
+      const saved = await this.savePendingRunUpdate(userId, run);
+      const user = await this.getUser(userId);
+      if (!user) {
+        await this.deletePendingRunUpdate(run.id);
+        return 'skipped';
+      }
+      if (!(await this.accountWritesClosed(userId))) {
+        await this.updateRun(run.id, run);
+        await this.deletePendingRunUpdate(run.id);
+        await afterWritten?.();
+        return 'written';
+      }
+      if (!saved) await this.savePendingRunUpdate(userId, run, true);
+      return 'pending';
+    });
+  }
+
+  private async savePendingRunUpdate(userId: string, run: Run, force = false): Promise<boolean> {
+    const payload = JSON.stringify(run);
+    const updatedAt = new Date().toISOString();
+    const sql = force
+      ? `INSERT INTO pending_run_updates (run_id, user_id, payload, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(run_id) DO UPDATE SET user_id = excluded.user_id, payload = excluded.payload, updated_at = excluded.updated_at`
+      : `INSERT INTO pending_run_updates (run_id, user_id, payload, updated_at)
+         SELECT ?, ?, ?, ?
+         WHERE EXISTS (SELECT 1 FROM account_write_locks WHERE user_id = ?)
+           AND EXISTS (SELECT 1 FROM users WHERE id = ?)
+         ON CONFLICT(run_id) DO UPDATE SET
+           user_id = excluded.user_id,
+           payload = excluded.payload,
+           updated_at = excluded.updated_at
+         WHERE EXISTS (SELECT 1 FROM account_write_locks WHERE user_id = excluded.user_id)
+           AND EXISTS (SELECT 1 FROM users WHERE id = excluded.user_id)`;
+    const statement = this.db.prepare(sql);
+    const res = force
+      ? await statement.bind(run.id, userId, payload, updatedAt).run()
+      : await statement.bind(run.id, userId, payload, updatedAt, userId, userId).run();
+    return (res.meta?.changes ?? 0) > 0;
+  }
+
+  private async deletePendingRunUpdate(runId: string): Promise<void> {
+    await this.db.prepare(`DELETE FROM pending_run_updates WHERE run_id = ?`).bind(runId).run();
+  }
+
+  private async flushPendingRunUpdates(userId: string): Promise<void> {
+    const { results } = await this.db
+      .prepare(`SELECT run_id, payload FROM pending_run_updates WHERE user_id = ?`)
+      .bind(userId)
+      .all<{ run_id: string; payload: string }>();
+    for (const row of results) {
+      const run = JSON.parse(row.payload) as Run;
+      await this.updateRun(row.run_id, run);
+      await this.db
+        .prepare(`DELETE FROM pending_run_updates WHERE run_id = ? AND payload = ?`)
+        .bind(row.run_id, row.payload)
+        .run();
+    }
+  }
+
+  private async eraseAccountUnlocked(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
+    const user = await this.getUser(userId);
+    if (!user) return { erased: false, userId, runs: 0, baselines: 0, reports: 0 };
+
+    const { results: memberRows } = await this.db
+      .prepare(
+        `SELECT team_id, user_id, role FROM team_members
+         WHERE team_id IN (SELECT team_id FROM team_members WHERE user_id = ? AND role = 'owner')`,
+      )
+      .bind(userId)
+      .all<{ team_id: string; user_id: string; role: string }>();
+    if (
+      erasureBlockedBySoleOwnership(
+        userId,
+        memberRows.map((row) => ({ teamId: row.team_id, userId: row.user_id, role: row.role })),
+      )
+    ) {
+      return { erased: false, userId, runs: 0, baselines: 0, reports: 0, reason: 'sole-owner' };
+    }
+
+    const { results: runRows } = await this.db
+      .prepare(`SELECT id, report_html FROM runs WHERE user_id = ?`)
+      .bind(userId)
+      .all<{ id: string; report_html: string | null }>();
+    const runIds = runRows.map((row) => row.id);
+    const reports = runRows.filter((row) => row.report_html != null && row.report_html !== '').length;
+    const baselineRow = await this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM screenshots WHERE type = 'baseline' AND run_id IN (SELECT id FROM runs WHERE user_id = ?)`,
+      )
+      .bind(userId)
+      .first<{ n: number | bigint }>();
+    const baselines = Number(baselineRow?.n ?? 0);
+
+    await this.closeAccountWrites(userId);
+    if (blobs) {
+      try {
+        for (const id of runIds) {
+          await blobs.deleteRun(userId, id);
+        }
+      } catch {
+        await this.reopenAccountWrites(userId);
+        return {
+          erased: false,
+          userId,
+          runs: runIds.length,
+          baselines,
+          reports,
+          reason: 'blob-delete-failed',
+        };
+      }
+    }
+
+    const statements: D1PreparedStatement[] = [
+      this.db
+        .prepare(
+          `DELETE FROM background_failures
+           WHERE user_id = ?
+              OR source_id IN (SELECT id FROM runs WHERE user_id = ?)
+              OR source_id IN (SELECT id FROM monitors WHERE user_id = ?)`,
+        )
+        .bind(userId, userId, userId),
+      this.db
+        .prepare(
+          `DELETE FROM screenshot_decisions
+           WHERE user_id = ? OR run_id IN (SELECT id FROM runs WHERE user_id = ?)`,
+        )
+        .bind(userId, userId),
+      this.db
+        .prepare(
+          `DELETE FROM baseline_approvals
+           WHERE reviewer_user_id = ? OR run_id IN (SELECT id FROM runs WHERE user_id = ?)`,
+        )
+        .bind(userId, userId),
+      this.db
+        .prepare(`DELETE FROM run_attachments WHERE run_id IN (SELECT id FROM runs WHERE user_id = ?)`)
+        .bind(userId),
+      this.db
+        .prepare(`DELETE FROM screenshots WHERE run_id IN (SELECT id FROM runs WHERE user_id = ?)`)
+        .bind(userId),
+      this.db.prepare(`DELETE FROM pending_run_updates WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM runs WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM api_keys WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM usage WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM usage_alert_state WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM masks WHERE user_id = ?`).bind(userId),
+      this.db
+        .prepare(`DELETE FROM monitor_alert_state WHERE monitor_id IN (SELECT id FROM monitors WHERE user_id = ?)`)
+        .bind(userId),
+      this.db
+        .prepare(
+          `DELETE FROM monitor_runs WHERE user_id = ? OR monitor_id IN (SELECT id FROM monitors WHERE user_id = ?)`,
+        )
+        .bind(userId, userId),
+      this.db.prepare(`DELETE FROM monitors WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM team_members WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM team_activity WHERE user_id = ?`).bind(userId),
+    ];
+    if (user.email) {
+      statements.push(
+        this.db
+          .prepare(`DELETE FROM team_invitations WHERE email IS NOT NULL AND lower(email) = lower(?)`)
+          .bind(user.email),
+      );
+    }
+    statements.push(this.db.prepare(`DELETE FROM users WHERE id = ?`).bind(userId));
+    await this.db.batch(statements);
+    return { erased: true, userId, runs: runIds.length, baselines, reports };
   }
 
   async createApiKey(key: ApiKeyRecord): Promise<void> {
@@ -738,7 +965,8 @@ export class D1Store implements Store {
     await this.db
       .prepare(
         `INSERT INTO background_failures (id, kind, source_id, user_id, error, attempt, context, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?
+         WHERE ? IS NULL OR EXISTS (SELECT 1 FROM users WHERE id = ?)`,
       )
       .bind(
         failure.id,
@@ -749,6 +977,8 @@ export class D1Store implements Store {
         failure.attempt,
         failure.context ? JSON.stringify(failure.context) : null,
         failure.createdAt,
+        failure.userId ?? null,
+        failure.userId ?? null,
       )
       .run();
   }

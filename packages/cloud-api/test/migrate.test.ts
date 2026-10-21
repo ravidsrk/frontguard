@@ -34,6 +34,8 @@ const BASELINE_TABLES = [
   'run_attachments',
   'usage_alert_state',
   'team_usage',
+  'account_write_locks',
+  'pending_run_updates',
 ] as const;
 
 function listTables(raw: ReturnType<typeof createNodeSqliteD1>['raw']): Set<string> {
@@ -73,7 +75,7 @@ describe('migrate (DM-1)', () => {
     const executed = await migrate(db);
     expect(executed).toBeGreaterThan(0);
     assertBaselineTables(raw);
-    assertLedger(raw, ['001', '002', '003', '004', '005', '006']);
+    assertLedger(raw, ['001', '002', '003', '004', '005', '006', '007', '008']);
 
     expect(await migrate(db)).toBe(0);
   });
@@ -85,7 +87,7 @@ describe('migrate (DM-1)', () => {
     const executed = await migrate(db);
     expect(executed).toBeGreaterThan(0);
     assertBaselineTables(raw);
-    assertLedger(raw, ['001', '002', '003', '004', '005', '006']);
+    assertLedger(raw, ['001', '002', '003', '004', '005', '006', '007', '008']);
 
     expect(await migrate(db)).toBe(0);
   });
@@ -95,7 +97,7 @@ describe('migrate (DM-1)', () => {
 
     await migrate(db, { migrations: [...MIGRATIONS, TEST_V2_MIGRATION] });
     assertBaselineTables(raw);
-    assertLedger(raw, ['001', '002', '003', '004', '005', '006', '099']);
+    assertLedger(raw, ['001', '002', '003', '004', '005', '006', '007', '008', '099']);
 
     const columns = raw.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
     expect(columns.some((col) => col.name === 'dm1_test_col')).toBe(true);
@@ -109,7 +111,7 @@ describe('migrate (DM-1)', () => {
 
     await migrate(db, { migrations: [...MIGRATIONS, TEST_V2_MIGRATION] });
     assertBaselineTables(raw);
-    assertLedger(raw, ['001', '002', '003', '004', '005', '006', '099']);
+    assertLedger(raw, ['001', '002', '003', '004', '005', '006', '007', '008', '099']);
 
     const columns = raw.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
     expect(columns.some((col) => col.name === 'dm1_test_col')).toBe(true);
@@ -147,7 +149,7 @@ describe('migrate (DM-1)', () => {
   });
 
   it('exposes a production registry with baseline and DM-2/DM-3 migration', () => {
-    expect(MIGRATIONS).toHaveLength(6);
+    expect(MIGRATIONS).toHaveLength(8);
     expect(MIGRATIONS[0]?.version).toBe('001');
     expect(MIGRATIONS[0]?.name).toBe('baseline');
     expect(MIGRATIONS[0]?.sql).toContain('CREATE TABLE IF NOT EXISTS users');
@@ -167,6 +169,12 @@ describe('migrate (DM-1)', () => {
     expect(MIGRATIONS[5]?.version).toBe('006');
     expect(MIGRATIONS[5]?.name).toBe('monitor_project_id');
     expect(MIGRATIONS[5]?.sql).toContain('project_id');
+    expect(MIGRATIONS[6]?.version).toBe('007');
+    expect(MIGRATIONS[6]?.name).toBe('account_write_locks');
+    expect(MIGRATIONS[6]?.sql).toContain('account_write_locks');
+    expect(MIGRATIONS[7]?.version).toBe('008');
+    expect(MIGRATIONS[7]?.name).toBe('pending_run_updates');
+    expect(MIGRATIONS[7]?.sql).toContain('pending_run_updates');
   });
 
   it('applies v2 on a fresh database and records both versions', async () => {
@@ -174,7 +182,7 @@ describe('migrate (DM-1)', () => {
     const executed = await migrate(db);
     expect(executed).toBeGreaterThan(0);
     assertBaselineTables(raw);
-    assertLedger(raw, ['001', '002', '003', '004', '005', '006']);
+    assertLedger(raw, ['001', '002', '003', '004', '005', '006', '007', '008']);
     const tables = listTables(raw);
     expect(tables.has('team_usage')).toBe(true);
     expect(tables.has('background_failures')).toBe(true);

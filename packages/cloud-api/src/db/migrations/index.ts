@@ -17,6 +17,8 @@ import { migration003OptimisticConcurrencyInvitationExpiry } from './003-optimis
 import { migration004MonitorLease } from './004-monitor-lease.js';
 import { migration005BackgroundFailures } from './005-background-failures.js';
 import { migration006MonitorProjectId } from './006-monitor-project-id.js';
+import { migration007AccountWriteLocks } from './007-account-write-locks.js';
+import { migration008PendingRunUpdates } from './008-pending-run-updates.js';
 import type { Migration } from './types.js';
 
 export type { Migration } from './types.js';
@@ -32,4 +34,6 @@ export const MIGRATIONS: readonly Migration[] = [
   migration004MonitorLease,
   migration005BackgroundFailures,
   migration006MonitorProjectId,
+  migration007AccountWriteLocks,
+  migration008PendingRunUpdates,
 ];

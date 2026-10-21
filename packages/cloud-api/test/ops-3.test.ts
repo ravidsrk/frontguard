@@ -90,6 +90,7 @@ describe('OPS-3 — background failure dead-letter', () => {
 
   it('records a dead-letter when a scheduled monitor check fails terminally', async () => {
     const store = getMemoryStore();
+    await store.createUser({ id: 'u1', plan: 'free', createdAt: '2026-01-01T00:00:00Z' });
     const monitor = makeMonitor();
     await store.createMonitor(monitor);
     const now = new Date('2026-01-01T12:00:00Z');
