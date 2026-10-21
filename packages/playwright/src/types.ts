@@ -39,6 +39,8 @@ export interface VisualTestOptions {
 export interface VisualTestResult {
   passed: boolean;
   diffPercentage: number;
+  /** Largest differing-pixel count in any 16×16 window. */
+  windowMax?: number;
   baselinePath: string;
   currentPath: string;
   diffPath?: string;
@@ -58,6 +60,8 @@ export interface VisualTestResult {
 export interface CompareResult {
   passed: boolean;
   diffPercentage: number;
+  /** Largest differing-pixel count in any 16×16 window. Above 64 fails. */
+  windowMax: number;
   diffBuffer: Buffer | null;
   ssim: number;
   clusters?: PlaywrightDiffCluster[];

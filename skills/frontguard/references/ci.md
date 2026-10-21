@@ -31,7 +31,11 @@ jobs:
           node-version: 22
 
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # Install the browser build that matches @frontguard/cli's Playwright.
+      # GitHub-hosted runner images update browsers on their own, and that
+      # drift flaked screenshot tests:
+      # https://x.com/karlhorky/status/2082458846031696091
+      - run: npx -p @frontguard/cli playwright install --with-deps chromium
 
       - name: Start app & run Frontguard
         run: |

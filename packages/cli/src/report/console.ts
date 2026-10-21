@@ -360,6 +360,9 @@ export class ConsoleReporter implements Reporter {
       const label = `${diff.route.path} @ ${diff.viewport}px`;
       console.log(chalk.red(`    ${label}`));
       console.log(chalk.dim(`    Diff: ${diff.diffPercentage.toFixed(2)}% pixels changed`));
+      if (diff.windowMax !== undefined && diff.windowMax > 64) {
+        console.log(chalk.dim(`    16×16 window: ${diff.windowMax} differing pixels (limit 64)`));
+      }
       this.printDiffTelemetry(diff);
 
       if (diff.aiAnalysis) {

@@ -627,6 +627,11 @@ export interface DiffResult {
   status: DiffStatus;
   /** Percentage of pixels that differ (0-100 scale, NOT 0-1). */
   diffPercentage: number;
+  /**
+   * Largest differing-pixel count in any 16×16 window.
+   * Present when that count is over 64, which fails even under the ratio.
+   */
+  windowMax?: number;
   /** PNG image highlighting pixel-level differences. */
   diffImage?: Buffer;
   /** The baseline image used for comparison. */
@@ -914,7 +919,7 @@ export interface RendererFingerprint {
   deviceScaleFactor: number;
   pixelmatch: {
     version: string;
-    /** Options object passed to pixelmatch for the pass/fail comparison. */
+    /** Color options passed to pixelmatch for the whole-image count. */
     options: { threshold: number; includeAA: boolean };
   };
   /** Screenshot options passed to the capture call. */

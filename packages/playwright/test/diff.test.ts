@@ -108,6 +108,62 @@ describe('compareImages', () => {
     expect(result.diffPercentage).toBeGreaterThan(0);
   });
 
+  it('fails a compact edit that is a few percent of the image at threshold 0.1', () => {
+    const base = createPNG(200, 150, [255, 255, 255, 255]);
+    const current = createPNGWithRegion(
+      200,
+      150,
+      [255, 255, 255, 255],
+      [0, 0, 0, 255],
+      30,
+      40,
+      40,
+      24,
+    );
+    const result = compareImages(base, current, 0.1);
+
+    expect(result.diffPercentage).toBeLessThan(0.1);
+    expect(result.diffPercentage).toBeGreaterThan(0);
+    expect(result.windowMax).toBeGreaterThan(64);
+    expect(result.passed).toBe(false);
+  });
+
+  it('keeps scattered high-contrast speckle under threshold 0.1', () => {
+    const width = 200;
+    const height = 150;
+    const basePng = new PNG({ width, height });
+    const currentPng = new PNG({ width, height });
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const speck = x % 8 === 0 && y % 8 === 0;
+        basePng.data[idx] = 255;
+        basePng.data[idx + 1] = 255;
+        basePng.data[idx + 2] = 255;
+        basePng.data[idx + 3] = 255;
+        currentPng.data[idx] = speck ? 0 : 255;
+        currentPng.data[idx + 1] = speck ? 0 : 255;
+        currentPng.data[idx + 2] = speck ? 0 : 255;
+        currentPng.data[idx + 3] = 255;
+      }
+    }
+    const result = compareImages(PNG.sync.write(basePng), PNG.sync.write(currentPng), 0.1);
+
+    expect(result.diffPercentage).toBeGreaterThan(0);
+    expect(result.diffPercentage).toBeLessThan(0.1);
+    expect(result.windowMax).toBeLessThanOrEqual(64);
+    expect(result.passed).toBe(true);
+  });
+
+  it('counts a large gray step and ignores a small one', () => {
+    const white = createPNG(16, 16, [255, 255, 255, 255]);
+    const under = createPNG(16, 16, [230, 230, 230, 255]);
+    const over = createPNG(16, 16, [220, 220, 220, 255]);
+
+    expect(compareImages(white, under, 0.1).diffPercentage).toBe(0);
+    expect(compareImages(white, over, 0.1).diffPercentage).toBeGreaterThan(0.5);
+  });
+
   it('threshold=0 fails on any difference', () => {
     const img1 = createPNG(10, 10, [128, 128, 128, 255]);
     const img2 = createPNGWithRegion(
@@ -124,12 +180,13 @@ describe('compareImages', () => {
     expect(typeof result.diffPercentage).toBe('number');
   });
 
-  it('threshold=1 passes on any difference', () => {
+  it('a ratio of 1 still fails a dense difference', () => {
     const img1 = createPNG(100, 100, [0, 0, 0, 255]);
     const img2 = createPNG(100, 100, [255, 255, 255, 255]);
     const result = compareImages(img1, img2, 1);
 
-    expect(result.passed).toBe(true);
+    expect(result.diffPercentage).toBeGreaterThan(0.5);
+    expect(result.passed).toBe(false);
   });
 
   it('extracts spatial connected-component diff clusters sorted by rawDiffPixels', () => {

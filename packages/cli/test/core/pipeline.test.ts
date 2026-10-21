@@ -39,10 +39,13 @@ function makeScreenshot(buffer: Buffer, overrides?: Partial<ScreenshotResult>): 
 }
 
 /**
- * Create a PNG where the first `diffPixels` pixels are a contrasting colour.
+ * Create a PNG where `diffPixels` pixels are a contrasting colour, spread
+ * across the canvas. A dense block would also trip the localized window gate;
+ * this helper is for the whole-image ratio.
  *
  * The base colour is solid red (255, 0, 0). The differing pixels are solid
- * blue (0, 0, 255) — far enough apart that pixelmatch will always count them.
+ * blue (0, 0, 255), which pixelmatch counts. Stride 17 is coprime to the
+ * 100×100 canvases these tests use, so the placement does not repeat early.
  */
 function createTestPngWithDiff(
   width: number,
@@ -50,23 +53,21 @@ function createTestPngWithDiff(
   diffPixels: number,
 ): Buffer {
   const png = new PNG({ width, height });
-  let changed = 0;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (width * y + x) << 2;
-      if (changed < diffPixels) {
-        png.data[idx] = 0;
-        png.data[idx + 1] = 0;
-        png.data[idx + 2] = 255;
-        png.data[idx + 3] = 255;
-        changed++;
-      } else {
-        png.data[idx] = 255;
-        png.data[idx + 1] = 0;
-        png.data[idx + 2] = 0;
-        png.data[idx + 3] = 255;
-      }
-    }
+  const total = width * height;
+  for (let i = 0; i < total; i++) {
+    const idx = i << 2;
+    png.data[idx] = 255;
+    png.data[idx + 1] = 0;
+    png.data[idx + 2] = 0;
+    png.data[idx + 3] = 255;
+  }
+  const n = Math.min(diffPixels, total);
+  for (let i = 0; i < n; i++) {
+    const idx = ((i * 17) % total) << 2;
+    png.data[idx] = 0;
+    png.data[idx + 1] = 0;
+    png.data[idx + 2] = 255;
+    png.data[idx + 3] = 255;
   }
   return PNG.sync.write(png);
 }

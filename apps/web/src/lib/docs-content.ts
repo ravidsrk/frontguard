@@ -212,6 +212,8 @@ $ npx -p @frontguard/cli frontguard run`,
 $ npm install -D @frontguard/playwright
 $ npx -p @frontguard/cli playwright install --with-deps chromium
 $ npx -p @frontguard/cli frontguard doctor`,
+    )}${p(
+      'Screenshot runs install the Playwright browser build that matches @frontguard/cli. GitHub-hosted runner images update browsers on their own, and that drift flaked screenshot tests (https://x.com/karlhorky/status/2082458846031696091).',
     )}${tip(
       'LINUX vs MACOS.',
       'The --with-deps flag installs required shared libraries on Ubuntu/Debian CI runners. On macOS, Playwright prints a benign note and installs the Chromium binary cleanly.',
@@ -550,7 +552,7 @@ $ frontguard monitor --history`,
         ['storybook', '{ url, stories?, exclude? }', 'undefined', 'Discover and render stories from a running Storybook 7/8 server.'],
         ['viewports', 'number[]', '[375, 768, 1440]', 'Viewport widths in CSS pixels.'],
         ['browsers', "Array&lt;'chromium'|'firefox'|'webkit'&gt;", "['chromium']", 'Playwright browser engines to test.'],
-        ['threshold', 'number (0-1)', '0.1', 'Changed-pixel ratio threshold (0.01 = 1%). Lower for stricter layout checks.'],
+        ['threshold', 'number (0-1)', '0.1', 'Whole-image changed-pixel ratio. 0.1 means 10% of pixels. The pixelmatch color distance is a separate hardcoded 0.1 (1 is black versus white). The Playwright per-pixel default is 0.2. A 16×16 window with more than 64 differing pixels fails even when the edit is a few percent of the image.'],
         ['ssimThreshold', 'number (0-1)', '0.98', 'SSIM fallback cutoff when ssimFallback is enabled.'],
         ['colorScheme', "'light' | 'dark'", 'undefined', 'Emulate prefers-color-scheme during capture. Uses the same baseline file as the default scheme until named capture modes exist, and warns when the stored scheme differs. The warning does not change the exit code.'],
         ['waitForStability', 'boolean', 'false', 'Wait for consecutive animation frames to converge before taking the screenshot.'],

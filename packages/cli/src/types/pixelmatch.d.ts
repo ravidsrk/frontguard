@@ -1,8 +1,8 @@
 declare module 'pixelmatch' {
   interface PixelmatchOptions {
-    /** Matching threshold (0 to 1); smaller is more sensitive. Default: 0.1 */
+    /** Per-pixel OKLab HyAB distance from 0 to 1. 1 is black versus white. Default: 0.1 */
     threshold?: number;
-    /** Whether to skip anti-aliasing detection. Default: false */
+    /** When true, anti-aliased pixels count as differences. Default: false */
     includeAA?: boolean;
     /** Opacity of original image in diff output. Default: 0.1 */
     alpha?: number;
@@ -14,11 +14,16 @@ declare module 'pixelmatch' {
     diffColorAlt?: [number, number, number];
     /** Draw diff mask with no alpha. Default: false */
     diffMask?: boolean;
+    /**
+     * When finite, return the largest number of differing pixels in any N×N
+     * square instead of the total count.
+     */
+    windowSize?: number;
   }
 
   /**
    * Compare two images pixel by pixel.
-   * @returns Number of mismatched pixels.
+   * @returns Mismatched pixel count, or the window max when windowSize is set.
    */
   function pixelmatch(
     img1: Uint8Array | Uint8ClampedArray,

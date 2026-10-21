@@ -41,8 +41,6 @@ function writeHtml(file: string, boxColor: string): string {
     .box { width: 200px; height: 200px; background: ${boxColor}; }
   </style></head><body>
     <div class="box"></div>
-    <div id="ts"></div>
-    <script>document.getElementById('ts').textContent = String(Date.now());</script>
   </body></html>`;
   const abs = join(workDir, file);
   fs.writeFileSync(abs, html, 'utf8');

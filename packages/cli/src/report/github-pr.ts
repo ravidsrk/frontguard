@@ -231,8 +231,12 @@ export class GitHubPRReporter implements Reporter {
 
     for (const diff of regressions) {
       const label = `\`${diff.route.path}\` @ ${diff.viewport}px (${diff.browser})`;
+      const windowNote =
+        diff.windowMax !== undefined && diff.windowMax > 64
+          ? `, 16×16 window ${diff.windowMax}`
+          : '';
       lines.push(`<details open>`);
-      lines.push(`<summary>${label} — ${diff.diffPercentage.toFixed(2)}% changed</summary>`);
+      lines.push(`<summary>${label} — ${diff.diffPercentage.toFixed(2)}% changed${windowNote}</summary>`);
       lines.push('');
 
       // Embed image thumbnails when upload URLs are available; otherwise fall

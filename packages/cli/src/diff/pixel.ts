@@ -115,19 +115,17 @@ export function compareScreenshot(
   }
 
   // --- Handle dimension mismatch ---------------------------------------------
-  let dimensionMismatch = false;
+  // Pad, then judge the padded pair with the same pixel gate.
   let noteMsg: string | undefined;
 
   if (
     currentPng.width !== baselinePng.width ||
     currentPng.height !== baselinePng.height
   ) {
-    dimensionMismatch = true;
     noteMsg =
       `Dimension mismatch: current=${currentPng.width}×${currentPng.height}, ` +
       `baseline=${baselinePng.width}×${baselinePng.height}. ` +
       `Images were padded to the larger dimensions for comparison.`;
-
     const maxWidth = Math.max(currentPng.width, baselinePng.width);
     const maxHeight = Math.max(currentPng.height, baselinePng.height);
 
@@ -141,6 +139,7 @@ export function compareScreenshot(
   const diffPng = new PNG({ width, height });
 
   let numDiffPixels: number;
+  let wmax = 0;
   try {
     numDiffPixels = pixelmatch(
       baselinePng.data,
@@ -150,6 +149,15 @@ export function compareScreenshot(
       height,
       PIXELMATCH_OPTIONS,
     );
+    // windowSize replaces the return value with a window max, so the percentage
+    // stays on numDiffPixels from the call above. 16 and 64 are the fixtures'
+    // split: a compact text edit is over 64, scattered speckle is under it.
+    if (numDiffPixels > 0) {
+      wmax = pixelmatch(baselinePng.data, currentPng.data, null, width, height, {
+        ...PIXELMATCH_OPTIONS,
+        windowSize: 16,
+      });
+    }
   } catch (err) {
     return errorResult(
       current,
@@ -163,13 +171,10 @@ export function compareScreenshot(
   // Encode the diff overlay to a PNG buffer
   const diffImage = PNG.sync.write(diffPng);
 
-  // Determine status
   let status: DiffResult['status'];
-  if (dimensionMismatch) {
-    status = 'changed';
-  } else if (diffPercentage === 0) {
+  if (diffPercentage === 0) {
     status = 'pass';
-  } else if (compareDiffToThreshold(diffPercentage, threshold) > 0) {
+  } else if (wmax > 64 || compareDiffToThreshold(diffPercentage, threshold) > 0) {
     status = 'regression';
   } else {
     status = 'changed';
@@ -190,6 +195,7 @@ export function compareScreenshot(
     ...(current.redactedCount !== undefined ? { redactedCount: current.redactedCount } : {}),
     ...(current.blockedRequestsCount !== undefined ? { blockedRequestsCount: current.blockedRequestsCount } : {}),
   };
+  if (wmax > 64) result.windowMax = wmax;
 
   if (noteMsg) {
     result.error = noteMsg;

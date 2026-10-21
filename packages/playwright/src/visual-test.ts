@@ -462,6 +462,7 @@ export async function visualTest(
   const result: VisualTestResult = {
     passed: diff.passed,
     diffPercentage: diff.diffPercentage,
+    windowMax: diff.windowMax,
     baselinePath: storage.getPath(baselineKey),
     currentPath: storage.getPath(baselineKey, 'current'),
     diffPath: diff.diffBuffer ? storage.getPath(baselineKey, 'diff') : undefined,
@@ -490,8 +491,12 @@ export async function expectVisual(
   const result = await visualTest(page, name, options);
   if (!result.passed) {
     const pct = (result.diffPercentage * 100).toFixed(2);
+    const windowNote =
+      result.windowMax !== undefined && result.windowMax > 64
+        ? `, 16×16 window ${result.windowMax} > 64`
+        : '';
     throw new Error(
-      `Visual regression detected for "${name}": ${pct}% diff (${result.diffPath ?? result.currentPath})`
+      `Visual regression detected for "${name}": ${pct}% diff${windowNote} (${result.diffPath ?? result.currentPath})`,
     );
   }
   return result;
