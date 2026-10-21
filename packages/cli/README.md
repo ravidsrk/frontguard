@@ -179,6 +179,8 @@ export default {
 };
 ```
 
+Optional text snapshots use `createTextSnapshotPlugin({ aria: true, json: "#payload", markdown: "article" })`. Each enabled kind writes a sibling of the PNG (`.aria.txt`, `.json`, or `.md`) and diffs it as text. A mismatch is reported on its own, with a short excerpt. It does not change `comparisonMethod` from pixelmatch and does not pass or fail a pixel regression. axe-core remains the accessibility plugin. Text diff is not a gate.
+
 ---
 
 ## Story discovery
@@ -233,7 +235,7 @@ The supported path is the local CLI. Hosted cloud, MCP, GitHub App, and Docker C
 - **Fix-pattern database** — `accept-fix` / `reject-fix` / `export-patterns` train and share a local pattern store that the pipeline reuses before calling the AI.
 - **`frontguard doctor`** — environment diagnostics for sources of non-determinism (Node, Playwright/Chromium, browsers, config, git).
 - **`frontguard monitor`** — live production-URL monitoring with daemon polling, history, and webhook alerts.
-- **Accessibility + performance-budget plugins** — axe-core audits captured route/viewport pairs in fresh Chromium pages; performance budgets report LCP/CLS/TTFB evidence alongside visual diffs.
+- **Accessibility + performance-budget plugins** — axe-core audits captured route/viewport pairs in fresh Chromium pages; performance budgets report LCP/CLS/TTFB evidence alongside visual diffs. Optional ARIA, JSON, and Markdown text snapshots are a separate plugin and do not replace axe-core or the pixel gate.
 - **Inspectable artifacts** — HTML reports retain baseline/current/diff images; remote thumbnails require an explicit image-upload backend.
 
 See the [full CHANGELOG](https://github.com/ravidsrk/frontguard/blob/main/CHANGELOG.md), [interactive documentation](https://frontguard.dev/docs), and [validation results](https://github.com/ravidsrk/frontguard/tree/main/validation). The published run used AI-disabled local comparisons and is not an AI-accuracy or cross-OS benchmark.

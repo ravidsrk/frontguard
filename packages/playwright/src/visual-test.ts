@@ -4,6 +4,8 @@ import type { VisualTestOptions, VisualTestResult } from './types.js';
 import { compareImages } from './diff.js';
 import { analyzeWithAI } from './ai.js';
 import { BaselineStorage } from './storage.js';
+import { recordTextSnapshots } from './text-snapshot.js';
+import type { TextSnapshotKind } from './types.js';
 
 function currentTestInfo(): TestInfo | undefined {
   try {
@@ -182,6 +184,9 @@ export async function visualTest(
   let currentBuffer: Buffer;
   let settled: boolean | undefined;
   let ariaSnapshot: string | undefined;
+  let jsonText: string | undefined;
+  let markdownText: string | undefined;
+  const textErrors: Array<{ kind: TextSnapshotKind; ext: string; message: string }> = [];
   try {
     // Mask elements
     if (opts.mask?.length) {
@@ -314,6 +319,16 @@ export async function visualTest(
         }
       }
     }
+    if (opts.textSnapshot?.json) {
+      const read = await readOptionalPageText(page, opts.textSnapshot.json);
+      if ('error' in read) textErrors.push({ kind: 'json', ext: '.json', message: read.error });
+      else jsonText = read.body;
+    }
+    if (opts.textSnapshot?.markdown) {
+      const read = await readOptionalPageText(page, opts.textSnapshot.markdown);
+      if ('error' in read) textErrors.push({ kind: 'markdown', ext: '.md', message: read.error });
+      else markdownText = read.body;
+    }
   } finally {
     if (hasMasks) {
       await page.evaluate(() => {
@@ -338,11 +353,27 @@ export async function visualTest(
   const current = Buffer.from(currentBuffer);
 
   const baselineKey = getBaselineKey(page, opts.selector ? `${name}__${opts.selector}` : name);
+  const textItems: Array<{ kind: TextSnapshotKind; ext: string; body: string }> = [];
+  if (ariaSnapshot !== undefined) textItems.push({ kind: 'aria', ext: '.aria.txt', body: ariaSnapshot });
+  if (jsonText !== undefined) textItems.push({ kind: 'json', ext: '.json', body: jsonText });
+  if (markdownText !== undefined) textItems.push({ kind: 'markdown', ext: '.md', body: markdownText });
 
   // Load or create baseline
   const baseline = storage.readBaseline(baselineKey);
+  const writing = baseline === null || opts.update === true;
+  const textFailure = textErrors[0];
+  if (writing && textFailure) throw new Error(textFailure.message);
+  const recorded = textItems.length
+    ? recordTextSnapshots(storage, baselineKey, textItems, writing)
+    : [];
+  const failed = textErrors.map((item) => ({
+    kind: item.kind,
+    status: 'error' as const,
+    path: storage.textPath(baselineKey, item.ext),
+  }));
+  const textSnapshots = recorded.length + failed.length > 0 ? [...recorded, ...failed] : undefined;
 
-  if (baseline === null || opts.update) {
+  if (writing) {
     storage.writeBaseline(baselineKey, current);
     storage.writeFile(baselineKey, 'current', current);
     return {
@@ -354,6 +385,7 @@ export async function visualTest(
       ...(settled !== undefined ? { settled } : {}),
       ...(blockedRequestsCount !== undefined ? { blockedRequestsCount } : {}),
       ...(ariaSnapshot !== undefined ? { ariaSnapshot } : {}),
+      ...(textSnapshots ? { textSnapshots } : {}),
     };
   }
 
@@ -472,6 +504,7 @@ export async function visualTest(
     ...(diff.clusters && diff.clusters.length > 0 ? { clusters: diff.clusters } : {}),
     ...(blockedRequestsCount !== undefined ? { blockedRequestsCount } : {}),
     ...(ariaSnapshot !== undefined ? { ariaSnapshot } : {}),
+    ...(textSnapshots ? { textSnapshots } : {}),
   };
 
   // AI analysis if enabled and diff detected
@@ -481,6 +514,31 @@ export async function visualTest(
   }
 
   return result;
+}
+
+async function readOptionalPageText(
+  page: Page,
+  selector: string,
+): Promise<{ body: string } | { error: string }> {
+  try {
+    return { body: await readPageText(page, selector) };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+async function readPageText(page: Page, selector: string): Promise<string> {
+  const locatorPage = page as Page & {
+    locator?: (selector: string) => {
+      textContent?: () => Promise<string | null>;
+      first?: () => { textContent?: () => Promise<string | null> };
+    };
+  };
+  if (typeof locatorPage.locator !== 'function') return '';
+  const raw = locatorPage.locator(selector);
+  const target = typeof raw.first === 'function' ? raw.first() : raw;
+  if (typeof target.textContent !== 'function') return '';
+  return (await target.textContent()) ?? '';
 }
 
 export async function expectVisual(

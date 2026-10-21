@@ -212,6 +212,8 @@ test('pricing tier card remains visually stable', async ({ page }) => {
 });
 ```
 
+`captureAriaSnapshot` stores that tree beside the PNG and diffs it as text. A text mismatch does not change `passed`. axe-core remains the accessibility plugin.
+
 ### 4. Multi-Provider BYOK Vision Analysis (OpenAI, Anthropic, Gemini & Local Ollama)
 
 AI analysis is optional. When configured, Frontguard sends screenshot evidence to your selected provider and returns an advisory classification (`regression`, `intentional`, `content_update`), confidence score, and explanation:

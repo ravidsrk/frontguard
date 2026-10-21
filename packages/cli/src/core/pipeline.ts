@@ -91,7 +91,7 @@ import { uploadImages } from '../storage/upload-stage.js';
 import { detectPreviewUrl, waitForUrl } from '../utils/preview-url.js';
 import { logger } from '../utils/logger.js';
 import { withCliTrace, type CliTrace } from '../utils/otel.js';
-import { PluginManager } from './plugins.js';
+import { PluginManager, type PluginContext } from './plugins.js';
 
 // ---------------------------------------------------------------------------
 // Memory Management Helpers
@@ -1222,6 +1222,23 @@ async function writeUpdatedBaselines(
   }
   reporter.onStageComplete('render', `Captured ${screenshots.length} screenshot(s)`);
 
+  let textDone: { manager: PluginManager; ctx: PluginContext } | undefined;
+  const textPlugin = config.plugins?.find((p) => p.name === 'text-snapshot');
+  if (textPlugin) {
+    const mgr = new PluginManager();
+    mgr.register(textPlugin);
+    const md = new Map<string, unknown>();
+    md.set('tw', true);
+    const ctx = { config, logger, metadata: md };
+    try {
+      await mgr.setup(ctx);
+      await mgr.runHook('afterRender', screenshots, ctx);
+      textDone = { manager: mgr, ctx };
+    } finally {
+      await mgr.teardown();
+    }
+  }
+
   // Init storage and write all baselines
   const writeSpan = trace.start('frontguard.baseline_write');
   reporter.onStageStart('compare', 'Writing baselines…');
@@ -1327,6 +1344,7 @@ async function writeUpdatedBaselines(
     ),
     baselineUpdate: true,
   };
+  if (textDone) await textDone.manager.runHook('afterRun', result, textDone.ctx);
   reporter.onStageStart('report', 'Generating baseline update report…');
   await reporter.onComplete(result);
   reporter.onStageComplete('report', 'Done');

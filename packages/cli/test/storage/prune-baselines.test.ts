@@ -448,6 +448,33 @@ describe('prune-baselines git history', () => {
     expect(git('rev-parse', '--abbrev-ref', 'HEAD')).toBe('main');
   }, 30_000);
 
+  it('removes text siblings with a stale PNG', async () => {
+    const mainSha = git('rev-parse', 'HEAD');
+    await writeBaselines(mainSha, [
+      { route: '/keep', buffer: keepBytes },
+      { route: '/gone', buffer: goneV1 },
+    ]);
+    const writing = new GitOrphanStorage(repoDir, { mode: 'update' });
+    await writing.init();
+    await writing.textFile('/gone', 1440, 'chromium', '.aria.txt', 'gone text');
+    await writing.textFile('/keep', 1440, 'chromium', '.json', '  {"ok":true}');
+
+    const code = await runPruneBaselines({
+      cwd: repoDir,
+      apply: true,
+      configPath: 'frontguard.config.json',
+      stdout: () => undefined,
+    });
+    expect(code).toBe(0);
+
+    const read = new GitOrphanStorage(repoDir);
+    await read.init();
+    expect(await read.textFile('/gone', 1440, 'chromium', '.aria.txt')).toBeNull();
+    expect(await read.readBaseline('/gone', 1440, 'chromium')).toBeNull();
+    expect(await read.textFile('/keep', 1440, 'chromium', '.json')).toBe('  {"ok":true}');
+    expect(await read.readBaseline('/keep', 1440, 'chromium')).toEqual(keepBytes);
+  });
+
   it('treats a missing local branch as nothing to prune', async () => {
     const lines: string[] = [];
     const code = await runPruneBaselines({

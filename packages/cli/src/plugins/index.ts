@@ -60,3 +60,6 @@ export {
   diffScriptInventory,
 } from './third-party-scripts.js';
 export type { ThirdPartyScriptConfig } from './third-party-scripts.js';
+
+export { createTextSnapshotPlugin, normalizeTextSnapshot } from './text-snapshot.js';
+export type { TextSnapshotConfig } from './text-snapshot.js';

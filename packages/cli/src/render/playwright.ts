@@ -18,10 +18,10 @@ import {
 import type {
   FrontguardConfig,
   Route,
-  RouteAction,
   ScreenshotResult,
   BrowserEngine,
 } from '../core/types.js';
+import { executeRouteActions } from './route-actions.js';
 import { logger } from '../utils/logger.js';
 import { cropToMaxHeight } from './crop.js';
 import { joinStoryUrl } from '../discovery/story-url.js';
@@ -131,14 +131,8 @@ interface RenderTask {
 // CSS injected into every page to freeze animations / transitions
 // ---------------------------------------------------------------------------
 
-const FREEZE_ANIMATIONS_CSS = `
-*, *::before, *::after {
-  animation-duration: 0s !important;
-  animation-delay: 0s !important;
-  transition-duration: 0s !important;
-  transition-delay: 0s !important;
-}
-`.trim();
+const FREEZE_ANIMATIONS_CSS =
+  '*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;transition-delay:0s!important;}';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -345,15 +339,7 @@ export async function executeTask(
         await pageWithClock.clock.setFixedTime(frozenTimestamp).catch(() => {});
       }
       if (typeof (page as { addInitScript?: unknown }).addInitScript === 'function') {
-        await page.addInitScript(`{
-          const __fg_frozen = ${frozenTimestamp};
-          const __fg_OrigDate = Date;
-          Date = class extends __fg_OrigDate {
-            constructor(...args) { if (args.length === 0) return new __fg_OrigDate(__fg_frozen); return new __fg_OrigDate(...args); }
-            static now() { return __fg_frozen; }
-          };
-          Date.prototype = __fg_OrigDate.prototype;
-        }`);
+        await page.addInitScript(`{const __fg_frozen=${frozenTimestamp};const __fg_OrigDate=Date;Date=class extends __fg_OrigDate{constructor(...args){if(args.length===0)return new __fg_OrigDate(__fg_frozen);return new __fg_OrigDate(...args);}static now(){return __fg_frozen;}};Date.prototype=__fg_OrigDate.prototype;}`);
       }
     }
 
@@ -362,15 +348,7 @@ export async function executeTask(
     if (effectiveSeedRandom !== undefined && effectiveSeedRandom !== false) {
       const seedVal = effectiveSeedRandom === true ? 42 : effectiveSeedRandom;
       if (typeof (page as { addInitScript?: unknown }).addInitScript === 'function') {
-        await page.addInitScript(`{
-          let __fg_seed = (${Number(seedVal)} >>> 0) || 42;
-          Math.random = function() {
-            let t = (__fg_seed += 0x6D2B79F5);
-            t = Math.imul(t ^ (t >>> 15), t | 1);
-            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-          };
-        }`);
+        await page.addInitScript(`{let __fg_seed=(${Number(seedVal)}>>>0)||42;Math.random=function(){let t=(__fg_seed+=0x6D2B79F5);t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}`);
       }
     }
 
@@ -637,49 +615,6 @@ function findConsensusScreenshot(buffers: Buffer[]): Buffer {
   return groups[0].buffer;
 }
 
-/**
- * Executes declarative pre-capture interaction steps on a Playwright page.
- */
-export async function executeRouteActions(
-  page: Page,
-  actions: RouteAction[],
-  timeoutMs: number,
-): Promise<void> {
-  for (const action of actions) {
-    switch (action.type) {
-      case 'click':
-        await page.click(action.selector, { timeout: timeoutMs });
-        break;
-      case 'hover':
-        await page.hover(action.selector, { timeout: timeoutMs });
-        break;
-      case 'fill':
-        await page.fill(action.selector, action.value, { timeout: timeoutMs });
-        break;
-      case 'press':
-        if (action.selector) {
-          await page.press(action.selector, action.key, { timeout: timeoutMs });
-        } else {
-          await page.keyboard.press(action.key);
-        }
-        break;
-      case 'waitForSelector':
-        await page.waitForSelector(action.selector, {
-          state: action.state ?? 'visible',
-          timeout: timeoutMs,
-        });
-        break;
-      case 'wait': {
-        const clampedMs = Math.min(Math.max(0, action.ms), 30_000);
-        if (typeof page.waitForTimeout === 'function') {
-          await page.waitForTimeout(clampedMs);
-        } else {
-          await new Promise((r) => setTimeout(r, clampedMs));
-        }
-        break;
-      }
-    }
-  }
-}
+export { executeRouteActions };
 
 

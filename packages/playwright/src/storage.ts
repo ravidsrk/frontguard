@@ -57,6 +57,25 @@ export class BaselineStorage {
     fs.writeFileSync(this.getPath(key, suffix), data);
   }
 
+  textPath(key: string, ext: string): string {
+    if (!/^\.(aria\.txt|json|md)$/.test(ext)) throw new Error('Unknown text snapshot');
+    return this.getPath(key).replace(/\.png$/, ext);
+  }
+
+  readText(key: string, ext: string): string | null {
+    try {
+      return fs.readFileSync(this.textPath(key, ext), 'utf8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
+  }
+
+  writeText(key: string, ext: string, text: string): void {
+    this.ensureDir();
+    fs.writeFileSync(this.textPath(key, ext), text);
+  }
+
   /**
    * Get the file path for a baseline key and optional suffix.
    */

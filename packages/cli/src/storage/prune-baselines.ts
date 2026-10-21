@@ -687,7 +687,11 @@ function removeStaleShots(
     const staleKeys = new Set(stale.map((shot) => targetKey(shot)));
     const retained = tipShots.filter((shot) => !staleKeys.has(targetKey(shot)));
     for (const shot of staleFilesToDelete(stale, retained)) {
-      gitText(worktree, ['rm', '-f', '--ignore-unmatch', '--', storagePath(shot)]);
+      const png = storagePath(shot);
+      gitText(worktree, ['rm', '-f', '--ignore-unmatch', '--', png]);
+      for (const suffix of ['.aria.txt', '.json', '.md']) {
+        gitText(worktree, ['rm', '-f', '--ignore-unmatch', '--', png.replace(/\.png$/, suffix)]);
+      }
     }
     const next = manifestWithoutStaleShots(manifest, stale);
     writeFileSync(join(worktree, 'manifest.json'), `${JSON.stringify(next, null, 2)}\n`);
