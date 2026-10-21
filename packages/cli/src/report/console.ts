@@ -443,6 +443,7 @@ export class ConsoleReporter implements Reporter {
     }
     for (const row of notable) {
       console.log(`  ${row.kind} ${row.status}: ${row.route} @ ${row.viewport}px [${row.browser}]`);
+      if (row.excerpt) console.log(chalk.dim(`  ${row.excerpt}`));
     }
     console.log(chalk.dim('  A text mismatch does not pass or fail the pixel comparison.'));
     console.log('');

@@ -68,8 +68,10 @@ export type TextSnapshotKind = 'aria' | 'json' | 'markdown';
 
 export interface TextSnapshotDiff {
   kind: TextSnapshotKind;
-  status: 'match' | 'mismatch' | 'new';
+  status: 'match' | 'mismatch' | 'new' | 'error';
   path: string;
+  /** Short mismatch preview. Absent unless status is mismatch. */
+  excerpt?: string;
 }
 
 export interface CompareResult {

@@ -583,8 +583,52 @@ describe('visualTest', () => {
 
     expect(result.passed).toBe(true);
     expect(result.textSnapshots).toEqual([
-      expect.objectContaining({ kind: 'json', status: 'mismatch' }),
+      expect.objectContaining({
+        kind: 'json',
+        status: 'mismatch',
+        excerpt: 'was {"price":1} now {"price":2}',
+      }),
     ]);
+  });
+
+  it('reports a text error without failing a pixel pass', async () => {
+    const img = createPNG(40, 40, [10, 120, 10, 255]);
+    await visualTest(createMockPage(img), 'text-error-pass', { baselineDir: TEST_BASELINE_DIR });
+    const page = createMockPage(img);
+    page.locator = vi.fn().mockReturnValue({
+      textContent: vi.fn().mockRejectedValue(new Error('selector missing')),
+      first: () => ({ textContent: vi.fn().mockRejectedValue(new Error('selector missing')) }),
+    });
+
+    const result = await expectVisual(page, 'text-error-pass', {
+      baselineDir: TEST_BASELINE_DIR,
+      textSnapshot: { json: '#missing' },
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.textSnapshots).toEqual([
+      expect.objectContaining({ kind: 'json', status: 'error' }),
+    ]);
+  });
+
+  it('throws before writing a baseline when text capture fails on update', async () => {
+    const img = createPNG(40, 40, [10, 120, 10, 255]);
+    const page = createMockPage(img);
+    page.locator = vi.fn().mockReturnValue({
+      textContent: vi.fn().mockRejectedValue(new Error('selector missing')),
+      first: () => ({ textContent: vi.fn().mockRejectedValue(new Error('selector missing')) }),
+    });
+
+    await expect(
+      visualTest(page, 'text-error-update', {
+        baselineDir: TEST_BASELINE_DIR,
+        update: true,
+        textSnapshot: { json: '#missing' },
+      }),
+    ).rejects.toThrow('selector missing');
+
+    const files = fs.existsSync(TEST_BASELINE_DIR) ? fs.readdirSync(TEST_BASELINE_DIR) : [];
+    expect(files.filter((file) => file.endsWith('.png') || file.endsWith('.json'))).toEqual([]);
   });
 
   it('attributes spatial diff clusters to the highest-overlap specific DOM selector', async () => {

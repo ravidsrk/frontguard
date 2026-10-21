@@ -843,6 +843,8 @@ export interface TextSnapshotReport {
   browser: BrowserEngine;
   kind: 'aria' | 'json' | 'markdown';
   status: 'match' | 'mismatch' | 'new' | 'error';
+  /** Short mismatch preview. It does not change the pixel result. */
+  excerpt?: string;
 }
 
 export interface RunResult {

@@ -484,7 +484,7 @@ function renderTextSnapshotSection(result: RunResult): string {
   const notable = rows.filter((row) => row.status !== 'match');
   const body = notable.length === 0
     ? '<p>Text snapshots match. Pixel status is unchanged.</p>'
-    : `<ul>${notable.map((row) => `<li>${escapeHtml(row.kind)} ${escapeHtml(row.status)}: ${escapeHtml(row.route)} @ ${row.viewport}px [${escapeHtml(row.browser)}]</li>`).join('')}</ul>`;
+    : `<ul>${notable.map((row) => `<li>${escapeHtml(row.kind)} ${escapeHtml(row.status)}: ${escapeHtml(row.route)} @ ${row.viewport}px [${escapeHtml(row.browser)}]${row.excerpt ? ` — ${escapeHtml(row.excerpt)}` : ''}</li>`).join('')}</ul>`;
   return `<section class="text-snapshots" id="text-snapshots">
       <h2>Text snapshots</h2>
       <p>These do not change the pixel result. axe-core remains the accessibility check.</p>

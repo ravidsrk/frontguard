@@ -348,7 +348,7 @@ export class GitOrphanStorage implements BaselineStorage {
     if (body === undefined) {
       if (this.readRef === null) return null;
       try {
-        return this.git('show', `${this.readRef}:${path}`);
+        return this.gitBuffer('show', `${this.readRef}:${path}`).toString('utf8');
       } catch (err) {
         const output = gitErrorOutput(err);
         if (/does not exist in|exists on disk, but not in/i.test(output)) return null;

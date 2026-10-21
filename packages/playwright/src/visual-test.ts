@@ -186,6 +186,7 @@ export async function visualTest(
   let ariaSnapshot: string | undefined;
   let jsonText: string | undefined;
   let markdownText: string | undefined;
+  const textErrors: Array<{ kind: TextSnapshotKind; ext: string; message: string }> = [];
   try {
     // Mask elements
     if (opts.mask?.length) {
@@ -318,8 +319,16 @@ export async function visualTest(
         }
       }
     }
-    if (opts.textSnapshot?.json) jsonText = await readPageText(page, opts.textSnapshot.json);
-    if (opts.textSnapshot?.markdown) markdownText = await readPageText(page, opts.textSnapshot.markdown);
+    if (opts.textSnapshot?.json) {
+      const read = await readOptionalPageText(page, opts.textSnapshot.json);
+      if ('error' in read) textErrors.push({ kind: 'json', ext: '.json', message: read.error });
+      else jsonText = read.body;
+    }
+    if (opts.textSnapshot?.markdown) {
+      const read = await readOptionalPageText(page, opts.textSnapshot.markdown);
+      if ('error' in read) textErrors.push({ kind: 'markdown', ext: '.md', message: read.error });
+      else markdownText = read.body;
+    }
   } finally {
     if (hasMasks) {
       await page.evaluate(() => {
@@ -351,11 +360,20 @@ export async function visualTest(
 
   // Load or create baseline
   const baseline = storage.readBaseline(baselineKey);
-  const textSnapshots = textItems.length
-    ? recordTextSnapshots(storage, baselineKey, textItems, baseline === null || opts.update === true)
-    : undefined;
+  const writing = baseline === null || opts.update === true;
+  const textFailure = textErrors[0];
+  if (writing && textFailure) throw new Error(textFailure.message);
+  const recorded = textItems.length
+    ? recordTextSnapshots(storage, baselineKey, textItems, writing)
+    : [];
+  const failed = textErrors.map((item) => ({
+    kind: item.kind,
+    status: 'error' as const,
+    path: storage.textPath(baselineKey, item.ext),
+  }));
+  const textSnapshots = recorded.length + failed.length > 0 ? [...recorded, ...failed] : undefined;
 
-  if (baseline === null || opts.update) {
+  if (writing) {
     storage.writeBaseline(baselineKey, current);
     storage.writeFile(baselineKey, 'current', current);
     return {
@@ -496,6 +514,17 @@ export async function visualTest(
   }
 
   return result;
+}
+
+async function readOptionalPageText(
+  page: Page,
+  selector: string,
+): Promise<{ body: string } | { error: string }> {
+  try {
+    return { body: await readPageText(page, selector) };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 async function readPageText(page: Page, selector: string): Promise<string> {

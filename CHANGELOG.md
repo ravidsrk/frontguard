@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Text comparison keeps the pixel result when capture or browser startup fails, and still refuses a baseline write on update. Text is read in the shot's browser after the same freeze, seed, block, and story-ready steps as the PNG. A stored snapshot is compared after one newline normalization, including leading spaces. A mismatch includes a short excerpt. `prune-baselines` removes the `.aria.txt`, `.json`, and `.md` siblings with the PNG.
 - Warn when a run's color scheme differs from the scheme stored on the baseline. The comparison still uses the same baseline file, and the warning does not change the exit code.
 - Prevent pull-request CI completions from changing or replacing main failure
   alerts, including fork branches named `main`.

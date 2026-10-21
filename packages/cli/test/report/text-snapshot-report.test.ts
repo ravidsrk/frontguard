@@ -42,7 +42,14 @@ function result(status: 'pass' | 'regression', text: 'match' | 'mismatch'): RunR
     diffs: [diff],
     timing: { discovery: 0, render: 0, compare: 0, ai: 0, total: 0 },
     config: config(),
-    textSnapshots: [{ route: '/', viewport: 1440, browser: 'chromium', kind: 'aria', status: text }],
+    textSnapshots: [{
+      route: '/',
+      viewport: 1440,
+      browser: 'chromium',
+      kind: 'aria',
+      status: text,
+      ...(text === 'mismatch' ? { excerpt: 'was Save now Cancel' } : {}),
+    }],
   };
 }
 
@@ -55,6 +62,7 @@ describe('text snapshot reports', () => {
 
     expect(text).toContain('TEXT SNAPSHOTS — not a pixel result');
     expect(text).toContain('aria mismatch: / @ 1440px [chromium]');
+    expect(text).toContain('was Save now Cancel');
     expect(text).toContain('does not pass or fail the pixel comparison');
     expect(text).toContain('All pages match baselines');
   });
@@ -71,6 +79,7 @@ describe('text snapshot reports', () => {
     expect(parsed.diffs[0]?.status).toBe('regression');
     expect(parsed.diffs[0]?.comparisonMethod).toBe('pixelmatch');
     expect(parsed.textSnapshots[0]?.status).toBe('mismatch');
+    expect(parsed.textSnapshots[0]).toMatchObject({ excerpt: 'was Save now Cancel' });
   });
 
   it('adds a GitHub section that does not change the pixel result', () => {
@@ -79,6 +88,7 @@ describe('text snapshot reports', () => {
     expect(comment).toContain('## Text snapshots');
     expect(comment).toContain('do not change the pixel result');
     expect(comment).toContain('aria: mismatch');
+    expect(comment).toContain('was Save now Cancel');
     expect(comment).toContain('All 1 pages match baselines');
     expect(comment).not.toContain('## ❌ Regressions');
   });
@@ -89,6 +99,7 @@ describe('text snapshot reports', () => {
     expect(html).toContain('id="text-snapshots"');
     expect(html).toContain('axe-core remains the accessibility check');
     expect(html).toContain('aria mismatch');
+    expect(html).toContain('was Save now Cancel');
     expect(html).toContain('Regressions (1)');
   });
 });

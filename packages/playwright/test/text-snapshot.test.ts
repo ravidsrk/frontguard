@@ -33,7 +33,25 @@ describe('text snapshot diff', () => {
         false,
       );
       expect(compared[0]?.status).toBe('mismatch');
+      expect(compared[0]?.excerpt).toBe('was {"ok":true} now {"ok":false}');
       expect(storage.readText('home', '.json')).toBe('{"ok":true}');
+      recordTextSnapshots(storage, 'blank', [{ kind: 'json', ext: '.json', body: 'a\n\n' }], true);
+      expect(storage.readText('blank', '.json')).toBe('a\n');
+      const shifted = recordTextSnapshots(
+        storage,
+        'blank',
+        [{ kind: 'json', ext: '.json', body: 'a\n' }],
+        false,
+      );
+      expect(shifted[0]?.status).toBe('mismatch');
+      const same = recordTextSnapshots(
+        storage,
+        'blank',
+        [{ kind: 'json', ext: '.json', body: 'a\n\n' }],
+        false,
+      );
+      expect(same[0]?.status).toBe('match');
+      expect(same[0]?.excerpt).toBeUndefined();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -205,7 +205,8 @@ export class GitHubPRReporter implements Reporter {
     const lines = ['## Text snapshots', '', 'These do not change the pixel result.', ''];
     for (const row of result.textSnapshots) {
       if (row.status === 'match') continue;
-      lines.push(`- \`${row.route}\` @ ${row.viewport}px [${row.browser}] ${row.kind}: ${row.status}`);
+      const detail = row.excerpt ? ` (${row.excerpt})` : '';
+      lines.push(`- \`${row.route}\` @ ${row.viewport}px [${row.browser}] ${row.kind}: ${row.status}${detail}`);
     }
     if (lines.length === 4) lines.push('- All captured text snapshots match.');
     return lines.join('\n');

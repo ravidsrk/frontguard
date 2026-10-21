@@ -39,6 +39,10 @@ describe('GitOrphanStorage text snapshots', () => {
     await expect(storage.textFile('/pricing', 1440, 'chromium', '.html', 'no')).rejects.toThrow(
       'Unknown text snapshot',
     );
+    await storage.textFile('/pricing', 1440, 'chromium', '.json', '  {"ok":true}\n');
+    await expect(storage.textFile('/pricing', 1440, 'chromium', '.json')).resolves.toBe(
+      '  {"ok":true}\n',
+    );
   });
 
   it('does not write text during comparison', async () => {

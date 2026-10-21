@@ -179,7 +179,7 @@ export default {
 };
 ```
 
-Optional text snapshots use `createTextSnapshotPlugin({ aria: true, json: "#payload", markdown: "article" })`. Each enabled kind writes a sibling of the PNG (`.aria.txt`, `.json`, or `.md`) and diffs it as text. A mismatch is reported on its own. It does not change `comparisonMethod` from pixelmatch and does not pass or fail a pixel regression. axe-core remains the accessibility plugin. Text diff is not a gate.
+Optional text snapshots use `createTextSnapshotPlugin({ aria: true, json: "#payload", markdown: "article" })`. Each enabled kind writes a sibling of the PNG (`.aria.txt`, `.json`, or `.md`) and diffs it as text. A mismatch is reported on its own, with a short excerpt. It does not change `comparisonMethod` from pixelmatch and does not pass or fail a pixel regression. axe-core remains the accessibility plugin. Text diff is not a gate.
 
 ---
 

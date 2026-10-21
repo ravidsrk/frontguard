@@ -759,7 +759,7 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
         ['settled', 'boolean | undefined', 'Whether captures converged within maxAttempts; present when waitForStable is enabled.'],
         ['blockedRequestsCount', 'number', 'Number of network requests aborted by blockUrls.'],
         ['ariaSnapshot', 'string', 'Playwright ARIA tree YAML/text snapshot when captureAriaSnapshot: true.'],
-        ['textSnapshots', "Array<{ kind, status, path }>", 'Text diff beside the PNG. status is match, mismatch, or new. It does not change passed.'],
+        ['textSnapshots', "Array<{ kind, status, path, excerpt? }>", 'Text diff beside the PNG. status is match, mismatch, new, or error. A mismatch excerpt does not change passed.'],
         ['ai', '{ classification: string, severity: string, explanation: string } | undefined', 'Optional vision model triage result when ai is enabled and a diff occurred.'],
       ],
     )}${h2('Inspecting spatial clusters in tests')}${code(
