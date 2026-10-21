@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
-import { act, cleanup, fireEvent, render, within } from '@testing-library/react'
+import { act, cleanup, render } from '@testing-library/react'
 import { RouterProvider } from '@tanstack/react-router'
-import { chromium, type Browser } from 'playwright'
+import { chromium, type Browser, type Page } from 'playwright'
 import { getRouter } from '../router'
 import { FIRST_DOC_SLUG } from '../lib/docs-content'
 import siteCss from '../styles.css?raw'
@@ -11,10 +11,10 @@ import siteCss from '../styles.css?raw'
  * axe-core runs in Chromium against the routed page markup. This is not the
  * CLI accessibility plugin, and it does not gate pixelmatch.
  *
- * Keyboard pass — keys exercised:
+ * Keyboard pass — Chromium itself moves focus and activates the link:
  * - Tab through the header (skip link, brand, primary nav)
- * - Enter activates the primary link
- * The test fails if that control is not in the tab sequence.
+ * - Enter on the focused primary link
+ * The test fails if that control is not in the tab sequence or Enter does not activate it.
  *
  * jsdom cannot compute contrast (no canvas, no pseudo-elements, unresolved
  * custom properties). Playwright applies apps/web/src/styles.css for real.
@@ -92,60 +92,26 @@ const ROUTES: RouteCase[] = [
  */
 const WAIVERS: Record<string, string> = {}
 
-const TABBABLE =
-  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]'
-
 let browser: Browser | undefined
 
-function accessibleName(el: HTMLElement): string {
-  return (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim()
-}
-
-function isHidden(el: HTMLElement): boolean {
-  if (el.hidden || el.getAttribute('aria-hidden') === 'true') return true
-  if (el.closest('[hidden], [aria-hidden="true"]')) return true
-  for (let node: HTMLElement | null = el; node; node = node.parentElement) {
-    const style = window.getComputedStyle(node)
-    if (style.display === 'none' || style.visibility === 'hidden') return true
-  }
-  return false
-}
-
-function tabbables(): HTMLElement[] {
-  return [...document.querySelectorAll<HTMLElement>(TABBABLE)].filter((el) => {
-    if (el.tabIndex < 0) return false
-    return !isHidden(el)
-  })
-}
-
-/** Move focus as Tab would and dispatch the key. Returns the newly focused control. */
-function pressTab(): HTMLElement | null {
-  const items = tabbables()
-  const current = document.activeElement
-  const start = current instanceof HTMLElement ? items.indexOf(current) : -1
-  const next = items[start + 1]
-  if (!next) return null
-  if (current instanceof HTMLElement) {
-    fireEvent.keyDown(current, { key: 'Tab', code: 'Tab' })
-  }
-  next.focus()
-  return document.activeElement instanceof HTMLElement ? document.activeElement : null
-}
-
-function tabThrough(header: HTMLElement): HTMLElement[] {
-  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-  const visited: HTMLElement[] = []
+/** Names of controls Chromium actually focused while Tab was still in the header. */
+async function headerTabNames(page: Page): Promise<string[]> {
+  const names: string[] = []
   for (let i = 0; i < 40; i++) {
-    const next = pressTab()
-    if (!next) break
-    const inside = header.contains(next)
-    const before = Boolean(
-      header.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_PRECEDING,
-    )
-    if (!inside && !before) break
-    visited.push(next)
+    await page.keyboard.press('Tab')
+    const name = await page.evaluate(() => {
+      const el = document.activeElement
+      const header = document.querySelector('header.fg-nav, header.fg-docs-header')
+      if (!(el instanceof HTMLElement) || !header || el === document.body) return null
+      const inHeader = header.contains(el)
+      const before = (header.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING) !== 0
+      if (!inHeader && !before) return null
+      return (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim()
+    })
+    if (name == null) break
+    names.push(name)
   }
-  return visited
+  return names
 }
 
 function siteHeader(): HTMLElement {
@@ -260,44 +226,58 @@ describe('marketing site accessibility', () => {
     async (route) => {
       const { router } = await renderRoute(route.to)
       expect(router.state.location.pathname).toBe(route.pathname)
-
-      const header = siteHeader()
-      const primary = within(header).getByRole('link', { name: route.primaryName })
-      expect(primary.tabIndex, `${route.id} primary link is not tabbable`).toBeGreaterThanOrEqual(0)
-
-      const visited = tabThrough(header)
-      const names = visited.map(accessibleName)
-      expect(visited, `${route.id} tab sequence: ${names.join(' | ')}`).toContain(primary)
-
-      let previous = -1
-      for (const stop of route.tabStops) {
-        const index = names.findIndex((name, i) => i > previous && name === stop)
-        expect(index, `${route.id} Tab missed "${stop}" in ${names.join(' | ')}`).toBeGreaterThan(
-          previous,
-        )
-        previous = index
-      }
-
-      const href = primary.getAttribute('href')
-      expect(href).toBeTruthy()
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-      let landed: HTMLElement | null = null
-      for (let i = 0; i < 40; i++) {
-        const next = pressTab()
-        if (!next) break
-        if (next === primary) {
-          landed = next
-          break
+      if (!browser) throw new Error('chromium was not launched')
+      const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
+      try {
+        const html = renderedDocument()
+        await page.setContent(html, { waitUntil: 'load' })
+        const names = await headerTabNames(page)
+        expect(names, `${route.id} tab sequence`).toEqual(expect.arrayContaining(route.tabStops))
+        let previous = -1
+        for (const stop of route.tabStops) {
+          const index = names.findIndex((name, i) => i > previous && name === stop)
+          expect(index, `${route.id} Tab missed "${stop}" in ${names.join(' | ')}`).toBeGreaterThan(
+            previous,
+          )
+          previous = index
         }
+
+        await page.setContent(html, { waitUntil: 'load' })
+        await page.evaluate(() => {
+          document.addEventListener(
+            'click',
+            (event) => {
+              const target = event.target
+              if (!(target instanceof Element)) return
+              const anchor = target.closest('a')
+              if (!anchor) return
+              event.preventDefault()
+              ;(window as unknown as { __fgActivated?: string }).__fgActivated =
+                anchor.getAttribute('href') ?? ''
+            },
+            true,
+          )
+        })
+        const header = page.locator('header.fg-nav, header.fg-docs-header').first()
+        const primary = header.getByRole('link', { name: route.primaryName })
+        let reached = false
+        for (let i = 0; i < 40; i++) {
+          await page.keyboard.press('Tab')
+          reached = await primary.evaluate((el) => el === document.activeElement)
+          if (reached) break
+        }
+        expect(reached, `${route.id} primary link was not reached by Tab`).toBe(true)
+        const href = await primary.getAttribute('href')
+        expect(href).toBeTruthy()
+        await page.keyboard.press('Enter')
+        const activated = await page.evaluate(
+          () => (window as unknown as { __fgActivated?: string }).__fgActivated ?? '',
+        )
+        expect(activated).toBe(href)
+      } finally {
+        await page.close()
       }
-      expect(landed, `${route.id} primary link was not reached by Tab`).toBe(primary)
-      expect(document.activeElement).toBe(primary)
-      await act(async () => {
-        fireEvent.keyDown(primary, { key: 'Enter', code: 'Enter' })
-        fireEvent.click(primary)
-      })
-      expect(router.state.location.pathname).toBe(href)
     },
-    20000,
+    30000,
   )
 })
