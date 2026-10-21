@@ -5,6 +5,7 @@
  *   run               Run visual regression tests (default)
  *   init              Generate a starter config file
  *   update-baselines  Accept current screenshots as new baselines
+ *   prune-baselines   Remove undeclared shots and unreachable baseline history
  *   doctor            Diagnose environment readiness
  *
  * @module cli/index
@@ -21,6 +22,7 @@ import {
   detectPackageManager,
 } from '../core/plugin-registry.js';
 import { runDoctor } from './doctor.js';
+import { runPruneBaselines } from './prune-baselines.js';
 import { runInit } from './init.js';
 import { GUIDE_TOPICS, getGuideTopic, formatGuideIndex } from './guide.js';
 import { maybeRunInDocker } from './run.js';
@@ -558,6 +560,34 @@ export async function main(argv?: string[]): Promise<number> {
         await updateBaselines(config, reporter);
         logger.info('✅ Baselines updated successfully');
         exitCode = 0;
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
+    });
+
+  // ---------------------------------------------------------------------------
+  // Command: prune-baselines
+  // ---------------------------------------------------------------------------
+
+  program
+    .command('prune-baselines')
+    .description(
+      'Remove baseline shots the full config no longer declares, and drop orphan history that is not a merge-base ancestor. Dry run unless --apply is set.',
+    )
+    .option('--apply', 'Rewrite frontguard-baselines. The default prints the plan and writes nothing.')
+    .option('-c, --config <path>', 'Config file path')
+    .option('-r, --routes <routes>', 'Refused. A route filter does not see every baseline.')
+    .option('--shard <shard>', 'Refused. A shard does not see every baseline.')
+    .action(async (opts: { apply?: boolean; config?: string; routes?: string; shard?: string }) => {
+      try {
+        exitCode = await runPruneBaselines({
+          cwd: process.cwd(),
+          apply: opts.apply === true,
+          configPath: opts.config,
+          routesFlag: opts.routes,
+          shardFlag: opts.shard,
+        });
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;
