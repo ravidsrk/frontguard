@@ -6,6 +6,7 @@
  *   init              Generate a starter config file
  *   update-baselines  Accept current screenshots as new baselines
  *   prune-baselines   Remove undeclared shots and unreachable baseline history
+ *   ignores           List aged ignore rules and the shots they cover
  *   doctor            Diagnose environment readiness
  *
  * @module cli/index
@@ -23,6 +24,7 @@ import {
 } from '../core/plugin-registry.js';
 import { runDoctor } from './doctor.js';
 import { runPruneBaselines } from './prune-baselines.js';
+import { collectAgedIgnores, formatAgedIgnores } from './aged-ignores.js';
 import { runInit } from './init.js';
 import { GUIDE_TOPICS, getGuideTopic, formatGuideIndex } from './guide.js';
 import { maybeRunInDocker } from './run.js';
@@ -588,6 +590,35 @@ export async function main(argv?: string[]): Promise<number> {
           routesFlag: opts.routes,
           shardFlag: opts.shard,
         });
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
+    });
+
+  // ---------------------------------------------------------------------------
+  // Command: ignores
+  // ---------------------------------------------------------------------------
+
+  program
+    .command('ignores')
+    .description(
+      'List ignore rules older than --older-than days, and the shots they cover. Does not remove a rule.',
+    )
+    .option('--older-than <days>', 'List rules strictly older than this many days')
+    .option('-c, --config <path>', 'Config file path')
+    .action(async (opts: { olderThan: string; config?: string }) => {
+      const days = Number(opts.olderThan);
+      if (!Number.isInteger(days) || days < 0) {
+        logger.error('--older-than must be a whole number of days');
+        exitCode = 2;
+        return;
+      }
+      try {
+        const config = await loadConfig(opts.config);
+        const text = formatAgedIgnores(collectAgedIgnores(config, days, new Date()), days);
+        logger.info(text);
+        exitCode = 0;
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;

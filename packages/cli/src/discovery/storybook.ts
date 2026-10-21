@@ -378,60 +378,23 @@ export async function discoverStorybookRoutesForConfig(
  * Exported as a string so the render layer can `page.evaluate` it without
  * pulling this module into the browser bundle.
  */
+// Kept as one expression. Whitespace inside the string is shipped in the library
+// bundle, so the body stays compact. The phase names and DOM markers are the contract.
 export const STORYBOOK_READY_SCRIPT = `(timeoutMs) => new Promise((resolve) => {
-  const start = Date.now();
-  let timer;
-
-  function done(why) {
-    if (timer) clearTimeout(timer);
-    resolve({ ready: true, reason: why, elapsedMs: Date.now() - start });
-  }
-
-  function isCompletedPhase(phase) {
-    return (
-      phase === 'completed' ||
-      phase === 'finished' ||
-      phase === 'played' ||
-      phase === 'errored' ||
-      phase === 'aborted'
-    );
-  }
-
-  function poll() {
-    try {
-      const preview = window.__STORYBOOK_PREVIEW__;
-      if (preview && preview.storyRenders && typeof preview.storyRenders.entries === 'function') {
-        const all = Array.from(preview.storyRenders.entries());
-        if (all.length > 0 && all.every(([, r]) => isCompletedPhase(r && r.phase))) {
-          return done('phase-complete');
-        }
-      } else if (preview && preview.urlStore && preview.storyStoreValue) {
-        // Storybook 7 fallback: storyStoreValue exists after render
-        return done('store-ready');
-      } else if (
-        document.body &&
-        document.body.classList.contains('sb-show-main') &&
-        !document.body.classList.contains('sb-show-preparingStory') &&
-        !document.body.classList.contains('sb-show-errordisplay')
-      ) {
-        // Last-resort heuristic — Storybook DOM marker.
-        return done('class-heuristic');
-      }
-    } catch (e) {
-      // ignore — keep polling
-    }
-    if (Date.now() - start > timeoutMs) return done('timeout');
-    requestAnimationFrame(poll);
-  }
-
-  // Also subscribe to the channel for SB7 'storyRendered' as a backup signal.
-  try {
-    const preview = window.__STORYBOOK_PREVIEW__;
-    if (preview && preview.channel && typeof preview.channel.once === 'function') {
-      preview.channel.once('storyRendered', () => done('event-storyRendered'));
-    }
-  } catch (e) { /* noop */ }
-
-  timer = setTimeout(() => done('timeout'), timeoutMs + 250);
-  poll();
-})`;
+const t0=Date.now();let timer;
+const done=(why)=>{if(timer)clearTimeout(timer);resolve({ready:true,reason:why,elapsedMs:Date.now()-t0});};
+const ok=(phase)=>phase==='completed'||phase==='finished'||phase==='played'||phase==='errored'||phase==='aborted';
+const poll=()=>{try{
+const p=window.__STORYBOOK_PREVIEW__;
+if(p&&p.storyRenders&&typeof p.storyRenders.entries==='function'){
+const all=Array.from(p.storyRenders.entries());
+if(all.length>0&&all.every(([,r])=>ok(r&&r.phase)))return done('phase-complete');
+}else if(p&&p.urlStore&&p.storyStoreValue)return done('store-ready');
+else if(document.body&&document.body.classList.contains('sb-show-main')&&!document.body.classList.contains('sb-show-preparingStory')&&!document.body.classList.contains('sb-show-errordisplay'))return done('class-heuristic');
+}catch(e){}
+if(Date.now()-t0>timeoutMs)return done('timeout');
+requestAnimationFrame(poll);};
+try{const p=window.__STORYBOOK_PREVIEW__;
+if(p&&p.channel&&typeof p.channel.once==='function')p.channel.once('storyRendered',()=>done('event-storyRendered'));
+}catch(e){}
+timer=setTimeout(()=>done('timeout'),timeoutMs+250);poll();})`;

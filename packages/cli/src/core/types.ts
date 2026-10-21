@@ -189,6 +189,11 @@ export interface IgnoreRule {
   rect?: { x: number; y: number; width: number; height: number };
   /** Optional human-readable description of why this rule exists. */
   description?: string;
+  /**
+   * YYYY-MM-DD date the rule was added. `frontguard ignores` uses it to list
+   * aged rules. The command does not remove the rule.
+   */
+  since?: string;
 }
 
 /**
