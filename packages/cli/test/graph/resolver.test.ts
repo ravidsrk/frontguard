@@ -314,4 +314,25 @@ describe('incompleteAnalysisReason', () => {
     expect(reason).toContain('./missing-widget');
     expect(reason).toContain('app/page.tsx');
   });
+
+  it('names an unresolved import in an unchanged intermediate file the walk already opened', () => {
+    const dir = makeTempProject({
+      'app/page.tsx': "import '../components/widget';\n",
+      'app/about/page.tsx': 'export default function About() { return null; }\n',
+      'components/widget.tsx': "import './data.js';\n",
+    });
+    const widget = `${dir}/components/widget.tsx`;
+    const reason = incompleteAnalysisReason({
+      changedFiles: [`${dir}/app/about/page.tsx`],
+      removedFiles: [],
+      graph: new Map([
+        [`${dir}/app/page.tsx`, new Set([widget])],
+        [widget, new Set()],
+      ]),
+      entryFiles: [`${dir}/app/page.tsx`, `${dir}/app/about/page.tsx`],
+      projectDir: dir,
+    });
+    expect(reason).toContain('./data.js');
+    expect(reason).toContain('components/widget.tsx');
+  });
 });

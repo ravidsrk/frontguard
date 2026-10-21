@@ -474,8 +474,9 @@ function graphImports(graph: Map<string, Set<string>>, filePath: string): boolea
  * - A removed path has no reverse edges left to walk.
  * - A file under `public/` or `static/` can be referenced by URL (`src`, CSS `url()`)
  *   without an import edge. An image or font that no parsed import names is the same gap.
- * - A relative import that does not resolve, in a changed file or a route entry, means
- *   the graph dropped an edge.
+ * - A relative import that does not resolve, in any source file the walk already
+ *   opened, means the graph dropped an edge. That includes route entries, changed
+ *   files, and unchanged intermediate files recorded as graph keys.
  * - A walk that hit the file cap is not a complete graph.
  */
 export function incompleteAnalysisReason(input: {
@@ -509,7 +510,11 @@ export function incompleteAnalysisReason(input: {
   }
 
   const sources = new Set<string>();
-  for (const file of [...input.entryFiles, ...input.changedFiles]) {
+  for (const file of [
+    ...input.entryFiles,
+    ...input.changedFiles,
+    ...input.graph.keys(),
+  ]) {
     if (!SOURCE_EXTENSIONS.has(extname(file).toLowerCase())) continue;
     if (!existsSync(file)) continue;
     sources.add(resolve(file));

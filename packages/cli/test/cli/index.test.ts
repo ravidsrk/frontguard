@@ -179,6 +179,37 @@ describe('CLI', () => {
     }
   });
 
+  it('exits 2 when a viewport override makes two routes share one baseline file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'frontguard-override-baseline-'));
+    const configPath = join(dir, 'frontguard.config.mjs');
+    writeFileSync(
+      configPath,
+      `export default {
+  version: 1,
+  baseUrl: 'http://127.0.0.1:1',
+  viewports: [375],
+  browsers: ['chromium'],
+  routes: [
+    '/',
+    { path: '/', viewport: [1440], colorScheme: 'dark' },
+  ],
+};\n`,
+    );
+    try {
+      const result = await runCliAsync(
+        ['run', '--config', configPath, '--viewports', '1440'],
+        dir,
+        { ...process.env, FRONTGUARD_TELEMETRY: '0' },
+      );
+      expect(result.exitCode).toBe(2);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain('Invalid Frontguard config');
+      expect(output).toContain('baselines/_root/1440/chromium.png');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('honors telemetry:false when a run fails after loading config', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'frontguard-telemetry-cli-'));
     const configPath = join(dir, 'frontguard.config.mjs');

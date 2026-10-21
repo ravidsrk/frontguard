@@ -11,7 +11,7 @@
  */
 
 import { Command } from 'commander';
-import { loadConfig } from '../core/config.js';
+import { duplicateBaselineKeyMessage, loadConfig } from '../core/config.js';
 import { runPipeline, runJudgePipeline, updateBaselines } from '../core/pipeline.js';
 import {
   installPlugin,
@@ -197,6 +197,12 @@ export async function buildConfig(
     );
   }
 
+  // Schema validation ran on the file. Overrides can still collide.
+  const collision = duplicateBaselineKeyMessage(config);
+  if (collision) {
+    throw new Error(`Invalid Frontguard config: ${collision}`);
+  }
+
   return config;
 }
 
@@ -361,11 +367,18 @@ export async function main(argv?: string[]): Promise<number> {
           );
           const judgeResult = await runJudgePipeline(config, reporter);
           const js = judgeResult.summary;
+          const judgements = judgeResult.judgements ?? [];
+          const withNotes = judgements.filter(
+            (judgement) => !judgement.error && judgement.issues.length > 0,
+          ).length;
+          const withoutNotes = judgements.filter(
+            (judgement) => !judgement.error && judgement.issues.length === 0,
+          ).length;
           logger.info('');
           logger.info('─'.repeat(60));
           logger.info(
-            `Judge notes: ${js.total} reviewed, ${js.passed} without notes, ` +
-              `${js.warnings} with notes, ${js.errors} errors`,
+            `Judge notes: ${js.total} reviewed, ${withoutNotes} without notes, ` +
+              `${withNotes} with notes, ${js.errors} errors`,
           );
           logger.info('─'.repeat(60));
           exitCode = comparisonExitCode(js);
