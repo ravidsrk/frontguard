@@ -63,7 +63,7 @@ if [ -n "$IN_CONFIG" ]; then CMD+=(--config "$IN_CONFIG"); fi
 if [ "$WRITE_BASELINES" -eq 1 ]; then CMD+=(--update-baselines --confirm-baselines); fi
 if [ "$BASELINE_EVENT" = "merge_group" ]; then CMD+=(--all-routes); fi
 # Pin smartFilter when the queue payload includes a base. --all-routes still
-# renders every route; the pin is for any later diff that does not disable it.
+# renders every route and does not turn off animation freeze or font waiting.
 MERGE_BASE="${IN_MERGE_GROUP_BASE_SHA:-}"
 case "$MERGE_BASE" in
   ""|-*|*[[:space:]]*) ;;

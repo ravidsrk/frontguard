@@ -685,6 +685,10 @@ describe('MCP server tools/list + tools/call', () => {
     ]);
     expect(names).not.toContain('promote_baseline');
     expect(names).not.toContain('accept_baseline');
+    const instructions = client.getInstructions() ?? '';
+    expect(instructions).toMatch(/not registered/);
+    expect(instructions).toMatch(/update-baselines --confirm-baselines/);
+    expect(instructions).not.toMatch(/`promote_baseline` promotes/);
     await client.close();
     await server.close();
   });
@@ -751,6 +755,8 @@ describe('MCP server tools/list + tools/call', () => {
     const instructions = client.getInstructions() ?? '';
     expect(instructions.length).toBeGreaterThan(0);
     expect(instructions.length).toBeLessThan(4096);
+    expect(instructions).toMatch(/`promote_baseline` promotes/);
+    expect(instructions).toMatch(/`accept_baseline` records/);
 
     await client.close();
     await server.close();

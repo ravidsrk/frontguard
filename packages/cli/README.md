@@ -101,7 +101,7 @@ Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on 
 - `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
 - `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render
 - `--output <console|json>` — Emit console summary or structured JSON to stdout
-- `--all-routes` — Render every discovered route. Disables smartFilter for this run.
+- `--all-routes` — Render every discovered route. Skips smartFilter for this run and leaves animation freeze and font waiting on.
 - `--update-baselines` — Accept current screenshots as new baselines. Requires `--confirm-baselines`.
 - `--confirm-baselines` — Human confirmation for a baseline write. `--mode judge` and an advisory caption cannot set it.
 

@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { getChangedFiles } from '../../src/graph/resolver.js';
+import { getChangedFiles, getChangedPaths } from '../../src/graph/resolver.js';
 
 const cleanups: string[] = [];
 
@@ -81,5 +81,16 @@ describe('getChangedFiles diff base', () => {
     const { dir } = repo();
     const head = git(dir, ['rev-parse', 'HEAD']);
     expect(names(dir, { FRONTGUARD_DIFF_BASE: head })).toEqual(['feature.txt']);
+  });
+
+  it('does not narrow to HEAD~1 when the pinned base cannot be compared', () => {
+    const { dir } = repo();
+    const changed = getChangedPaths(dir, {
+      FRONTGUARD_DIFF_BASE: '0123456789abcdef0123456789abcdef01234567',
+    });
+    expect(changed.pinnedDiffError).toMatch(/FRONTGUARD_DIFF_BASE/);
+    expect(changed.present).toEqual([]);
+    expect(changed.removed).toEqual([]);
+    expect(names(dir, {})).toEqual(['feature.txt', 'pin.txt']);
   });
 });

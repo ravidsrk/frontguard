@@ -342,7 +342,8 @@ export function mapRoutesToFiles(
  * value threaded through here would otherwise be one commit away from command
  * injection. src/storage/git-orphan.ts already does it this way.
  */
-function gitDiff(projectDir: string, args: string[]): string[] {
+/** Changed paths, or null when git exits non-zero. An empty diff is `[]`, not null. */
+function gitDiff(projectDir: string, args: string[]): string[] | null {
   try {
     const output = execFileSync('git', args, {
       cwd: projectDir,
@@ -355,7 +356,7 @@ function gitDiff(projectDir: string, args: string[]): string[] {
       .split('\n')
       .filter((line) => line.length > 0);
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -370,7 +371,8 @@ function gitDiff(projectDir: string, args: string[]): string[] {
  * 4. `git diff --name-only --cached` — staged changes
  *
  * An empty pinned diff still falls through to strategy 2. It does not also
- * consult origin/main. Unset env keeps the origin/main...HEAD chain.
+ * consult origin/main. A pinned diff that git cannot run does not fall
+ * through: callers render every route. Unset env keeps the origin/main...HEAD chain.
  *
  * Resolves relative paths to absolute. Missing paths are returned separately
  * so a deletion is not treated as "no change".
@@ -381,6 +383,11 @@ function gitDiff(projectDir: string, args: string[]): string[] {
 export interface ChangedPaths {
   present: string[];
   removed: string[];
+  /**
+   * Set when `FRONTGUARD_DIFF_BASE` is set but git cannot compare it.
+   * Callers render every route. An empty successful diff does not set this.
+   */
+  pinnedDiffError?: string;
 }
 
 export function getChangedPaths(
@@ -393,6 +400,11 @@ export function getChangedPaths(
 
   if (pinnedBase) {
     const pinnedFiles = gitDiff(resolvedDir, ['diff', '--name-only', `${pinnedBase}...HEAD`]);
+    if (pinnedFiles === null) {
+      const pinnedDiffError = `FRONTGUARD_DIFF_BASE ${pinnedBase} could not be compared; rendering all routes`;
+      logger.warn(pinnedDiffError);
+      return { present: [], removed: [], pinnedDiffError };
+    }
     for (const f of pinnedFiles) allFiles.add(f);
   } else {
     // Strategy 1: PR diff against main (most common CI context)
@@ -407,26 +419,26 @@ export function getChangedPaths(
     }
 
     if (hasRemote) {
-      const prFilesMain = gitDiff(resolvedDir, ['diff', '--name-only', 'origin/main...HEAD']);
+      const prFilesMain = gitDiff(resolvedDir, ['diff', '--name-only', 'origin/main...HEAD']) ?? [];
       for (const f of prFilesMain) allFiles.add(f);
     }
   }
 
   // Strategy 2: Last commit diff
   if (allFiles.size === 0) {
-    const commitFiles = gitDiff(resolvedDir, ['diff', '--name-only', 'HEAD~1']);
+    const commitFiles = gitDiff(resolvedDir, ['diff', '--name-only', 'HEAD~1']) ?? [];
     for (const f of commitFiles) allFiles.add(f);
   }
 
   // Strategy 3: Uncommitted changes
   if (allFiles.size === 0) {
-    const uncommitted = gitDiff(resolvedDir, ['diff', '--name-only', 'HEAD']);
+    const uncommitted = gitDiff(resolvedDir, ['diff', '--name-only', 'HEAD']) ?? [];
     for (const f of uncommitted) allFiles.add(f);
   }
 
   // Strategy 4: Staged changes
   if (allFiles.size === 0) {
-    const stagedFiles = gitDiff(resolvedDir, ['diff', '--name-only', '--cached']);
+    const stagedFiles = gitDiff(resolvedDir, ['diff', '--name-only', '--cached']) ?? [];
     for (const f of stagedFiles) allFiles.add(f);
   }
 

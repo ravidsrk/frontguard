@@ -117,10 +117,12 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # @frontguard/cli@0.2.2 rejects --confirm-baselines. That flag is in
+          # this repo's unreleased CLI. The Action passes it from action-run.sh.
+          # This published pin keeps the 0.2.2 write command.
           npm exec --yes --package="@frontguard/cli@0.2.2" -- frontguard run \
             --config apps/demo/frontguard.config.ts \
-            --update-baselines \
-            --confirm-baselines
+            --update-baselines
           git push origin frontguard-baselines:frontguard-baselines
 
       - name: Compare against persisted baselines

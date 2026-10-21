@@ -84,6 +84,11 @@ export async function smartFilter(
   routes: Route[],
   config: FrontguardConfig,
 ): Promise<SmartFilterResult> {
+  // --all-routes asks for every route without turning off capture stabilization.
+  if (config.includeAllRoutes) {
+    return includeAll(routes, 'all routes requested; capture settings unchanged');
+  }
+
   // Gate: smart rendering must be enabled
   if (!config.smartRender) {
     return includeAll(routes, 'smart rendering disabled');
@@ -108,6 +113,10 @@ export async function smartFilter(
   let removedFiles: string[];
   try {
     const changed = getChangedPaths(process.cwd());
+    if (changed.pinnedDiffError) {
+      logger.warn(changed.pinnedDiffError);
+      return includeAll(routes, changed.pinnedDiffError);
+    }
     changedFiles = changed.present;
     removedFiles = changed.removed;
   } catch (err) {

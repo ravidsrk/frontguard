@@ -313,7 +313,7 @@ export default {
 - `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
 - `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render
 - `--output <console|json>` — Emit human-readable console report or structured JSON to stdout
-- `--all-routes` — Render every discovered route. Disables smartFilter for this run. The merge-queue Action passes it on `merge_group`.
+- `--all-routes` — Render every discovered route. Skips smartFilter for this run and leaves animation freeze and font waiting on. The merge-queue Action passes it on `merge_group`.
 
 ### Sample CLI Output
 

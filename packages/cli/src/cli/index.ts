@@ -174,8 +174,10 @@ export async function buildConfig(
     }
   }
 
+  // smartRender also freezes animations and waits for fonts. This flag only
+  // skips route filtering, so a full capture still matches a normal baseline.
   if (opts.allRoutes === true) {
-    config.smartRender = false;
+    config.includeAllRoutes = true;
   }
 
   if (opts.blockUrls !== undefined) {
@@ -305,7 +307,7 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--verbose', 'Verbose output')
     .option('--debug', 'Debug output (includes Playwright traces)')
     .option('--update-baselines', 'Accept current screenshots as new baselines')
-    .option('--all-routes', 'Render every discovered route. Disables smartFilter for this run.')
+    .option('--all-routes', 'Render every discovered route. Skips smartFilter for this run and leaves animation freeze and font waiting on.')
     .option(
       '--confirm-baselines',
       'Human confirmation required with --update-baselines. Judge mode and an advisory caption cannot set this. An agent setting confirm_reviewed: true is not a human review.',

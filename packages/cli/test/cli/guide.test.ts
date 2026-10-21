@@ -82,10 +82,12 @@ describe('buildConfig CLI flags for stability, redaction, and colorScheme', () =
     expect(config.colorScheme).toBe('dark');
   });
 
-  it('disables smartFilter when --all-routes is set', async () => {
+  it('requests every route without turning off capture stabilization', async () => {
     const enabled = await buildConfig({ url: 'http://localhost:3000' });
-    const disabled = await buildConfig({ url: 'http://localhost:3000', allRoutes: true });
+    const allRoutes = await buildConfig({ url: 'http://localhost:3000', allRoutes: true });
     expect(enabled.smartRender).toBe(true);
-    expect(disabled.smartRender).toBe(false);
+    expect(enabled.includeAllRoutes).toBeUndefined();
+    expect(allRoutes.smartRender).toBe(true);
+    expect(allRoutes.includeAllRoutes).toBe(true);
   });
 });

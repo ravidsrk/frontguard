@@ -17,7 +17,9 @@ vi.mock('../../src/graph/parser.js', () => ({
 }));
 
 vi.mock('../../src/graph/resolver.js', () => ({
-  getChangedPaths: vi.fn<(dir: string) => { present: string[]; removed: string[] }>(),
+  getChangedPaths: vi.fn<
+    (dir: string) => { present: string[]; removed: string[]; pinnedDiffError?: string }
+  >(),
   mapRoutesToFiles: vi.fn<(routes: Route[], dir: string) => Map<string, string[]>>(),
   filterAffectedRoutes: vi.fn<(
     routes: Route[],
@@ -117,6 +119,30 @@ describe('smartFilter', () => {
 
     expect(mockedGetChangedPaths).toHaveBeenCalled();
     expect(result.reason).toContain('no changes');
+  });
+
+  it('renders every route when --all-routes is set and leaves smartRender on', async () => {
+    const routes = [route('/'), route('/about')];
+    const result = await smartFilter(routes, makeConfig({ includeAllRoutes: true }));
+
+    expect(result.filtered).toEqual(routes);
+    expect(result.skipped).toHaveLength(0);
+    expect(result.reason).toContain('all routes requested');
+    expect(mockedGetChangedPaths).not.toHaveBeenCalled();
+  });
+
+  it('renders all routes when the pinned diff base cannot be compared', async () => {
+    mockedGetChangedPaths.mockReturnValue({
+      present: ['/repo/app/page.tsx'],
+      removed: [],
+      pinnedDiffError: 'FRONTGUARD_DIFF_BASE abc could not be compared; rendering all routes',
+    });
+    const routes = [route('/'), route('/pricing')];
+    const result = await smartFilter(routes, makeConfig());
+
+    expect(result.filtered).toEqual(routes);
+    expect(result.reason).toContain('FRONTGUARD_DIFF_BASE');
+    expect(mockedMapRoutesToFiles).not.toHaveBeenCalled();
   });
 
   it('returns all routes when smartRender is disabled', async () => {

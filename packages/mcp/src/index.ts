@@ -56,8 +56,24 @@ import {
 const SERVER_NAME = '@frontguard/mcp';
 const SERVER_VERSION = '0.2.3';
 
-export const SERVER_INSTRUCTIONS =
-  'Frontguard MCP server. Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, `promote_baseline` to promote reviewed visual changes, and `recent_runs` to browse history. `accept_baseline` currently records whole-run approval.';
+const READ_INSTRUCTIONS =
+  'Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, and `recent_runs` to browse history.';
+
+/** Instructions match the tools this process actually registers. */
+export function serverInstructions(env: NodeJS.ProcessEnv = process.env): string {
+  if (mcpWritesEnabled(env)) {
+    return (
+      'Frontguard MCP server. ' +
+      READ_INSTRUCTIONS +
+      ' Write tools are enabled: `promote_baseline` promotes reviewed visual changes, and `accept_baseline` records whole-run approval. A human still confirms baseline files with `frontguard update-baselines --confirm-baselines`.'
+    );
+  }
+  return (
+    'Frontguard MCP server. ' +
+    READ_INSTRUCTIONS +
+    ' This server is read-only. `promote_baseline` and `accept_baseline` are not registered. A human reviews the report and runs `frontguard update-baselines --confirm-baselines`.'
+  );
+}
 
 /**
  * MCP annotations are untrusted hints. A client may skip a prompt because of
@@ -125,7 +141,7 @@ export function createServer(): McpServer {
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
       capabilities: { tools: {} },
-      instructions: SERVER_INSTRUCTIONS,
+      instructions: serverInstructions(),
     },
   );
 
