@@ -2,7 +2,7 @@
  * Horizontal overflow measurement, loaded at runtime so it stays out of the
  * published bundles. The ceilings are 220KB for the library entry and 400KB
  * for the bin. A row is flagged only when a visible border box passes the
- * right edge and no ancestor clips that protrusion.
+ * right edge and no ancestor that contains the element clips that protrusion.
  */
 
 function pageProbe() {
@@ -28,29 +28,62 @@ function pageProbe() {
   return { innerWidth: width, scrollWidth, elements };
 
   function shown(el) {
+    // Visibility is this element's computed value. A `visibility: visible`
+    // child of a hidden parent is visible. Opacity and display hide descendants.
+    const own = getComputedStyle(el);
+    if (own.visibility === 'hidden' || own.visibility === 'collapse') return false;
     let node = el;
     while (node) {
       const style = getComputedStyle(node);
-      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) {
-        return false;
-      }
+      if (style.display === 'none' || Number(style.opacity) === 0) return false;
       node = node.parentElement;
     }
     return true;
   }
 
   function clipped(el, rect) {
+    const position = getComputedStyle(el).position;
+    // In-flow boxes are clipped by ancestor overflow. Absolute and fixed boxes
+    // escape it until an ancestor is their containing block; a later overflow
+    // still clips. The contained flag is set before the overflow test so a
+    // containing block that itself overflows does clip.
+    let contained = position !== 'absolute' && position !== 'fixed';
     let node = el.parentElement;
     const body = document.body;
     while (node) {
-      const overflowX = getComputedStyle(node).overflowX;
-      const internal = node !== body && node !== root;
-      const clips =
-        overflowX === 'hidden' ||
-        overflowX === 'clip' ||
-        ((overflowX === 'scroll' || overflowX === 'auto') && internal);
-      if (clips && rect.right > node.getBoundingClientRect().right + 1) return true;
+      const style = getComputedStyle(node);
+      if (!contained) {
+        contained = position === 'fixed' ? holdsFixed(style) : style.position !== 'static' || holdsFixed(style);
+      }
+      if (contained) {
+        const overflowX = style.overflowX;
+        const internal = node !== body && node !== root;
+        const clips =
+          overflowX === 'hidden' ||
+          overflowX === 'clip' ||
+          ((overflowX === 'scroll' || overflowX === 'auto') && internal);
+        if (clips && rect.right > node.getBoundingClientRect().right + 1) return true;
+      }
       node = node.parentElement;
+    }
+    return false;
+  }
+
+  function holdsFixed(style) {
+    if (style.transform !== 'none' || style.filter !== 'none') return true;
+    const backdrop = style.backdropFilter || style.webkitBackdropFilter;
+    if (backdrop && backdrop !== 'none') return true;
+    if (style.perspective && style.perspective !== 'none') return true;
+    if (listed(style.contain, ['paint', 'layout', 'strict', 'content'])) return true;
+    if (listed(style.willChange, ['transform', 'filter', 'perspective', 'contain'])) return true;
+    return Boolean(style.containerType && style.containerType !== 'normal');
+  }
+
+  function listed(value, names) {
+    if (!value || value === 'none' || value === 'auto') return false;
+    const parts = value.split(/[,\s]+/);
+    for (let i = 0; i < parts.length; i++) {
+      if (names.indexOf(parts[i]) !== -1) return true;
     }
     return false;
   }

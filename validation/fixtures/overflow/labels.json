@@ -9,6 +9,11 @@
     { "file": "ghost.html", "flag": false, "selector": "[data-testid=\"ghost\"]", "scrolls": true },
     { "file": "faded.html", "flag": false, "selector": "[data-testid=\"faded\"]", "scrolls": true },
     { "file": "inside.html", "flag": false, "selector": "[data-testid=\"inside\"]", "scrolls": false },
-    { "file": "fit.html", "flag": false, "selector": "[data-testid=\"fit\"]", "scrolls": false }
+    { "file": "fit.html", "flag": false, "selector": "[data-testid=\"fit\"]", "scrolls": false },
+    { "file": "fixed.html", "flag": true, "selector": "[data-testid=\"fixed\"]", "scrolls": false },
+    { "file": "fixed-box.html", "flag": false, "selector": "[data-testid=\"boxed\"]", "scrolls": false },
+    { "file": "fixed-nest.html", "flag": false, "selector": "[data-testid=\"nested\"]", "scrolls": false },
+    { "file": "pinned.html", "flag": true, "selector": "[data-testid=\"pinned\"]", "scrolls": true },
+    { "file": "revealed.html", "flag": true, "selector": "[data-testid=\"revealed\"]", "scrolls": true }
   ]
 }
