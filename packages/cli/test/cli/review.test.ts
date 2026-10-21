@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HTMLReporter } from '../../src/report/html.js';
-import { runReview, type ReviewShot } from '../../src/cli/review-command.js';
+import { runReview, writeReviewManifest, type ReviewShot } from '../../src/cli/review-command.js';
 import type { FrontguardConfig, RendererFingerprint, RunResult } from '../../src/core/types.js';
 import { GitOrphanStorage } from '../../src/storage/git-orphan.js';
 
@@ -15,6 +15,20 @@ const TSX_PATH = createRequire(import.meta.url).resolve('tsx/cli');
 
 function sha256(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
+}
+
+/** Compare-mode reads fail closed when CI is set and the fixture has no origin. */
+async function compareStorage(cwd: string): Promise<GitOrphanStorage> {
+  const previous = process.env.CI;
+  process.env.CI = 'false';
+  try {
+    const storage = new GitOrphanStorage(cwd, { mode: 'compare', offline: true });
+    await storage.init();
+    return storage;
+  } finally {
+    if (previous === undefined) delete process.env.CI;
+    else process.env.CI = previous;
+  }
 }
 
 function baseConfig(outputDir: string, plugins?: FrontguardConfig['plugins']): FrontguardConfig {
@@ -66,17 +80,21 @@ describe('frontguard review', () => {
     writeFileSync(join(reportDir, 'review.json'), `${JSON.stringify({ shots })}\n`);
   }
 
-  async function stored(route: string): Promise<Buffer | null> {
-    const storage = new GitOrphanStorage(repoDir, { mode: 'compare', offline: true });
-    await storage.init();
+  async function stored(route: string, cwd = repoDir): Promise<Buffer | null> {
+    const storage = await compareStorage(cwd);
     return storage.readBaseline(route, 800, 'chromium');
   }
 
   async function manifestSha(route: string): Promise<string | undefined> {
-    const storage = new GitOrphanStorage(repoDir, { mode: 'compare', offline: true });
-    await storage.init();
+    const storage = await compareStorage(repoDir);
     const manifest = await storage.readManifest();
     return manifest?.routes?.[route]?.snapshots?.['800/chromium']?.sha256;
+  }
+
+  async function storedScheme(route: string): Promise<string | undefined> {
+    const storage = await compareStorage(repoDir);
+    const manifest = await storage.readManifest();
+    return manifest?.routes?.[route]?.snapshots?.['800/chromium']?.colorScheme;
   }
 
   beforeEach(() => {
@@ -198,7 +216,7 @@ describe('frontguard review', () => {
       const sidecar = JSON.parse(readFileSync(sidecarPath, 'utf8')) as {
         shots: Array<{ fingerprint: RendererFingerprint }>;
       };
-      sidecar.shots[0]!.fingerprint.os = 'linux';
+      sidecar.shots[0]!.fingerprint.os = process.platform === 'linux' ? 'darwin' : 'linux';
       writeFileSync(sidecarPath, `${JSON.stringify(sidecar)}\n`);
 
       const refused = await runReview({
@@ -212,9 +230,7 @@ describe('frontguard review', () => {
       expect(refused.exitCode).toBe(2);
       expect(refused.message).toContain('os');
       expect(refused.message).toContain('Nothing was written.');
-      const storage = new GitOrphanStorage(otherRepo, { mode: 'compare', offline: true });
-      await storage.init();
-      expect(await storage.readBaseline('/pricing', 800, 'chromium')).toBeNull();
+      expect(await stored('/pricing', otherRepo)).toBeNull();
     } finally {
       rmSync(otherRepo, { recursive: true, force: true });
     }
@@ -294,6 +310,160 @@ describe('frontguard review', () => {
     git('remote', 'add', 'origin', join(repoDir, 'no-such-remote'));
     const png = Buffer.from('offline-png');
     writeManifest([shot('/pricing', place('pricing', png))]);
+    const out = await runReview({
+      cwd: repoDir,
+      reportDir,
+      all: true,
+      confirmBaselines: true,
+      config: baseConfig(reportDir),
+    });
+    expect(out.exitCode).toBe(0);
+    expect(await stored('/pricing')).toEqual(png);
+  });
+
+  it('does not let a missing shot cancel an accepted one', async () => {
+    const keep = Buffer.from('keep-png');
+    const gone = Buffer.from('gone-png');
+    const goneSha = sha256(gone);
+    const writer = new GitOrphanStorage(repoDir, { mode: 'update', offline: true });
+    await writer.init();
+    const now = '2026-01-01T00:00:00.000Z';
+    await writer.writeBaselines(
+      [{ route: '/gone', viewport: 800, browser: 'chromium', buffer: gone }],
+      {
+        schemaVersion: 2,
+        createdBy: 'test',
+        updatedAt: now,
+        routes: {
+          '/gone': {
+            viewports: [800],
+            browsers: ['chromium'],
+            lastUpdated: now,
+            sha256: goneSha,
+            snapshots: { '800/chromium': { sha256: goneSha, updatedAt: now } },
+          },
+        },
+      },
+    );
+    writeManifest([shot('/keep', place('keep', keep))]);
+    const asked: string[] = [];
+    const out = await runReview({
+      cwd: repoDir,
+      reportDir,
+      confirmBaselines: true,
+      config: baseConfig(reportDir),
+      ask: async (item) => {
+        asked.push(`${item.route}:${item.status}`);
+        return 'accept';
+      },
+    });
+    expect(out.exitCode).toBe(0);
+    expect(out.written).toEqual(['/keep']);
+    expect(asked).toEqual(['/keep:regression', '/gone:missing']);
+    expect(await stored('/keep')).toEqual(keep);
+    expect(await stored('/gone')).toEqual(gone);
+  });
+
+  it('refuses a filter that only matches a shot with no current image', async () => {
+    const gone = Buffer.from('gone-png');
+    const goneSha = sha256(gone);
+    const writer = new GitOrphanStorage(repoDir, { mode: 'update', offline: true });
+    await writer.init();
+    const now = '2026-01-01T00:00:00.000Z';
+    await writer.writeBaselines(
+      [{ route: '/gone', viewport: 800, browser: 'chromium', buffer: gone }],
+      {
+        schemaVersion: 2,
+        createdBy: 'test',
+        updatedAt: now,
+        routes: {
+          '/gone': {
+            viewports: [800],
+            browsers: ['chromium'],
+            lastUpdated: now,
+            sha256: goneSha,
+            snapshots: { '800/chromium': { sha256: goneSha, updatedAt: now } },
+          },
+        },
+      },
+    );
+    writeManifest([]);
+    const out = await runReview({
+      cwd: repoDir,
+      reportDir,
+      confirmBaselines: true,
+      filter: '/gone',
+      config: baseConfig(reportDir),
+    });
+    expect(out.exitCode).toBe(2);
+    expect(out.message).toContain('no shots with a current image');
+    expect(await stored('/gone')).toEqual(gone);
+  });
+
+  it('stamps the captured color scheme instead of the global setting', async () => {
+    const png = Buffer.from('dark-png');
+    const config = { ...baseConfig(reportDir), colorScheme: 'light' as const };
+    mkdirSync(reportDir, { recursive: true });
+    writeReviewManifest(
+      {
+        summary: { total: 1, passed: 0, regressions: 1, warnings: 0, newPages: 0, errors: 0 },
+        diffs: [
+          {
+            route: { path: '/pricing', colorScheme: 'dark' },
+            viewport: 800,
+            browser: 'chromium',
+            status: 'regression',
+            diffPercentage: 4,
+            currentImage: png,
+          },
+        ],
+        timing: { discovery: 0, render: 0, compare: 0, ai: 0, total: 0 },
+        config,
+      },
+      reportDir,
+    );
+    const sidecar = JSON.parse(readFileSync(join(reportDir, 'review.json'), 'utf8')) as {
+      shots: Array<{ current?: string; colorScheme?: string }>;
+    };
+    expect(sidecar.shots[0]?.colorScheme).toBe('dark');
+    mkdirSync(join(reportDir, 'images'), { recursive: true });
+    writeFileSync(join(reportDir, sidecar.shots[0]?.current ?? ''), png);
+
+    const out = await runReview({
+      cwd: repoDir,
+      reportDir,
+      all: true,
+      confirmBaselines: true,
+      config,
+    });
+    expect(out.exitCode).toBe(0);
+    expect(await stored('/pricing')).toEqual(png);
+    expect(await storedScheme('/pricing')).toBe('dark');
+  });
+
+  it('refuses a current image whose real path leaves the report directory', async () => {
+    const secret = Buffer.from('secret-bytes');
+    writeFileSync(join(repoDir, 'secret.png'), secret);
+    mkdirSync(join(reportDir, 'images'), { recursive: true });
+    symlinkSync(join(repoDir, 'secret.png'), join(reportDir, 'images', 'link.png'));
+    writeManifest([shot('/pricing', 'images/link.png')]);
+    const out = await runReview({
+      cwd: repoDir,
+      reportDir,
+      all: true,
+      confirmBaselines: true,
+      config: baseConfig(reportDir),
+    });
+    expect(out.exitCode).toBe(2);
+    expect(out.message).toContain('Nothing was written.');
+    expect(await stored('/pricing')).toBeNull();
+  });
+
+  it('accepts a symlink that stays inside the report directory', async () => {
+    const png = Buffer.from('inside-png');
+    const rel = place('real', png);
+    symlinkSync(join(reportDir, rel), join(reportDir, 'images', 'link.png'));
+    writeManifest([shot('/pricing', 'images/link.png')]);
     const out = await runReview({
       cwd: repoDir,
       reportDir,

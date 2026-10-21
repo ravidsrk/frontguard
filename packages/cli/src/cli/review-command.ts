@@ -11,7 +11,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, realpathSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { stdin, stdout } from 'node:process';
 import { baselineWriteBlockReason } from './baseline-confirm.js';
@@ -25,6 +25,7 @@ import {
 import { PluginManager } from '../core/plugins.js';
 import type {
   BrowserEngine,
+  ColorScheme,
   DiffStatus,
   FrontguardConfig,
   RendererFingerprint,
@@ -48,6 +49,8 @@ export interface ReviewShot {
   diff?: string;
   fingerprint?: RendererFingerprint;
   discoveredVia?: Route['discoveredVia'];
+  /** Effective scheme at capture. Stamped onto the baseline when present. */
+  colorScheme?: ColorScheme;
 }
 
 export interface ReviewRequest {
@@ -162,8 +165,8 @@ function prepareWrites(
 ): { ready: Prepared[]; error?: string } {
   const ready: Prepared[] = [];
   for (const shot of shots) {
-    const current = shot.current ? safePath(reportDir, shot.current) : null;
-    if (!current || !existsSync(current)) {
+    const current = shot.current ? readableInside(reportDir, shot.current) : null;
+    if (!current) {
       return { ready: [], error: `No current image for ${label(shot)}. Nothing was written.` };
     }
     const bytes = readFileSync(current);
@@ -175,6 +178,7 @@ function prepareWrites(
         route: {
           path: shot.route,
           discoveredVia: shot.discoveredVia,
+          ...(shot.colorScheme ? { colorScheme: shot.colorScheme } : {}),
         },
         viewport: shot.viewport,
         browser: shot.browser,
@@ -253,9 +257,17 @@ async function selectShots(
 ): Promise<{ exitCode?: 2; message?: string; audits?: string[]; accepted: ReviewShot[] }> {
   if (request.filter) {
     const wanted = new Set(request.filter.split(',').map((part) => part.trim()).filter(Boolean));
-    const accepted = candidates.filter((shot) => wanted.has(shot.route));
-    if (accepted.length === 0) {
+    const matched = candidates.filter((shot) => wanted.has(shot.route));
+    if (matched.length === 0) {
       return { exitCode: 2, message: 'Filter matched no reviewable shots. Nothing was written.', accepted: [] };
+    }
+    const accepted = matched.filter((shot) => Boolean(shot.current));
+    if (accepted.length === 0) {
+      return {
+        exitCode: 2,
+        message: 'Filter matched no shots with a current image. Nothing was written.',
+        accepted: [],
+      };
     }
     return { accepted };
   }
@@ -278,24 +290,25 @@ async function selectShots(
   for (const shot of candidates) {
     const choice = await ask(shot, displayPaths(request.reportDir, shot));
     if (choice === 'quit') break;
-    if (choice === 'accept') accepted.push(shot);
+    if (choice === 'accept' && shot.current) accepted.push(shot);
   }
   return { accepted };
 }
 
 function askOnTerminal(shot: ReviewShot, paths: ShotPaths): Promise<'accept' | 'skip' | 'quit'> {
+  const canAccept = Boolean(shot.current);
   const rl = createInterface({ input: stdin, output: stdout });
   const text = [
     `${label(shot)} ${shot.status}`,
     `  baseline: ${paths.baseline}`,
     `  current: ${paths.current}`,
     `  diff: ${paths.diff}`,
-    'accept, skip, or quit? ',
+    canAccept ? 'accept, skip, or quit? ' : 'no current image; skip, or quit? ',
   ].join('\n');
   return rl.question(text).then((answer) => {
     rl.close();
     const word = answer.trim().toLowerCase();
-    if (word === 'accept' || word === 'a') return 'accept';
+    if (canAccept && (word === 'accept' || word === 'a')) return 'accept';
     if (word === 'quit' || word === 'q') return 'quit';
     return 'skip';
   });
@@ -367,6 +380,7 @@ function parseShot(item: unknown): ReviewShot | null {
         : undefined,
     discoveredVia:
       typeof row.discoveredVia === 'string' ? (row.discoveredVia as Route['discoveredVia']) : undefined,
+    colorScheme: row.colorScheme === 'light' || row.colorScheme === 'dark' ? row.colorScheme : undefined,
   };
 }
 
@@ -377,6 +391,23 @@ function safePath(root: string, rel: string): string | null {
   const fromBase = relative(base, full);
   if (fromBase.startsWith(`..${sep}`) || fromBase === '..') return null;
   return full;
+}
+
+/** Resolved file, or null when the path is missing or its real path leaves root. */
+function readableInside(root: string, rel: string): string | null {
+  const full = safePath(root, rel);
+  if (!full || !existsSync(full)) return null;
+  let realFile: string;
+  let realRoot: string;
+  try {
+    realFile = realpathSync(full);
+    realRoot = realpathSync(resolve(root));
+  } catch {
+    return null;
+  }
+  const fromRoot = relative(realRoot, realFile);
+  if (fromRoot.startsWith(`..${sep}`) || fromRoot === '..' || isAbsolute(fromRoot)) return null;
+  return realFile;
 }
 
 function displayPaths(reportDir: string, shot: ReviewShot): ShotPaths {
@@ -468,6 +499,7 @@ export function writeReviewManifest(result: RunResult, outputDir: string): void 
         browser: diff.browser,
         status: diff.status,
         discoveredVia: diff.route.discoveredVia,
+        colorScheme: diff.route.colorScheme ?? result.config.colorScheme ?? 'light',
         current: file(diff.currentImage, 'current'),
         baseline: file(diff.baselineImage, 'baseline'),
         diff: file(diff.diffImage, 'diff'),
