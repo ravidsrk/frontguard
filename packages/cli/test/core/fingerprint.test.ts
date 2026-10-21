@@ -95,7 +95,9 @@ import { runPipeline } from '../../src/core/pipeline.js';
 import { logger } from '../../src/utils/logger.js';
 
 function installedPin(name: string): { browserVersion?: string; title?: string } | undefined {
-  const pkgPath = require.resolve('playwright-core/package.json');
+  const playwrightPkg = require.resolve('playwright/package.json');
+  const fromPlaywright = createRequire(playwrightPkg);
+  const pkgPath = fromPlaywright.resolve('playwright-core/package.json');
   const json = JSON.parse(readFileSync(join(dirname(pkgPath), 'browsers.json'), 'utf8')) as {
     browsers?: { name?: string; browserVersion?: string; title?: string }[];
   };
@@ -301,6 +303,42 @@ describe('fingerprint comparison', () => {
       { ...shot(), route: { path: '/', discoveredVia: 'storybook' } },
     ]);
     expect(story.routes['/']?.snapshots?.['1440/chromium']?.fingerprint?.captureRunner).toBe('storybook');
+
+    const explicit = stampBaselineManifest(story, [shot()]);
+    expect(explicit.routes['/']?.snapshots?.['1440/chromium']?.fingerprint?.captureRunner).toBe('routes');
+  });
+
+  it('does not let a retired snapshot force a full render', () => {
+    const current = currentFingerprint('chromium', 'routes');
+    const stale: RendererFingerprint = {
+      ...current,
+      browser: { ...current.browser, version: '0.0.0-retired' },
+    };
+    const retiredRoute = manifestFor(stale, ['/retired']);
+    expect(
+      rendererBypassReason(retiredRoute, ['chromium'], {
+        routes: [{ path: '/' }],
+        viewports: [1440],
+      }),
+    ).toBeUndefined();
+
+    const retiredViewport = manifestFor(stale, ['/']);
+    const snapshots = retiredViewport.routes['/']?.snapshots;
+    if (!snapshots?.['1440/chromium']) throw new Error('fixture snapshot missing');
+    snapshots['390/chromium'] = snapshots['1440/chromium'];
+    delete snapshots['1440/chromium'];
+    expect(
+      rendererBypassReason(retiredViewport, ['chromium'], {
+        routes: [{ path: '/' }],
+        viewports: [1440],
+      }),
+    ).toBeUndefined();
+    expect(
+      rendererBypassReason(retiredViewport, ['chromium'], {
+        routes: [{ path: '/' }],
+        viewports: [390],
+      }),
+    ).toContain('browser.version');
   });
 });
 

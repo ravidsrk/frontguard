@@ -495,7 +495,10 @@ export async function runPipeline(
     }
   }
   const bypassReason = manifestReadable
-    ? rendererBypassReason(baselineManifest, config.browsers)
+    ? rendererBypassReason(baselineManifest, config.browsers, {
+        routes,
+        viewports: config.viewports,
+      })
     : undefined;
 
   reporter.onStageStart('filter', 'Analyzing dependency graph…');

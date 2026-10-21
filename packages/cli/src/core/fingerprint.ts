@@ -98,8 +98,12 @@ function packageVersion(name: string): string {
 
 function playwrightBrowserPins(): PlaywrightBrowserPin[] {
   try {
-    // browsers.json is shipped beside the package but is not an export.
-    const pkgPath = require.resolve('playwright-core/package.json');
+    // browsers.json ships beside playwright-core and is not a package export.
+    // Resolve it from the installed playwright package so an isolated layout
+    // (pnpm) still describes the browser that package launches.
+    const playwrightPkg = require.resolve('playwright/package.json');
+    const fromPlaywright = createRequire(playwrightPkg);
+    const pkgPath = fromPlaywright.resolve('playwright-core/package.json');
     const json = JSON.parse(readFileSync(join(dirname(pkgPath), 'browsers.json'), 'utf8')) as {
       browsers?: PlaywrightBrowserPin[];
     };
@@ -167,13 +171,21 @@ export function currentFingerprint(
   return fingerprint;
 }
 
-/** Runner this capture knows about. Ladle and Histoire are preserved, not discovered. */
+/** Runners this CLI can discover. Anything else (ladle, histoire, a custom label) is kept. */
+const DISCOVERED_CAPTURE_RUNNERS = new Set(['storybook', 'routes']);
+
+/**
+ * Runner to store for this capture.
+ * A route that moved between Storybook discovery and an explicit route records
+ * the runner this process actually used. Runners the CLI cannot discover stay
+ * on the snapshot so a later update does not pretend it recaptured them.
+ */
 export function captureRunnerForWrite(
   route: Pick<Route, 'discoveredVia'>,
   existing?: string,
 ): string {
   if (route.discoveredVia === 'storybook') return 'storybook';
-  if (existing) return existing;
+  if (existing && !DISCOVERED_CAPTURE_RUNNERS.has(existing)) return existing;
   return 'routes';
 }
 
@@ -391,13 +403,29 @@ function bothPresentAndDiffer(baseline: unknown, current: unknown): boolean {
 export function rendererBypassReason(
   manifest: BaselineManifest | null | undefined,
   browsers: readonly string[],
+  selection?: {
+    routes: readonly { path: string }[];
+    viewports: readonly number[];
+  },
 ): string | undefined {
   if (!manifest?.routes) return undefined;
   const active = new Set(browsers);
+  const activeRoutes =
+    selection && selection.routes.length > 0
+      ? new Set(selection.routes.map((route) => route.path))
+      : null;
+  const activeViewports =
+    selection && selection.viewports.length > 0 ? new Set(selection.viewports) : null;
   const reasons = new Set<string>();
-  for (const route of Object.values(manifest.routes)) {
+  for (const [routePath, route] of Object.entries(manifest.routes)) {
+    if (activeRoutes && !activeRoutes.has(routePath)) continue;
     if (!route?.snapshots) continue;
-    for (const snapshot of Object.values(route.snapshots)) {
+    for (const [snapshotKey, snapshot] of Object.entries(route.snapshots)) {
+      if (activeViewports) {
+        const slash = snapshotKey.indexOf('/');
+        const viewport = slash > 0 ? Number(snapshotKey.slice(0, slash)) : Number.NaN;
+        if (!activeViewports.has(viewport)) continue;
+      }
       const fingerprint = snapshot?.fingerprint;
       if (!fingerprint) continue;
       const engine = fingerprint.browser?.name;
