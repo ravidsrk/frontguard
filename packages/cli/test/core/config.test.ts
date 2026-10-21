@@ -18,6 +18,18 @@ describe('configSchema', () => {
     expect(result.outputDir).toBe('./frontguard-report');
     expect(result.version).toBe(1);
     expect(result.ignore).toEqual([]);
+    expect(result.fingerprint).toBe('warn');
+  });
+
+  it('accepts strict fingerprint mode and rejects an unknown mode', () => {
+    const strict = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      fingerprint: 'strict',
+    });
+    expect(strict.fingerprint).toBe('strict');
+    expect(() =>
+      configSchema.parse({ baseUrl: 'http://localhost:3000', fingerprint: 'off' }),
+    ).toThrow(ZodError);
   });
 
   it('throws ZodError when threshold is a string', () => {

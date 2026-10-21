@@ -130,12 +130,36 @@ describe('updateBaselines', () => {
     const version = readFileSync(new URL('../../../../VERSION', import.meta.url), 'utf8').trim();
     expect(mocks.writeManifest).toHaveBeenCalledWith(
       expect.objectContaining({
+        schemaVersion: 2,
         createdBy: `frontguard@${version}`,
-        routes: expect.objectContaining({
+        routes: {
           '/': expect.objectContaining({
             sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+            snapshots: {
+              '1440/chromium': expect.objectContaining({
+                sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+                fingerprint: expect.objectContaining({
+                  frontguard: version,
+                  playwright: expect.any(String),
+                  os: process.platform,
+                  arch: process.arch,
+                  deviceScaleFactor: 1,
+                  screenshot: { fullPage: true, type: 'png' },
+                  captureRunner: 'routes',
+                  pixelmatch: expect.objectContaining({
+                    version: expect.stringMatching(/^7\./),
+                    options: { threshold: 0.1, includeAA: false },
+                  }),
+                  browser: expect.objectContaining({
+                    name: 'chromium',
+                    version: expect.stringMatching(/\S/),
+                    channel: expect.stringMatching(/\S/),
+                  }),
+                }),
+              }),
+            },
           }),
-        }),
+        },
       }),
     );
   });

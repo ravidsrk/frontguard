@@ -24,7 +24,7 @@ import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
 import { GUIDE_TOPICS, getGuideTopic, formatGuideIndex } from './guide.js';
 import { maybeRunInDocker } from './run.js';
-import { comparisonExitCode } from './exit-code.js';
+import { comparisonExitCode, runExitCode } from './exit-code.js';
 import { parseThresholdRatio } from './threshold.js';
 import { compareDiffToThreshold } from '../diff/threshold.js';
 import { sendTelemetry, isTelemetryEnabled, type TelemetryEvent } from '../utils/telemetry.js';
@@ -410,7 +410,7 @@ export async function main(argv?: string[]): Promise<number> {
         logger.info('─'.repeat(60));
 
         // Exit code
-        exitCode = comparisonExitCode(summary);
+        exitCode = runExitCode(summary, result.fingerprintCheck);
         if (exitCode === 2) {
           logger.error('❌ Visual comparison could not complete');
         } else if (summary.regressions > 0) {
@@ -617,8 +617,8 @@ export async function main(argv?: string[]): Promise<number> {
           const regressions = result.diffs.filter(
             (diff) => compareDiffToThreshold(diff.diffPercentage, alertThreshold) > 0,
           ).length;
-          const runExitCode = comparisonExitCode(result.summary, regressions);
-          if (runExitCode === 2) {
+          const monitorExit = runExitCode(result.summary, result.fingerprintCheck, regressions);
+          if (monitorExit === 2) {
             logger.error('❌ Monitoring comparison could not complete');
           } else if (result.summary.newPages > 0) {
             logger.error(
@@ -629,7 +629,7 @@ export async function main(argv?: string[]): Promise<number> {
           } else {
             logger.info('✅ All monitored URLs within threshold');
           }
-          return runExitCode;
+          return monitorExit;
         };
 
         const intervalMin = opts.interval ? parseInt(opts.interval as string, 10) : null;

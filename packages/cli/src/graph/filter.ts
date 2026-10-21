@@ -66,23 +66,33 @@ function includeAll(routes: Route[], reason: string): SmartFilterResult {
  * need re-rendering.
  *
  * Flow:
- * 1. Check if smart rendering is enabled
- * 2. Detect changed files via Git
- * 3. Map routes to their source file entry points
- * 4. Build dependency graph from route entry files
- * 5. Filter routes using transitive dependency analysis
+ * 1. Honor an explicit renderer-fingerprint bypass (before the smart-render gate)
+ * 2. Check if smart rendering is enabled
+ * 3. Detect changed files via Git
+ * 4. Map routes to their source file entry points
+ * 5. Build dependency graph from route entry files
+ * 6. Filter routes using transitive dependency analysis
  *
  * All failure modes fall back to rendering ALL routes with a warning.
  * This function NEVER throws — it catches everything and degrades gracefully.
  *
  * @param routes - All discovered routes to potentially filter
  * @param config - Frontguard configuration
+ * @param options - Optional bypass. When `bypassReason` is set, every route is rendered and the reason is logged.
  * @returns Filtered + skipped routes with explanation
  */
 export async function smartFilter(
   routes: Route[],
   config: FrontguardConfig,
+  options?: { bypassReason?: string },
 ): Promise<SmartFilterResult> {
+  // A browser-build or comparator change makes a scoped render untrustworthy.
+  // Checked before the smart-render gate so the log says why every route ran.
+  if (options?.bypassReason) {
+    logger.warn(options.bypassReason);
+    return includeAll(routes, options.bypassReason);
+  }
+
   // Gate: smart rendering must be enabled
   if (!config.smartRender) {
     return includeAll(routes, 'smart rendering disabled');

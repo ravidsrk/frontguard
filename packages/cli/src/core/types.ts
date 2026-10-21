@@ -375,6 +375,13 @@ export interface FrontguardConfig {
    * bounding boxes if the page does not settle.
    */
   waitForStability?: boolean | StabilityConfig;
+  /**
+   * What to do when the baseline renderer fingerprint differs from this run.
+   * `warn` (default) logs each differing field. `strict` exits 2 because the
+   * comparison is untrusted, not because pixels failed. A baseline with no
+   * fingerprint warns once and does not fail strict mode.
+   */
+  fingerprint?: 'warn' | 'strict';
 }
 
 /**
@@ -780,6 +787,12 @@ export interface RunResult {
   timing: RunTiming;
   /** Configuration used for this run. */
   config: FrontguardConfig;
+  /**
+   * Renderer fingerprint check against the baseline.
+   * `strictFailure` means the comparison is untrusted (exit 2), not that pixels failed.
+   * A missing fingerprint sets `missing` and leaves `strictFailure` false.
+   */
+  fingerprintCheck?: FingerprintCheck;
   /** Accessibility audit results (Task 5.1), if the a11y plugin ran. */
   accessibility?: AccessibilityResult[];
   /** Performance budget results, if the perf-budgets plugin ran. */
@@ -813,10 +826,67 @@ export interface ThirdPartyScriptResult {
 // ---------------------------------------------------------------------------
 
 /**
+ * What rendered and compared a baseline snapshot.
+ * Written on schema 2 manifests. Absent on schema 1.
+ */
+export interface RendererFingerprint {
+  /** Frontguard CLI version (`CLI_VERSION`). */
+  frontguard: string;
+  /** Installed `playwright` package version. */
+  playwright: string;
+  /** Browser Playwright actually launched. Version and channel come from Playwright, not a guessed build id. */
+  browser: {
+    name: string;
+    /** `browserVersion` from Playwright's browser registry, when published. */
+    version?: string;
+    /** Playwright's registry title (for example Chrome Headless Shell or Chrome for Testing). */
+    channel?: string;
+  };
+  /** `FRONTGUARD_IMAGE_DIGEST` when set. Omitted otherwise. */
+  imageDigest?: string;
+  os: NodeJS.Platform;
+  arch: string;
+  /** Device scale factor used for the capture. */
+  deviceScaleFactor: number;
+  pixelmatch: {
+    version: string;
+    /** Options object passed to pixelmatch for the pass/fail comparison. */
+    options: { threshold: number; includeAA: boolean };
+  };
+  /** Screenshot options passed to the capture call. */
+  screenshot: { fullPage: boolean; type: string };
+  /**
+   * Capture runner when the caller knows it (`storybook`, `ladle`, `histoire`, `routes`).
+   * Preserved when already stored. Ladle and Histoire are not discovered here.
+   */
+  captureRunner?: string;
+}
+
+/** One viewport × browser baseline inside a route entry. */
+export interface BaselineSnapshot {
+  sha256: string;
+  updatedAt: string;
+  fingerprint?: RendererFingerprint;
+}
+
+/** Result of comparing a baseline fingerprint with the current runtime. */
+export interface FingerprintCheck {
+  /** Field paths that differ, such as `browser.version`. */
+  fields: string[];
+  /** One human-readable line per differing field. */
+  lines: string[];
+  /** At least one compared baseline had no fingerprint. */
+  missing: boolean;
+  /** Strict mode and a real field mismatch. Never set only because a fingerprint is missing. */
+  strictFailure: boolean;
+}
+
+/**
  * Manifest tracking all stored baselines.
  *
  * Persisted in the Git orphan branch (`frontguard-baselines`) alongside
- * the PNG baseline images.
+ * the PNG baseline images. Schema 1 manifests omit fingerprints and still load.
+ * New writes use schema 2.
  */
 export interface BaselineManifest {
   /** Schema version for forward-compatible manifest evolution. */
@@ -845,8 +915,8 @@ export interface BaselineRouteInfo {
   lastUpdated: string;
   /** Content-addressable SHA-256 hex digest of the latest baseline PNG buffer. */
   sha256?: string;
-  /** Per-combination (`<viewport>/<browser>`) SHA-256 and timestamp map. */
-  snapshots?: Record<string, { sha256: string; updatedAt: string }>;
+  /** Per-combination (`<viewport>/<browser>`) SHA-256, timestamp, and renderer fingerprint. */
+  snapshots?: Record<string, BaselineSnapshot>;
 }
 
 /** Alias for a single entry in the baseline manifest's `routes` map. */

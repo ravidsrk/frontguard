@@ -13,8 +13,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { BaselineStorage, BaselineManifest, BrowserEngine } from '../core/types.js';
+import { emptyBaselineManifest, parseBaselineManifest } from '../core/fingerprint.js';
 import { logger } from '../utils/logger.js';
-import { CLI_VERSION } from '../version.js';
 
 /**
  * Buffer ceiling for every git child process (install-2).
@@ -423,7 +423,7 @@ export class GitOrphanStorage implements BaselineStorage {
 
     try {
       const raw = this.git('show', `${this.readRef}:manifest.json`);
-      return JSON.parse(raw) as BaselineManifest;
+      return parseBaselineManifest(raw);
     } catch {
       return null;
     }
@@ -619,12 +619,7 @@ export class GitOrphanStorage implements BaselineStorage {
       this.gitIn(tmpDir, 'config', 'user.email', 'frontguard@users.noreply.github.com');
       this.gitIn(tmpDir, 'config', 'commit.gpgsign', 'false');
 
-      const manifest: BaselineManifest = {
-        schemaVersion: 1,
-        createdBy: `frontguard@${CLI_VERSION}`,
-        updatedAt: new Date().toISOString(),
-        routes: {},
-      };
+      const manifest: BaselineManifest = emptyBaselineManifest();
       writeFileSync(
         join(tmpDir, 'manifest.json'),
         JSON.stringify(manifest, null, 2) + '\n',
@@ -660,12 +655,7 @@ export class GitOrphanStorage implements BaselineStorage {
       this.gitIn(tmpDir, 'rm', '-rf', '--ignore-unmatch', '.');
 
       // Write initial manifest into the temp worktree
-      const manifest: BaselineManifest = {
-        schemaVersion: 1,
-        createdBy: `frontguard@${CLI_VERSION}`,
-        updatedAt: new Date().toISOString(),
-        routes: {},
-      };
+      const manifest: BaselineManifest = emptyBaselineManifest();
       writeFileSync(
         join(tmpDir, 'manifest.json'),
         JSON.stringify(manifest, null, 2) + '\n'
@@ -712,12 +702,7 @@ export class GitOrphanStorage implements BaselineStorage {
       this.git('checkout', '--orphan', this.branch);
       this.git('rm', '-rf', '.');
 
-      const manifest: BaselineManifest = {
-        schemaVersion: 1,
-        createdBy: `frontguard@${CLI_VERSION}`,
-        updatedAt: new Date().toISOString(),
-        routes: {},
-      };
+      const manifest: BaselineManifest = emptyBaselineManifest();
       writeFileSync(
         join(this.repoDir, 'manifest.json'),
         JSON.stringify(manifest, null, 2) + '\n'

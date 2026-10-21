@@ -7,6 +7,7 @@
 
 import type { Route, FrontguardConfig } from '../../src/core/types.js';
 import { smartFilter, type SmartFilterResult } from '../../src/graph/filter.js';
+import { logger } from '../../src/utils/logger.js';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -315,5 +316,35 @@ describe('smartFilter', () => {
     expect(result.skipped).toHaveLength(0);
     expect(result.reason).toContain('untraced static asset');
     expect(mockedFilterAffectedRoutes).not.toHaveBeenCalled();
+  });
+
+  it('renders every route when the renderer fingerprint bypasses scoping', async () => {
+    mockedGetChangedPaths.mockClear();
+    const routes = [route('/'), route('/about')];
+    mockedGetChangedPaths.mockReturnValue({ present: ['src/pages/about.tsx'], removed: [] });
+    mockedFilterAffectedRoutes.mockReturnValue([route('/about')]);
+    const reason =
+      'renderer fingerprint changed since the baseline (browser.version "1" → "2"); rendering all routes';
+
+    const result = await smartFilter(routes, makeConfig(), { bypassReason: reason });
+
+    expect(result.filtered.map((entry) => entry.path)).toEqual(['/', '/about']);
+    expect(result.skipped).toHaveLength(0);
+    expect(result.reason).toBe(reason);
+    expect(logger.warn).toHaveBeenCalledWith(reason);
+    expect(mockedGetChangedPaths).not.toHaveBeenCalled();
+  });
+
+  it('reports a renderer bypass before the smart-render disabled gate', async () => {
+    const reason =
+      'renderer fingerprint changed since the baseline (pixelmatch.version "7.1.0" → "7.2.0"); rendering all routes';
+
+    const result = await smartFilter([route('/')], makeConfig({ smartRender: false }), {
+      bypassReason: reason,
+    });
+
+    expect(result.filtered).toHaveLength(1);
+    expect(result.reason).toBe(reason);
+    expect(result.reason).not.toContain('disabled');
   });
 });

@@ -10,11 +10,10 @@
  */
 
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { CLI_VERSION } from '../version.js';
 import type {
+  BaselineManifest,
   FrontguardConfig,
   Route,
   RouteEntry,
@@ -26,6 +25,17 @@ import type {
   AccessibilityResult,
   AccessibilityViolation,
 } from './types.js';
+import {
+  createFingerprintAccum,
+  emptyBaselineManifest,
+  finishFingerprintCheck,
+  fingerprintMode,
+  formatFingerprintWarning,
+  missingFingerprintWarning,
+  noteComparedFingerprint,
+  rendererBypassReason,
+  stampBaselineManifest,
+} from './fingerprint.js';
 import type { JudgeResult } from './types.js';
 
 // Re-exports for consumers of the published library entry (`@frontguard/cli`).
@@ -452,10 +462,46 @@ export async function runPipeline(
   // -----------------------------------------------------------------------
   let filteredRoutes: Route[] = routes;
 
+  // Read the baseline manifest before filtering. A browser-build or pixelmatch
+  // change has to render every route. A missing or unreadable manifest must
+  // not crash this stage and must not force that bypass.
+  let comparisonStorage: GitOrphanStorage | undefined;
+  let comparisonStorageReady = false;
+  let baselineManifest: BaselineManifest | null = null;
+  let manifestReadable = false;
+  let manifestReadAttempted = false;
+  try {
+    comparisonStorage = new GitOrphanStorage(process.cwd());
+    await comparisonStorage.init();
+    comparisonStorageReady = true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.debug(`Baseline storage unavailable before filtering: ${msg}`);
+  }
+  if (
+    comparisonStorageReady &&
+    comparisonStorage &&
+    typeof comparisonStorage.readManifest === 'function'
+  ) {
+    manifestReadAttempted = true;
+    try {
+      baselineManifest = await comparisonStorage.readManifest();
+      manifestReadable = true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.debug(
+        `Baseline manifest unreadable; skipping renderer fingerprint bypass: ${msg}`,
+      );
+    }
+  }
+  const bypassReason = manifestReadable
+    ? rendererBypassReason(baselineManifest, config.browsers)
+    : undefined;
+
   reporter.onStageStart('filter', 'Analyzing dependency graph…');
   try {
     const [filterResult, filterDuration] = await timed(async () =>
-      smartFilter(routes, config),
+      smartFilter(routes, config, bypassReason ? { bypassReason } : undefined),
     );
 
     filteredRoutes = filterResult.filtered;
@@ -557,15 +603,35 @@ export async function runPipeline(
   const tempPaths = new Map<number, { baseline: string; current: string; diff: string }>();
 
   reporter.onStageStart('compare', 'Comparing against baselines…');
-  const storage = new GitOrphanStorage(process.cwd());
-  try {
-    await storage.init();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`Baseline storage init failed: ${msg}`);
-    reporter.onStageComplete('compare', `Failed: ${msg}`);
-    throw err;
+  if (!comparisonStorage) {
+    comparisonStorage = new GitOrphanStorage(process.cwd());
   }
+  const storage = comparisonStorage;
+  if (!comparisonStorageReady) {
+    try {
+      await storage.init();
+      comparisonStorageReady = true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error(`Baseline storage init failed: ${msg}`);
+      reporter.onStageComplete('compare', `Failed: ${msg}`);
+      throw err;
+    }
+  }
+  if (!manifestReadAttempted && typeof storage.readManifest === 'function') {
+    manifestReadAttempted = true;
+    try {
+      baselineManifest = await storage.readManifest();
+      manifestReadable = true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.debug(
+        `Baseline manifest unreadable; renderer fingerprint check skipped: ${msg}`,
+      );
+    }
+  }
+
+  const fingerprintAccum = createFingerprintAccum();
 
   try {
     const [, duration] = await timed(async () => {
@@ -606,6 +672,12 @@ export async function runPipeline(
               diff = createNewPageResult(shot);
               logger.debug(`New page: ${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`);
             } else {
+              noteComparedFingerprint(
+                fingerprintAccum,
+                baselineManifest,
+                manifestReadable,
+                shot,
+              );
               // Compare against existing baseline using the effective threshold
               diff = compareScreenshot(shot, baseline, effectiveThreshold, {
                 enabled: config.ssimFallback,
@@ -663,6 +735,17 @@ export async function runPipeline(
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`Compare stage failed: ${msg}`);
     reporter.onStageComplete('compare', `Failed: ${msg}`);
+  }
+
+  const fingerprintCheck = finishFingerprintCheck(
+    fingerprintAccum,
+    fingerprintMode(config.fingerprint),
+  );
+  if (fingerprintCheck.lines.length > 0) {
+    logger.warn(formatFingerprintWarning(fingerprintCheck.lines));
+  }
+  if (fingerprintCheck.missing) {
+    logger.warn(missingFingerprintWarning());
   }
 
   // Free the screenshots array — all data has been extracted
@@ -927,6 +1010,7 @@ export async function runPipeline(
 
   timing.total = Math.round(performance.now() - totalStart);
   const result = buildResult(diffs, timing, totalStart, config);
+  if (fingerprintCheck) result.fingerprintCheck = fingerprintCheck;
 
   // Surface accessibility results (Task 5.1) from plugin metadata onto the
   // result so reporters can render them.
@@ -1068,33 +1152,8 @@ export async function updateBaselines(
     (isMockFn(storage.writeBaselines) || !isMockFn(storage.writeBaseline));
 
   if (useBatchWrite) {
-    const manifest = (await storage.readManifest()) ?? {
-      schemaVersion: 1,
-      createdBy: `frontguard@${CLI_VERSION}`,
-      updatedAt: new Date().toISOString(),
-      routes: {},
-    };
-    for (const shot of screenshots) {
-      const existing = manifest.routes[shot.route.path];
-      const now = new Date().toISOString();
-      const sha256 = createHash('sha256').update(shot.buffer).digest('hex');
-      const snapshotKey = `${shot.viewport}/${shot.browser}`;
-      manifest.routes[shot.route.path] = {
-        viewports: [
-          ...new Set([...(existing?.viewports ?? []), shot.viewport]),
-        ],
-        browsers: [
-          ...new Set([...(existing?.browsers ?? []), shot.browser]),
-        ],
-        lastUpdated: now,
-        sha256,
-        snapshots: {
-          ...(existing?.snapshots ?? {}),
-          [snapshotKey]: { sha256, updatedAt: now },
-        },
-      };
-    }
-    manifest.updatedAt = new Date().toISOString();
+    const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
+    const manifest = stampBaselineManifest(existing, screenshots);
 
     try {
       await storage.writeBaselines(
@@ -1148,35 +1207,8 @@ export async function updateBaselines(
       }
     }
 
-    // Update manifest
-    const manifest = (await storage.readManifest()) ?? {
-      schemaVersion: 1,
-      createdBy: `frontguard@${CLI_VERSION}`,
-      updatedAt: new Date().toISOString(),
-      routes: {},
-    };
-
-    for (const shot of writtenScreenshots) {
-      const existing = manifest.routes[shot.route.path];
-      const now = new Date().toISOString();
-      const sha256 = createHash('sha256').update(shot.buffer).digest('hex');
-      const snapshotKey = `${shot.viewport}/${shot.browser}`;
-      manifest.routes[shot.route.path] = {
-        viewports: [
-          ...new Set([...(existing?.viewports ?? []), shot.viewport]),
-        ],
-        browsers: [
-          ...new Set([...(existing?.browsers ?? []), shot.browser]),
-        ],
-        lastUpdated: now,
-        sha256,
-        snapshots: {
-          ...(existing?.snapshots ?? {}),
-          [snapshotKey]: { sha256, updatedAt: now },
-        },
-      };
-    }
-    manifest.updatedAt = new Date().toISOString();
+    const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
+    const manifest = stampBaselineManifest(existing, writtenScreenshots);
     await storage.writeManifest(manifest);
   }
   timing.compare = Math.round(performance.now() - writeStart);

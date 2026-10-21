@@ -18,6 +18,7 @@
 
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
+import { PIXELMATCH_OPTIONS } from '../core/fingerprint.js';
 import { compareDiffToThreshold } from './threshold.js';
 import type { ScreenshotResult, DiffResult, DiffCluster } from '../core/types.js';
 import { computeSSIM, computeRegionSimilarity } from './ssim.js';
@@ -147,7 +148,7 @@ export function compareScreenshot(
       diffPng.data,
       width,
       height,
-      { threshold: 0.1, includeAA: false },
+      PIXELMATCH_OPTIONS,
     );
   } catch (err) {
     return errorResult(
