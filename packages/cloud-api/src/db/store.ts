@@ -156,6 +156,14 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
   reopenAccountWrites(userId: string): Promise<void>;
   /** True while an erasure attempt has closed writes and has not reopened them. */
   accountWritesClosed(userId: string): Promise<boolean>;
+  /** When the write lock was closed, or null while writes are open. */
+  accountWriteLockClosedAt(userId: string): Promise<string | null>;
+  /**
+   * Persist a finished run. While erasure has closed writes and the account
+   * still exists, park the payload and apply it if writes reopen. Skip when
+   * the account is already gone.
+   */
+  commitFinishedRun(userId: string, run: Run): Promise<FinishedRunCommit>;
 
   // API keys
   createApiKey(key: ApiKeyRecord): Promise<void>;
@@ -221,6 +229,9 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
   listScreenshotDecisions(runId: string): Promise<ScreenshotDecision[]>;
 }
 
+/** What happened to a finished run that raced an account erasure. */
+export type FinishedRunCommit = 'written' | 'pending' | 'skipped';
+
 // ---------------------------------------------------------------------------
 // In-memory implementation (default — dev & tests)
 // ---------------------------------------------------------------------------
@@ -238,7 +249,9 @@ export class InMemoryStore implements Store {
 
   private users = new Map<string, User>();
   /** Accounts whose screenshot writes must no-op until erasure reopens or finishes. */
-  private closedWrites = new Set<string>();
+  private closedWrites = new Map<string, string>();
+  /** Finished runs waiting for an erasure lock to reopen. */
+  private pendingRunUpdates = new Map<string, { userId: string; run: Run }>();
   private apiKeys = new Map<string, ApiKeyRecord>();
   private runs = new Map<string, { run: Run; userId: string }>();
   private runVersions = new Map<string, number>();
@@ -288,13 +301,69 @@ export class InMemoryStore implements Store {
   }
 
   async closeAccountWrites(userId: string): Promise<void> {
-    this.closedWrites.add(userId);
+    this.closedWrites.set(userId, new Date().toISOString());
   }
   async reopenAccountWrites(userId: string): Promise<void> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await this.flushPendingRunUpdates(userId);
+      if (!this.hasPendingRunUpdate(userId)) {
+        this.closedWrites.delete(userId);
+        await this.flushPendingRunUpdates(userId);
+        return;
+      }
+    }
+    await this.flushPendingRunUpdates(userId);
     this.closedWrites.delete(userId);
+    await this.flushPendingRunUpdates(userId);
   }
   async accountWritesClosed(userId: string): Promise<boolean> {
     return this.closedWrites.has(userId);
+  }
+  async accountWriteLockClosedAt(userId: string): Promise<string | null> {
+    return this.closedWrites.get(userId) ?? null;
+  }
+  async commitFinishedRun(userId: string, run: Run): Promise<FinishedRunCommit> {
+    return withUserMutation(userId, async () => {
+      if (!(await this.getUser(userId))) {
+        this.pendingRunUpdates.delete(run.id);
+        return 'skipped';
+      }
+      if (this.closedWrites.has(userId)) {
+        this.pendingRunUpdates.set(run.id, { userId, run: { ...run } });
+      }
+      if (!(await this.getUser(userId))) {
+        this.pendingRunUpdates.delete(run.id);
+        return 'skipped';
+      }
+      if (!this.closedWrites.has(userId)) {
+        this.pendingRunUpdates.delete(run.id);
+        await this.updateRun(run.id, run);
+        return 'written';
+      }
+      return 'pending';
+    });
+  }
+
+  private hasPendingRunUpdate(userId: string): boolean {
+    for (const pending of this.pendingRunUpdates.values()) {
+      if (pending.userId === userId) return true;
+    }
+    return false;
+  }
+
+  private async flushPendingRunUpdates(userId: string): Promise<void> {
+    const pending = [...this.pendingRunUpdates.entries()].filter(([, item]) => item.userId === userId);
+    for (const [runId, item] of pending) {
+      if (this.pendingRunUpdates.get(runId) !== item) continue;
+      this.pendingRunUpdates.delete(runId);
+      await this.updateRun(runId, item.run);
+    }
+  }
+
+  private dropPendingRunUpdates(userId: string): void {
+    for (const [runId, item] of this.pendingRunUpdates) {
+      if (item.userId === userId) this.pendingRunUpdates.delete(runId);
+    }
   }
 
   private async eraseAccountUnlocked(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
@@ -382,6 +451,7 @@ export class InMemoryStore implements Store {
       (failure) =>
         failure.userId !== userId && !ownedIdSet.has(failure.sourceId) && !monitorIdSet.has(failure.sourceId),
     );
+    this.dropPendingRunUpdates(userId);
     this.users.delete(userId);
     return { erased: true, userId, runs: ownedIds.length, baselines, reports };
   }
@@ -935,6 +1005,7 @@ export class InMemoryStore implements Store {
   clear(): void {
     this.users.clear();
     this.closedWrites.clear();
+    this.pendingRunUpdates.clear();
     this.apiKeys.clear();
     this.runs.clear();
     this.screenshots.clear();

@@ -16,6 +16,7 @@ import { Hono } from 'hono';
 import type { Bindings } from '../db/factory.js';
 import { getStore, isProduction } from '../db/factory.js';
 import type { Store } from '../db/store.js';
+import { allocateDemoUserId } from '../auth/demo-user.js';
 import { generateApiKey, hashKey, MAX_KEYS_PER_USER } from '../auth/keys.js';
 
 type Variables = { store: Store; userId: string };
@@ -35,7 +36,7 @@ keyRoutes.use('*', async (c, next) => {
     if (!record) return c.json({ error: 'Invalid API key' }, 401);
     c.set('userId', record.userId);
   } else {
-    const userId = `demo:${await hashKey(apiKey)}`;
+    const userId = await allocateDemoUserId(store, apiKey);
     if (!(await store.getUser(userId))) {
       await store.createUser({ id: userId, plan: 'free', createdAt: new Date().toISOString() });
     }

@@ -21,7 +21,6 @@ import { getStore, type Bindings } from './db/factory.js';
 import type { Monitor, MonitorRun, MonitorRunStatus } from './db/monitors.js';
 import type { Store } from './db/store.js';
 import { currentMonth } from './db/store.js';
-import { withUserMutation } from './db/account-writes.js';
 import { processRun, type ProcessorEnv } from './processor.js';
 import { dispatchAlertsWithState, type MonitorAlert, type AlertEnv } from './alerts/index.js';
 import { getPlan, hasFeature } from './billing/plans.js';
@@ -198,10 +197,7 @@ async function attemptCheck(
   };
 
   await processRun(run, env, onScreenshots, baselineRestore);
-  await withUserMutation(monitor.userId, async () => {
-    if (await store.accountWritesClosed(monitor.userId)) return;
-    await store.updateRun(run.id, run);
-  });
+  await store.commitFinishedRun(monitor.userId, run);
 
   const screenshotRefs = buildMonitorScreenshotRefs(
     monitor.routes,

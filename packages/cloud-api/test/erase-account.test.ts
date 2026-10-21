@@ -14,6 +14,7 @@ import { app } from '../src/index.js';
 import { getMemoryStore, resetMemoryStore } from '../src/db/factory.js';
 import { getMemoryScreenshotStore, resetMemoryScreenshotStore } from '../src/storage/screenshots.js';
 import type { Run } from '../src/types.js';
+import { allocateDemoUserId } from '../src/auth/demo-user.js';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -371,4 +372,58 @@ describe('DELETE /v1/account', () => {
     expect(await blobs.get(key)).toBeNull();
     expect((await store.getRun('run-b'))?.reportHtml).toBe("Bob's report");
   });
+});
+
+describe('erasure races a finished run', () => {
+  it.each(['sqlite', 'memory'] as const)(
+    'applies a parked %s run when writes reopen',
+    async (kind) => {
+      const store = await openStore(kind);
+      await store.createUser({ id: 'fixture-a', plan: 'free', createdAt: '2026-01-01T00:00:00Z' });
+      const queued = makeRun('run-parked', '');
+      queued.status = 'queued';
+      queued.reportHtml = undefined;
+      await store.createRun(queued, 'fixture-a');
+      await store.closeAccountWrites('fixture-a');
+
+      const finished = makeRun('run-parked', 'done');
+      expect(await store.commitFinishedRun('fixture-a', finished)).toBe('pending');
+      expect((await store.getRun('run-parked'))?.status).toBe('queued');
+
+      await store.reopenAccountWrites('fixture-a');
+      expect(await store.accountWritesClosed('fixture-a')).toBe(false);
+      expect((await store.getRun('run-parked'))?.status).toBe('completed');
+      expect((await store.getRun('run-parked'))?.reportHtml).toBe('done');
+    },
+  );
+
+  it.each(['sqlite', 'memory'] as const)(
+    'drops a parked %s run when erasure succeeds and does not reuse the locked id',
+    async (kind) => {
+      const store = await openStore(kind);
+      const token = `erase-${kind}`;
+      const first = await allocateDemoUserId(store, token);
+      await store.createUser({ id: first, plan: 'free', createdAt: '2026-01-01T00:00:00Z' });
+      const queued = makeRun('run-gone', '');
+      queued.status = 'queued';
+      await store.createRun(queued, first);
+      await store.closeAccountWrites(first);
+      expect(await store.commitFinishedRun(first, makeRun('run-gone', 'late'))).toBe('pending');
+
+      const erased = await store.eraseAccount(first);
+      expect(erased.erased).toBe(true);
+      expect(await store.getRun('run-gone')).toBeNull();
+      expect(await store.accountWritesClosed(first)).toBe(true);
+
+      const second = await allocateDemoUserId(store, token);
+      const third = await allocateDemoUserId(store, token);
+      expect(second).toBe(third);
+      expect(second).not.toBe(first);
+      await store.createUser({ id: second, plan: 'free', createdAt: '2026-01-02T00:00:00Z' });
+      await store.createRun(makeRun('run-new', 'fresh'), second);
+      expect(await store.commitFinishedRun(second, makeRun('run-new', 'fresh'))).toBe('written');
+      expect((await store.getRun('run-new'))?.reportHtml).toBe('fresh');
+      expect(await store.accountWritesClosed(first)).toBe(true);
+    },
+  );
 });

@@ -17,6 +17,7 @@ import type {
   ScreenshotDecision,
   ListRunsOptions,
   AccountErasureResult,
+  FinishedRunCommit,
   RunBlobDeleter,
 } from './store.js';
 import { erasureBlockedBySoleOwnership } from './account-erasure.js';
@@ -184,7 +185,23 @@ export class D1Store implements Store {
       .run();
   }
   async reopenAccountWrites(userId: string): Promise<void> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await this.flushPendingRunUpdates(userId);
+      const res = await this.db
+        .prepare(
+          `DELETE FROM account_write_locks WHERE user_id = ?
+           AND NOT EXISTS (SELECT 1 FROM pending_run_updates WHERE user_id = ?)`,
+        )
+        .bind(userId, userId)
+        .run();
+      if ((res.meta?.changes ?? 0) > 0 || !(await this.accountWritesClosed(userId))) {
+        await this.flushPendingRunUpdates(userId);
+        return;
+      }
+    }
+    await this.flushPendingRunUpdates(userId);
     await this.db.prepare(`DELETE FROM account_write_locks WHERE user_id = ?`).bind(userId).run();
+    await this.flushPendingRunUpdates(userId);
   }
   async accountWritesClosed(userId: string): Promise<boolean> {
     const row = await this.db
@@ -192,6 +209,72 @@ export class D1Store implements Store {
       .bind(userId)
       .first<{ user_id: string }>();
     return row != null;
+  }
+  async accountWriteLockClosedAt(userId: string): Promise<string | null> {
+    const row = await this.db
+      .prepare(`SELECT closed_at FROM account_write_locks WHERE user_id = ?`)
+      .bind(userId)
+      .first<{ closed_at: string }>();
+    return row?.closed_at ?? null;
+  }
+  async commitFinishedRun(userId: string, run: Run): Promise<FinishedRunCommit> {
+    return withUserMutation(userId, async () => {
+      const saved = await this.savePendingRunUpdate(userId, run);
+      const user = await this.getUser(userId);
+      if (!user) {
+        await this.deletePendingRunUpdate(run.id);
+        return 'skipped';
+      }
+      if (!(await this.accountWritesClosed(userId))) {
+        await this.updateRun(run.id, run);
+        await this.deletePendingRunUpdate(run.id);
+        return 'written';
+      }
+      if (!saved) await this.savePendingRunUpdate(userId, run, true);
+      return 'pending';
+    });
+  }
+
+  private async savePendingRunUpdate(userId: string, run: Run, force = false): Promise<boolean> {
+    const payload = JSON.stringify(run);
+    const updatedAt = new Date().toISOString();
+    const sql = force
+      ? `INSERT INTO pending_run_updates (run_id, user_id, payload, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(run_id) DO UPDATE SET user_id = excluded.user_id, payload = excluded.payload, updated_at = excluded.updated_at`
+      : `INSERT INTO pending_run_updates (run_id, user_id, payload, updated_at)
+         SELECT ?, ?, ?, ?
+         WHERE EXISTS (SELECT 1 FROM account_write_locks WHERE user_id = ?)
+           AND EXISTS (SELECT 1 FROM users WHERE id = ?)
+         ON CONFLICT(run_id) DO UPDATE SET
+           user_id = excluded.user_id,
+           payload = excluded.payload,
+           updated_at = excluded.updated_at
+         WHERE EXISTS (SELECT 1 FROM account_write_locks WHERE user_id = excluded.user_id)
+           AND EXISTS (SELECT 1 FROM users WHERE id = excluded.user_id)`;
+    const statement = this.db.prepare(sql);
+    const res = force
+      ? await statement.bind(run.id, userId, payload, updatedAt).run()
+      : await statement.bind(run.id, userId, payload, updatedAt, userId, userId).run();
+    return (res.meta?.changes ?? 0) > 0;
+  }
+
+  private async deletePendingRunUpdate(runId: string): Promise<void> {
+    await this.db.prepare(`DELETE FROM pending_run_updates WHERE run_id = ?`).bind(runId).run();
+  }
+
+  private async flushPendingRunUpdates(userId: string): Promise<void> {
+    const { results } = await this.db
+      .prepare(`SELECT run_id, payload FROM pending_run_updates WHERE user_id = ?`)
+      .bind(userId)
+      .all<{ run_id: string; payload: string }>();
+    for (const row of results) {
+      const run = JSON.parse(row.payload) as Run;
+      await this.updateRun(row.run_id, run);
+      await this.db
+        .prepare(`DELETE FROM pending_run_updates WHERE run_id = ? AND payload = ?`)
+        .bind(row.run_id, row.payload)
+        .run();
+    }
   }
 
   private async eraseAccountUnlocked(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
@@ -274,6 +357,7 @@ export class D1Store implements Store {
       this.db
         .prepare(`DELETE FROM screenshots WHERE run_id IN (SELECT id FROM runs WHERE user_id = ?)`)
         .bind(userId),
+      this.db.prepare(`DELETE FROM pending_run_updates WHERE user_id = ?`).bind(userId),
       this.db.prepare(`DELETE FROM runs WHERE user_id = ?`).bind(userId),
       this.db.prepare(`DELETE FROM api_keys WHERE user_id = ?`).bind(userId),
       this.db.prepare(`DELETE FROM usage WHERE user_id = ?`).bind(userId),

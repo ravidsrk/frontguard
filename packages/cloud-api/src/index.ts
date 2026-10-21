@@ -17,8 +17,8 @@ import {
 } from "./db/factory.js";
 import { apiRateLimiter } from "./rate-limit.js";
 import { currentMonth, type Store } from "./db/store.js";
-import { withUserMutation } from "./db/account-writes.js";
 import { hashKey } from "./auth/keys.js";
+import { allocateDemoUserId } from "./auth/demo-user.js";
 import { authRoutes } from "./routes/auth.js";
 import { keyRoutes } from "./routes/keys.js";
 import { screenshotRoutes } from "./routes/screenshots.js";
@@ -226,7 +226,8 @@ app.use("/v1/*", async (c, next) => {
     await store.touchApiKey(keyHash, new Date().toISOString());
   } else {
     // Dev / tests: accept any token and scope data to a per-token demo user.
-    userId = `demo:${await hashKey(apiKey)}`;
+    // After erasure the old id stays locked, so the same token gets a new id.
+    userId = await allocateDemoUserId(store, apiKey);
     if (!(await store.getUser(userId))) {
       await store.createUser({
         id: userId,
@@ -566,21 +567,18 @@ app.post("/v1/run", async (c) => {
     })
     .finally(async () => {
       // Screenshots were reserved at submit time (COST-1).
-      // Skip when erasure has closed writes or already removed the account,
-      // so this callback cannot recreate rows after DELETE /v1/account.
-      await withUserMutation(userId, async () => {
-        if (await store.accountWritesClosed(userId)) return;
-        await store.updateRun(runId, run);
-        if (run.status === "failed") {
-          await recordDeadLetter(store, {
-            kind: "run",
-            sourceId: runId,
-            userId,
-            error: run.error ?? "background run failed",
-            attempt: 1,
-          });
-        }
-      });
+      // A closed erasure lock parks the finished run and applies it if writes
+      // reopen. A finished erasure skips the write so this cannot recreate rows.
+      const committed = await store.commitFinishedRun(userId, run);
+      if (committed === "written" && run.status === "failed") {
+        await recordDeadLetter(store, {
+          kind: "run",
+          sourceId: runId,
+          userId,
+          error: run.error ?? "background run failed",
+          attempt: 1,
+        });
+      }
       // Complete the originating GitHub Check Run, if this run came from CI.
       if (run.github) void completeCheckRun(c.env ?? {}, run);
       // Export OTLP metrics (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).

@@ -272,3 +272,12 @@ CREATE TABLE IF NOT EXISTS account_write_locks (
   closed_at TEXT NOT NULL
 );
 
+-- Finished runs parked while an erasure lock is held. Applied if writes reopen.
+CREATE TABLE IF NOT EXISTS pending_run_updates (
+  run_id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pending_run_updates_user ON pending_run_updates(user_id);
+
