@@ -138,7 +138,7 @@ describe('built CLI baseline lifecycle', () => {
       ),
     ).toThrow();
 
-    const seed = await runCli([...commonArgs, '--update-baselines'], repoDir);
+    const seed = await runCli([...commonArgs, '--update-baselines', '--confirm-baselines'], repoDir);
     expect(seed.exitCode, seed.stderr).toBe(0);
     expect(parseResult(seed).summary).toMatchObject({
       total: 1,

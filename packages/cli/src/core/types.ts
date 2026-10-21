@@ -316,6 +316,11 @@ export interface FrontguardConfig {
   auth?: AuthConfig;
   /** Enable smart rendering — waits for animations, fonts, lazy images (default `true`). */
   smartRender: boolean;
+  /**
+   * Render every discovered route. Set by `--all-routes`.
+   * Does not turn off animation freeze or font waiting; `smartRender: false` does.
+   */
+  includeAllRoutes?: boolean;
   /** Number of parallel browser workers (default `4`). */
   workers: number;
   /** Page navigation timeout in milliseconds (default `30 000`). */

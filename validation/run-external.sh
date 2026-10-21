@@ -252,7 +252,7 @@ run_repo() {
     # green re-compare against unchanged code. Anything non-pass in recheck is a
     # pixel-only false positive.
     local extra_flag=""
-    [[ "${pass_name}" == "baselineRuns" ]] && extra_flag="--update-baselines"
+    [[ "${pass_name}" == "baselineRuns" ]] && extra_flag="--update-baselines --confirm-baselines"
     local pass_first=1
     {
       echo "  \"${pass_name}\": ["

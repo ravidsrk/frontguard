@@ -7,6 +7,7 @@
  * The cloud-api is stubbed via a `fetch` override so the suite stays hermetic.
  */
 
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -641,12 +642,14 @@ describe('MCP server tools/list + tools/call', () => {
   const ORIG_FETCH = globalThis.fetch;
   const ORIG_KEY = process.env.FRONTGUARD_API_KEY;
   const ORIG_URL = process.env.FRONTGUARD_API_URL;
+  const ORIG_WRITES = process.env.FRONTGUARD_MCP_WRITES;
   let state: StubState;
 
   beforeEach(() => {
     state = { approved: [] };
     process.env.FRONTGUARD_API_KEY = 'fg_test';
     process.env.FRONTGUARD_API_URL = 'https://api.frontguard.dev';
+    process.env.FRONTGUARD_MCP_WRITES = '1';
     globalThis.fetch = makeStubFetch(state);
   });
 
@@ -656,6 +659,8 @@ describe('MCP server tools/list + tools/call', () => {
     else process.env.FRONTGUARD_API_KEY = ORIG_KEY;
     if (ORIG_URL === undefined) delete process.env.FRONTGUARD_API_URL;
     else process.env.FRONTGUARD_API_URL = ORIG_URL;
+    if (ORIG_WRITES === undefined) delete process.env.FRONTGUARD_MCP_WRITES;
+    else process.env.FRONTGUARD_MCP_WRITES = ORIG_WRITES;
   });
 
   async function connectPair() {
@@ -666,7 +671,29 @@ describe('MCP server tools/list + tools/call', () => {
     return { server, client };
   }
 
-  it('advertises all seven tools via tools/list', async () => {
+  it('advertises read tools without write tools unless FRONTGUARD_MCP_WRITES=1', async () => {
+    delete process.env.FRONTGUARD_MCP_WRITES;
+    const { client, server } = await connectPair();
+    const res = await client.listTools();
+    const names = res.tools.map((t) => t.name).sort();
+    expect(names).toEqual([
+      'get_suggested_fix',
+      'inspect_diff_cluster_dom',
+      'list_regressions',
+      'recent_runs',
+      'verify_css_patch',
+    ]);
+    expect(names).not.toContain('promote_baseline');
+    expect(names).not.toContain('accept_baseline');
+    const instructions = client.getInstructions() ?? '';
+    expect(instructions).toMatch(/not registered/);
+    expect(instructions).toMatch(/update-baselines --confirm-baselines/);
+    expect(instructions).not.toMatch(/`promote_baseline` promotes/);
+    await client.close();
+    await server.close();
+  });
+
+  it('advertises all seven tools via tools/list when writes are enabled', async () => {
     const { client, server } = await connectPair();
     const res = await client.listTools();
     const names = res.tools.map((t) => t.name).sort();
@@ -679,6 +706,58 @@ describe('MCP server tools/list + tools/call', () => {
       'recent_runs',
       'verify_css_patch',
     ]);
+    await client.close();
+    await server.close();
+  });
+
+  it('lists read-only and destructive annotations, and keeps descriptions under 4096 characters', async () => {
+    const { client, server } = await connectPair();
+    const res = await client.listTools();
+    const byName = new Map(res.tools.map((tool) => [tool.name, tool]));
+
+    const readOnly = [
+      ['list_regressions', 'List regressions for a PR'],
+      ['get_suggested_fix', 'Get the suggested fix for a diff'],
+      ['recent_runs', 'List recent Frontguard runs'],
+      ['inspect_diff_cluster_dom', 'Inspect diff cluster and grounded DOM target'],
+      ['verify_css_patch', 'Verify a candidate CSS patch before applying'],
+    ] as const;
+    for (const [name, title] of readOnly) {
+      const tool = byName.get(name);
+      expect(tool?.title).toBe(title);
+      expect(tool?.annotations).toEqual({
+        title,
+        readOnlyHint: true,
+        openWorldHint: false,
+        destructiveHint: false,
+      });
+      expect(tool?._meta?.['anthropic/requiresUserInteraction']).toBeUndefined();
+      expect(tool?.description?.length ?? 0).toBeLessThan(4096);
+    }
+
+    const destructive = [
+      ['promote_baseline', 'Promote reviewed visual baselines'],
+      ['accept_baseline', 'Record whole-run baseline approval'],
+    ] as const;
+    for (const [name, title] of destructive) {
+      const tool = byName.get(name);
+      expect(tool?.title).toBe(title);
+      expect(tool?.annotations).toEqual({
+        title,
+        readOnlyHint: false,
+        destructiveHint: true,
+        openWorldHint: false,
+      });
+      expect(tool?._meta).toMatchObject({ 'anthropic/requiresUserInteraction': true });
+      expect(tool?.description?.length ?? 0).toBeLessThan(4096);
+    }
+
+    const instructions = client.getInstructions() ?? '';
+    expect(instructions.length).toBeGreaterThan(0);
+    expect(instructions.length).toBeLessThan(4096);
+    expect(instructions).toMatch(/`promote_baseline` promotes/);
+    expect(instructions).toMatch(/`accept_baseline` records/);
+
     await client.close();
     await server.close();
   });
@@ -870,30 +949,59 @@ describe('MCP server tools/list + tools/call', () => {
               explanation: 'Spacing changed on pricing grid',
               target: '.pricing',
             },
+            clusters: [
+              {
+                id: 1,
+                bbox: { x: 10, y: 20, width: 100, height: 40 },
+                targetSelector: '.pricing',
+              },
+            ],
           },
         ],
       }),
     );
     process.env.FRONTGUARD_LOCAL_REPORT = reportPath;
+    delete process.env.FRONTGUARD_MCP_WRITES;
+    const previousCwd = process.cwd();
+    const repoDir = mkdtempSync(join(tmpdir(), 'fg-mcp-local-git-'));
+    execFileSync('git', ['init', '-q'], { cwd: repoDir });
+    process.chdir(repoDir);
     try {
       const localClient = createLocalReportClient(reportPath);
       const listed = await listRegressions(localClient, { pr_id: 'run_local' });
       expect(listed.count).toBe(1);
       expect(listed.regressions[0].route).toBe('/pricing');
 
+      const inspected = await inspectDiffClusterDom(localClient, {
+        diff_id: 'run_local:/pricing:1280',
+      });
+      expect(inspected.clusters[0]?.targetSelector).toBe('.pricing');
+
       const { client, server } = await connectPair();
+      const names = (await client.listTools()).tools.map((tool) => tool.name);
+      expect(names).not.toContain('promote_baseline');
+      expect(names).not.toContain('accept_baseline');
       const res = (await client.callTool({
-        name: 'get_suggested_fix',
-        arguments: { diff_id: 'run_local:/pricing:1280' },
+        name: 'inspect_diff_cluster_dom',
+        arguments: { diff_id: 'run_local:/pricing:1280', cluster_id: 1 },
       })) as CallToolResult;
       expect(res.isError).toBeFalsy();
       const data = JSON.parse(extractText(res));
-      expect(data.fix.patch).toContain('.pricing');
+      expect(data.clusters[0].targetSelector).toBe('.pricing');
       await client.close();
       await server.close();
+
+      expect(() =>
+        execFileSync('git', ['rev-parse', '--verify', 'refs/heads/frontguard-baselines'], {
+          cwd: repoDir,
+          stdio: 'ignore',
+        }),
+      ).toThrow();
     } finally {
+      process.chdir(previousCwd);
       delete process.env.FRONTGUARD_LOCAL_REPORT;
       rmSync(tmpDir, { recursive: true, force: true });
+      rmSync(repoDir, { recursive: true, force: true });
     }
   });
 });

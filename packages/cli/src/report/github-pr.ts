@@ -508,7 +508,7 @@ export class GitHubPRReporter implements Reporter {
     lines.push(
       baselineUpdate
         ? '> These screenshots were explicitly accepted and committed to the local `frontguard-baselines` branch.'
-        : '> These pages have no accepted baseline yet. Review them, then run `frontguard update-baselines` to capture and accept fresh baselines.',
+        : '> These pages have no accepted baseline yet. Review them, then run `frontguard update-baselines --confirm-baselines` to capture and accept fresh baselines.',
     );
 
     return lines.join('\n');

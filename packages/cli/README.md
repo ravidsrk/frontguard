@@ -59,7 +59,7 @@ npm run dev
 **Frontguard terminal:** review the running app in your browser, capture baselines with `update-baselines`, then compare with `run`. Local comparison needs no `origin` remote:
 
 ```bash
-npx -p @frontguard/cli frontguard update-baselines
+npx -p @frontguard/cli frontguard update-baselines --confirm-baselines
 npx -p @frontguard/cli frontguard run
 ```
 
@@ -69,7 +69,7 @@ Only CI comparisons need the published orphan branch:
 git push origin frontguard-baselines
 ```
 
-Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on your `PATH` and you can drop the `npx -p @frontguard/cli` prefix (e.g. `frontguard run`). `run` exits `0` when pages match, `1` on a regression or unaccepted new page, and `2` on a tool error. The default `threshold` is `0.1` (10% changed pixels), so a small visible change still passes — lower it for stricter pages.
+Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on your `PATH` and you can drop the `npx -p @frontguard/cli` prefix (e.g. `frontguard run`). `run` exits `0` when pages match, `1` on a regression or unaccepted new page, and `2` on a tool error. `update-baselines` and `run --update-baselines` exit `2` and write nothing without `--confirm-baselines`. Judge mode cannot supply that flag, and an advisory caption cannot set it. An agent setting `confirm_reviewed: true` on itself is not a human review. MCP promotion is refused in local-report mode; this CLI command is the local write. Cloud `approveRun` is not a production path. The default `threshold` is `0.1` (10% changed pixels), so a small visible change still passes — lower it for stricter pages.
 
 ---
 
@@ -81,7 +81,7 @@ Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on 
 | `frontguard init [--ci] [--yes]`     | Generate a starter config; `--ci` also writes a GitHub Actions workflow                 |
 | `frontguard doctor`                  | Diagnose environment readiness (Node, Playwright, browsers, config, git)                |
 | `frontguard guide [topic] [--json]`  | Print offline reference guides (`setup`, `diffing`, `mcp`, `playwright`, `ci`)          |
-| `frontguard update-baselines`        | Accept current screenshots as new baselines                                             |
+| `frontguard update-baselines --confirm-baselines` | Accept current screenshots as new baselines. Refuses, exit 2, without the flag. |
 | `frontguard monitor`                 | Monitor live production URLs for visual regressions                                     |
 | `frontguard accept-fix <id>`         | Mark a suggested fix as accepted (improves future suggestions)                          |
 | `frontguard reject-fix <id>`         | Mark a suggested fix as rejected (negative training signal)                             |
@@ -101,6 +101,9 @@ Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on 
 - `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
 - `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render
 - `--output <console|json>` — Emit console summary or structured JSON to stdout
+- `--all-routes` — Render every discovered route. Skips smartFilter for this run and leaves animation freeze and font waiting on.
+- `--update-baselines` — Accept current screenshots as new baselines. Requires `--confirm-baselines`.
+- `--confirm-baselines` — Human confirmation for a baseline write. `--mode judge` and an advisory caption cannot set it.
 
 ---
 

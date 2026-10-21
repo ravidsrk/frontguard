@@ -33,10 +33,12 @@ async function runDistBin(
   stdin: string,
 ): Promise<{ stdout: string; stderr: string; code: number | null }> {
   return new Promise((resolve, reject) => {
+    const env = { ...process.env, NODE_NO_WARNINGS: '1' };
+    delete env.FRONTGUARD_MCP_WRITES;
     const child = spawn(process.execPath, [binPath], {
       cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, NODE_NO_WARNINGS: '1' },
+      env,
     });
     let stdout = '';
     let stderr = '';
@@ -142,11 +144,9 @@ describe('dist bin JSON-RPC stdio (mcp-3, mcp-10)', () => {
       ) as { result: { tools: Array<{ name: string }> } } | undefined;
       const names = toolsList?.result.tools.map((t) => t.name).sort();
       expect(names).toEqual([
-        'accept_baseline',
         'get_suggested_fix',
         'inspect_diff_cluster_dom',
         'list_regressions',
-        'promote_baseline',
         'recent_runs',
         'verify_css_patch',
       ]);

@@ -70,7 +70,7 @@ export async function promoteBaseline(
 
   if (client.mode === 'local-report') {
     throw new Error(
-      'Baseline promotion is not supported in local-report mode because JSON reports do not store baseline PNGs. Run `npx frontguard update-baselines` via CLI to update local baselines.',
+      'Baseline promotion is not supported in local-report mode and does not write the frontguard-baselines branch. The local write is the CLI command `npx frontguard update-baselines --confirm-baselines`. Cloud approveRun is not a production path. Setting confirm_reviewed: true is not a human review.',
     );
   }
 

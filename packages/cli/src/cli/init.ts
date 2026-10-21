@@ -388,7 +388,7 @@ export function runInit(opts: InitOptions = {}): InitResult {
     logger.info('  2. Start your Storybook (e.g. npm run storybook)');
     logger.info(`     Frontguard expects it at ${storybookUrl}`);
     logger.info('  3. Accept the initial state:');
-    logger.info('     npx -p @frontguard/cli frontguard update-baselines');
+    logger.info('     npx -p @frontguard/cli frontguard update-baselines --confirm-baselines');
     logger.info('  4. Run comparisons: npx -p @frontguard/cli frontguard run');
     logger.info('  5. (Optional) Add `parameters.frontguard` to individual stories');
     logger.info('     to set per-story viewports, threshold, or ignore rules.');
@@ -398,7 +398,7 @@ export function runInit(opts: InitOptions = {}): InitResult {
     logger.info(`     ${commitCommand}`);
     logger.info('  3. Start your dev server (e.g. npm run dev)');
     logger.info('  4. Accept the initial state:');
-    logger.info('     npx -p @frontguard/cli frontguard update-baselines');
+    logger.info('     npx -p @frontguard/cli frontguard update-baselines --confirm-baselines');
     logger.info('  5. Run comparisons: npx -p @frontguard/cli frontguard run');
   }
   logger.info('');
