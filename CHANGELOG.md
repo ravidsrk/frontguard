@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Warn when a run's color scheme differs from the scheme stored on the baseline. The comparison still uses the same baseline file, and the warning does not change the exit code.
 - Prevent pull-request CI completions from changing or replacing main failure
   alerts, including fork branches named `main`.
 - Correct copied plugin, MCP, Playwright and monitoring documentation, warn

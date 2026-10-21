@@ -171,6 +171,7 @@ All actionable post-launch engineering work is tracked under parent issue [#283]
 3. **[#301](https://github.com/ravidsrk/frontguard/issues/301) — Route entries that share a path overwrite each other's baselines.**
    - Reject duplicate baseline keys at config validation (exit `2`) until named modes exist.
    - Document that `--color-scheme` compares against the default scheme's baselines.
+   - Warn when the run's effective color scheme differs from the scheme stored on the baseline. The warning does not change the exit code.
 4. **[#302](https://github.com/ravidsrk/frontguard/issues/302) — Accessibility plugin docs use options the plugin ignores.**
    - Fix the recipe to `impact` + `failOnViolation: true`.
    - Warn on unknown option keys.

@@ -308,7 +308,7 @@ export default {
 - `--threshold <ratio>` — Changed-pixel ratio threshold on a `0–1` scale (`0.01` = 1%)
 - `--wait-for-stability` — Wait for consecutive animation frames to converge before capturing
 - `--redact-sensitive` — Redact password, payment, and `[data-frontguard-redact]` inputs and scrub DOM snapshots before capture
-- `--color-scheme <scheme>` — Emulate `light` or `dark` `prefers-color-scheme`. This compares against the same baseline file as the default scheme until named capture modes exist.
+- `--color-scheme <scheme>` — Emulate `light` or `dark` `prefers-color-scheme`. This compares against the same baseline file as the default scheme until named capture modes exist, and warns when the stored scheme differs. The warning does not change the exit code.
 - `--freeze-time [timestamp]` — Freeze `Date.now()` / `new Date()` (boolean default, epoch ms, or ISO 8601 date string)
 - `--seed-random [seed]` — Seed `Math.random()` with a deterministic PRNG (`true` or numeric seed)
 - `--block-urls <patterns...>` — Abort matching third-party / analytics / ad request URLs during render

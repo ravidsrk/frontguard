@@ -156,7 +156,28 @@ describe('updateBaselines', () => {
                     channel: expect.stringMatching(/\S/),
                   }),
                 }),
+                colorScheme: 'light',
               }),
+            },
+          }),
+        },
+      }),
+    );
+  });
+
+  it('records a route color scheme over the global scheme', async () => {
+    mocks.renderPages.mockResolvedValue([
+      { ...screenshot(), route: { path: '/', colorScheme: 'dark' } },
+    ]);
+
+    await updateBaselines({ ...config(), colorScheme: 'light' }, reporter());
+
+    expect(mocks.writeManifest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routes: {
+          '/': expect.objectContaining({
+            snapshots: {
+              '1440/chromium': expect.objectContaining({ colorScheme: 'dark' }),
             },
           }),
         },

@@ -43,7 +43,7 @@ npx frontguard update-baselines --confirm-baselines --url http://localhost:3000
 npx frontguard run --url http://localhost:3000 --wait-for-stability --redact-sensitive
 
 # Emulate dark mode and emit machine-readable JSON.
-# This uses the same baseline files as the default scheme until named capture modes exist.
+# Same baseline files as the default scheme until named modes exist. A stored scheme that differs warns; the exit code stays a pixel result.
 npx frontguard run --url http://localhost:3000 --color-scheme dark --output json
 ```
 

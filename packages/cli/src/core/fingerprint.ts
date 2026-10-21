@@ -22,6 +22,7 @@ import type {
   BaselineManifest,
   BaselineSnapshot,
   BrowserEngine,
+  ColorScheme,
   FingerprintCheck,
   RendererFingerprint,
   Route,
@@ -231,6 +232,7 @@ export function parseBaselineManifest(raw: string): BaselineManifest | null {
 export function stampBaselineManifest(
   manifest: BaselineManifest,
   shots: readonly ScreenshotResult[],
+  globalColorScheme?: ColorScheme,
 ): BaselineManifest {
   const routes: BaselineManifest['routes'] = { ...(manifest.routes ?? {}) };
   for (const shot of shots) {
@@ -248,6 +250,7 @@ export function stampBaselineManifest(
       sha256,
       updatedAt: now,
       fingerprint,
+      colorScheme: shot.route.colorScheme ?? globalColorScheme ?? 'light',
     };
     routes[shot.route.path] = {
       viewports: [...new Set([...(existing?.viewports ?? []), shot.viewport])],

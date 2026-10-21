@@ -16,6 +16,7 @@ import {
   CAPTURE_SCREENSHOT_OPTIONS,
   PIXELMATCH_OPTIONS,
   currentFingerprint,
+  emptyBaselineManifest,
   fingerprintDiffs,
   formatFingerprintWarning,
   missingFingerprintWarning,
@@ -308,6 +309,22 @@ describe('fingerprint comparison', () => {
     expect(explicit.routes['/']?.snapshots?.['1440/chromium']?.fingerprint?.captureRunner).toBe('routes');
   });
 
+  it('records the effective color scheme without putting it in the fingerprint', () => {
+    const light = stampBaselineManifest(emptyBaselineManifest(), [shot()]);
+    expect(light.routes['/']?.snapshots?.['1440/chromium']?.colorScheme).toBe('light');
+
+    const globalDark = stampBaselineManifest(emptyBaselineManifest(), [shot()], 'dark');
+    expect(globalDark.routes['/']?.snapshots?.['1440/chromium']?.colorScheme).toBe('dark');
+
+    const routeDark = stampBaselineManifest(
+      emptyBaselineManifest(),
+      [{ ...shot(), route: { path: '/', colorScheme: 'dark' } }],
+      'light',
+    );
+    expect(routeDark.routes['/']?.snapshots?.['1440/chromium']?.colorScheme).toBe('dark');
+    expect(routeDark.routes['/']?.snapshots?.['1440/chromium']?.fingerprint).not.toHaveProperty('colorScheme');
+  });
+
   it('does not let a retired snapshot force a full render', () => {
     const current = currentFingerprint('chromium', 'routes');
     const stale: RendererFingerprint = {
@@ -537,6 +554,78 @@ describe('pipeline fingerprint policy', () => {
     expect(info).toContain('disabled');
     expect(info).not.toContain('renderer fingerprint');
     expect(warnText().join('\n')).not.toContain('renderer fingerprint');
+  });
+
+  function withColorScheme(scheme: 'light' | 'dark' | undefined): BaselineManifest {
+    const manifest = manifestFor(currentFingerprint('chromium', 'routes'));
+    for (const route of Object.values(manifest.routes)) {
+      const snapshot = route.snapshots?.['1440/chromium'];
+      if (snapshot && scheme) snapshot.colorScheme = scheme;
+    }
+    return manifest;
+  }
+
+  it('warns when the stored color scheme differs and does not change the exit code', async () => {
+    pipelineMocks.readManifest.mockResolvedValue(withColorScheme('light'));
+
+    const result = await runPipeline(
+      makeConfig({ colorScheme: 'dark', fingerprint: 'strict' }),
+      reporter(),
+    );
+    const warnings = warnText().join('\n');
+    const rendered = pipelineMocks.renderPages.mock.calls[0]?.[0] as Route[];
+
+    expect(rendered.map((route) => route.path)).toEqual(['/about']);
+    expect(warnings).toContain('Color scheme differs');
+    expect(warnings).toContain('Not a pixel failure');
+    expect(warnings).toContain('/about @ 1440px [chromium] light vs dark');
+    expect(warnings).toContain('same baseline file');
+    expect(result.fingerprintCheck?.strictFailure).toBe(false);
+    expect(result.summary.passed).toBe(1);
+    expect(runExitCode(result.summary, result.fingerprintCheck)).toBe(0);
+  });
+
+  it('does not warn when the scheme matches or was not stored', async () => {
+    pipelineMocks.readManifest.mockResolvedValue(withColorScheme('dark'));
+    await runPipeline(makeConfig({ colorScheme: 'dark', smartRender: false }), reporter());
+    expect(warnText().join('\n')).not.toContain('Color scheme differs');
+
+    vi.clearAllMocks();
+    pipelineMocks.init.mockResolvedValue(undefined);
+    pipelineMocks.readBaseline.mockResolvedValue(Buffer.from('baseline'));
+    pipelineMocks.readManifest.mockResolvedValue(withColorScheme(undefined));
+    pipelineMocks.renderPages.mockImplementation(async (routes: Route[]) =>
+      routes.map((route) => shot(route.path)),
+    );
+    pipelineMocks.compareScreenshot.mockImplementation((current: ScreenshotResult) => ({
+      route: current.route,
+      viewport: current.viewport,
+      browser: current.browser,
+      status: 'pass' as const,
+      diffPercentage: 0,
+    }));
+    await runPipeline(makeConfig({ colorScheme: 'dark', smartRender: false }), reporter());
+    expect(warnText().join('\n')).not.toContain('Color scheme differs');
+  });
+
+  it('compares a route scheme against the stored scheme', async () => {
+    pipelineMocks.readManifest.mockResolvedValue(withColorScheme('dark'));
+    pipelineMocks.renderPages.mockImplementation(async (routes: Route[]) =>
+      routes.map((route) => ({ ...shot(route.path), route })),
+    );
+
+    await runPipeline(
+      makeConfig({
+        colorScheme: 'light',
+        smartRender: false,
+        routes: ['/', { path: '/about', colorScheme: 'dark' }],
+      }),
+      reporter(),
+    );
+
+    const warnings = warnText().join('\n');
+    expect(warnings).toContain('/ @ 1440px [chromium] dark vs light');
+    expect(warnings).not.toContain('/about @ 1440px');
   });
 });
 
