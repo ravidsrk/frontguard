@@ -408,6 +408,30 @@ function effectiveViewports(
 }
 
 /**
+ * One entry per path. Repeated paths keep every width they capture.
+ * An entry with no override uses the global list, so the union does too.
+ */
+function selectedRoutesByPath(
+  routes: readonly { path: string; viewport?: readonly number[] }[],
+): Map<string, { path: string; viewport?: number[] }> {
+  const grouped = new Map<string, { path: string; viewport?: number[] }>();
+  for (const route of routes) {
+    const explicit = route.viewport && route.viewport.length > 0 ? [...route.viewport] : undefined;
+    const current = grouped.get(route.path);
+    if (!current) {
+      grouped.set(route.path, { path: route.path, viewport: explicit });
+      continue;
+    }
+    if (!current.viewport || !explicit) {
+      current.viewport = undefined;
+      continue;
+    }
+    current.viewport = [...new Set([...current.viewport, ...explicit])];
+  }
+  return grouped;
+}
+
+/**
  * Why smart filtering must render every route, or undefined when the baseline
  * browser build and pixelmatch options still match this process.
  * A missing fingerprint does not bypass scoping. Retired routes and widths
@@ -424,9 +448,7 @@ export function rendererBypassReason(
   if (!manifest?.routes) return undefined;
   const active = new Set(browsers);
   const selectedByPath =
-    selection && selection.routes.length > 0
-      ? new Map(selection.routes.map((route) => [route.path, route]))
-      : null;
+    selection && selection.routes.length > 0 ? selectedRoutesByPath(selection.routes) : null;
   const globalViewports =
     selection && selection.viewports.length > 0 ? new Set(selection.viewports) : null;
   const reasons = new Set<string>();

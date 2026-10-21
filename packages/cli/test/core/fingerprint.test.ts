@@ -374,6 +374,31 @@ describe('fingerprint comparison', () => {
       }),
     ).toBeUndefined();
   });
+
+  it('unions widths when the same path is selected twice', () => {
+    const current = currentFingerprint('chromium', 'routes');
+    const stale: RendererFingerprint = {
+      ...current,
+      browser: { ...current.browser, version: '0.0.0-split' },
+    };
+    const manifest = manifestFor(current, ['/']);
+    const snapshots = manifest.routes['/']?.snapshots;
+    if (!snapshots?.['1440/chromium']) throw new Error('fixture snapshot missing');
+    snapshots['375/chromium'] = {
+      ...snapshots['1440/chromium'],
+      fingerprint: stale,
+    };
+
+    expect(
+      rendererBypassReason(manifest, ['chromium'], {
+        routes: [
+          { path: '/', viewport: [375] },
+          { path: '/', viewport: [1440] },
+        ],
+        viewports: [375, 1440],
+      }),
+    ).toContain('browser.version');
+  });
 });
 
 describe('pipeline fingerprint policy', () => {
