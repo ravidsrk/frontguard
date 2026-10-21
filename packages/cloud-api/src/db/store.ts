@@ -12,6 +12,8 @@
  */
 
 import type { Run, RunResult } from '../types.js';
+import { erasureBlockedBySoleOwnership } from './account-erasure.js';
+import { withUserMutation } from './account-writes.js';
 import type { Monitor, MonitorRun, MonitorAlertState, MonitorStore } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
 import type {
@@ -96,6 +98,12 @@ export interface AccountErasureResult {
   runs: number;
   baselines: number;
   reports: number;
+  /**
+   * Why the account was left in place. Omitted when `erased` is true.
+   * `sole-owner` means another member would be left with nobody who can grant owner.
+   * `blob-delete-failed` means object bytes may still exist, so the rows were kept.
+   */
+  reason?: 'sole-owner' | 'blob-delete-failed';
 }
 
 /** Options for {@link Store.listRuns}. */
@@ -136,10 +144,18 @@ export interface Store extends MonitorStore, TeamStore, MaskStore, AttachmentSto
   updateUserIdentity(id: string, patch: { email?: string; githubLogin?: string }): Promise<void>;
   /**
    * Deletes one account and the baselines, reports, and other rows it owns.
-   * Other accounts are left intact. Blob deletion is best-effort and runs
-   * before the rows disappear. Does not touch accounts that do not match `userId`.
+   * Other accounts are left intact. Closes writes, then deletes blobs, then
+   * deletes rows. A blob-delete failure keeps the account so a later call can
+   * retry. Refuses when the user is the only owner of a team that still has
+   * another member. Does not touch accounts that do not match `userId`.
    */
   eraseAccount(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult>;
+  /** Stop new screenshot writes for this account until erasure finishes or reopens. */
+  closeAccountWrites(userId: string): Promise<void>;
+  /** Allow screenshot writes again after an erasure attempt that kept the account. */
+  reopenAccountWrites(userId: string): Promise<void>;
+  /** True while an erasure attempt has closed writes and has not reopened them. */
+  accountWritesClosed(userId: string): Promise<boolean>;
 
   // API keys
   createApiKey(key: ApiKeyRecord): Promise<void>;
@@ -221,6 +237,8 @@ export class InMemoryStore implements Store {
   private monitorClaimLocks = new Map<string, Promise<void>>();
 
   private users = new Map<string, User>();
+  /** Accounts whose screenshot writes must no-op until erasure reopens or finishes. */
+  private closedWrites = new Set<string>();
   private apiKeys = new Map<string, ApiKeyRecord>();
   private runs = new Map<string, { run: Run; userId: string }>();
   private runVersions = new Map<string, number>();
@@ -266,8 +284,31 @@ export class InMemoryStore implements Store {
   }
 
   async eraseAccount(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
+    return withUserMutation(userId, () => this.eraseAccountUnlocked(userId, blobs));
+  }
+
+  async closeAccountWrites(userId: string): Promise<void> {
+    this.closedWrites.add(userId);
+  }
+  async reopenAccountWrites(userId: string): Promise<void> {
+    this.closedWrites.delete(userId);
+  }
+  async accountWritesClosed(userId: string): Promise<boolean> {
+    return this.closedWrites.has(userId);
+  }
+
+  private async eraseAccountUnlocked(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
     const user = this.users.get(userId);
     if (!user) return { erased: false, userId, runs: 0, baselines: 0, reports: 0 };
+
+    const memberships = [...this.members.values()].map((member) => ({
+      teamId: member.teamId,
+      userId: member.userId,
+      role: member.role,
+    }));
+    if (erasureBlockedBySoleOwnership(userId, memberships)) {
+      return { erased: false, userId, runs: 0, baselines: 0, reports: 0, reason: 'sole-owner' };
+    }
 
     const ownedIds: string[] = [];
     let baselines = 0;
@@ -278,13 +319,22 @@ export class InMemoryStore implements Store {
       if (entry.run.reportHtml) reports++;
       baselines += (this.screenshots.get(id) ?? []).filter((shot) => shot.type === 'baseline').length;
     }
+    await this.closeAccountWrites(userId);
     if (blobs) {
-      for (const id of ownedIds) {
-        try {
+      try {
+        for (const id of ownedIds) {
           await blobs.deleteRun(userId, id);
-        } catch {
-          // Object deletion must not keep the account row.
         }
+      } catch {
+        await this.reopenAccountWrites(userId);
+        return {
+          erased: false,
+          userId,
+          runs: ownedIds.length,
+          baselines,
+          reports,
+          reason: 'blob-delete-failed',
+        };
       }
     }
     for (const id of ownedIds) {
@@ -884,6 +934,7 @@ export class InMemoryStore implements Store {
   /** Test helper: wipe all data. */
   clear(): void {
     this.users.clear();
+    this.closedWrites.clear();
     this.apiKeys.clear();
     this.runs.clear();
     this.screenshots.clear();

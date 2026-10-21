@@ -9,6 +9,7 @@ import type { Store } from '../src/db/store.js';
 import { migrate } from '../src/db/migrate.js';
 import { createSqliteD1 } from './helpers/sqlite-d1.js';
 import { MemoryScreenshotStore, screenshotKey } from '../src/storage/screenshots.js';
+import { persistScreenshots } from '../src/storage/persist-screenshots.js';
 import { app } from '../src/index.js';
 import { getMemoryStore, resetMemoryStore } from '../src/db/factory.js';
 import { getMemoryScreenshotStore, resetMemoryScreenshotStore } from '../src/storage/screenshots.js';
@@ -33,7 +34,11 @@ function makeRun(id: string, reportHtml: string): Run {
   };
 }
 
-async function seedFixture(store: Store, blobs: MemoryScreenshotStore): Promise<void> {
+async function seedFixture(
+  store: Store,
+  blobs: MemoryScreenshotStore,
+  secondOwner = true,
+): Promise<void> {
   await store.createUser({
     id: 'fixture-a',
     email: 'a@example.com',
@@ -56,6 +61,20 @@ async function seedFixture(store: Store, blobs: MemoryScreenshotStore): Promise<
     role: 'member',
     createdAt: '2026-01-01T00:00:00Z',
   });
+  if (secondOwner) {
+    await store.createUser({
+      id: 'fixture-c',
+      email: 'c@example.com',
+      plan: 'free',
+      createdAt: '2026-01-01T00:00:00Z',
+    });
+    await store.addMember({
+      teamId: 'team-1',
+      userId: 'fixture-c',
+      role: 'owner',
+      createdAt: '2026-01-01T00:00:00Z',
+    });
+  }
   await store.createInvitation({
     id: 'inv-a',
     teamId: 'team-1',
@@ -178,6 +197,7 @@ async function expectErased(store: Store, blobs: MemoryScreenshotStore): Promise
   expect((await store.listScreenshots('run-b')).map((shot) => shot.type)).toEqual(['baseline']);
   expect(await blobs.get(screenshotKey('fixture-b', 'run-b', 'baseline', '/', 1440, 'chromium'))).toEqual(PNG);
   expect(await store.getMember('team-1', 'fixture-b')).toMatchObject({ role: 'member' });
+  expect(await store.getMember('team-1', 'fixture-c')).toMatchObject({ role: 'owner' });
   expect((await store.getTeam('team-1'))?.name).toBe('Shared');
   expect((await store.getInvitationByToken('tok-b'))?.email).toBe('b@example.com');
 }
@@ -199,6 +219,103 @@ describe('eraseAccount — fixture account', () => {
     const blobs = new MemoryScreenshotStore();
     await seedFixture(store, blobs);
     await expectErased(store, blobs);
+  });
+});
+
+async function openStore(kind: 'sqlite' | 'memory'): Promise<Store> {
+  if (kind === 'memory') return new InMemoryStore();
+  const { db } = createSqliteD1();
+  await migrate(db);
+  return new D1Store(db);
+}
+
+describe('eraseAccount — refusal', () => {
+  it.each(['sqlite', 'memory'] as const)(
+    'keeps the %s account when blob deletion fails',
+    async (kind) => {
+      const store = await openStore(kind);
+      const blobs = new MemoryScreenshotStore();
+      await seedFixture(store, blobs);
+      const key = screenshotKey('fixture-a', 'run-a', 'baseline', '/', 1440, 'chromium');
+      blobs.deleteRun = async () => {
+        throw new Error('object store unavailable');
+      };
+      const result = await store.eraseAccount('fixture-a', blobs);
+      expect(result).toMatchObject({ erased: false, userId: 'fixture-a', reason: 'blob-delete-failed' });
+      expect(await store.getUser('fixture-a')).not.toBeNull();
+      expect(await store.getRun('run-a')).not.toBeNull();
+      expect(await blobs.get(key)).toEqual(PNG);
+      expect(await store.accountWritesClosed('fixture-a')).toBe(false);
+    },
+  );
+
+  it.each(['sqlite', 'memory'] as const)(
+    'refuses to erase the sole %s owner while another member remains',
+    async (kind) => {
+      const store = await openStore(kind);
+      const blobs = new MemoryScreenshotStore();
+      await seedFixture(store, blobs, false);
+      const key = screenshotKey('fixture-a', 'run-a', 'baseline', '/', 1440, 'chromium');
+      const result = await store.eraseAccount('fixture-a', blobs);
+      expect(result).toMatchObject({ erased: false, userId: 'fixture-a', reason: 'sole-owner' });
+      expect(await store.getUser('fixture-a')).not.toBeNull();
+      expect(await store.getMember('team-1', 'fixture-a')).toMatchObject({ role: 'owner' });
+      expect(await store.getMember('team-1', 'fixture-b')).toMatchObject({ role: 'member' });
+      expect(await blobs.get(key)).toEqual(PNG);
+    },
+  );
+
+  it('drops a screenshot that was uploading when erasure started', async () => {
+    const store = new InMemoryStore();
+    const blobs = new MemoryScreenshotStore();
+    await store.createUser({
+      id: 'fixture-a',
+      email: 'a@example.com',
+      plan: 'free',
+      createdAt: '2026-01-01T00:00:00Z',
+    });
+    await store.createRun(makeRun('run-a', "Alice's report"), 'fixture-a');
+    let releasePut: () => void = () => {};
+    const putEntered = new Promise<void>((resolve) => {
+      const original = blobs.put.bind(blobs);
+      blobs.put = async (key, bytes) => {
+        resolve();
+        await new Promise<void>((release) => {
+          releasePut = release;
+        });
+        await original(key, bytes);
+      };
+    });
+    const pending = persistScreenshots(store, blobs, 'fixture-a', 'run-a', [
+      { name: 'home_1440_chromium_0_current', type: 'current', bytes: PNG },
+    ]);
+    await putEntered;
+    const erasing = store.eraseAccount('fixture-a', blobs);
+    releasePut();
+    const [count, result] = await Promise.all([pending, erasing]);
+    expect(count).toBe(1);
+    expect(result.erased).toBe(true);
+    expect(blobs.size()).toBe(0);
+    expect(await store.getUser('fixture-a')).toBeNull();
+  });
+
+  it('does not put screenshots after writes are closed', async () => {
+    const { db } = createSqliteD1();
+    await migrate(db);
+    const store = new D1Store(db);
+    const blobs = new MemoryScreenshotStore();
+    await store.createUser({
+      id: 'fixture-a',
+      email: 'a@example.com',
+      plan: 'free',
+      createdAt: '2026-01-01T00:00:00Z',
+    });
+    await store.closeAccountWrites('fixture-a');
+    const count = await persistScreenshots(store, blobs, 'fixture-a', 'run-a', [
+      { name: 'home_1440_chromium_0_current', type: 'current', bytes: PNG },
+    ]);
+    expect(count).toBe(0);
+    expect(blobs.size()).toBe(0);
   });
 });
 

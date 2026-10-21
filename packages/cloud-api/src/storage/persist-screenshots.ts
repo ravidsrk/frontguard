@@ -10,6 +10,7 @@
  */
 
 import type { Store, ScreenshotRecord } from '../db/store.js';
+import { withUserMutation } from '../db/account-writes.js';
 import { type ScreenshotStore, screenshotKey } from './screenshots.js';
 
 /** A screenshot produced by a run, before persistence. */
@@ -190,10 +191,19 @@ export async function promoteRunCurrentScreenshotsToBaseline(
   }
 }
 
+/** True while erasure has closed writes for this account. The lock stays after a successful erase. */
+async function screenshotWritesBlocked(store: Store, userId: string): Promise<boolean> {
+  return store.accountWritesClosed(userId);
+}
+
 /**
  * Persists a run's screenshots to blob storage + metadata store.
  * Best-effort per screenshot: a single failure does not abort the rest.
  * Returns the number of screenshots successfully persisted.
+ *
+ * Waits for an in-process erasure of the same account, and refuses the put
+ * when writes are closed. The lock stays closed after a successful erase.
+ * A put that finishes as erasure closes writes deletes the object it just wrote.
  */
 export async function persistScreenshots(
   store: Store,
@@ -204,15 +214,35 @@ export async function persistScreenshots(
   nowOrRoutes: (() => string) | readonly string[] = () => new Date().toISOString(),
   knownRoutes?: readonly string[],
 ): Promise<number> {
+  return withUserMutation(userId, () =>
+    persistScreenshotsUnlocked(store, blobs, userId, runId, screenshots, nowOrRoutes, knownRoutes),
+  );
+}
+
+async function persistScreenshotsUnlocked(
+  store: Store,
+  blobs: ScreenshotStore,
+  userId: string,
+  runId: string,
+  screenshots: PendingScreenshot[],
+  nowOrRoutes: (() => string) | readonly string[] = () => new Date().toISOString(),
+  knownRoutes?: readonly string[],
+): Promise<number> {
+  if (await screenshotWritesBlocked(store, userId)) return 0;
   const now = typeof nowOrRoutes === 'function' ? nowOrRoutes : () => new Date().toISOString();
   const routes = Array.isArray(nowOrRoutes) ? nowOrRoutes : knownRoutes;
   let persisted = 0;
   for (const shot of screenshots) {
+    if (await screenshotWritesBlocked(store, userId)) break;
     const parsed = parseScreenshotName(shot.name, routes);
     if (!parsed) continue;
     const key = screenshotKey(userId, runId, parsed.type, parsed.route, parsed.viewport, parsed.browser);
     try {
       await blobs.put(key, shot.bytes);
+      if (await screenshotWritesBlocked(store, userId)) {
+        await blobs.delete(key);
+        continue;
+      }
       const record: ScreenshotRecord = {
         id: crypto.randomUUID(),
         runId,
@@ -226,6 +256,9 @@ export async function persistScreenshots(
       };
       await store.addScreenshot(record);
       persisted++;
+      if (await screenshotWritesBlocked(store, userId)) {
+        await blobs.delete(key);
+      }
     } catch {
       // Skip this screenshot; continue with the rest.
     }

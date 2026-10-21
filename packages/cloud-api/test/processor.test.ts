@@ -139,6 +139,23 @@ describe('processRun — Daytona branch', () => {
     expect(run.error).toBe(NO_COMPARISON_ERROR);
   });
 
+  it('persists screenshots when the first capture has no comparison', async () => {
+    const shots = [{ name: 'home_1440_chromium_0_current', type: 'current' as const, bytes: new Uint8Array([1]) }];
+    executeInSandbox.mockResolvedValue({
+      results: [{ route: '/', viewport: 1440, status: 'new', diffPercentage: 0, timestamp: 't1' }],
+      screenshots: shots,
+      reportHtml: '<html>first capture</html>',
+    });
+    const seen: unknown[] = [];
+    const run = makeRun();
+    await processRun(run, { DAYTONA_API_KEY: 'dt_key' }, async (got) => {
+      seen.push(got);
+    });
+    expect(run.status).toBe('failed');
+    expect(run.error).toBe(NO_COMPARISON_ERROR);
+    expect(seen).toEqual([shots]);
+  });
+
   it('marks the run failed when the sandbox throws', async () => {
     executeInSandbox.mockRejectedValue(new Error('sandbox boom'));
     const run = makeRun();

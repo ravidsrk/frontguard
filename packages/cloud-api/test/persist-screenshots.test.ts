@@ -53,9 +53,12 @@ describe('parseScreenshotName', () => {
 
 describe('persistScreenshots', () => {
   let store: InMemoryStore;
-  beforeEach(() => {
+  beforeEach(async () => {
     store = new InMemoryStore();
     resetMemoryScreenshotStore();
+    for (const id of ['user-1', 'u', 'u1']) {
+      await store.createUser({ id, email: `${id}@example.com`, plan: 'free', createdAt: '2026-01-01T00:00:00Z' });
+    }
   });
 
   it('writes bytes to the blob store and metadata to the run store, namespaced per user', async () => {

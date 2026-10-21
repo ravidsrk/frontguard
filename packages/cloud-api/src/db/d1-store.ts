@@ -19,6 +19,8 @@ import type {
   AccountErasureResult,
   RunBlobDeleter,
 } from './store.js';
+import { erasureBlockedBySoleOwnership } from './account-erasure.js';
+import { withUserMutation } from './account-writes.js';
 import type { Monitor, MonitorRun, MonitorRunStatus, MonitorAlertState } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
 import type {
@@ -168,8 +170,49 @@ export class D1Store implements Store {
   }
 
   async eraseAccount(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
+    return withUserMutation(userId, () => this.eraseAccountUnlocked(userId, blobs));
+  }
+
+  async closeAccountWrites(userId: string): Promise<void> {
+    const closedAt = new Date().toISOString();
+    await this.db
+      .prepare(
+        `INSERT INTO account_write_locks (user_id, closed_at) VALUES (?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET closed_at = excluded.closed_at`,
+      )
+      .bind(userId, closedAt)
+      .run();
+  }
+  async reopenAccountWrites(userId: string): Promise<void> {
+    await this.db.prepare(`DELETE FROM account_write_locks WHERE user_id = ?`).bind(userId).run();
+  }
+  async accountWritesClosed(userId: string): Promise<boolean> {
+    const row = await this.db
+      .prepare(`SELECT user_id FROM account_write_locks WHERE user_id = ?`)
+      .bind(userId)
+      .first<{ user_id: string }>();
+    return row != null;
+  }
+
+  private async eraseAccountUnlocked(userId: string, blobs?: RunBlobDeleter): Promise<AccountErasureResult> {
     const user = await this.getUser(userId);
     if (!user) return { erased: false, userId, runs: 0, baselines: 0, reports: 0 };
+
+    const { results: memberRows } = await this.db
+      .prepare(
+        `SELECT team_id, user_id, role FROM team_members
+         WHERE team_id IN (SELECT team_id FROM team_members WHERE user_id = ? AND role = 'owner')`,
+      )
+      .bind(userId)
+      .all<{ team_id: string; user_id: string; role: string }>();
+    if (
+      erasureBlockedBySoleOwnership(
+        userId,
+        memberRows.map((row) => ({ teamId: row.team_id, userId: row.user_id, role: row.role })),
+      )
+    ) {
+      return { erased: false, userId, runs: 0, baselines: 0, reports: 0, reason: 'sole-owner' };
+    }
 
     const { results: runRows } = await this.db
       .prepare(`SELECT id, report_html FROM runs WHERE user_id = ?`)
@@ -185,13 +228,22 @@ export class D1Store implements Store {
       .first<{ n: number | bigint }>();
     const baselines = Number(baselineRow?.n ?? 0);
 
+    await this.closeAccountWrites(userId);
     if (blobs) {
-      for (const id of runIds) {
-        try {
+      try {
+        for (const id of runIds) {
           await blobs.deleteRun(userId, id);
-        } catch {
-          // Object deletion must not keep the account row.
         }
+      } catch {
+        await this.reopenAccountWrites(userId);
+        return {
+          erased: false,
+          userId,
+          runs: runIds.length,
+          baselines,
+          reports,
+          reason: 'blob-delete-failed',
+        };
       }
     }
 

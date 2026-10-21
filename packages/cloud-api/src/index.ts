@@ -17,6 +17,7 @@ import {
 } from "./db/factory.js";
 import { apiRateLimiter } from "./rate-limit.js";
 import { currentMonth, type Store } from "./db/store.js";
+import { withUserMutation } from "./db/account-writes.js";
 import { hashKey } from "./auth/keys.js";
 import { authRoutes } from "./routes/auth.js";
 import { keyRoutes } from "./routes/keys.js";
@@ -565,16 +566,21 @@ app.post("/v1/run", async (c) => {
     })
     .finally(async () => {
       // Screenshots were reserved at submit time (COST-1).
-      await store.updateRun(runId, run);
-      if (run.status === "failed") {
-        await recordDeadLetter(store, {
-          kind: "run",
-          sourceId: runId,
-          userId,
-          error: run.error ?? "background run failed",
-          attempt: 1,
-        });
-      }
+      // Skip when erasure has closed writes or already removed the account,
+      // so this callback cannot recreate rows after DELETE /v1/account.
+      await withUserMutation(userId, async () => {
+        if (await store.accountWritesClosed(userId)) return;
+        await store.updateRun(runId, run);
+        if (run.status === "failed") {
+          await recordDeadLetter(store, {
+            kind: "run",
+            sourceId: runId,
+            userId,
+            error: run.error ?? "background run failed",
+            attempt: 1,
+          });
+        }
+      });
       // Complete the originating GitHub Check Run, if this run came from CI.
       if (run.github) void completeCheckRun(c.env ?? {}, run);
       // Export OTLP metrics (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).

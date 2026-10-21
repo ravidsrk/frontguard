@@ -98,21 +98,26 @@ export async function processRun(
 
       // Empty output and first-capture markers are not comparisons. The old
       // path still set `completed` after a CLI invocation that never diffed.
+      // Images are still stored so a reviewer can approve them later. The run
+      // stays `failed` because nothing was diffed.
+      const persistCapturedScreenshots = async (): Promise<void> => {
+        if (!onScreenshots || !sandboxResult.screenshots?.length) return;
+        try {
+          await onScreenshots(sandboxResult.screenshots);
+        } catch {
+          // Persistence is best-effort and must not fail the run.
+        }
+      };
+
       if (!sandboxResult.results.some((r) => isBaselineComparison(r))) {
+        await persistCapturedScreenshots();
         run.status = 'failed';
         run.error = NO_COMPARISON_ERROR;
         return;
       }
 
       run.completedAt = new Date().toISOString();
-
-      if (onScreenshots && sandboxResult.screenshots?.length) {
-        try {
-          await onScreenshots(sandboxResult.screenshots);
-        } catch {
-          // Persistence is best-effort and must not fail the run.
-        }
-      }
+      await persistCapturedScreenshots();
 
       if (sandboxResult.reportHtml && sandboxResult.reportHtml !== '<p>No report generated</p>') {
         run.reportHtml = sandboxResult.reportHtml;
