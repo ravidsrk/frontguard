@@ -113,7 +113,7 @@ jobs:
         #   ready script and measures the library entry at 219250 bytes and
         #   the published bin at 395561 bytes. Optional text snapshots (#299)
         #   measure the library entry at 219916 bytes and the published bin
-        #   at 398484 bytes. No dependency is inlined.
+        #   at 398781 bytes. No dependency is inlined.
         # dist/cli/index.js  — the actual published bin (bin.frontguard). This
         #   was previously UNGATED, so the artifact users install could grow
         #   without limit while CI guarded only the library entry. The same

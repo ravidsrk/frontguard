@@ -34,6 +34,23 @@ function formatDeltaPct(frac: number): string {
   return `${pct >= 0 ? '+' : ''}${pct}%`;
 }
 
+/** Inline code span. A longer fence keeps backticks inside the excerpt literal. */
+function markdownCode(text: string): string {
+  let run = 0;
+  let longest = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '`') {
+      run += 1;
+      if (run > longest) longest = run;
+    } else {
+      run = 0;
+    }
+  }
+  const fence = '`'.repeat(longest + 1);
+  const pad = text.startsWith('`') || text.endsWith('`') ? ' ' : '';
+  return `${fence}${pad}${text}${pad}${fence}`;
+}
+
 // ---------------------------------------------------------------------------
 // GitHub PR Reporter
 // ---------------------------------------------------------------------------
@@ -205,7 +222,7 @@ export class GitHubPRReporter implements Reporter {
     const lines = ['## Text snapshots', '', 'These do not change the pixel result.', ''];
     for (const row of result.textSnapshots) {
       if (row.status === 'match') continue;
-      const detail = row.excerpt ? ` (${row.excerpt})` : '';
+      const detail = row.excerpt ? ` (${markdownCode(row.excerpt)})` : '';
       lines.push(`- \`${row.route}\` @ ${row.viewport}px [${row.browser}] ${row.kind}: ${row.status}${detail}`);
     }
     if (lines.length === 4) lines.push('- All captured text snapshots match.');

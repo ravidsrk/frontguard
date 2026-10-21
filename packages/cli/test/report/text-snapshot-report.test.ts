@@ -88,9 +88,17 @@ describe('text snapshot reports', () => {
     expect(comment).toContain('## Text snapshots');
     expect(comment).toContain('do not change the pixel result');
     expect(comment).toContain('aria: mismatch');
-    expect(comment).toContain('was Save now Cancel');
+    expect(comment).toContain('`was Save now Cancel`');
     expect(comment).toContain('All 1 pages match baselines');
     expect(comment).not.toContain('## ❌ Regressions');
+  });
+
+  it('keeps Markdown in a text excerpt literal', () => {
+    const row = result('pass', 'mismatch');
+    row.textSnapshots![0]!.excerpt = 'was [Pay](https://example.com) now <b>`x`</b>';
+    const comment = new GitHubPRReporter().generateComment(row);
+
+    expect(comment).toContain('``was [Pay](https://example.com) now <b>`x`</b>``');
   });
 
   it('renders the HTML section separately from the pixel status', () => {
