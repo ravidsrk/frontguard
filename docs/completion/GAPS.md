@@ -76,7 +76,7 @@ S2 degrades with workaround · S3 polish.
 | G-37 | Most outbound `fetch` lack timeout/retry/circuit breaker | Real, but the CLI is short-lived and `pageTimeout` covers the page under test |
 | G-38 | OpenTelemetry pinned in 30 overrides but never instrumented | Cleanup; the overrides may be load-bearing for resolution and need care |
 | G-39 | God files: `pipeline.ts` 1328, web `index.tsx` 1811 | Refactor, explicitly out of scope in §4 |
-| G-40 | No coverage thresholds enforced | Out of scope in §4 |
+| G-40 | CLI v8 thresholds are the measured totals on this tree (statements 79.32, branches 70.33, functions 82.99, lines 81.02). External research did not supply the number. Undeployed cloud-api is not included. | Enforced in `packages/cli/vitest.config.ts`. Still post-launch and non-blocking in §4 |
 | G-41 | PNG baseline growth will bloat git history over time | Slow-moving; needs a documented pruning story, not a launch fix |
 | G-42 | `apps/web` has no axe/keyboard/contrast proof | Out of scope in §4 |
 
