@@ -28,6 +28,8 @@ import {
   getSuggestedFixOutputSchema,
   inspectDiffClusterDom,
   inspectDiffClusterDomOutputSchema,
+  listHorizontalOverflow,
+  listHorizontalOverflowOutputSchema,
   listRegressions,
   listRegressionsOutputSchema,
   promoteBaseline,
@@ -679,6 +681,7 @@ describe('MCP server tools/list + tools/call', () => {
     expect(names).toEqual([
       'get_suggested_fix',
       'inspect_diff_cluster_dom',
+      'list_horizontal_overflow',
       'list_regressions',
       'recent_runs',
       'verify_css_patch',
@@ -693,7 +696,7 @@ describe('MCP server tools/list + tools/call', () => {
     await server.close();
   });
 
-  it('advertises all seven tools via tools/list when writes are enabled', async () => {
+  it('advertises all eight tools via tools/list when writes are enabled', async () => {
     const { client, server } = await connectPair();
     const res = await client.listTools();
     const names = res.tools.map((t) => t.name).sort();
@@ -701,6 +704,7 @@ describe('MCP server tools/list + tools/call', () => {
       'accept_baseline',
       'get_suggested_fix',
       'inspect_diff_cluster_dom',
+      'list_horizontal_overflow',
       'list_regressions',
       'promote_baseline',
       'recent_runs',
@@ -721,6 +725,7 @@ describe('MCP server tools/list + tools/call', () => {
       ['recent_runs', 'List recent Frontguard runs'],
       ['inspect_diff_cluster_dom', 'Inspect diff cluster and grounded DOM target'],
       ['verify_css_patch', 'Verify a candidate CSS patch before applying'],
+      ['list_horizontal_overflow', 'List horizontal overflow'],
     ] as const;
     for (const [name, title] of readOnly) {
       const tool = byName.get(name);
@@ -1002,6 +1007,55 @@ describe('MCP server tools/list + tools/call', () => {
       delete process.env.FRONTGUARD_LOCAL_REPORT;
       rmSync(tmpDir, { recursive: true, force: true });
       rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('list_horizontal_overflow', () => {
+  it('reads flagged and unflagged rows from a local report without changing pixel status', async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'fg-mcp-overflow-'));
+    const reportPath = join(tmpDir, 'report.json');
+    writeFileSync(
+      reportPath,
+      JSON.stringify({
+        id: 'run_local',
+        diffs: [{ route: '/pricing', viewport: 800, status: 'pass', diffPercentage: 0 }],
+        horizontalOverflow: [
+          {
+            route: '/pricing',
+            viewport: 800,
+            browser: 'chromium',
+            innerWidth: 800,
+            scrollWidth: 1400,
+            flagged: true,
+            elements: [{ selector: '[data-testid="wide"]', overflowPx: 600 }],
+          },
+          {
+            route: '/ghost',
+            viewport: 800,
+            browser: 'chromium',
+            innerWidth: 800,
+            scrollWidth: 1400,
+            flagged: false,
+            elements: [],
+          },
+        ],
+      }),
+    );
+    try {
+      const client = createLocalReportClient(reportPath);
+      const listed = await listHorizontalOverflow(client, {});
+      expect(listHorizontalOverflowOutputSchema.parse(listed)).toMatchObject({
+        count: 2,
+        flagged: 1,
+        runId: 'run_local',
+      });
+      expect(listed.rows[0]?.elements[0]?.selector).toBe('[data-testid="wide"]');
+      expect(listed.rows[1]?.flagged).toBe(false);
+      const run = await client.getRun('run_local');
+      expect(run.results?.[0]?.status).toBe('pass');
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 });

@@ -134,6 +134,7 @@ export class ConsoleReporter implements Reporter {
 
     this.printAccessibility(result);
     this.printTextSnapshots(result);
+    this.printHorizontalOverflow(result);
     this.printPerformance(result);
     this.printThirdPartyScripts(result);
     this.printSummary(result);
@@ -446,6 +447,20 @@ export class ConsoleReporter implements Reporter {
       if (row.excerpt) console.log(chalk.dim(`  ${row.excerpt}`));
     }
     console.log(chalk.dim('  A text mismatch does not pass or fail the pixel comparison.'));
+    console.log('');
+  }
+
+  private printHorizontalOverflow(result: RunResult): void {
+    const rows = result.horizontalOverflow?.filter((row) => row.flagged) ?? [];
+    if (rows.length === 0) return;
+    console.log(chalk.bold('  HORIZONTAL OVERFLOW — not a pixel result'));
+    for (const row of rows) {
+      console.log(
+        `  ${row.route} @ ${row.viewport}px [${row.browser}] scroll ${row.scrollWidth} > inner ${row.innerWidth}`,
+      );
+      for (const el of row.elements) console.log(`    ${el.selector} ${el.overflowPx}px`);
+    }
+    console.log(chalk.dim('  This does not change the exit code.'));
     console.log('');
   }
 

@@ -159,7 +159,7 @@ export async function captureStableScreenshot(
   wait: (ms: number) => Promise<void>,
   options: StabilityOptions = {},
 ): Promise<StabilityResult> {
-  const maxAttempts = Math.max(2, options.maxAttempts ?? 4);
+  const ma = Math.max(2, options.maxAttempts ?? 4);
   const intervalMs = Math.max(0, options.intervalMs ?? 120);
 
   let previous = await captureFrame();
@@ -171,7 +171,7 @@ export async function captureStableScreenshot(
     motionClusters: [],
   };
 
-  while (attempts < maxAttempts) {
+  while (attempts < ma) {
     if (intervalMs > 0) {
       await wait(intervalMs);
     }

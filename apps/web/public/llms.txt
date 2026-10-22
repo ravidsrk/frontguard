@@ -21,7 +21,7 @@ Frontguard is an open-source CLI with pre-release cloud components. The CLI is M
 
 - [Agent task routing](https://frontguard.dev/agents.md) — Start here for MCP tools, cloud API routes, auth, limits, and safe task ordering
 - [OpenAPI contract](https://frontguard.dev/openapi.json) — Machine-readable contract for the pre-release cloud API; there is no live default hosted endpoint yet
-- [MCP discovery manifest](https://frontguard.dev/.well-known/mcp.json) — Discovery for `@frontguard/mcp` (7 tools: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `promote_baseline`, `accept_baseline`, `recent_runs`); supports local report fallback (`FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json`) or a verified deployment via `FRONTGUARD_API_URL`
+- [MCP discovery manifest](https://frontguard.dev/.well-known/mcp.json) — Discovery for `@frontguard/mcp` (8 tools: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `list_horizontal_overflow`, `promote_baseline`, `accept_baseline`, `recent_runs`); supports local report fallback (`FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json`) or a verified deployment via `FRONTGUARD_API_URL`
 
 ## What Frontguard Does
 

@@ -361,12 +361,12 @@ export async function main(argv?: string[]): Promise<number> {
         telemetryConfig = config.telemetry;
 
         // Create reporter
-        const reporter = createReporter(opts.output);
+        const rp = createReporter(opts.output);
 
         // Update baselines mode
         if (opts.updateBaselines) {
           logger.info('Updating baselines…');
-          await updateBaselines(config, new HTMLReporter(reporter));
+          await updateBaselines(config, new HTMLReporter(rp));
           logger.info('✅ Baselines updated successfully');
           exitCode = 0;
           return;
@@ -394,7 +394,7 @@ export async function main(argv?: string[]): Promise<number> {
             '🧪 Judge mode (experimental): model notes are advisory and do not change the exit code. ' +
               'Pixel comparison is the only pass/fail path. This mode does not read baselines.',
           );
-          const judgeResult = await runJudgePipeline(config, reporter);
+          const judgeResult = await runJudgePipeline(config, rp);
           const js = judgeResult.summary;
           const judgements = judgeResult.judgements ?? [];
           const withNotes = judgements.filter(
@@ -421,7 +421,7 @@ export async function main(argv?: string[]): Promise<number> {
 
         // Run the pipeline
         logger.info(`Running Frontguard against ${config.baseUrl}`);
-        const result = await runPipeline(config, new HTMLReporter(reporter));
+        const result = await runPipeline(config, new HTMLReporter(rp));
 
         // Print summary
         const { summary } = result;
@@ -558,10 +558,10 @@ export async function main(argv?: string[]): Promise<number> {
         }
 
         const config = await buildConfig(opts);
-        const reporter = new ConsoleReporter();
+        const rp = new ConsoleReporter();
 
         logger.info('Updating baselines…');
-        await updateBaselines(config, reporter);
+        await updateBaselines(config, rp);
         logger.info('✅ Baselines updated successfully');
         exitCode = 0;
       } catch (err) {
@@ -736,9 +736,9 @@ export async function main(argv?: string[]): Promise<number> {
           });
           config.plugins = [...(config.plugins ?? []), monitorPlugin];
 
-          const reporter = new ConsoleReporter();
+          const rp = new ConsoleReporter();
           logger.info(`🔍 Monitoring ${monitorUrls.length} URL(s)…`);
-          const result = await runPipeline(config, reporter);
+          const result = await runPipeline(config, rp);
           const regressions = result.diffs.filter(
             (diff) => compareDiffToThreshold(diff.diffPercentage, alertThreshold) > 0,
           ).length;
@@ -770,13 +770,13 @@ export async function main(argv?: string[]): Promise<number> {
             `Starting monitor ${mode} (every ${periodMin}m). Press Ctrl+C to stop.`,
           );
 
-          const controller = createPollingController();
+          const ct = createPollingController();
 
           // ----- Graceful shutdown on SIGINT/SIGTERM -----
           const onSignal = (signal: NodeJS.Signals): void => {
             logger.newline();
             logger.info(`Received ${signal} — shutting down monitor after current iteration…`);
-            controller.stop();
+            ct.stop();
           };
           const sigintHandler = (): void => onSignal('SIGINT');
           const sigtermHandler = (): void => onSignal('SIGTERM');
@@ -784,7 +784,7 @@ export async function main(argv?: string[]): Promise<number> {
           process.on('SIGTERM', sigtermHandler);
 
           try {
-            await runPollingLoop(controller, {
+            await runPollingLoop(ct, {
               intervalMs,
               iterate: async () => {
                 await runOnce();

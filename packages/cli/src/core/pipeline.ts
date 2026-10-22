@@ -78,6 +78,7 @@ import { discoverHistoireRoutesForConfig } from '../discovery/histoire.js';
 import { selectedCaptureRunner, warnIfCaptureRunnerChanged } from '../discovery/capture-runner.js';
 import { smartFilter } from '../graph/filter.js';
 import { renderPages } from '../render/playwright.js';
+import { overflowReports } from '../render/horizontal-overflow.js';
 import { compareScreenshot, createNewPageResult } from '../diff/pixel.js';
 import { compareDiffToThreshold } from '../diff/threshold.js';
 import { analyzeWithAI } from '../diff/ai-vision.js';
@@ -391,7 +392,7 @@ export async function runPipeline(
 
 async function runCapturedPipeline(
   config: FrontguardConfig,
-  reporter: Reporter,
+  rp: Reporter,
   trace: CliTrace,
 ): Promise<RunResult> {
   const totalStart = performance.now();
@@ -407,11 +408,11 @@ async function runCapturedPipeline(
   // -----------------------------------------------------------------------
   // Plugin setup
   // -----------------------------------------------------------------------
-  const pluginManager = new PluginManager();
+  const pm = new PluginManager();
   const pluginCtx = { config, logger, metadata: new Map<string, unknown>() };
   if (config.plugins) {
     for (const plugin of config.plugins) {
-      pluginManager.register(plugin);
+      pm.register(plugin);
     }
   }
 
@@ -419,7 +420,7 @@ async function runCapturedPipeline(
   const diffs: DiffResult[] = [];
 
   try {
-  await pluginManager.setup(pluginCtx);
+  await pm.setup(pluginCtx);
 
   // -----------------------------------------------------------------------
   // Stage 0: PREVIEW URL DETECTION
@@ -456,15 +457,15 @@ async function runCapturedPipeline(
   let routes: Route[] = [];
 
   // Plugin hook: beforeDiscover — can modify config before discovery
-  config = await pluginManager.runHook('beforeDiscover', config);
+  config = await pm.runHook('beforeDiscover', config);
 
-  reporter.onStageStart('discover', 'Determining routes to test…');
+  rp.onStageStart('discover', 'Determining routes to test…');
   try {
     const [discovered, duration] = await timed(() => discoverAllRoutes(config));
 
     routes = discovered;
     timing.discovery = duration;
-    reporter.onStageComplete('discover', `Found ${routes.length} route(s)`);
+    rp.onStageComplete('discover', `Found ${routes.length} route(s)`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
 
@@ -472,7 +473,7 @@ async function runCapturedPipeline(
     // more identical ECONNREFUSEDs — one per viewport — and a confusing
     // stack-of-errors report. Bail with a single clear message instead.
     if (isUnreachableHostError(msg)) {
-      reporter.onStageComplete(
+      rp.onStageComplete(
         'discover',
         `Failed — ${config.baseUrl} is unreachable`,
       );
@@ -480,7 +481,7 @@ async function runCapturedPipeline(
     }
 
     logger.error(`Discovery failed: ${msg}`);
-    reporter.onStageComplete('discover', `Failed — falling back to /`);
+    rp.onStageComplete('discover', `Failed — falling back to /`);
 
     // Absolute fallback: just test the root
     routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
@@ -492,24 +493,24 @@ async function runCapturedPipeline(
   }
 
   // Plugin hook: afterDiscover — can add, remove, or modify routes
-  routes = await pluginManager.runHook('afterDiscover', routes, config);
+  routes = await pm.runHook('afterDiscover', routes, config);
 
   // -----------------------------------------------------------------------
   // Stage 2: FILTER (dependency graph analysis)
   // -----------------------------------------------------------------------
-  let filteredRoutes: Route[] = routes;
+  let fr: Route[] = routes;
 
   // Read the baseline manifest before filtering. A browser-build or pixelmatch
   // change has to render every route. A missing or unreadable manifest must
   // not crash this stage and must not force that bypass.
-  let comparisonStorage: GitOrphanStorage | undefined;
+  let cs: GitOrphanStorage | undefined;
   let comparisonStorageReady = false;
   let baselineManifest: BaselineManifest | null = null;
   let manifestReadable = false;
   let manifestReadAttempted = false;
   try {
-    comparisonStorage = new GitOrphanStorage(process.cwd());
-    await comparisonStorage.init();
+    cs = new GitOrphanStorage(process.cwd());
+    await cs.init();
     comparisonStorageReady = true;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -517,12 +518,12 @@ async function runCapturedPipeline(
   }
   if (
     comparisonStorageReady &&
-    comparisonStorage &&
-    typeof comparisonStorage.readManifest === 'function'
+    cs &&
+    typeof cs.readManifest === 'function'
   ) {
     manifestReadAttempted = true;
     try {
-      baselineManifest = await comparisonStorage.readManifest();
+      baselineManifest = await cs.readManifest();
       manifestReadable = true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -538,13 +539,13 @@ async function runCapturedPipeline(
       })
     : undefined;
 
-  reporter.onStageStart('filter', 'Analyzing dependency graph…');
+  rp.onStageStart('filter', 'Analyzing dependency graph…');
   try {
     const [filterResult, filterDuration] = await timed(async () =>
       smartFilter(routes, config, bypassReason ? { bypassReason } : undefined),
     );
 
-    filteredRoutes = filterResult.filtered;
+    fr = filterResult.filtered;
     const skippedCount = filterResult.skipped.length;
 
     if (skippedCount > 0) {
@@ -560,21 +561,21 @@ async function runCapturedPipeline(
       );
     }
 
-    reporter.onStageComplete(
+    rp.onStageComplete(
       'filter',
-      `${filteredRoutes.length}/${routes.length} route(s) to render — ${filterResult.reason}`,
+      `${fr.length}/${routes.length} route(s) to render — ${filterResult.reason}`,
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.warn(`Smart filter failed: ${msg} — rendering all ${routes.length} routes`);
-    filteredRoutes = routes;
-    reporter.onStageComplete('filter', `${filteredRoutes.length} route(s) to render (filter failed, rendering all)`);
+    fr = routes;
+    rp.onStageComplete('filter', `${fr.length} route(s) to render (filter failed, rendering all)`);
   }
 
   const totalCombinations =
-    filteredRoutes.length * config.viewports.length * config.browsers.length;
+    fr.length * config.viewports.length * config.browsers.length;
   logger.info(
-    `Testing ${filteredRoutes.length} route(s) × ${config.viewports.length} viewport(s) × ${config.browsers.length} browser(s) = ${totalCombinations} combination(s)`,
+    `Testing ${fr.length} route(s) × ${config.viewports.length} viewport(s) × ${config.browsers.length} browser(s) = ${totalCombinations} combination(s)`,
   );
 
   // -----------------------------------------------------------------------
@@ -584,23 +585,23 @@ async function runCapturedPipeline(
 
   // Plugin hook: beforeRender — can modify routes or config per-render
   {
-    const renderInput = await pluginManager.runHook(
+    const renderInput = await pm.runHook(
       'beforeRender',
-      { routes: filteredRoutes, config },
+      { routes: fr, config },
     );
-    if (renderInput && renderInput.routes) filteredRoutes = renderInput.routes;
+    if (renderInput && renderInput.routes) fr = renderInput.routes;
     if (renderInput && renderInput.config) config = renderInput.config;
   }
 
   const captureSpan = trace.start('frontguard.capture');
-  reporter.onStageStart('render', `Capturing ${totalCombinations} screenshot(s)…`);
+  rp.onStageStart('render', `Capturing ${totalCombinations} screenshot(s)…`);
   try {
     const [captured, duration] = await timed(async () => {
-      const results = await renderPages(filteredRoutes, config);
+      const results = await renderPages(fr, config);
 
       // Report progress per screenshot
       results.forEach((shot, i) => {
-        reporter.onStageProgress(
+        rp.onStageProgress(
           'render',
           i + 1,
           totalCombinations,
@@ -613,26 +614,26 @@ async function runCapturedPipeline(
 
     shots = captured;
     timing.render = duration;
-    reporter.onStageComplete('render', `Captured ${shots.length} screenshot(s) in ${duration}ms`);
+    rp.onStageComplete('render', `Captured ${shots.length} screenshot(s) in ${duration}ms`);
     captureSpan.end(shots.length === 0 ? 'error' : 'ok', {
       'frontguard.shots': shots.length,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`Render stage failed: ${msg}`);
-    reporter.onStageComplete('render', `Failed: ${msg}`);
+    rp.onStageComplete('render', `Failed: ${msg}`);
     captureSpan.end('error', { 'frontguard.shots': shots.length });
   }
 
   // Plugin hook: afterRender — can modify screenshots before comparison
   if (shots.length > 0) {
-    shots = await pluginManager.runHook('afterRender', shots, pluginCtx);
+    shots = await pm.runHook('afterRender', shots, pluginCtx);
   }
 
   if (shots.length === 0) {
     logger.error('No screenshots were captured — cannot proceed with comparison');
     const emptyResult = buildResult([], timing, totalStart, config);
-    await reporter.onComplete(emptyResult);
+    await rp.onComplete(emptyResult);
     return emptyResult;
   }
 
@@ -648,11 +649,11 @@ async function runCapturedPipeline(
   const tempPaths = new Map<number, { baseline: string; current: string; diff: string }>();
 
   const compareSpan = trace.start('frontguard.compare');
-  reporter.onStageStart('compare', 'Comparing against baselines…');
-  if (!comparisonStorage) {
-    comparisonStorage = new GitOrphanStorage(process.cwd());
+  rp.onStageStart('compare', 'Comparing against baselines…');
+  if (!cs) {
+    cs = new GitOrphanStorage(process.cwd());
   }
-  const storage = comparisonStorage;
+  const storage = cs;
   if (!comparisonStorageReady) {
     try {
       await storage.init();
@@ -660,7 +661,7 @@ async function runCapturedPipeline(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error(`Baseline storage init failed: ${msg}`);
-      reporter.onStageComplete('compare', `Failed: ${msg}`);
+      rp.onStageComplete('compare', `Failed: ${msg}`);
       compareSpan.end('error', { 'frontguard.shots': 0 });
       throw err;
     }
@@ -765,7 +766,7 @@ async function runCapturedPipeline(
           (shot as { buffer: Buffer | null }).buffer = null!;
 
           completed++;
-          reporter.onStageProgress(
+          rp.onStageProgress(
             'compare',
             completed,
             shots.length,
@@ -797,12 +798,12 @@ async function runCapturedPipeline(
     });
 
     timing.compare = duration;
-    reporter.onStageComplete('compare', `Compared ${diffs.length} screenshot(s) in ${duration}ms`);
+    rp.onStageComplete('compare', `Compared ${diffs.length} screenshot(s) in ${duration}ms`);
     compareSpan.end('ok', { 'frontguard.shots': diffs.length });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`Compare stage failed: ${msg}`);
-    reporter.onStageComplete('compare', `Failed: ${msg}`);
+    rp.onStageComplete('compare', `Failed: ${msg}`);
     compareSpan.end('error', { 'frontguard.shots': diffs.length });
   }
 
@@ -822,13 +823,15 @@ async function runCapturedPipeline(
     );
   }
 
+  const hx = await overflowReports(shots);
+
   // Free the screenshots array — all data has been extracted
   shots = [];
 
   // Plugin hook: afterCompare — can modify diff results or add custom analysis
   // Runs before buffer disposal so plugins (e.g. Figma compliance) can read diff.currentImage.
   {
-    const modifiedDiffs = await pluginManager.runHook('afterCompare', diffs, pluginCtx);
+    const modifiedDiffs = await pm.runHook('afterCompare', diffs, pluginCtx);
     // Only replace diffs if the hook returned a DIFFERENT array
     if (modifiedDiffs !== undefined && modifiedDiffs !== diffs) {
       diffs.length = 0;
@@ -873,7 +876,7 @@ async function runCapturedPipeline(
     }
 
     if (aiDiffs.length > 0) {
-      reporter.onStageStart(
+      rp.onStageStart(
         'analyze',
         `Analyzing ${aiDiffs.length} change(s) with ${config.ai.provider}/${config.ai.model} (batch size: ${AI_BATCH_SIZE})…`,
       );
@@ -910,7 +913,7 @@ async function runCapturedPipeline(
               // advisory so a crawled page cannot prompt-inject a clean CI run.
 
               completed++;
-              reporter.onStageProgress(
+              rp.onStageProgress(
                 'analyze',
                 completed,
                 aiDiffs.length,
@@ -934,7 +937,7 @@ async function runCapturedPipeline(
             diff.status = 'error';
             diff.error = `AI analysis failed: ${msg}`;
             completed++;
-            reporter.onStageProgress(
+            rp.onStageProgress(
               'analyze',
               completed,
               aiDiffs.length,
@@ -946,12 +949,12 @@ async function runCapturedPipeline(
         timing.ai = duration;
         if (analysisFailures > 0) {
           logger.error(`AI analysis failed for ${analysisFailures} change(s)`);
-          reporter.onStageComplete(
+          rp.onStageComplete(
             'analyze',
             `Analyzed ${aiDiffs.length - analysisFailures} change(s); ${analysisFailures} failed in ${duration}ms`,
           );
         } else {
-          reporter.onStageComplete(
+          rp.onStageComplete(
             'analyze',
             `Analyzed ${aiDiffs.length} change(s) in ${duration}ms`,
           );
@@ -959,7 +962,7 @@ async function runCapturedPipeline(
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         logger.error(`AI analysis stage failed: ${msg}`);
-        reporter.onStageComplete('analyze', `Failed: ${msg}`);
+        rp.onStageComplete('analyze', `Failed: ${msg}`);
       }
 
       // Free AI buffers again after analysis — they'll be restored for reporting
@@ -992,7 +995,7 @@ async function runCapturedPipeline(
     }
 
     if (regressionDiffs.length > 0) {
-      reporter.onStageStart(
+      rp.onStageStart(
         'fix',
         `Generating fixes for ${regressionDiffs.length} regression(s)…`,
       );
@@ -1044,15 +1047,15 @@ async function runCapturedPipeline(
               );
             }
             fixCompleted++;
-            reporter.onStageProgress('fix', fixCompleted, regressionDiffs.length, diff.route.path);
+            rp.onStageProgress('fix', fixCompleted, regressionDiffs.length, diff.route.path);
           }
         });
         timing.fix = duration;
-        reporter.onStageComplete('fix', `Generated fixes in ${duration}ms`);
+        rp.onStageComplete('fix', `Generated fixes in ${duration}ms`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         logger.error(`Fix generation stage failed: ${msg}`);
-        reporter.onStageComplete('fix', `Failed: ${msg}`);
+        rp.onStageComplete('fix', `Failed: ${msg}`);
       } finally {
         patternDB.close();
       }
@@ -1092,6 +1095,7 @@ async function runCapturedPipeline(
   if (Array.isArray(a11yResults) && a11yResults.length > 0) {
     result.accessibility = a11yResults as RunResult['accessibility'];
   }
+  if (hx.length > 0) result.horizontalOverflow = hx;
 
   // -----------------------------------------------------------------------
   // Stage 6.5: UPLOAD IMAGES (optional — for PR comment thumbnails)
@@ -1111,14 +1115,14 @@ async function runCapturedPipeline(
   }
 
   // Plugin hook: afterRun — notifications, uploads, custom reporting
-  await pluginManager.runHook('afterRun', result, pluginCtx);
+  await pm.runHook('afterRun', result, pluginCtx);
 
   // -----------------------------------------------------------------------
   // Stage 7: REPORT
   // -----------------------------------------------------------------------
-  reporter.onStageStart('report', 'Generating report…');
-  await reporter.onComplete(result);
-  reporter.onStageComplete('report', 'Done');
+  rp.onStageStart('report', 'Generating report…');
+  await rp.onComplete(result);
+  rp.onStageComplete('report', 'Done');
 
   return result;
 
@@ -1126,7 +1130,7 @@ async function runCapturedPipeline(
     // Plugin hook: onError — plugins can inspect or suppress errors
     let suppressed = false;
     if (pipelineError instanceof Error) {
-      const suppressResult = await pluginManager.runHook('onError', pipelineError, 'pipeline');
+      const suppressResult = await pm.runHook('onError', pipelineError, 'pipeline');
       // runHook returns the last non-undefined value. If any plugin returned true, suppress.
       if (suppressResult === true) suppressed = true;
     }
@@ -1148,7 +1152,7 @@ async function runCapturedPipeline(
       }
     }
     // Plugin hook: teardown — always called, even on error
-    await pluginManager.teardown();
+    await pm.teardown();
   }
 }
 
@@ -1172,7 +1176,7 @@ export async function updateBaselines(
 
 async function writeUpdatedBaselines(
   config: FrontguardConfig,
-  reporter: Reporter,
+  rp: Reporter,
   trace: CliTrace,
 ): Promise<RunResult> {
   const totalStart = performance.now();
@@ -1183,7 +1187,7 @@ async function writeUpdatedBaselines(
     ai: 0,
     total: 0,
   };
-  reporter.onStageStart('init', 'Updating baselines…');
+  rp.onStageStart('init', 'Updating baselines…');
 
   // Discover routes (shared logic with runPipeline)
   let routes: Route[];
@@ -1194,7 +1198,7 @@ async function writeUpdatedBaselines(
   }
 
   logger.info(`Rendering ${routes.length} route(s) for baseline update…`);
-  reporter.onStageStart('render', `Capturing screenshots for ${routes.length} route(s)…`);
+  rp.onStageStart('render', `Capturing screenshots for ${routes.length} route(s)…`);
 
   const captureSpan = trace.start('frontguard.capture');
   const [shots, renderDuration] = await timed(() => renderPages(routes, config));
@@ -1204,7 +1208,7 @@ async function writeUpdatedBaselines(
     shots.some((shot) => !Buffer.isBuffer(shot.buffer) || shot.buffer.length === 0);
   captureSpan.end(captureFailed ? 'error' : 'ok', { 'frontguard.shots': shots.length });
   if (shots.length === 0) {
-    reporter.onStageComplete('render', 'Failed: no screenshots were captured');
+    rp.onStageComplete('render', 'Failed: no screenshots were captured');
     throw new Error('Cannot update baselines: no screenshots were captured');
   }
   const failedCaptures = shots.filter(
@@ -1212,7 +1216,7 @@ async function writeUpdatedBaselines(
   );
   if (failedCaptures.length > 0) {
     const failureCount = failedCaptures.length;
-    reporter.onStageComplete(
+    rp.onStageComplete(
       'render',
       `Failed: ${failureCount} capture${failureCount === 1 ? '' : 's'} produced no screenshot`,
     );
@@ -1220,7 +1224,7 @@ async function writeUpdatedBaselines(
       `Cannot update baselines: ${failureCount} capture${failureCount === 1 ? '' : 's'} failed`,
     );
   }
-  reporter.onStageComplete('render', `Captured ${shots.length} screenshot(s)`);
+  rp.onStageComplete('render', `Captured ${shots.length} screenshot(s)`);
 
   // The accessibility plugin's own cutoff is the block. Pixel status is not an input.
   let baselineBlock: string | undefined;
@@ -1266,7 +1270,7 @@ async function writeUpdatedBaselines(
 
     // Init storage and write all baselines
     const writeSpan = trace.start('frontguard.baseline_write');
-    reporter.onStageStart('compare', 'Writing baselines…');
+    rp.onStageStart('compare', 'Writing baselines…');
     const writeStart = performance.now();
     const storage = new GitOrphanStorage(process.cwd(), { mode: 'update' });
     await storage.init();
@@ -1298,7 +1302,7 @@ async function writeUpdatedBaselines(
         for (const shot of shots) {
           written++;
           writtenScreenshots.push(shot);
-          reporter.onStageProgress(
+          rp.onStageProgress(
             'compare',
             written,
             shots.length,
@@ -1323,7 +1327,7 @@ async function writeUpdatedBaselines(
           written++;
           writtenScreenshots.push(shot);
 
-          reporter.onStageProgress(
+          rp.onStageProgress(
             'compare',
             written,
             shots.length,
@@ -1345,7 +1349,7 @@ async function writeUpdatedBaselines(
 
     if (writeFailures > 0) {
       writeSpan.end('error', { 'frontguard.shots': written });
-      reporter.onStageComplete(
+      rp.onStageComplete(
         'compare',
         `Failed to write ${writeFailures} of ${shots.length} baseline${shots.length === 1 ? '' : 's'}`,
       );
@@ -1355,12 +1359,13 @@ async function writeUpdatedBaselines(
     }
 
     writeSpan.end('ok', { 'frontguard.shots': written });
-    reporter.onStageComplete('compare', `Wrote ${written} baseline(s)`);
+    rp.onStageComplete('compare', `Wrote ${written} baseline(s)`);
     logger.info(`✅ Updated ${written} baseline(s) successfully`);
     logger.info('To share these baselines with CI, run: git push origin frontguard-baselines');
   }
 
   timing.total = Math.round(performance.now() - totalStart);
+  const hx = await overflowReports(shots);
   const result = {
     ...buildResult(
       shots.map((shot) => createNewPageResult(shot)),
@@ -1370,11 +1375,12 @@ async function writeUpdatedBaselines(
     ),
     ...(baselineBlock ? { baselineRefusal: baselineBlock } : { baselineUpdate: true }),
     ...(baselineA11y ? { accessibility: baselineA11y } : {}),
+    ...(hx.length > 0 ? { horizontalOverflow: hx } : {}),
   };
   if (textDone) await textDone.manager.runHook('afterRun', result, textDone.ctx);
-  reporter.onStageStart('report', 'Generating baseline update report…');
-  await reporter.onComplete(result);
-  reporter.onStageComplete('report', 'Done');
+  rp.onStageStart('report', 'Generating baseline update report…');
+  await rp.onComplete(result);
+  rp.onStageComplete('report', 'Done');
   if (baselineBlock) throw new Error(baselineBlock);
   return result;
 }
@@ -1402,7 +1408,7 @@ export async function runJudgePipeline(
 
 async function judgeCapturedPages(
   config: FrontguardConfig,
-  reporter: Reporter,
+  rp: Reporter,
   trace: CliTrace,
 ): Promise<RunResult> {
   const totalStart = performance.now();
@@ -1413,17 +1419,17 @@ async function judgeCapturedPages(
   }
 
   // Stage 1: DISCOVER ------------------------------------------------------
-  reporter.onStageStart('discover', 'Determining routes to judge…');
+  rp.onStageStart('discover', 'Determining routes to judge…');
   let routes: Route[] = [];
   try {
     const [discovered, duration] = await timed(() => discoverAllRoutes(config));
     routes = discovered;
     timing.discovery = duration;
-    reporter.onStageComplete('discover', `Found ${routes.length} route(s)`);
+    rp.onStageComplete('discover', `Found ${routes.length} route(s)`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (isUnreachableHostError(msg)) {
-      reporter.onStageComplete(
+      rp.onStageComplete(
         'discover',
         `Failed — ${config.baseUrl} is unreachable`,
       );
@@ -1431,7 +1437,7 @@ async function judgeCapturedPages(
     }
     logger.error(`Discovery failed: ${msg}`);
     routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
-    reporter.onStageComplete('discover', 'Failed — falling back to /');
+    rp.onStageComplete('discover', 'Failed — falling back to /');
   }
   if (routes.length === 0) {
     routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
@@ -1442,30 +1448,30 @@ async function judgeCapturedPages(
   // Stage 2: RENDER --------------------------------------------------------
   let shots: ScreenshotResult[] = [];
   const captureSpan = trace.start('frontguard.capture');
-  reporter.onStageStart('render', `Capturing ${totalCombinations} screenshot(s)…`);
+  rp.onStageStart('render', `Capturing ${totalCombinations} screenshot(s)…`);
   try {
     const [captured, duration] = await timed(() => renderPages(routes, config));
     shots = captured;
     timing.render = duration;
-    reporter.onStageComplete('render', `Captured ${shots.length} screenshot(s) in ${duration}ms`);
+    rp.onStageComplete('render', `Captured ${shots.length} screenshot(s) in ${duration}ms`);
     captureSpan.end(shots.length === 0 ? 'error' : 'ok', {
       'frontguard.shots': shots.length,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`Render stage failed: ${msg}`);
-    reporter.onStageComplete('render', `Failed: ${msg}`);
+    rp.onStageComplete('render', `Failed: ${msg}`);
     captureSpan.end('error', { 'frontguard.shots': shots.length });
   }
 
   if (shots.length === 0) {
     const empty = buildJudgeResult([], timing, totalStart, config);
-    await reporter.onComplete(empty);
+    await rp.onComplete(empty);
     return empty;
   }
 
   // Stage 3: JUDGE ---------------------------------------------------------
-  reporter.onStageStart('analyze', `Judging ${shots.length} screenshot(s) with ${config.ai.provider}/${config.ai.model}…`);
+  rp.onStageStart('analyze', `Judging ${shots.length} screenshot(s) with ${config.ai.provider}/${config.ai.model}…`);
   const judgements: JudgeResult[] = [];
   const judgeConfig = config.judge;
 
@@ -1494,7 +1500,7 @@ async function judgeCapturedPages(
       const figmaReference = await referenceFor(shot.route.path);
       const verdict = await judgeScreenshot(shot, { ai: config.ai!, figmaReference });
       judgements.push(verdict);
-      reporter.onStageProgress(
+      rp.onStageProgress(
         'analyze',
         index + 1,
         shots.length,
@@ -1521,7 +1527,7 @@ async function judgeCapturedPages(
       withDesignReference: false,
       error: `Judge failed: ${msg}`,
     });
-    reporter.onStageProgress(
+    rp.onStageProgress(
       'analyze',
       i + 1,
       shots.length,
@@ -1532,14 +1538,16 @@ async function judgeCapturedPages(
   if (judgeFailures > 0) {
     logger.error(`Judge failed for ${judgeFailures} screenshot(s)`);
   }
-  reporter.onStageComplete(
+  rp.onStageComplete(
     'analyze',
     `Judged ${judgements.length} screenshot(s) in ${judgeDuration}ms${judgeFailures > 0 ? `; ${judgeFailures} failed` : ''}`,
   );
 
   timing.total = Math.round(performance.now() - totalStart);
   const result = buildJudgeResult(judgements, timing, totalStart, config);
-  await reporter.onComplete(result);
+  const hx = await overflowReports(shots);
+  if (hx.length > 0) result.horizontalOverflow = hx;
+  await rp.onComplete(result);
   return result;
 }
 

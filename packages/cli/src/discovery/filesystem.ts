@@ -21,7 +21,7 @@ import { logger } from '../utils/logger.js';
 type Framework = 'nextjs-app' | 'nextjs-pages' | 'remix' | 'sveltekit' | 'nuxt';
 
 /** File extensions that represent page/route files */
-const PAGE_EXTENSIONS = new Set([
+const px = new Set([
   '.tsx', '.jsx', '.ts', '.js', '.vue', '.svelte', '.mdx', '.md',
 ]);
 
@@ -96,8 +96,8 @@ function detectFramework(
       const appDir = join(proj, candidate);
       if (existsSync(appDir)) {
         // App Router requires a layout or page file at root
-        const hasLayout = PAGE_EXTENSIONS.has('.tsx') &&
-          [...PAGE_EXTENSIONS].some(
+        const hasLayout = px.has('.tsx') &&
+          [...px].some(
             (ext) =>
               existsSync(join(appDir, `layout${ext}`)) ||
               existsSync(join(appDir, `page${ext}`))
@@ -160,7 +160,7 @@ function detectFramework(
 function isRouteFile(fileName: string, framework: Framework): boolean {
   const { name: stem, ext } = parsePath(fileName);
 
-  if (!PAGE_EXTENSIONS.has(ext.toLowerCase())) return false;
+  if (!px.has(ext.toLowerCase())) return false;
 
   switch (framework) {
     case 'nextjs-app':
@@ -274,7 +274,7 @@ function scanDirectory(
   baseDir: string,
   framework: Framework,
   routes: Route[],
-  dynamicWarnings: Set<string>
+  dw: Set<string>
 ): void {
   let entries: string[];
   try {
@@ -301,8 +301,8 @@ function scanDirectory(
 
       // Skip dynamic segment directories with a warning
       if (isDynamicSegment(entry)) {
-        if (!dynamicWarnings.has(entry)) {
-          dynamicWarnings.add(entry);
+        if (!dw.has(entry)) {
+          dw.add(entry);
           logger.warn(
             `Skipping dynamic segment "${entry}" — ` +
               'add routes with parameters explicitly in your frontguard config'
@@ -311,14 +311,14 @@ function scanDirectory(
         continue;
       }
 
-      scanDirectory(fullPath, baseDir, framework, routes, dynamicWarnings);
+      scanDirectory(fullPath, baseDir, framework, routes, dw);
     } else if (stat.isFile()) {
       const { name: stem } = parsePath(entry);
 
       // Skip dynamic segment files
       if (isDynamicSegment(stem) || isDynamicSegment(entry)) {
-        if (!dynamicWarnings.has(entry)) {
-          dynamicWarnings.add(entry);
+        if (!dw.has(entry)) {
+          dw.add(entry);
           logger.warn(
             `Skipping dynamic file "${entry}" — ` +
               'add parameterized routes explicitly in your frontguard config'
@@ -383,9 +383,9 @@ export function discoverRoutesFromFilesystem(proj: string): Route[] | null {
   }
 
   const routes: Route[] = [];
-  const dynamicWarnings = new Set<string>();
+  const dw = new Set<string>();
 
-  scanDirectory(routeDir, routeDir, framework, routes, dynamicWarnings);
+  scanDirectory(routeDir, routeDir, framework, routes, dw);
 
   // Ensure root route exists (most apps have one)
   if (!routes.some((r) => r.path === '/')) {
@@ -398,8 +398,8 @@ export function discoverRoutesFromFilesystem(proj: string): Route[] | null {
 
   logger.info(
     `Filesystem discovery (${framework}): found ${routes.length} route(s)` +
-      (dynamicWarnings.size > 0
-        ? ` (skipped ${dynamicWarnings.size} dynamic segment(s))`
+      (dw.size > 0
+        ? ` (skipped ${dw.size} dynamic segment(s))`
         : '')
   );
 

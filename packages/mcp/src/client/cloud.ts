@@ -56,6 +56,17 @@ export interface CloudSuggestedFix {
   verified?: boolean;
 }
 
+export interface CloudHorizontalOverflow {
+  route: string;
+  viewport: number;
+  browser?: string;
+  innerWidth: number;
+  scrollWidth: number;
+  /** True only when a visible unclipped box passes the right edge. */
+  flagged: boolean;
+  elements: Array<{ selector: string; overflowPx: number }>;
+}
+
 export interface CloudRun {
   id: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
@@ -70,6 +81,8 @@ export interface CloudRun {
   results: CloudRunResult[] | null;
   reportUrl: string | null;
   baselinesApproved?: boolean;
+  /** Present on CLI JSON reports. Does not change pixel status. */
+  horizontalOverflow?: CloudHorizontalOverflow[];
   projectId?: string;
   error?: string;
   github?: {
@@ -278,6 +291,7 @@ export function loadLocalReportAsRun(reportPath: string): CloudRun {
         : typeof configObj?.baseUrl === 'string'
           ? configObj.baseUrl
           : 'http://localhost';
+  const horizontalOverflow = readHorizontalOverflow(obj.horizontalOverflow);
 
   return {
     id: typeof obj.id === 'string' && obj.id ? obj.id : 'run_local',
@@ -302,7 +316,36 @@ export function loadLocalReportAsRun(reportPath: string): CloudRun {
       ? { baselinesApproved: obj.baselinesApproved }
       : {}),
     ...(obj.github ? { github: obj.github as CloudRun['github'] } : {}),
+    ...(horizontalOverflow ? { horizontalOverflow } : {}),
   };
+}
+
+function readHorizontalOverflow(raw: unknown): CloudHorizontalOverflow[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const rows: CloudHorizontalOverflow[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.route !== 'string') continue;
+    const elements = Array.isArray(row.elements)
+      ? row.elements.flatMap((el) => {
+          if (!el || typeof el !== 'object') return [];
+          const box = el as Record<string, unknown>;
+          if (typeof box.selector !== 'string' || typeof box.overflowPx !== 'number') return [];
+          return [{ selector: box.selector, overflowPx: box.overflowPx }];
+        })
+      : [];
+    rows.push({
+      route: row.route,
+      viewport: Number(row.viewport ?? 0),
+      ...(typeof row.browser === 'string' ? { browser: row.browser } : {}),
+      innerWidth: Number(row.innerWidth ?? 0),
+      scrollWidth: Number(row.scrollWidth ?? 0),
+      flagged: row.flagged === true,
+      elements,
+    });
+  }
+  return rows.length > 0 ? rows : undefined;
 }
 
 /** Creates a {@link CloudClient}-compatible adapter backed by a local CLI report file. */

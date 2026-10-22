@@ -118,13 +118,14 @@ Add \`@frontguard/mcp\` to \`.mcp.json\` or \`.cursor/mcp.json\`:
 
 Works against local CLI reports (\`./frontguard-report/report.json\` or \`FRONTGUARD_LOCAL_REPORT\`) with zero cloud account required, or against Frontguard Cloud when \`FRONTGUARD_API_KEY\` is set.
 
-## 2. Available Tools (7 Tools)
+## 2. Available Tools (8 Tools)
 1. \`list_regressions\`: List visual regressions for a run ID, PR number, or latest local report.
 2. \`inspect_diff_cluster_dom\`: Inspect spatial \`DiffCluster\` bounding boxes, target CSS selectors, AI classification, and localized similarity metrics for a \`diff_id\`.
 3. \`get_suggested_fix\`: Retrieve the candidate CSS/HTML patch, confidence score, and verification status for a \`diff_id\`.
 4. \`verify_css_patch\`: Validate a candidate CSS patch against the target selector (checking balanced braces, selector alignment, and guarding against layout-destroying rules like \`display: none !important\` or external \`@import\`).
 5. \`promote_baseline\` and \`accept_baseline\` are not part of the agent workflow. They are unregistered unless \`FRONTGUARD_MCP_WRITES=1\`. \`confirm_reviewed: true\` is UX only — an agent setting it is not a human review. Local-report mode refuses promotion. A human writes baselines with \`frontguard update-baselines --confirm-baselines\`. Cloud \`approveRun\` is not a production path.
-6. \`recent_runs\`: List recent visual test runs and their pass/regression counts.`,
+6. \`recent_runs\`: List recent visual test runs and their pass/regression counts.
+7. \`list_horizontal_overflow\`: List visible unclipped boxes past the right edge. It does not change the pixel exit code.`,
   },
   {
     id: 'playwright',

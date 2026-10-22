@@ -386,8 +386,8 @@ export class GitOrphanStorage implements BaselineStorage {
     const path = baselinePath(route, viewport, browser);
 
     await this.writeToOrphanBranch(
-      (worktreeDir) => {
-        const fullPath = join(worktreeDir, path);
+      (wt) => {
+        const fullPath = join(wt, path);
         if (existsSync(fullPath)) {
           try {
             if (readFileSync(fullPath).equals(buffer)) {
@@ -422,11 +422,11 @@ export class GitOrphanStorage implements BaselineStorage {
     if (entries.length === 0 && !manifest) return;
 
     await this.writeToOrphanBranch(
-      (worktreeDir) => {
+      (wt) => {
         for (const entry of entries) {
           const browser = entry.browser ?? 'chromium';
           const path = baselinePath(entry.route, entry.viewport, browser);
-          const fullPath = join(worktreeDir, path);
+          const fullPath = join(wt, path);
           if (existsSync(fullPath)) {
             try {
               if (readFileSync(fullPath).equals(entry.buffer)) {
@@ -440,7 +440,7 @@ export class GitOrphanStorage implements BaselineStorage {
           writeFileSync(fullPath, entry.buffer);
         }
         if (manifest) {
-          const manifestPath = join(worktreeDir, 'manifest.json');
+          const manifestPath = join(wt, 'manifest.json');
           writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
         }
       },
@@ -474,8 +474,8 @@ export class GitOrphanStorage implements BaselineStorage {
     this.ensureWritable();
 
     await this.writeToOrphanBranch(
-      (worktreeDir) => {
-        const manifestPath = join(worktreeDir, 'manifest.json');
+      (wt) => {
+        const manifestPath = join(wt, 'manifest.json');
         writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
       },
       'Update baseline manifest'
@@ -779,35 +779,35 @@ export class GitOrphanStorage implements BaselineStorage {
    * @param commitMessage - Commit message for the change
    */
   private async writeToOrphanBranch(
-    writeFn: (worktreeDir: string) => void,
+    writeFn: (wt: string) => void,
     commitMessage: string
   ): Promise<void> {
-    const maxAttempts = 2;
+    const ma = 2;
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const worktreeDir = mkdtempSync(join(tmpdir(), 'frontguard-wt-'));
+    for (let attempt = 1; attempt <= ma; attempt++) {
+      const wt = mkdtempSync(join(tmpdir(), 'frontguard-wt-'));
 
       try {
         // Remove the empty temp dir so git worktree can create it
-        rmSync(worktreeDir, { recursive: true, force: true });
+        rmSync(wt, { recursive: true, force: true });
 
         // Add a temporary worktree for the orphan branch
-        this.git('worktree', 'add', worktreeDir, this.branch);
+        this.git('worktree', 'add', wt, this.branch);
 
         // Apply the write operation
-        writeFn(worktreeDir);
+        writeFn(wt);
 
         // Stage and commit from the worktree. Callers decide when to push the branch.
-        this.gitIn(worktreeDir, 'add', '-A');
+        this.gitIn(wt, 'add', '-A');
 
         // Check if there are changes to commit
-        if (this.gitCheckIn(worktreeDir, 'diff', '--cached', '--quiet')) {
+        if (this.gitCheckIn(wt, 'diff', '--cached', '--quiet')) {
           logger.debug('No changes to commit to baseline branch');
           return;
         }
 
         this.gitIn(
-          worktreeDir,
+          wt,
           '-c',
           'user.name=Frontguard',
           '-c',
@@ -825,9 +825,9 @@ export class GitOrphanStorage implements BaselineStorage {
 
         // Detect concurrent update conflicts
         if (msg.includes('lock') || msg.includes('index.lock') || msg.includes('cannot lock')) {
-          if (attempt < maxAttempts) {
+          if (attempt < ma) {
             logger.warn(
-              `Concurrent update detected on "${this.branch}", retrying (attempt ${attempt}/${maxAttempts})...`
+              `Concurrent update detected on "${this.branch}", retrying (attempt ${attempt}/${ma})...`
             );
             // Brief wait before retry
             await new Promise((resolve) => setTimeout(resolve, 500));
@@ -847,11 +847,11 @@ export class GitOrphanStorage implements BaselineStorage {
       } finally {
         // Always clean up the worktree
         try {
-          this.git('worktree', 'remove', worktreeDir, '--force');
+          this.git('worktree', 'remove', wt, '--force');
         } catch {
           // Manual cleanup if worktree remove fails
-          if (existsSync(worktreeDir)) {
-            rmSync(worktreeDir, { recursive: true, force: true });
+          if (existsSync(wt)) {
+            rmSync(wt, { recursive: true, force: true });
           }
           // Prune stale worktree references
           try {

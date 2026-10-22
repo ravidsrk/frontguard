@@ -153,7 +153,7 @@ const faqs = [
   },
   {
     q: 'Is there an MCP server for in-IDE agents?',
-    a: '@frontguard/mcp exposes 7 tools for coding agents: list_regressions, get_suggested_fix, recent_runs, accept_baseline, inspect_diff_cluster_dom, verify_css_patch, and promote_baseline. It works locally against ./frontguard-report/report.json (or FRONTGUARD_LOCAL_REPORT) without a server, or against an explicit FRONTGUARD_API_URL deployment.',
+    a: '@frontguard/mcp exposes 8 tools for coding agents: list_regressions, get_suggested_fix, recent_runs, accept_baseline, inspect_diff_cluster_dom, verify_css_patch, list_horizontal_overflow, and promote_baseline. It works locally against ./frontguard-report/report.json (or FRONTGUARD_LOCAL_REPORT) without a server, or against an explicit FRONTGUARD_API_URL deployment.',
   },
   {
     q: "What's the data retention policy for screenshots?",

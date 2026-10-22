@@ -1,5 +1,28 @@
-import { defineConfig } from 'tsup';
+import { copyFileSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { defineConfig, type Options } from 'tsup';
+
+const packageDir = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * `tsup --watch` does not run the package.json `cp`. The first entry also
+ * wipes `dist/`, so a fresh watch would drop the runtime probe and overflow
+ * reports would silently disappear. Copy after every esbuild pass.
+ */
+function copyOverflowProbe(): NonNullable<Options['esbuildPlugins']>[number] {
+  return {
+    name: 'copy-overflow-probe',
+    setup(build) {
+      build.onEnd(() => {
+        const dest = join(packageDir, 'dist');
+        mkdirSync(dest, { recursive: true });
+        copyFileSync(join(packageDir, 'src/render/overflow-probe.js'), join(dest, 'overflow-probe.js'));
+      });
+    },
+  };
+}
 
 const pkg = createRequire(import.meta.url)('./package.json') as {
   dependencies?: Record<string, string>;
@@ -40,6 +63,7 @@ export default defineConfig([
     sourcemap: true,
     external: EXTERNAL,
     banner: { js: '#!/usr/bin/env node' },
+    esbuildPlugins: [copyOverflowProbe()],
     esbuildOptions(options) {
       options.minifyWhitespace = true;
     },
@@ -55,6 +79,7 @@ export default defineConfig([
     splitting: false,
     sourcemap: true,
     external: EXTERNAL,
+    esbuildPlugins: [copyOverflowProbe()],
   },
   // Library entries — no shebang
   {
@@ -69,6 +94,7 @@ export default defineConfig([
     splitting: false,
     sourcemap: true,
     external: EXTERNAL,
+    esbuildPlugins: [copyOverflowProbe()],
     esbuildOptions(options) {
       options.minifyWhitespace = true;
     },

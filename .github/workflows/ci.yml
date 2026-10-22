@@ -119,7 +119,10 @@ jobs:
         #   at 398781 bytes. Landing that block together with text snapshots,
         #   and auditing a hosted Ladle or Histoire preview at the captured
         #   URL, measures the library entry at 219593 bytes and the published
-        #   bin at 398884 bytes. The ceilings stay 220KB and 400KB. No
+        #   bin at 398884 bytes. Horizontal overflow (#308) is loaded from
+        #   overflow-probe.js at runtime. Together with `frontguard review`,
+        #   that measures the library entry at 218189 bytes and the published
+        #   bin at 399557 bytes. The ceilings stay 220KB and 400KB. No
         #   dependency is inlined.
         # dist/cli/index.js  — the actual published bin (bin.frontguard). This
         #   was previously UNGATED, so the artifact users install could grow

@@ -183,6 +183,8 @@ export default {
 
 Optional text snapshots use `createTextSnapshotPlugin({ aria: true, json: "#payload", markdown: "article" })`. Each enabled kind writes a sibling of the PNG (`.aria.txt`, `.json`, or `.md`) and diffs it as text. A mismatch is reported on its own, with a short excerpt. It does not change `comparisonMethod` from pixelmatch and does not pass or fail a pixel regression. axe-core remains the accessibility plugin. Text diff is not a gate.
 
+The capture page also records horizontal overflow: `scrollWidth` against `innerWidth`, and visible elements whose border box passes the right edge with no clipping ancestor. Clipped and transparent overflow is not flagged. The HTML report, JSON output, and MCP `list_horizontal_overflow` show the finding. It does not change the exit code. Precision for the fixture set is in `validation/results-overflow.md`.
+
 ---
 
 ## Story discovery

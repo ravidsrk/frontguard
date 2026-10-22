@@ -230,9 +230,9 @@ npx -p @frontguard/cli frontguard guide --json
 FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json \\
   npx @frontguard/mcp
 
-# 7 MCP tools: list_regressions · inspect_diff_cluster_dom
-# get_suggested_fix · verify_css_patch · promote_baseline
-# accept_baseline · recent_runs`;
+# 8 MCP tools: list_regressions · inspect_diff_cluster_dom
+# get_suggested_fix · verify_css_patch · list_horizontal_overflow
+# promote_baseline · accept_baseline · recent_runs`;
 
 export const MCP_HTML = `<span style="color:#a89f94"># Machine-readable workflow guide for coding agents</span>
 <span style="color:#f5f1ea">npx -p @frontguard/cli frontguard guide --json</span>
@@ -241,9 +241,9 @@ export const MCP_HTML = `<span style="color:#a89f94"># Machine-readable workflow
 <span style="color:#f5f1ea">FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json \\</span>
   <span style="color:#f5f1ea">npx @frontguard/mcp</span>
 
-<span style="color:#a89f94"># 7 MCP tools: list_regressions · inspect_diff_cluster_dom</span>
-<span style="color:#a89f94"># get_suggested_fix · verify_css_patch · promote_baseline</span>
-<span style="color:#a89f94"># accept_baseline · recent_runs</span>`;
+<span style="color:#a89f94"># 8 MCP tools: list_regressions · inspect_diff_cluster_dom</span>
+<span style="color:#a89f94"># get_suggested_fix · verify_css_patch · list_horizontal_overflow</span>
+<span style="color:#a89f94"># promote_baseline · accept_baseline · recent_runs</span>`;
 
 export const CONFIG_CODE = `import { defineConfig } from '@frontguard/cli'
 

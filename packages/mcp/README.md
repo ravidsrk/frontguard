@@ -6,7 +6,7 @@
 
 ## Why
 
-Frontguard runs your visual-regression checks locally or in CI. The expensive part of that loop isn't the screenshots — it's the agent context-switch between "agent sees diff" and "agent inspects the report, DOM cluster, and suggested fix." This MCP server collapses that loop with **7 tools** across **Local Report Mode** (zero Cloud API key required) and **Cloud API Mode**: the agent calls `list_regressions`, inspects spatial diff clusters and DOM nodes with `inspect_diff_cluster_dom`, retrieves patches via `get_suggested_fix`, validates candidate CSS via `verify_css_patch`, and records explicit approval metadata. Local screenshot baselines are updated through the CLI review workflow.
+Frontguard runs your visual-regression checks locally or in CI. The expensive part of that loop isn't the screenshots — it's the agent context-switch between "agent sees diff" and "agent inspects the report, DOM cluster, and suggested fix." This MCP server collapses that loop with **8 tools** across **Local Report Mode** (zero Cloud API key required) and **Cloud API Mode**: the agent calls `list_regressions`, inspects spatial diff clusters and DOM nodes with `inspect_diff_cluster_dom`, retrieves patches via `get_suggested_fix`, validates candidate CSS via `verify_css_patch`, and records explicit approval metadata. Local screenshot baselines are updated through the CLI review workflow.
 
 ## Install
 
@@ -105,7 +105,7 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
 }
 ```
 
-## Tools (7 Tools)
+## Tools (8 Tools)
 
 | Tool | Input | Returns |
 |------|-------|---------|
@@ -116,6 +116,7 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
 | `promote_baseline` | `run_id`, `confirm_reviewed: true`, optional `routes` | records reviewed run approval in Cloud API mode; refuses local-report mode and does not promote cloud PNGs |
 | `accept_baseline` | `run_id`, `confirm_all_regressions_reviewed: true` | records approval metadata for the **entire run** in the JSON report or Cloud API; screenshot promotion is not implemented |
 | `recent_runs` | optional `repo`, `branch`, `limit` | newest-first run summary list from the Cloud API or local report |
+| `list_horizontal_overflow` | optional `run_id` | visible unclipped boxes past the right edge, plus `scrollWidth` and `innerWidth`. It does not change the pixel result |
 
 Every tool returns JSON in the MCP `text` content channel; agents parse it directly.
 
@@ -123,7 +124,7 @@ Tool `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `openWorldHint`)
 
 ## Baseline writes stay with a human
 
-The default server is read-only. `promote_baseline` and `accept_baseline` are not registered unless `FRONTGUARD_MCP_WRITES=1`. Reads (`list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `recent_runs`) work without that variable. When writes are enabled, those two tools keep the destructive annotations and the `requiresUserInteraction` flag above. Annotations still do not enforce anything.
+The default server is read-only. `promote_baseline` and `accept_baseline` are not registered unless `FRONTGUARD_MCP_WRITES=1`. Reads (`list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `recent_runs`, `list_horizontal_overflow`) work without that variable. When writes are enabled, those two tools keep the destructive annotations and the `requiresUserInteraction` flag above. Annotations still do not enforce anything.
 
 MCP promotion is refused in local-report mode. It does not write the `frontguard-baselines` branch. The local write is the CLI, and only with an explicit human flag:
 

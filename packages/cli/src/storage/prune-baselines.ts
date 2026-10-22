@@ -567,8 +567,8 @@ export function readBaselineCommits(repoDir: string, branch = BRANCH): BaselineH
 }
 
 export function mergeBaseCommit(repoDir: string): string {
-  const candidates = ['origin/HEAD', 'origin/main', 'main', 'origin/master', 'master'];
-  for (const name of candidates) {
+  const ks = ['origin/HEAD', 'origin/main', 'main', 'origin/master', 'master'];
+  for (const name of ks) {
     try {
       if (name === 'origin/HEAD') {
         const ref = gitText(repoDir, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']);

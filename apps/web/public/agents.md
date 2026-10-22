@@ -27,6 +27,7 @@ Agents have two public integration paths (plus offline CLI reference via `frontg
 | `inspect_diff_cluster_dom` | `GET /v1/runs/:id` or local report            | Inspect connected-component diff clusters, Chroma/CW-SSIM scores, and intersecting DOM nodes for a `diffId`. |
 | `get_suggested_fix`        | `GET /v1/runs/:id` or local report            | Load the run behind a `diffId` and return the stored AI fix for that route, viewport, and browser.           |
 | `verify_css_patch`         | `GET /v1/runs/:id` or local report            | Validate a candidate CSS patch and target selector against the diff cluster's captured DOM snapshot.         |
+| `list_horizontal_overflow` | `GET /v1/runs/:id` or local report            | List visible unclipped boxes past the right edge. This does not change the pixel result.                      |
 | `promote_baseline`         | Local baseline store (`frontguard-baselines`) | Not registered unless `FRONTGUARD_MCP_WRITES=1`. Local-report mode refuses promotion and does not write baselines. |
 | `accept_baseline`          | `POST /v1/baselines/:runId/approve`           | Record run approval; screenshot promotion is not implemented yet.                                            |
 

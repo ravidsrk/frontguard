@@ -188,12 +188,13 @@ visual:
 
 ## MCP server
 
-`@frontguard/mcp` exposes 7 tools to in-IDE agents (Claude Code, Cursor, Cline, Copilot) across local report mode (`FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json` or automatic fallback when `./frontguard-report/report.json` is present) and a verified Cloud API deployment (`FRONTGUARD_API_URL` + `FRONTGUARD_API_KEY`). There is no live default hosted endpoint, and `accept_baseline` currently records cloud approval without promoting screenshots:
+`@frontguard/mcp` exposes 8 tools to in-IDE agents (Claude Code, Cursor, Cline, Copilot) across local report mode (`FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json` or automatic fallback when `./frontguard-report/report.json` is present) and a verified Cloud API deployment (`FRONTGUARD_API_URL` + `FRONTGUARD_API_KEY`). There is no live default hosted endpoint, and `accept_baseline` currently records cloud approval without promoting screenshots:
 
 - `list_regressions(pr_id, repo?)`
 - `inspect_diff_cluster_dom(diff_id, cluster_id?)`
 - `get_suggested_fix(diff_id)`
 - `verify_css_patch(diff_id, css_patch, target_selector?)`
+- `list_horizontal_overflow(run_id?)` — visible unclipped boxes past the right edge; this does not change the pixel result
 - `promote_baseline(diff_id, confirm_reviewed: true)` — promotes a verified local screenshot into the local baseline store
 - `accept_baseline(run_id, confirm_all_regressions_reviewed: true)` — run-scoped cloud approval metadata, not per-diff
 - `recent_runs(repo?, branch?, limit?)`
@@ -236,7 +237,7 @@ Yes. `frontguard init` detects `.storybook/main.ts` and scaffolds a Storybook-aw
 
 ### Is there an MCP server?
 
-`@frontguard/mcp` exposes 7 tools (`list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `promote_baseline`, `accept_baseline`, `recent_runs`) and supports local report mode via `FRONTGUARD_LOCAL_REPORT`.
+`@frontguard/mcp` exposes 8 tools (`list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `list_horizontal_overflow`, `promote_baseline`, `accept_baseline`, `recent_runs`) and supports local report mode via `FRONTGUARD_LOCAL_REPORT`. Horizontal overflow does not change the pixel result.
 
 ### Data retention?
 

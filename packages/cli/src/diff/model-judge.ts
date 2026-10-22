@@ -191,8 +191,8 @@ async function callOpenAIJudge(
   apiKey: string,
   model: string,
   images: string[],
-  contextText: string,
-  systemPrompt: string,
+  cx: string,
+  sp: string,
   fetchImpl: typeof fetch = fetch,
   baseUrl?: string,
 ): Promise<string> {
@@ -204,8 +204,8 @@ async function callOpenAIJudge(
     model,
     max_tokens: 1024,
     messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: [{ type: 'text', text: contextText }, ...imageMessages] },
+      { role: 'system', content: sp },
+      { role: 'user', content: [{ type: 'text', text: cx }, ...imageMessages] },
     ],
   };
   const rawBase = baseUrl || process.env.FRONTGUARD_OPENAI_BASE_URL;
@@ -237,8 +237,8 @@ async function callAnthropicJudge(
   apiKey: string,
   model: string,
   images: string[],
-  contextText: string,
-  systemPrompt: string,
+  cx: string,
+  sp: string,
   fetchImpl: typeof fetch = fetch,
   baseUrl?: string,
 ): Promise<string> {
@@ -249,8 +249,8 @@ async function callAnthropicJudge(
   const body = {
     model,
     max_tokens: 1024,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: contextText }] }],
+    system: sp,
+    messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: cx }] }],
   };
   const rawBase = baseUrl || process.env.FRONTGUARD_ANTHROPIC_BASE_URL;
   const endpoint = rawBase
@@ -285,8 +285,8 @@ async function callGeminiJudge(
   apiKey: string,
   model: string,
   images: string[],
-  contextText: string,
-  systemPrompt: string,
+  cx: string,
+  sp: string,
   fetchImpl: typeof fetch = fetch,
   baseUrl?: string,
 ): Promise<string> {
@@ -302,7 +302,7 @@ async function callGeminiJudge(
     ...images.map((data) => ({
       inlineData: { mimeType: 'image/png' as const, data },
     })),
-    { text: `${systemPrompt}\n\n${contextText}` },
+    { text: `${sp}\n\n${cx}` },
   ];
   const body = {
     contents: [{ role: 'user', parts }],
@@ -333,10 +333,10 @@ async function callGeminiJudge(
 
 /** Wraps a fetch call with an abort timeout. */
 async function withTimeout(fn: (signal: AbortSignal) => Promise<Response>): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const ct = new AbortController();
+  const timer = setTimeout(() => ct.abort(), REQUEST_TIMEOUT_MS);
   try {
-    return await fn(controller.signal);
+    return await fn(ct.signal);
   } finally {
     clearTimeout(timer);
   }
@@ -382,8 +382,8 @@ export async function judgeScreenshot(
       ? [downscaleForAI(figmaReference as Buffer).toString('base64'), screenshotB64]
       : [screenshotB64];
 
-    const systemPrompt = withDesignReference ? FIGMA_PROMPT : HEURISTIC_PROMPT;
-    const contextText = withDesignReference
+    const sp = withDesignReference ? FIGMA_PROMPT : HEURISTIC_PROMPT;
+    const cx = withDesignReference
       ? `Image 1 is the Figma design, Image 2 is the rendered screenshot.\n\n${buildJudgeContext(screenshot)}`
       : `Evaluate this rendered screenshot.\n\n${buildJudgeContext(screenshot)}`;
 
@@ -392,12 +392,12 @@ export async function judgeScreenshot(
     const raw = await retry(
       () => {
         if (ai.provider === 'openai') {
-          return callOpenAIJudge(apiKey, model, images, contextText, systemPrompt, fetchImpl, ai.baseUrl);
+          return callOpenAIJudge(apiKey, model, images, cx, sp, fetchImpl, ai.baseUrl);
         }
         if (ai.provider === 'gemini') {
-          return callGeminiJudge(apiKey, model, images, contextText, systemPrompt, fetchImpl, ai.baseUrl);
+          return callGeminiJudge(apiKey, model, images, cx, sp, fetchImpl, ai.baseUrl);
         }
-        return callAnthropicJudge(apiKey, model, images, contextText, systemPrompt, fetchImpl, ai.baseUrl);
+        return callAnthropicJudge(apiKey, model, images, cx, sp, fetchImpl, ai.baseUrl);
       },
       { retries: 2, backoff: 1000 },
     );

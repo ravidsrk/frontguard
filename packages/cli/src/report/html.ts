@@ -104,6 +104,7 @@ ${renderHeader(result)}
     ${renderJudgementsSection(result)}
     ${renderAccessibilitySection(result)}
     ${renderTextSnapshotSection(result)}
+    ${renderHorizontalOverflowSection(result)}
     ${renderPerformanceSection(result)}
     ${renderThirdPartyScriptsSection(result)}
   </main>
@@ -495,6 +496,24 @@ function renderTextSnapshotSection(result: RunResult): string {
       <h2>Text snapshots</h2>
       <p>These do not change the pixel result. axe-core remains the accessibility check.</p>
       ${body}
+    </section>`;
+}
+
+function renderHorizontalOverflowSection(result: RunResult): string {
+  const rows = (result.horizontalOverflow ?? []).filter((row) => row.flagged);
+  if (rows.length === 0) return '';
+  const blocks = rows.map((row) => {
+    const items = row.elements
+      .map((el) => `<li><code>${escapeHtml(el.selector)}</code> ${el.overflowPx}px past the right edge</li>`)
+      .join('');
+    return `<h3>${escapeHtml(row.route)} @ ${row.viewport}px [${escapeHtml(row.browser)}]</h3>
+        <p>scrollWidth ${row.scrollWidth}, innerWidth ${row.innerWidth}.</p>
+        <ul>${items}</ul>`;
+  }).join('\n');
+  return `<section class="overflow-section" id="overflow-section">
+      <h2>Horizontal overflow</h2>
+      <p>Visible unclipped boxes past the right edge. This does not change the pixel result or the exit code.</p>
+      ${blocks}
     </section>`;
 }
 

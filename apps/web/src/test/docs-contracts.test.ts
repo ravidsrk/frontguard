@@ -7,6 +7,7 @@ import {
   acceptBaselineInputSchema,
   getSuggestedFixInputSchema,
   inspectDiffClusterDomInputSchema,
+  listHorizontalOverflowInputSchema,
   listRegressionsInputSchema,
   promoteBaselineInputSchema,
   recentRunsInputSchema,
@@ -82,6 +83,7 @@ describe('copyable documentation contracts', () => {
   it('lists the real required and optional MCP inputs', () => {
     const schemas = {
       list_regressions: listRegressionsInputSchema,
+      list_horizontal_overflow: listHorizontalOverflowInputSchema,
       inspect_diff_cluster_dom: inspectDiffClusterDomInputSchema,
       get_suggested_fix: getSuggestedFixInputSchema,
       verify_css_patch: verifyCssPatchInputSchema,

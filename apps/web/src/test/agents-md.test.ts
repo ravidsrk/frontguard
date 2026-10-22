@@ -19,6 +19,7 @@ describe('agents.md', () => {
       'inspect_diff_cluster_dom',
       'get_suggested_fix',
       'verify_css_patch',
+      'list_horizontal_overflow',
       'promote_baseline',
       'accept_baseline',
       'frontguard guide',

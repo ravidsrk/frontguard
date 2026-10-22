@@ -41,6 +41,10 @@ Do not treat a blog score or a frontier-model demo as this eval.
 4. Keep UI-Lens failure classes (overflow, crop, overlap) as cases the model is not assumed to catch. A miss there does not flip a pixelmatch result.
 5. Injection text in the page must not change the exit code. The pixel gate stays in control.
 
+## Horizontal overflow fixtures
+
+`validation/fixtures/overflow` is the set for the deterministic horizontal-overflow check. This repository has not run the advisory judge on that set, so it publishes no Frontguard judge accuracy for overflow, cropping, or overlap. UI-Lens remains the external negative evidence: nine models scored 50.04% on text overflow, 54.07% on cropped content, and 54.14% on container overlap. Those figures are not a Frontguard rate. The geometry check's precision on that set is in [`validation/results-overflow.md`](../validation/results-overflow.md). A judge note does not change the pixel exit code.
+
 ## What this mode must not do
 
 - It must not be described as accepting or rejecting a baseline.

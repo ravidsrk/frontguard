@@ -1567,6 +1567,7 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
         ['promote_baseline', 'run_id, confirm_reviewed: true; optional routes', 'Cloud API mode only: records reviewed run approval. Refuses local-report mode; does not promote cloud PNGs.'],
         ['accept_baseline', 'run_id, confirm_all_regressions_reviewed: true', 'Records whole-run approval metadata in the local JSON report or Cloud API; does not replace screenshot baselines.'],
         ['recent_runs', 'optional repo, branch, limit', 'Lists runs, including the local run ID when reading a JSON report.'],
+        ['list_horizontal_overflow', 'optional run_id', 'Lists horizontal overflow from the JSON report. A flagged row is a visible unclipped box past the right edge. It does not change the pixel result.'],
       ],
     )}${h2('Agentic debugging workflow')}${steps([
       {

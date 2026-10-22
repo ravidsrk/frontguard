@@ -33,6 +33,7 @@ import {
   resolveRedactSelectors,
 } from './redaction.js';
 import { extractDomElementBoxes } from './dom-elements.js';
+import { measureHorizontalOverflow } from './horizontal-overflow.js';
 import { CAPTURE_SCREENSHOT_OPTIONS } from '../core/fingerprint.js';
 
 /**
@@ -516,6 +517,9 @@ export async function executeTask(
     const domSnapshot =
       redactSelectors.length > 0 ? redactSensitiveDomHtml(rawDomSnapshot) : rawDomSnapshot;
 
+    // Same settled page as the screenshot. A measurement failure stays unreported.
+    const hx = await measureHorizontalOverflow(page);
+
     // --- Extract spatial DOM element bounding boxes for diff attribution ------
     const domElements = await extractDomElementBoxes(page);
 
@@ -534,6 +538,7 @@ export async function executeTask(
       ...(redactedCount !== undefined ? { redactedCount } : {}),
       ...(stabilityMetadata !== undefined ? { stability: stabilityMetadata } : {}),
       ...(domElements.length > 0 ? { domElements } : {}),
+      ...(hx ? { horizontalOverflow: hx } : {}),
       ...(blockUrls.length > 0 || blockedRequestsCount > 0 ? { blockedRequestsCount } : {}),
     };
   } catch (err) {

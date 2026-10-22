@@ -7,6 +7,14 @@
  */
 
 export {
+  listHorizontalOverflow,
+  listHorizontalOverflowInputSchema,
+  listHorizontalOverflowOutputSchema,
+  type ListHorizontalOverflowInput,
+  type ListHorizontalOverflowResult,
+} from './list-horizontal-overflow.js';
+
+export {
   listRegressions,
   listRegressionsInputSchema,
   listRegressionsOutputSchema,

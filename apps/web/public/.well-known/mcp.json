@@ -40,6 +40,10 @@
       "description": "Return the visual regressions Frontguard detected on a given GitHub PR (or run id). Each row carries a `diffId` you can pass to `get_suggested_fix`."
     },
     {
+      "name": "list_horizontal_overflow",
+      "description": "List horizontal overflow from a run. A flagged row is a visible unclipped box past the right edge, with selector and pixels. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code."
+    },
+    {
       "name": "get_suggested_fix",
       "description": "Return the AI-generated patch for a single diff (keyed by the `diffId` from `list_regressions`)."
     },

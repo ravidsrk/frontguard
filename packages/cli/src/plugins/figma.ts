@@ -319,8 +319,8 @@ export function createFigmaPlugin(config: FigmaConfig): FrontguardPlugin {
 
         try {
           // Decode the current screenshot to get dimensions
-          const currentPng = PNG.sync.read(diff.currentImage);
-          const { width, height } = currentPng;
+          const cp = PNG.sync.read(diff.currentImage);
+          const { width, height } = cp;
           const totalPixels = width * height;
 
           // Resize Figma export to match screenshot dimensions
@@ -330,7 +330,7 @@ export function createFigmaPlugin(config: FigmaConfig): FrontguardPlugin {
           // Run pixelmatch
           const diffOutput = new PNG({ width, height });
           const numDiffPixels = pixelmatch(
-            currentPng.data,
+            cp.data,
             figmaPng.data,
             diffOutput.data,
             width,
