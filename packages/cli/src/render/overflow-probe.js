@@ -62,10 +62,14 @@ function pageProbe() {
           overflowX === 'hidden' ||
           overflowX === 'clip' ||
           ((overflowX === 'scroll' || overflowX === 'auto') && internal);
-        // `contain: paint` clips to the padding edge while overflow-x stays visible.
-        // `content` and `strict` include paint. `layout` does not clip.
-        const paints = listed(style.contain, ['paint', 'strict', 'content']);
-        if ((clips || paints) && rect.right > node.getBoundingClientRect().right + 1) return true;
+        // `display: contents` generates no box, so overflow and paint do not clip.
+        // Do not `continue` here: that would skip the parent step and spin.
+        if (style.display !== 'contents') {
+          // `contain: paint` clips to the padding edge while overflow-x stays visible.
+          // `content` and `strict` include paint. `layout` does not clip.
+          const paints = listed(style.contain, ['paint', 'strict', 'content']);
+          if ((clips || paints) && rect.right > node.getBoundingClientRect().right + 1) return true;
+        }
       }
       node = node.parentElement;
     }

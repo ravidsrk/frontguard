@@ -22,6 +22,7 @@
     { "file": "will-scale.html", "flag": false, "selector": "[data-testid=\"willscale\"]", "scrolls": false },
     { "file": "content.html", "flag": false, "selector": "[data-testid=\"content\"]", "scrolls": false },
     { "file": "strict.html", "flag": false, "selector": "[data-testid=\"strict\"]", "scrolls": false },
-    { "file": "layout.html", "flag": true, "selector": "[data-testid=\"layout\"]", "scrolls": false }
+    { "file": "layout.html", "flag": true, "selector": "[data-testid=\"layout\"]", "scrolls": false },
+    { "file": "contents.html", "flag": true, "selector": "[data-testid=\"contents\"]", "scrolls": true }
   ]
 }
