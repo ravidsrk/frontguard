@@ -5,6 +5,7 @@
  *   run               Run visual regression tests (default)
  *   init              Generate a starter config file
  *   update-baselines  Accept current screenshots as new baselines
+ *   review            Accept failing, new, and missing shots one at a time
  *   prune-baselines   Remove undeclared shots and unreachable baseline history
  *   ignores           List aged ignore rules and the shots they cover
  *   doctor            Diagnose environment readiness
@@ -30,6 +31,7 @@ import { GUIDE_TOPICS, getGuideTopic, formatGuideIndex } from './guide.js';
 import { maybeRunInDocker } from './run.js';
 import { comparisonExitCode, runExitCode } from './exit-code.js';
 import { baselineWriteBlockReason } from './baseline-confirm.js';
+import { loadReview } from './load-review.js';
 import { parseThresholdRatio } from './threshold.js';
 import { compareDiffToThreshold } from '../diff/threshold.js';
 import { sendTelemetry, isTelemetryEnabled, type TelemetryEvent } from '../utils/telemetry.js';
@@ -562,6 +564,29 @@ export async function main(argv?: string[]): Promise<number> {
         await updateBaselines(config, reporter);
         logger.info('✅ Baselines updated successfully');
         exitCode = 0;
+      } catch (err) {
+        logger.error(formatFatalError(err));
+        exitCode = 2;
+      }
+    });
+
+  // ---------------------------------------------------------------------------
+  // Command: review
+  // ---------------------------------------------------------------------------
+
+  program
+    .command('review')
+    .description('Accept shots one at a time')
+    .option('--from <dir>')
+    .option('--all')
+    .option('--filter <routes>')
+    .option('--confirm-baselines')
+    .option('--mode <mode>')
+    .option('-c, --config <path>')
+    .action(async (opts) => {
+      try {
+        const { reviewCli } = await loadReview();
+        exitCode = await reviewCli(opts, buildConfig);
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;
