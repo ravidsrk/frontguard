@@ -324,6 +324,8 @@ export default {
 
 ### Sample CLI Output
 
+This block is sample output, not a measured run. `smartFilter` falls back to rendering all routes when it cannot prove a smaller set.
+
 ```
  frontguard
 

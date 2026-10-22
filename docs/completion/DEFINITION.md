@@ -90,7 +90,7 @@ Frozen so it cannot be re-litigated. None of the following counts against comple
   competitive differentiators, not table stakes, for an OSS tool in this category.
 - **Billing.** No live money path exists. Deploying billing re-opens the Appendix D payments and
   PCI areas that are currently N/A, and would require its own compliance pass.
-- **God-file refactors** (`pipeline.ts` 1328 lines, web `index.tsx` 1811), **coverage thresholds**,
+- **God-file refactors.** This section quoted `pipeline.ts` at 1328 lines and web `index.tsx` at 1811. Measured on 2026-10-19, `pipeline.ts` was 1422 lines and `apps/web/src/routes/index.tsx` is 91 lines, so the `index.tsx` refactor is obsolete. The pipeline is split into the published entry and sibling stage modules. That split does not add `html.ts` or `docs-content.ts` as required splits. **Coverage thresholds**,
   **OpenTelemetry instrumentation**, **PNG baseline history pruning**, **`apps/web` accessibility
   audit**. Real, filed as `post-launch`, none blocking.
 - **npm trusted publishing (OIDC) migration.** The current pipeline is strong and safe; moving off
