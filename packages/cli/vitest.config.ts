@@ -2,17 +2,99 @@ import { defineConfig } from 'vitest/config';
 
 const VITEST_COMMANDS = new Set(['run', 'watch', 'dev', 'related', 'list', 'bench']);
 
+/** These select a subset of tests, so the full-package floors do not apply. */
+const FILTER_FLAGS = new Set([
+  '-t',
+  '--testNamePattern',
+  '--changed',
+  '--shard',
+  '--tagsFilter',
+]);
+
 /**
- * The floors apply to a full `vitest run` only. A file path or a test-name
- * filter would otherwise be measured against the whole src tree and fail
- * even when those tests pass.
+ * Flags whose next argv token is an option value, not a test file.
+ * Names match `vitest run --help` for Vitest 5.0.5.
+ */
+const VALUE_FLAGS = new Set([
+  '-r',
+  '--root',
+  '-c',
+  '--config',
+  '--dir',
+  '--reporter',
+  '--outputFile',
+  '--mode',
+  '--browser',
+  '--pool',
+  '--execArgv',
+  '--vmMemoryLimit',
+  '--maxWorkers',
+  '--environment',
+  '--sequence',
+  '--testTimeout',
+  '--hookTimeout',
+  '--bail',
+  '--retry',
+  '--repeats',
+  '--diff',
+  '--exclude',
+  '-p',
+  '--project',
+  '--slowTestThreshold',
+  '--teardownTimeout',
+  '--maxConcurrency',
+  '--fsModuleCachePath',
+  '--attachmentsDir',
+  '--configLoader',
+  '--experimental',
+]);
+
+const UPDATE_VALUES = new Set(['new', 'all', 'none', 'true', 'false']);
+const SILENT_VALUES = new Set(['passed-only', 'true', 'false']);
+
+function flagName(arg: string): string {
+  const eq = arg.indexOf('=');
+  return eq === -1 ? arg : arg.slice(0, eq);
+}
+
+function consumesOptionalValue(name: string, next: string): boolean {
+  if ((name === '-u' || name === '--update') && UPDATE_VALUES.has(next)) return true;
+  if (name === '--silent' && SILENT_VALUES.has(next)) return true;
+  if (name === '--listTags' && next === 'json') return true;
+  if (
+    (name === '--api' || name === '--inspect' || name === '--inspectBrk') &&
+    /^(\d+|[\w.-]+:\d+)$/.test(next)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * The floors apply to a full `vitest run` only. A file path, a test-name
+ * pattern, a shard, a changed-only run, or a tag filter would otherwise be
+ * measured against the whole src tree and fail even when those tests pass.
+ * Space-separated option values, such as `--reporter verbose`, stay on the gate.
  */
 export function coverageGateEnabled(argv: readonly string[]): boolean {
-  for (const arg of argv.slice(2)) {
-    if (arg === '-t' || arg === '--testNamePattern' || arg.startsWith('--testNamePattern=')) {
-      return false;
+  const args = argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--') {
+      return !args.slice(i + 1).some((rest) => !VITEST_COMMANDS.has(rest));
     }
-    if (!arg.startsWith('-') && !VITEST_COMMANDS.has(arg)) return false;
+    if (!arg.startsWith('-')) {
+      if (!VITEST_COMMANDS.has(arg)) return false;
+      continue;
+    }
+    const name = flagName(arg);
+    if (FILTER_FLAGS.has(name)) return false;
+    if (arg.includes('=')) continue;
+    const next = args[i + 1];
+    if (next === undefined || next.startsWith('-')) continue;
+    if (VALUE_FLAGS.has(name) || name.startsWith('--coverage.') || consumesOptionalValue(name, next)) {
+      i += 1;
+    }
   }
   return true;
 }
