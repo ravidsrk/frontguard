@@ -66,7 +66,7 @@ export function createTextSnapshotPlugin(config: TextSnapshotConfig = {}): Front
   return {
     name: 'text-snapshot',
 
-    async afterRender(screenshots: ScreenshotResult[], ctx: PluginContext): Promise<void> {
+    async afterRender(shots: ScreenshotResult[], ctx: PluginContext): Promise<void> {
       reports = [];
       if (kinds.length === 0) return;
       const writing = ctx.metadata.get(WRITE_KEY) === true;
@@ -81,7 +81,7 @@ export function createTextSnapshotPlugin(config: TextSnapshotConfig = {}): Front
       await storage.init();
       const pending: Array<{ shot: ScreenshotResult; kind: TextSnapshotReport['kind']; suffix: string; body: string }> = [];
       const groups = new Map<BrowserEngine, ScreenshotResult[]>();
-      for (const shot of screenshots) {
+      for (const shot of shots) {
         const list = groups.get(shot.browser);
         if (list) list.push(shot);
         else groups.set(shot.browser, [shot]);

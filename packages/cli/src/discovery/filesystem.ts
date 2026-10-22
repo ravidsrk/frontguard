@@ -67,9 +67,9 @@ function isDynamicSegment(name: string): boolean {
  * @param baseName - Config file base name (e.g. 'next.config')
  * @returns true if any matching config file exists
  */
-function hasConfigFile(projectDir: string, baseName: string): boolean {
+function hasConfigFile(proj: string, baseName: string): boolean {
   const extensions = ['.ts', '.js', '.mjs', '.cjs', '.mts'];
-  return extensions.some((ext) => existsSync(join(projectDir, baseName + ext)));
+  return extensions.some((ext) => existsSync(join(proj, baseName + ext)));
 }
 
 /**
@@ -86,14 +86,14 @@ function hasConfigFile(projectDir: string, baseName: string): boolean {
  * @returns Detected framework and its route directory, or null
  */
 function detectFramework(
-  projectDir: string
+  proj: string
 ): { framework: Framework; routeDir: string } | null {
-  const hasNextConfig = hasConfigFile(projectDir, 'next.config');
+  const hasNextConfig = hasConfigFile(proj, 'next.config');
 
   // Next.js App Router — check both app/ and src/app/
   if (hasNextConfig) {
     for (const candidate of ['src/app', 'app']) {
-      const appDir = join(projectDir, candidate);
+      const appDir = join(proj, candidate);
       if (existsSync(appDir)) {
         // App Router requires a layout or page file at root
         const hasLayout = PAGE_EXTENSIONS.has('.tsx') &&
@@ -111,7 +111,7 @@ function detectFramework(
 
     // Next.js Pages Router — check both pages/ and src/pages/
     for (const candidate of ['src/pages', 'pages']) {
-      const pagesDir = join(projectDir, candidate);
+      const pagesDir = join(proj, candidate);
       if (existsSync(pagesDir)) {
         logger.info(`Detected Next.js Pages Router (${candidate}/)`);
         return { framework: 'nextjs-pages', routeDir: pagesDir };
@@ -120,8 +120,8 @@ function detectFramework(
   }
 
   // Remix — remix.config.* or app/routes/ directory
-  const hasRemixConfig = hasConfigFile(projectDir, 'remix.config');
-  const remixRoutesDir = join(projectDir, 'app', 'routes');
+  const hasRemixConfig = hasConfigFile(proj, 'remix.config');
+  const remixRoutesDir = join(proj, 'app', 'routes');
   if (hasRemixConfig || existsSync(remixRoutesDir)) {
     if (existsSync(remixRoutesDir)) {
       logger.info('Detected Remix (app/routes/)');
@@ -130,16 +130,16 @@ function detectFramework(
   }
 
   // SvelteKit — svelte.config.* + src/routes/
-  const hasSvelteConfig = hasConfigFile(projectDir, 'svelte.config');
-  const svelteRoutesDir = join(projectDir, 'src', 'routes');
+  const hasSvelteConfig = hasConfigFile(proj, 'svelte.config');
+  const svelteRoutesDir = join(proj, 'src', 'routes');
   if (hasSvelteConfig && existsSync(svelteRoutesDir)) {
     logger.info('Detected SvelteKit (src/routes/)');
     return { framework: 'sveltekit', routeDir: svelteRoutesDir };
   }
 
   // Nuxt — nuxt.config.* + pages/
-  const hasNuxtConfig = hasConfigFile(projectDir, 'nuxt.config');
-  const nuxtPagesDir = join(projectDir, 'pages');
+  const hasNuxtConfig = hasConfigFile(proj, 'nuxt.config');
+  const nuxtPagesDir = join(proj, 'pages');
   if (hasNuxtConfig && existsSync(nuxtPagesDir)) {
     logger.info('Detected Nuxt (pages/)');
     return { framework: 'nuxt', routeDir: nuxtPagesDir };
@@ -187,40 +187,40 @@ function isRouteFile(fileName: string, framework: Framework): boolean {
  */
 export function filePathToRoute(relativePath: string, framework: Framework): string | null {
   // Normalize separators to forward slashes
-  let routePath = relativePath.replace(/\\/g, '/');
+  let rpath = relativePath.replace(/\\/g, '/');
 
   // Remove the file extension
-  const { ext } = parsePath(routePath);
-  routePath = routePath.slice(0, -ext.length);
+  const { ext } = parsePath(rpath);
+  rpath = rpath.slice(0, -ext.length);
 
   // Ignore Next.js parallel route slots (@slot) and intercepting routes ((.)x, (..)x, (...)x)
-  if (/(^|\/)@[^/]+(\/|$)/.test(routePath) || /\(\.+[^)]*\)/.test(routePath)) {
+  if (/(^|\/)@[^/]+(\/|$)/.test(rpath) || /\(\.+[^)]*\)/.test(rpath)) {
     return null;
   }
 
   // Strip route groups like (marketing) or (auth)
-  routePath = routePath.replace(/\([^/]+\)\/?/g, '');
+  rpath = rpath.replace(/\([^/]+\)\/?/g, '');
 
   switch (framework) {
     case 'nextjs-app':
       // app/checkout/page.tsx → /checkout
       // app/page.tsx → /
-      routePath = routePath.replace(/(?:\/|^)page$/, '');
-      if (routePath === 'page') routePath = '';
+      rpath = rpath.replace(/(?:\/|^)page$/, '');
+      if (rpath === 'page') rpath = '';
       break;
 
     case 'nextjs-pages':
       // pages/checkout.tsx → /checkout
       // pages/index.tsx → /
-      routePath = routePath.replace(/\/index$/, '');
-      if (routePath === 'index') routePath = '';
+      rpath = rpath.replace(/\/index$/, '');
+      if (rpath === 'index') rpath = '';
       break;
 
     case 'remix': {
       // Remix uses `.` as path separator in flat routes
       // e.g., `about.tsx` → `/about`, `checkout.step-1.tsx` → `/checkout/step-1`
       // `_index.tsx` → `/`, `dashboard._index.tsx` → `/dashboard`, `_auth.login.tsx` → `/login`
-      const rawSegments = routePath.split(/[./]/).filter(Boolean);
+      const rawSegments = rpath.split(/[./]/).filter(Boolean);
       const hasIndex = rawSegments.some((seg) => seg === 'index' || seg === '_index');
       const filtered = rawSegments.filter(
         (seg) => seg !== 'index' && seg !== '_index' && !seg.startsWith('_'),
@@ -228,34 +228,34 @@ export function filePathToRoute(relativePath: string, framework: Framework): str
       if (filtered.length === 0 && !hasIndex) {
         return null;
       }
-      routePath = filtered.join('/');
+      rpath = filtered.join('/');
       break;
     }
 
     case 'sveltekit':
       // src/routes/checkout/+page.svelte → /checkout
-      routePath = routePath.replace(/(?:\/|^)\+page$/, '');
-      if (routePath === '+page') routePath = '';
+      rpath = rpath.replace(/(?:\/|^)\+page$/, '');
+      if (rpath === '+page') rpath = '';
       break;
 
     case 'nuxt':
       // pages/checkout.vue → /checkout
       // pages/index.vue → /
-      routePath = routePath.replace(/\/index$/, '');
-      if (routePath === 'index') routePath = '';
+      rpath = rpath.replace(/\/index$/, '');
+      if (rpath === 'index') rpath = '';
       break;
   }
 
   // Ensure leading slash
-  routePath = '/' + routePath;
+  rpath = '/' + rpath;
 
   // Normalize double slashes and trailing slash
-  routePath = routePath.replace(/\/+/g, '/');
-  if (routePath.length > 1 && routePath.endsWith('/')) {
-    routePath = routePath.slice(0, -1);
+  rpath = rpath.replace(/\/+/g, '/');
+  if (rpath.length > 1 && rpath.endsWith('/')) {
+    rpath = rpath.slice(0, -1);
   }
 
-  return routePath;
+  return rpath;
 }
 
 export { filePathToRoute as fileToRoute };
@@ -331,14 +331,14 @@ function scanDirectory(
       if (!isRouteFile(entry, framework)) continue;
 
       const relativePath = relative(baseDir, fullPath);
-      const routePath = filePathToRoute(relativePath, framework);
-      if (routePath === null) continue;
+      const rpath = filePathToRoute(relativePath, framework);
+      if (rpath === null) continue;
 
       // Deduplicate
-      if (!routes.some((r) => r.path === routePath)) {
+      if (!routes.some((r) => r.path === rpath)) {
         routes.push({
-          path: routePath,
-          label: routePath === '/' ? 'Home' : routePath,
+          path: rpath,
+          label: rpath === '/' ? 'Home' : rpath,
           discoveredVia: 'filesystem',
         });
       }
@@ -364,8 +364,8 @@ function scanDirectory(
  * @param projectDir - Root directory of the project
  * @returns Array of discovered routes with `discoveredVia: 'filesystem'`, or null if no framework detected
  */
-export function discoverRoutesFromFilesystem(projectDir: string): Route[] | null {
-  const detection = detectFramework(projectDir);
+export function discoverRoutesFromFilesystem(proj: string): Route[] | null {
+  const detection = detectFramework(proj);
 
   if (!detection) {
     logger.debug(

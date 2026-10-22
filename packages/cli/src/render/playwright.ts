@@ -45,7 +45,7 @@ import { CAPTURE_SCREENSHOT_OPTIONS } from '../core/fingerprint.js';
  */
 export const FONT_READY_TIMEOUT_MS = 10_000;
 
-async function waitForDocumentFonts(page: Page, routePath: string): Promise<void> {
+async function waitForDocumentFonts(page: Page, rpath: string): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([
@@ -54,7 +54,7 @@ async function waitForDocumentFonts(page: Page, routePath: string): Promise<void
         timer = setTimeout(() => {
           reject(
             new Error(
-              `document.fonts.ready timed out after ${FONT_READY_TIMEOUT_MS}ms for route ${routePath}`,
+              `document.fonts.ready timed out after ${FONT_READY_TIMEOUT_MS}ms for route ${rpath}`,
             ),
           );
         }, FONT_READY_TIMEOUT_MS);
