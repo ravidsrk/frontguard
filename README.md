@@ -287,7 +287,7 @@ export default {
 };
 ```
 
-`failOnViolation: true` also refuses `frontguard update-baselines` when a violation is at or above `impact`, including when the pixel status is not a regression, and when an audit does not complete. The report lists those violations beside the pixel result, says the baselines were not written, and does not call them accepted. It does not change the pixel status. A clean audit leaves a pixel regression as a regression.
+`failOnViolation: true` also refuses `frontguard update-baselines` and `frontguard review` when a violation is at or above `impact`, including when the pixel status is not a regression, and when an audit does not complete. The report lists those violations beside the pixel result, says the baselines were not written, and does not call them accepted. It does not change the pixel status. A clean audit leaves a pixel regression as a regression.
 
 ---
 
@@ -300,6 +300,7 @@ export default {
 | `frontguard doctor`                  | Diagnose environment readiness (Node, Playwright, browsers, config, git)                |
 | `frontguard guide [topic] [--json]`  | Print offline reference guides (`setup`, `diffing`, `mcp`, `playwright`, `ci`)          |
 | `frontguard update-baselines --confirm-baselines` | Accept current screenshots as new baselines. Exits 2 and writes nothing without the flag. |
+| `frontguard review --confirm-baselines` | Accept failing, new, and missing shots one at a time. `--from` copies a CI report byte for byte and exits 2 on a fingerprint mismatch. |
 | `frontguard monitor`                 | Monitor live production URLs for visual regressions                                     |
 | `frontguard accept-fix <id>`         | Mark a suggested fix as accepted (improves future suggestions)                          |
 | `frontguard reject-fix <id>`         | Mark a suggested fix as rejected (negative training signal)                             |

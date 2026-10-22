@@ -67,6 +67,8 @@ export type GitOrphanStorageMode = 'compare' | 'update';
 export interface GitOrphanStorageOptions {
   branch?: string;
   mode?: GitOrphanStorageMode;
+  /** Do not fetch origin. `frontguard review` must not make network calls. */
+  offline?: boolean;
 }
 
 /**
@@ -130,6 +132,7 @@ export class GitOrphanStorage implements BaselineStorage {
   private readonly repoDir: string;
   private readonly branch: string;
   private readonly mode: GitOrphanStorageMode;
+  private readonly offline: boolean;
   private readRef: string | null;
   private initialized = false;
 
@@ -140,6 +143,7 @@ export class GitOrphanStorage implements BaselineStorage {
     this.repoDir = repoDir;
     this.branch = options.branch ?? 'frontguard-baselines';
     this.mode = options.mode ?? 'compare';
+    this.offline = options.offline === true;
     this.readRef = null;
   }
 
@@ -256,7 +260,7 @@ export class GitOrphanStorage implements BaselineStorage {
       );
     }
 
-    if (hasOrigin) {
+    if (hasOrigin && !this.offline) {
       try {
         if (this.remoteBranchExists()) {
           const remoteCommit = this.fetchRemoteBranch();

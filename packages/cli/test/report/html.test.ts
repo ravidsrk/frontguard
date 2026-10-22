@@ -213,6 +213,41 @@ describe('HTMLReporter', () => {
     }
   });
 
+  it('writes review.json with the current image path and fingerprint', async () => {
+    const png = createTestPng(2, 2, 9, 8, 7);
+    const { dir, cleanup } = createTempDir();
+
+    try {
+      const reporter = new HTMLReporter();
+      await reporter.writeReport(
+        makeRunResult(
+          [
+            makeDiff({
+              route: { path: '/pricing' },
+              viewport: 800,
+              browser: 'chromium',
+              status: 'regression',
+              currentImage: png,
+            }),
+          ],
+          { config: makeConfig({ outputDir: dir }) },
+        ),
+        dir,
+      );
+
+      const sidecar = JSON.parse(readFileSync(join(dir, 'review.json'), 'utf8')) as {
+        shots: Array<{ current?: string; fingerprint?: { os?: string; captureRunner?: string } }>;
+      };
+      expect(sidecar.shots).toHaveLength(1);
+      expect(sidecar.shots[0]?.current).toBe('images/0_pricing_800_chromium_0_current.png');
+      expect(sidecar.shots[0]?.fingerprint?.os).toBe(process.platform);
+      expect(sidecar.shots[0]?.fingerprint?.captureRunner).toBe('routes');
+      expect(readFileSync(join(dir, sidecar.shots[0]?.current ?? '')).equals(png)).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
   it('propagates report write failures', async () => {
     const reporter = new HTMLReporter();
     vi.spyOn(reporter, 'writeReport').mockImplementation(() => {
