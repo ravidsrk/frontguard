@@ -5,6 +5,7 @@
     { "file": "real.html", "flag": true, "selector": "[data-testid=\"wide\"]", "scrolls": true },
     { "file": "body-axis.html", "flag": true, "selector": "[data-testid=\"axis\"]", "scrolls": true },
     { "file": "clipped.html", "flag": false, "selector": "[data-testid=\"clipped\"]", "scrolls": false },
+    { "file": "paint.html", "flag": false, "selector": "[data-testid=\"painted\"]", "scrolls": false },
     { "file": "clip.html", "flag": false, "selector": "[data-testid=\"clip\"]", "scrolls": false },
     { "file": "ghost.html", "flag": false, "selector": "[data-testid=\"ghost\"]", "scrolls": true },
     { "file": "faded.html", "flag": false, "selector": "[data-testid=\"faded\"]", "scrolls": true },
@@ -18,6 +19,9 @@
     { "file": "scaled.html", "flag": false, "selector": "[data-testid=\"scaled\"]", "scrolls": false },
     { "file": "moved.html", "flag": false, "selector": "[data-testid=\"moved\"]", "scrolls": false },
     { "file": "turned.html", "flag": false, "selector": "[data-testid=\"turned\"]", "scrolls": false },
-    { "file": "will-scale.html", "flag": false, "selector": "[data-testid=\"willscale\"]", "scrolls": false }
+    { "file": "will-scale.html", "flag": false, "selector": "[data-testid=\"willscale\"]", "scrolls": false },
+    { "file": "content.html", "flag": false, "selector": "[data-testid=\"content\"]", "scrolls": false },
+    { "file": "strict.html", "flag": false, "selector": "[data-testid=\"strict\"]", "scrolls": false },
+    { "file": "layout.html", "flag": true, "selector": "[data-testid=\"layout\"]", "scrolls": false }
   ]
 }

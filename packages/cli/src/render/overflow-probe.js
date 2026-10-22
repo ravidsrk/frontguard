@@ -62,7 +62,10 @@ function pageProbe() {
           overflowX === 'hidden' ||
           overflowX === 'clip' ||
           ((overflowX === 'scroll' || overflowX === 'auto') && internal);
-        if (clips && rect.right > node.getBoundingClientRect().right + 1) return true;
+        // `contain: paint` clips to the padding edge while overflow-x stays visible.
+        // `content` and `strict` include paint. `layout` does not clip.
+        const paints = listed(style.contain, ['paint', 'strict', 'content']);
+        if ((clips || paints) && rect.right > node.getBoundingClientRect().right + 1) return true;
       }
       node = node.parentElement;
     }
