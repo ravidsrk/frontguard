@@ -203,6 +203,8 @@ Histoire is read from `histoire.json` while its native visual testing is still u
 
 ## Sample CLI Output
 
+This block is sample output, not a measured run. `smartFilter` falls back to rendering all routes when it cannot prove a smaller set.
+
 ```
  frontguard v0.2.3
 

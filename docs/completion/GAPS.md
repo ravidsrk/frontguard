@@ -75,7 +75,7 @@ S2 degrades with workaround · S3 polish.
 | G-36 | Marketplace listings not live (4 platforms) | Third-party review; outside the product's control |
 | G-37 | Most outbound `fetch` lack timeout/retry/circuit breaker | Real, but the CLI is short-lived and `pageTimeout` covers the page under test |
 | G-38 | OpenTelemetry pinned in 30 overrides but never instrumented | Cleanup; the overrides may be load-bearing for resolution and need care |
-| G-39 | God files: `pipeline.ts` 1328, web `index.tsx` 1811 | Refactor, explicitly out of scope in §4 |
+| G-39 | God files: the §4 quotes of `pipeline.ts` 1328 and web `index.tsx` 1811 were stale. Measured on 2026-10-19, `pipeline.ts` was 1422 lines and `index.tsx` is 91, so the route refactor is obsolete. The pipeline split does not require `html.ts` or `docs-content.ts`. | Corrected with the pipeline split |
 | G-40 | CLI v8 floors are the lower measured total for each metric on 2026-10-22 (statements 79.32, branches 70.24, functions 82.99, lines 81.02). macOS branches were 70.33; GitHub ubuntu Node 22 and Node 24 were 70.24 (3768/5364). External research did not supply the number. Undeployed cloud-api is not included. | Enforced on a full CLI vitest run. A file or name filter does not apply the floor. Still post-launch and non-blocking in §4 |
 | G-41 | PNG baseline growth will bloat git history over time | Slow-moving; needs a documented pruning story, not a launch fix |
 | G-42 | `apps/web` has no axe/keyboard/contrast proof | Out of scope in §4 |
