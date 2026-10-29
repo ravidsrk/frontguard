@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   root-action-contract:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || format('codebuild-gha-frontguard-{0}-{1}', github.run_id, github.run_attempt) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +45,7 @@ jobs:
           done
 
   subpath-action-contract:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # tests rely on non-root file permissions
     steps:
       - uses: actions/checkout@v4
 
@@ -80,7 +80,7 @@ jobs:
 
   documented-baseline-ref-fetch:
     name: Documented CI path fetches the baseline ref
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || format('codebuild-gha-frontguard-{0}-{1}', github.run_id, github.run_attempt) }}
     steps:
       - uses: actions/checkout@v4
         with:
