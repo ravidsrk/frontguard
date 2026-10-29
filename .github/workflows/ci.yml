@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || format('codebuild-gha-frontguard-{0}-{1}', github.run_id, github.run_attempt) }}
+    runs-on: ubuntu-latest  # tests rely on non-root file permissions
     strategy:
       matrix:
         node-version: [22, 24]
