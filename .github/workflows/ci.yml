@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || format('codebuild-gha-frontguard-{0}-{1}', github.run_id, github.run_attempt) }}
     strategy:
       matrix:
         node-version: [22, 24]
@@ -30,7 +30,7 @@ jobs:
       - run: npm test
 
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || format('codebuild-gha-frontguard-{0}-{1}', github.run_id, github.run_attempt) }}
     # The docker-build e2e does a cold, uncached Playwright base pull plus apt
     # install on every run, which is legitimately 10-25 minutes. Bound the job
     # so a genuinely hung build fails in 45 minutes instead of consuming the
@@ -50,7 +50,7 @@ jobs:
         run: npm run test:e2e --workspace=packages/cli
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || format('codebuild-gha-frontguard-{0}-{1}', github.run_id, github.run_attempt) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
@@ -71,7 +71,7 @@ jobs:
   docs-links:
     # Guards apps/web docs-content.ts against broken internal /docs links
     # and non-canonical action refs. Dependency-free Node script — no build.
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || format('codebuild-gha-frontguard-{0}-{1}', github.run_id, github.run_attempt) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
@@ -81,7 +81,7 @@ jobs:
         run: node apps/web/scripts/check-doc-links.mjs
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || format('codebuild-gha-frontguard-{0}-{1}', github.run_id, github.run_attempt) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
@@ -151,7 +151,7 @@ jobs:
           exit $status
 
   audit:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || format('codebuild-gha-frontguard-{0}-{1}', github.run_id, github.run_attempt) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7
