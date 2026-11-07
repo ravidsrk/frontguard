@@ -207,7 +207,7 @@ function registerProtocolHandlers(server: McpServer, instructions: string): void
   });
 }
 
-function registerTools(server: McpServer, writesEnabled: boolean): void {
+function registerCoreTools(server: McpServer, writesEnabled: boolean): void {
   server.registerTool(
     'list_regressions',
     {
@@ -257,7 +257,9 @@ function registerTools(server: McpServer, writesEnabled: boolean): void {
       async (args) => withCloudClient(async (client) => acceptBaseline(client, args)),
     );
   }
+}
 
+function registerExtendedTools(server: McpServer, writesEnabled: boolean): void {
   server.registerTool(
     'recent_runs',
     {
@@ -322,7 +324,9 @@ export function createServer(): McpServer {
       instructions,
     },
   );
-  registerTools(server, mcpWritesEnabled());
+  const writesEnabled = mcpWritesEnabled();
+  registerCoreTools(server, writesEnabled);
+  registerExtendedTools(server, writesEnabled);
   registerProtocolHandlers(server, instructions);
   return server;
 }

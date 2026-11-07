@@ -64,29 +64,11 @@ export class CaptureEnvironmentMismatchError extends Error {
 }
 
 export async function probeCaptureEnvironment(
-  page: Pick<Page, 'evaluate'> & {
-    emulateMedia?: (opts: Record<string, string | undefined>) => Promise<void>;
-  },
+  page: Pick<Page, 'evaluate'>,
   expected: CaptureModeConfig & { devicePixelRatio?: number },
   routePath = '/',
   modeName?: string,
 ): Promise<CaptureEnvironmentProbe | null> {
-  if (
-    typeof page.emulateMedia === 'function' &&
-    (expected.colorScheme ||
-      expected.reducedMotion ||
-      expected.forcedColors ||
-      expected.contrast)
-  ) {
-    await page
-      .emulateMedia({
-        ...(expected.colorScheme ? { colorScheme: expected.colorScheme } : {}),
-        ...(expected.reducedMotion ? { reducedMotion: expected.reducedMotion } : {}),
-        ...(expected.forcedColors ? { forcedColors: expected.forcedColors } : {}),
-        ...(expected.contrast ? { contrast: expected.contrast } : {}),
-      })
-      .catch(() => {});
-  }
   if (typeof page.evaluate !== 'function') return null;
   let probe: unknown;
   try {
@@ -659,9 +641,7 @@ export async function executeTask(
     const expectedColorScheme =
       modeSettings?.colorScheme ?? task.route.colorScheme ?? config.colorScheme;
     await probeCaptureEnvironment(
-      page as unknown as Pick<Page, 'evaluate'> & {
-        emulateMedia?: (opts: Record<string, string | undefined>) => Promise<void>;
-      },
+      page,
       {
         ...modeSettings,
         ...(expectedColorScheme ? { colorScheme: expectedColorScheme } : {}),
