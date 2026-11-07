@@ -12,6 +12,10 @@ Frontguard runs without a hosted account and keeps the deterministic comparison 
 >
 > _Numbers are derived from source by [`scripts/stats.ts`](https://github.com/ravidsrk/frontguard/blob/main/scripts/stats.ts); see [`scripts/stats.json`](https://github.com/ravidsrk/frontguard/blob/main/scripts/stats.json) for the canonical snapshot._
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/pipeline-architecture.jpg" alt="Frontguard 5-Stage Visual Regression Pipeline" width="840"/>
+</p>
+
 ## Install
 
 The npm package is **`@frontguard/cli`**; the command it installs is **`frontguard`**.
@@ -27,6 +31,10 @@ npx -p @frontguard/cli frontguard run --url http://localhost:3000
 ```
 
 ## Quick Start (Two-Terminal Workflow)
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/quick-start-terminal-loop.jpg" alt="Quick Start Two-Terminal Workflow and Explicit Baseline Gate" width="840"/>
+</p>
 
 **Prerequisites:** Node.js 22+, a git repository, and an `origin` remote if CI should compare against published baselines.
 
@@ -110,6 +118,10 @@ Once `@frontguard/cli` is installed as a dependency, the `frontguard` bin is on 
 ---
 
 ## Practical Configuration Recipes
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/anti-flake-hermetic-render.jpg" alt="Deterministic Rendering and Anti-Flake Engine" width="840"/>
+</p>
 
 ### 1. Deterministic Rendering & Per-Route Actions (`frontguard.config.ts`)
 

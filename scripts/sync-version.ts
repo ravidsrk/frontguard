@@ -110,6 +110,17 @@ const FILE_EDITS: Array<{ file: string; edits: RequiredEdit[] }> = [
     ],
   },
   {
+    file: "packages/mcp/server.json",
+    edits: [
+      {
+        find: /("version":\s*")[^"]+(")/g,
+        replace: `$1${version}$2`,
+        label: "MCP Registry server.json version",
+        expected: 2,
+      },
+    ],
+  },
+  {
     file: "apps/web/public/.well-known/mcp.json",
     edits: [
       {

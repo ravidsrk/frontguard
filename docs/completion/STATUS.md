@@ -3,14 +3,13 @@
 > Driven by `/product-completion`. Working state; rewritten each phase.
 
 ```
-VERDICT: GO on the binding launch gate (DEFINITION.md section 2)
+VERDICT: GO on the binding launch gate (DEFINITION.md section 2) + POST-LAUNCH ROADMAP (#283) COMPLETE
 COMPLETION: 45% historical — angle scores NOT recomputed (A-16)
-HEAD: fb6f336
-GATE: CI on fb6f336 is green (run 39229749365). Deploy Web on e0676af
-      succeeded (run 39229657033); fb6f336 does not change apps/web.
-      Alert drill issue #280 fired. Live site serves e0676af, legal pages
-      200, pricing has no $29. H-05 does not gate and stays open.
-NEXT: none for the launch gate. Do not deploy cloud-api. Do not raise
+HEAD: main (all 27 #283 child items #284–#299, #301–#310, #321 + #157/#367 closed)
+GATE: CI is green across lint, build, typecheck, test, e2e, audit (0 vulns), and docs-links.
+      Alert drill issue #280 fired. Live site legal pages return 200, pricing has no $29.
+      H-05 does not gate and stays open until 2027-03-01.
+NEXT: none for the launch gate or #283 post-launch roadmap. Do not deploy cloud-api. Do not raise
       angle scores without a new scored audit.
 ```
 

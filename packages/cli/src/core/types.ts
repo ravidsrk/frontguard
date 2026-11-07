@@ -23,6 +23,31 @@ export type BrowserEngine = 'chromium' | 'firefox' | 'webkit';
 /** Preferred color scheme for browser emulation. */
 export type ColorScheme = 'light' | 'dark';
 
+/** Preferred reduced-motion emulation. */
+export type ReducedMotion = 'reduce' | 'no-preference';
+
+/** Forced-colors emulation. */
+export type ForcedColors = 'active' | 'none';
+
+/** Contrast preference emulation. */
+export type Contrast = 'more' | 'less' | 'no-preference';
+
+/** Named capture mode bundle applied to a fresh Playwright browser context. */
+export interface CaptureModeConfig {
+  /** Preferred color scheme (`'light'` or `'dark'`). */
+  colorScheme?: ColorScheme;
+  /** Emulate `prefers-reduced-motion` (`'reduce'` or `'no-preference'`). */
+  reducedMotion?: ReducedMotion;
+  /** Emulate `forced-colors` (`'active'` or `'none'`). */
+  forcedColors?: ForcedColors;
+  /** Emulate `prefers-contrast` (`'more'`, `'less'`, or `'no-preference'`). */
+  contrast?: Contrast;
+  /** BCP-47 locale tag passed to `browser.newContext({ locale })` (e.g. `'fr-FR'`). */
+  locale?: string;
+  /** IANA timezone identifier passed to `browser.newContext({ timezoneId })` (e.g. `'Europe/Paris'`). */
+  timezoneId?: string;
+}
+
 /** Declarative pre-capture interaction step executed on a route before screenshotting. */
 export type RouteAction =
   | { type: 'click'; selector: string }
@@ -275,6 +300,10 @@ export interface RouteConfig {
   seedRandom?: boolean | number;
   /** Per-route URL substring or wildcard patterns (`*`) to abort before capture. */
   blockUrls?: string[];
+  /** Named capture mode(s) to run on this route, or `false` to opt out of global modes. */
+  modes?: string[] | false | Record<string, CaptureModeConfig>;
+  /** Single named capture mode for this route entry. */
+  mode?: string;
 }
 
 /**
@@ -391,6 +420,8 @@ export interface FrontguardConfig {
   captureRunner?: CaptureRunnerName;
   /** Global browser color scheme emulation (`'light'` or `'dark'`). */
   colorScheme?: ColorScheme;
+  /** Named capture modes (`colorScheme`, `reducedMotion`, `forcedColors`, `contrast`, `locale`, `timezoneId`). */
+  modes?: Record<string, CaptureModeConfig>;
   /**
    * Automatically redact sensitive input fields (`input[type="password"]`,
    * credit-card autocomplete fields, `[data-frontguard-redact]`, plus any
@@ -533,6 +564,12 @@ export interface Route {
   seedRandom?: boolean | number;
   /** Per-route URL substring or wildcard patterns (`*`) to abort before capture. */
   blockUrls?: string[];
+  /** Named capture mode(s) to run on this route, or `false` to opt out of global modes. */
+  modes?: string[] | false | Record<string, CaptureModeConfig>;
+  /** Single named capture mode for this route entry. */
+  mode?: string;
+  /** Resolved capture mode settings for this route. */
+  modeConfig?: CaptureModeConfig;
 }
 
 /**
@@ -576,6 +613,10 @@ export interface ScreenshotResult {
   horizontalOverflow?: HorizontalOverflowMeasure;
   /** Number of network requests aborted via `blockUrls` rules during capture. */
   blockedRequestsCount?: number;
+  /** Named capture mode used for this screenshot, when non-default. */
+  mode?: string;
+  /** Resolved capture mode settings used for this screenshot. */
+  modeConfig?: CaptureModeConfig;
 }
 
 /** Severity/impact level of an accessibility violation (axe-core scale). */
@@ -685,6 +726,10 @@ export interface DiffResult {
   redactedCount?: number;
   /** Number of network requests aborted via `blockUrls` rules during capture. */
   blockedRequestsCount?: number;
+  /** Named capture mode used for this screenshot, when non-default. */
+  mode?: string;
+  /** Resolved capture mode settings used for this screenshot. */
+  modeConfig?: CaptureModeConfig;
 }
 
 /**
@@ -998,6 +1043,11 @@ export interface RendererFingerprint {
    * Preserved when already stored. Ladle and Histoire are not discovered here.
    */
   captureRunner?: string;
+  /** Per-mode settings fingerprint recorded for named capture modes. */
+  mode?: {
+    name: string;
+    settings: CaptureModeConfig;
+  };
 }
 
 /** One viewport × browser baseline inside a route entry. */
@@ -1100,12 +1150,12 @@ export interface BaselineStorage {
   /** Initialise the storage backend (create dirs, checkout branch, etc.). */
   init(): Promise<void>;
   /** Read a baseline image. Returns `null` if no baseline exists yet. */
-  readBaseline(route: string, viewport: number, browser: BrowserEngine): Promise<Buffer | null>;
+  readBaseline(route: string, viewport: number, browser: BrowserEngine, mode?: string): Promise<Buffer | null>;
   /** Write (or overwrite) a baseline image. */
-  writeBaseline(route: string, viewport: number, browser: BrowserEngine, buffer: Buffer): Promise<void>;
+  writeBaseline(route: string, viewport: number, browser: BrowserEngine, buffer: Buffer, mode?: string): Promise<void>;
   /** Write multiple baseline images (and optional manifest) in a single transaction. */
   writeBaselines?(
-    entries: Array<{ route: string; viewport: number; browser?: BrowserEngine; buffer: Buffer }>,
+    entries: Array<{ route: string; viewport: number; browser?: BrowserEngine; mode?: string; buffer: Buffer }>,
     manifest?: BaselineManifest,
   ): Promise<void>;
   /** Read the baseline manifest. Returns `null` if none exists. */

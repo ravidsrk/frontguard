@@ -46,6 +46,8 @@ export function toRouteObjects(entries: RouteEntry[]): Route[] {
       freezeTime: entry.freezeTime,
       seedRandom: entry.seedRandom,
       blockUrls: entry.blockUrls,
+      mode: entry.mode,
+      modes: entry.modes,
     };
   });
 }

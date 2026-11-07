@@ -278,6 +278,23 @@ jobs:
           RELEASE_SOURCE_SHA: ${{ needs.validate.outputs.release_sha }}
         run: ./scripts/release.sh --only-npm
 
+      - name: Publish MCP Registry entry (server.json)
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          jq -e --arg version "$VERSION" \
+            '.name == "io.github.ravidsrk/frontguard" and .version == $version and .packages[0].version == $version' \
+            packages/mcp/server.json >/dev/null
+          if command -v mcp-publisher >/dev/null 2>&1; then
+            mcp-publisher login github-oidc
+            mcp-publisher publish packages/mcp/server.json
+          else
+            npx -y @modelcontextprotocol/publisher login github-oidc
+            npx -y @modelcontextprotocol/publisher publish packages/mcp/server.json
+          fi
+
       - name: Marketplace checklist
         run: |
           {

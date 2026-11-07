@@ -15,7 +15,7 @@ import { readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { tsImport } from "tsx/esm/api";
-import type { FrontguardConfig } from "./types.js";
+import type { CaptureModeConfig, FrontguardConfig } from "./types.js";
 import {
   FRAMEWORK_TEMPLATES,
   getFrameworkInfo,
@@ -149,6 +149,16 @@ const browserEngineSchema = z.enum(["chromium", "firefox", "webkit"]);
 /** Color scheme enum. */
 const colorSchemeSchema = z.enum(["light", "dark"]);
 
+/** Named capture mode schema. */
+export const captureModeSchema = z.object({
+  colorScheme: colorSchemeSchema.optional(),
+  reducedMotion: z.enum(["reduce", "no-preference"]).optional(),
+  forcedColors: z.enum(["active", "none"]).optional(),
+  contrast: z.enum(["more", "less", "no-preference"]).optional(),
+  locale: z.string().min(1).optional(),
+  timezoneId: z.string().min(1).optional(),
+});
+
 /** Declarative pre-capture route action schema. */
 const routeActionSchema = z.discriminatedUnion("type", [
   z.object({
@@ -220,18 +230,142 @@ const routeConfigSchema = z.object({
   freezeTime: freezeTimeSchema.optional(),
   seedRandom: z.union([z.boolean(), z.number()]).optional(),
   blockUrls: z.array(z.string().min(1)).optional(),
+  mode: z.string().min(1).optional(),
+  modes: z
+    .union([
+      z.literal(false),
+      z.array(z.string().min(1)),
+      z.record(z.string().min(1), captureModeSchema),
+    ])
+    .optional(),
 });
 
 /** A route entry — either a plain string path or a {@link routeConfigSchema}. */
 const routeEntrySchema = z.union([z.string().min(1), routeConfigSchema]);
 
+export interface ResolvedRouteMode {
+  name?: string;
+  settings?: CaptureModeConfig;
+}
+
+function lookupModeSettings(
+  name: string,
+  globalModes?: Record<string, CaptureModeConfig>,
+): CaptureModeConfig {
+  if (globalModes && globalModes[name]) return { ...globalModes[name] };
+  if (name === "light" || name === "dark") return { colorScheme: name };
+  return {};
+}
+
+/**
+ * Resolves the effective capture modes for a route entry or runtime route.
+ *
+ * - `modes: false` or `modes: []` opts out of global modes and captures the default mode.
+ * - `modes: ['light', 'dark']` selects named modes from `globalModes` (with `'light'`/`'dark'` fallback).
+ * - `modes: { highContrast: { contrast: 'more' } }` uses inline named modes on the route.
+ * - `mode: 'dark'` selects a single named mode.
+ * - Otherwise, when `globalModes` is non-empty, all global modes apply.
+ * - When no modes are configured, returns a single default mode `{ name: undefined }`.
+ */
+export function resolveRouteModes(
+  entry:
+    | string
+    | {
+        mode?: string;
+        modes?: string[] | false | Record<string, CaptureModeConfig>;
+        modeConfig?: CaptureModeConfig;
+      },
+  globalModes?: Record<string, CaptureModeConfig>,
+): ResolvedRouteMode[] {
+  if (typeof entry !== "string") {
+    if (entry.modes === false || (Array.isArray(entry.modes) && entry.modes.length === 0)) {
+      return [
+        {
+          name: entry.mode,
+          settings: entry.mode ? entry.modeConfig ?? lookupModeSettings(entry.mode, globalModes) : entry.modeConfig,
+        },
+      ];
+    }
+    if (Array.isArray(entry.modes)) {
+      return entry.modes.map((name) => ({
+        name,
+        settings: lookupModeSettings(name, globalModes),
+      }));
+    }
+    if (entry.modes && typeof entry.modes === "object") {
+      const entries = Object.entries(entry.modes);
+      if (entries.length === 0) return [{ name: undefined }];
+      return entries.map(([name, settings]) => ({
+        name,
+        settings: { ...lookupModeSettings(name, globalModes), ...settings },
+      }));
+    }
+    if (entry.mode) {
+      return [
+        {
+          name: entry.mode,
+          settings: entry.modeConfig ?? lookupModeSettings(entry.mode, globalModes),
+        },
+      ];
+    }
+  }
+  if (globalModes && Object.keys(globalModes).length > 0) {
+    return Object.entries(globalModes).map(([name, settings]) => ({
+      name,
+      settings: { ...settings },
+    }));
+  }
+  return [{ name: undefined }];
+}
+
+/**
+ * Computes the projected number of screenshot captures for a route list and config.
+ */
+export function projectedCaptureCount(
+  routes: ReadonlyArray<
+    | string
+    | {
+        viewport?: number[];
+        mode?: string;
+        modes?: string[] | false | Record<string, CaptureModeConfig>;
+        modeConfig?: CaptureModeConfig;
+      }
+  >,
+  config: Pick<FrontguardConfig, "viewports" | "browsers" | "modes">,
+): number {
+  let count = 0;
+  for (const route of routes) {
+    const viewports =
+      typeof route === "string" || !route.viewport || route.viewport.length === 0
+        ? config.viewports
+        : route.viewport;
+    const modes = resolveRouteModes(route, config.modes);
+    count += viewports.length * modes.length * config.browsers.length;
+  }
+  return count;
+}
+
 type BaselineKeyEntry =
   | string
-  | { path: string; viewport?: number[]; colorScheme?: string; label?: string };
+  | {
+      path: string;
+      viewport?: number[];
+      colorScheme?: string;
+      label?: string;
+      mode?: string;
+      modes?: string[] | false | Record<string, CaptureModeConfig>;
+    };
 
 function describeRouteEntry(index: number, entry: BaselineKeyEntry): string {
   if (typeof entry === "string") return `routes[${index}] "${entry}"`;
+  const modeNote =
+    entry.mode
+      ? `mode=${entry.mode}`
+      : Array.isArray(entry.modes) && entry.modes.length > 0
+        ? `modes=${entry.modes.join("+")}`
+        : "";
   const details = [
+    modeNote,
     entry.colorScheme ? `colorScheme=${entry.colorScheme}` : "",
     entry.label ? `label=${entry.label}` : "",
   ].filter(Boolean);
@@ -241,13 +375,14 @@ function describeRouteEntry(index: number, entry: BaselineKeyEntry): string {
 
 /**
  * Names two route entries that would write the same baseline file.
- * The file key is path + viewport + browser. Color scheme, label, and actions
- * are not part of it until named capture modes exist.
+ * The file key is path + viewport + mode + browser. Routes that differ by
+ * `modes` (or `mode`) write distinct baseline files and do not collide.
  */
 export function duplicateBaselineKeyMessage(config: {
   routes?: BaselineKeyEntry[];
   viewports: number[];
   browsers: Array<"chromium" | "firefox" | "webkit">;
+  modes?: Record<string, CaptureModeConfig>;
 }): string | null {
   const seen = new Map<string, string>();
   for (const [index, entry] of (config.routes ?? []).entries()) {
@@ -256,19 +391,22 @@ export function duplicateBaselineKeyMessage(config: {
       typeof entry === "string" || !entry.viewport?.length
         ? config.viewports
         : entry.viewport;
+    const modes = resolveRouteModes(entry, config.modes);
     const description = describeRouteEntry(index, entry);
     for (const viewport of viewports) {
-      for (const browser of config.browsers) {
-        const file = baselineStoragePath(path, viewport, browser);
-        const previous = seen.get(file);
-        if (previous) {
-          return (
-            `${previous} and ${description} share baseline file ${file}. ` +
-            "Color scheme, label, and actions do not get their own file yet, " +
-            "so give the entries different paths or viewports."
-          );
+      for (const mode of modes) {
+        for (const browser of config.browsers) {
+          const file = baselineStoragePath(path, viewport, browser, mode.name);
+          const previous = seen.get(file);
+          if (previous) {
+            return (
+              `${previous} and ${description} share baseline file ${file}. ` +
+              "Color scheme, label, and actions do not get their own file yet, " +
+              "so give the entries different paths, viewports, or modes."
+            );
+          }
+          seen.set(file, description);
         }
-        seen.set(file, description);
       }
     }
   }
@@ -468,6 +606,9 @@ export const configSchema = z.object({
 
   /** Global browser color scheme emulation ('light' or 'dark'). */
   colorScheme: colorSchemeSchema.optional(),
+
+  /** Named capture mode bundles ('light', 'dark', reducedMotion, forcedColors, contrast, locale, timezoneId). */
+  modes: z.record(z.string().min(1), captureModeSchema).optional(),
 
   /** Redact sensitive inputs (password, cc-*, [data-frontguard-redact]) in screenshots and DOM snapshots. */
   redactSensitive: z

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "io.github.ravidsrk/frontguard",
+  "description": "Model Context Protocol server for Frontguard visual regression testing and suggested fixes.",
+  "repository": {
+    "url": "https://github.com/ravidsrk/frontguard",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "version": "0.2.3",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@frontguard/mcp",
+      "version": "0.2.3",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "FRONTGUARD_API_URL",
+          "description": "Verified Frontguard API deployment URL. No default hosted endpoint is live.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "FRONTGUARD_API_KEY",
+          "description": "Frontguard API key for cloud-api mode.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "FRONTGUARD_LOCAL_REPORT",
+          "description": "Path to a local Frontguard report directory or results.json for offline mode.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

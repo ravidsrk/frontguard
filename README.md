@@ -14,6 +14,10 @@ Frontguard gives frontend teams a local, inspectable screenshot comparison loop 
 > _Current test, source, version, and bundle metrics are derived by [`scripts/stats.ts`](./scripts/stats.ts). See [`scripts/stats.json`](./scripts/stats.json) for the canonical snapshot._
 
 <p align="center">
+  <img src="./apps/web/public/images/docs/og-hero-banner.jpg" alt="Frontguard visual regression testing banner" width="840"/>
+</p>
+
+<p align="center">
   <img src="./demo/frontguard-demo.gif" alt="Frontguard demo: init, doctor, run, AI classification" width="720"/><br/>
   <em>📽️ Demo: <code>frontguard init</code> → <code>doctor</code> → <code>run</code> → AI classification.</em>
 </p>
@@ -26,6 +30,10 @@ Frontguard gives frontend teams a local, inspectable screenshot comparison loop 
 
 ## Choose Your Workflow
 
+<p align="center">
+  <img src="./apps/web/public/images/docs/pipeline-architecture.jpg" alt="Frontguard 5-Stage Visual Regression Pipeline" width="840"/>
+</p>
+
 Frontguard is organized as modular npm packages so you can adopt the exact level of visual testing your project needs:
 
 | Workflow | Package | When to Use It | Where Baselines Live |
@@ -37,6 +45,10 @@ Frontguard is organized as modular npm packages so you can adopt the exact level
 ---
 
 ## Quick Start (`@frontguard/cli`)
+
+<p align="center">
+  <img src="./apps/web/public/images/docs/quick-start-terminal-loop.jpg" alt="Quick Start Two-Terminal Workflow and Explicit Baseline Gate" width="840"/>
+</p>
 
 **Prerequisites:** [Node.js](https://nodejs.org/) 22+, a git repository, and an `origin` remote if CI should compare against published baselines. Frontguard stores screenshots on the `frontguard-baselines` orphan branch.
 
@@ -114,6 +126,10 @@ Capture the PR head SHA (`github.event.pull_request.head.sha` on pull requests, 
 ## Practical Developer Recipes
 
 ### 1. Eliminating Flaky Renders (Clocks, PRNG, Third-Party Widgets & Frame Convergence)
+
+<p align="center">
+  <img src="./apps/web/public/images/docs/anti-flake-hermetic-render.jpg" alt="Deterministic Rendering and Anti-Flake Engine" width="840"/>
+</p>
 
 Lock down time-dependent UI, random charts/IDs, and third-party analytics/chat widgets in `frontguard.config.ts`:
 
@@ -379,6 +395,14 @@ AI is optional; without it, the CLI performs local pixel comparison and writes l
 ---
 
 ## Repository Architecture
+
+<p align="center">
+  <img src="./apps/web/public/images/docs/git-cas-storage.jpg" alt="Zero-Pollution Git Orphan and Cloud CAS Storage" width="840"/>
+</p>
+
+<p align="center">
+  <img src="./apps/web/public/images/docs/html-workbench-4mode-inspector.jpg" alt="Interactive 4-Mode HTML Visual Diff Workbench" width="840"/>
+</p>
 
 ```
 packages/

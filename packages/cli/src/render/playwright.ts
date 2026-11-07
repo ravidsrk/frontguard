@@ -20,7 +20,9 @@ import type {
   Route,
   ScreenshotResult,
   BrowserEngine,
+  CaptureModeConfig,
 } from '../core/types.js';
+import { resolveRouteModes } from '../core/config.js';
 import { executeRouteActions } from './route-actions.js';
 import { logger } from '../utils/logger.js';
 import { cropToMaxHeight } from './crop.js';
@@ -34,7 +36,123 @@ import {
 } from './redaction.js';
 import { extractDomElementBoxes } from './dom-elements.js';
 import { measureHorizontalOverflow } from './horizontal-overflow.js';
-import { CAPTURE_SCREENSHOT_OPTIONS } from '../core/fingerprint.js';
+import {
+  CAPTURE_DEVICE_SCALE_FACTOR,
+  CAPTURE_SCREENSHOT_OPTIONS,
+} from '../core/fingerprint.js';
+
+export interface CaptureEnvironmentProbe {
+  colorScheme?: string;
+  reducedMotion?: string;
+  forcedColors?: string;
+  contrast?: string;
+  devicePixelRatio?: number;
+  language?: string;
+  timeZone?: string;
+}
+
+export class CaptureEnvironmentMismatchError extends Error {
+  readonly mismatches: string[];
+  constructor(routePath: string, modeName: string | undefined, mismatches: string[]) {
+    const modeLabel = modeName ? ` [mode=${modeName}]` : '';
+    super(
+      `Capture environment probe mismatch on ${routePath}${modeLabel}: ${mismatches.join('; ')}`,
+    );
+    this.name = 'CaptureEnvironmentMismatchError';
+    this.mismatches = mismatches;
+  }
+}
+
+export async function probeCaptureEnvironment(
+  page: Pick<Page, 'evaluate'>,
+  expected: CaptureModeConfig & { devicePixelRatio?: number },
+  routePath = '/',
+  modeName?: string,
+): Promise<CaptureEnvironmentProbe | null> {
+  if (typeof page.evaluate !== 'function') return null;
+  let probe: unknown;
+  try {
+    probe = await page.evaluate(() => ({
+      colorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'reduce'
+        : 'no-preference',
+      forcedColors: window.matchMedia('(forced-colors: active)').matches ? 'active' : 'none',
+      contrast: window.matchMedia('(prefers-contrast: more)').matches
+        ? 'more'
+        : window.matchMedia('(prefers-contrast: less)').matches
+          ? 'less'
+          : 'no-preference',
+      devicePixelRatio: window.devicePixelRatio,
+      language: navigator.language,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }));
+  } catch {
+    return null;
+  }
+  if (!probe || typeof probe !== 'object') return null;
+  const actual = probe as CaptureEnvironmentProbe;
+  const mismatches: string[] = [];
+
+  if (
+    expected.colorScheme &&
+    typeof actual.colorScheme === 'string' &&
+    actual.colorScheme !== expected.colorScheme
+  ) {
+    mismatches.push(`colorScheme expected ${expected.colorScheme}, got ${actual.colorScheme}`);
+  }
+  if (
+    expected.reducedMotion &&
+    typeof actual.reducedMotion === 'string' &&
+    actual.reducedMotion !== expected.reducedMotion
+  ) {
+    mismatches.push(
+      `reducedMotion expected ${expected.reducedMotion}, got ${actual.reducedMotion}`,
+    );
+  }
+  if (
+    expected.forcedColors &&
+    typeof actual.forcedColors === 'string' &&
+    actual.forcedColors !== expected.forcedColors
+  ) {
+    mismatches.push(`forcedColors expected ${expected.forcedColors}, got ${actual.forcedColors}`);
+  }
+  if (
+    expected.contrast &&
+    typeof actual.contrast === 'string' &&
+    actual.contrast !== expected.contrast
+  ) {
+    mismatches.push(`contrast expected ${expected.contrast}, got ${actual.contrast}`);
+  }
+  if (
+    expected.devicePixelRatio !== undefined &&
+    typeof actual.devicePixelRatio === 'number' &&
+    actual.devicePixelRatio !== expected.devicePixelRatio
+  ) {
+    mismatches.push(
+      `devicePixelRatio expected ${expected.devicePixelRatio}, got ${actual.devicePixelRatio}`,
+    );
+  }
+  if (
+    expected.locale &&
+    typeof actual.language === 'string' &&
+    actual.language.toLowerCase() !== expected.locale.toLowerCase()
+  ) {
+    mismatches.push(`locale expected ${expected.locale}, got ${actual.language}`);
+  }
+  if (
+    expected.timezoneId &&
+    typeof actual.timeZone === 'string' &&
+    actual.timeZone !== expected.timezoneId
+  ) {
+    mismatches.push(`timezoneId expected ${expected.timezoneId}, got ${actual.timeZone}`);
+  }
+
+  if (mismatches.length > 0) {
+    throw new CaptureEnvironmentMismatchError(routePath, modeName, mismatches);
+  }
+  return actual;
+}
 
 /**
  * Bound for `document.fonts.ready`.
@@ -121,11 +239,59 @@ const engines = { chromium, firefox, webkit } as const;
 // Internal types
 // ---------------------------------------------------------------------------
 
-/** A single unit of work: one route × viewport × browser combination. */
-interface RenderTask {
+/** A single unit of work: one route × viewport × mode × browser combination. */
+export interface RenderTask {
   route: Route;
   viewport: number;
   browser: BrowserEngine;
+  mode?: string;
+  modeConfig?: CaptureModeConfig;
+}
+
+/**
+ * Expands routes × viewports × modes × browsers into the ordered capture plan.
+ */
+export function projectCaptureTasks(
+  routes: Route[],
+  config: Pick<FrontguardConfig, 'viewports' | 'browsers' | 'modes'>,
+): RenderTask[] {
+  const tasks: RenderTask[] = [];
+  for (const route of routes) {
+    const viewports =
+      route.viewport && route.viewport.length > 0 ? route.viewport : config.viewports;
+    const modes = resolveRouteModes(route, config.modes);
+    for (const viewport of viewports) {
+      for (const mode of modes) {
+        for (const browser of config.browsers) {
+          const taskRoute: Route = mode.name
+            ? {
+                ...route,
+                mode: mode.name,
+                modeConfig: mode.settings,
+                ...(mode.settings?.colorScheme ? { colorScheme: mode.settings.colorScheme } : {}),
+              }
+            : route;
+          tasks.push({
+            route: taskRoute,
+            viewport,
+            browser,
+            ...(mode.name ? { mode: mode.name, modeConfig: mode.settings } : {}),
+          });
+        }
+      }
+    }
+  }
+  return tasks;
+}
+
+/**
+ * Computes the projected capture count for a set of routes and config.
+ */
+export function projectedCaptureCount(
+  routes: Route[],
+  config: Pick<FrontguardConfig, 'viewports' | 'browsers' | 'modes'>,
+): number {
+  return projectCaptureTasks(routes, config).length;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,24 +323,16 @@ export async function renderPages(
   const workers = config.workers ?? 4;
 
   // --- Build the full task list ------------------------------------------------
-  // Per-route viewport overrides restrict capture to a subset of widths.
-  const tasks: RenderTask[] = [];
-  for (const route of routes) {
-    const viewports =
-      route.viewport && route.viewport.length > 0 ? route.viewport : config.viewports;
-    for (const viewport of viewports) {
-      for (const browser of config.browsers) {
-        tasks.push({ route, viewport, browser });
-      }
-    }
-  }
+  const tasks = projectCaptureTasks(routes, config);
 
   if (tasks.length === 0) {
     logger.warn('No render tasks to process — check routes, viewports, and browsers config.');
     return [];
   }
 
-  logger.info(`Rendering ${tasks.length} screenshots (${routes.length} routes × ${config.viewports.length} viewports × ${config.browsers.length} browsers)`);
+  logger.info(
+    `Projected captures: ${tasks.length} (${routes.length} routes × ${config.viewports.length} viewports × ${config.browsers.length} browsers)`,
+  );
 
   // --- Launch all required browsers once ---------------------------------------
   const browserMap = new Map<BrowserEngine, Browser>();
@@ -216,6 +374,16 @@ export async function renderPages(
       if (outcome.status === 'fulfilled') {
         results.push(outcome.value);
       } else {
+        if (outcome.reason instanceof CaptureEnvironmentMismatchError) {
+          for (const [, browser] of browserMap) {
+            try {
+              await browser.close();
+            } catch {
+              // Best-effort close
+            }
+          }
+          throw outcome.reason;
+        }
         // Produce an error-state ScreenshotResult so downstream stages can report it
         const task = batch[j];
         const errMsg = outcome.reason instanceof Error
@@ -228,6 +396,7 @@ export async function renderPages(
           route: task.route,
           viewport: task.viewport,
           browser: task.browser,
+          ...(task.mode ? { mode: task.mode, modeConfig: task.modeConfig } : {}),
           buffer: Buffer.alloc(0),
           domSnapshot: '',
           consoleErrors: [`Render error: ${errMsg}`],
@@ -287,9 +456,26 @@ export async function executeTask(
       contextOptions.storageState = config.auth.storageState;
     }
 
-    const effectiveColorScheme = task.route.colorScheme ?? config.colorScheme;
+    const modeCfg = task.modeConfig ?? task.route.modeConfig;
+    const effectiveColorScheme =
+      modeCfg?.colorScheme ?? task.route.colorScheme ?? config.colorScheme;
     if (effectiveColorScheme) {
       contextOptions.colorScheme = effectiveColorScheme;
+    }
+    if (modeCfg?.reducedMotion) {
+      contextOptions.reducedMotion = modeCfg.reducedMotion;
+    }
+    if (modeCfg?.forcedColors) {
+      contextOptions.forcedColors = modeCfg.forcedColors;
+    }
+    if (modeCfg?.contrast) {
+      contextOptions.contrast = modeCfg.contrast;
+    }
+    if (modeCfg?.locale) {
+      contextOptions.locale = modeCfg.locale;
+    }
+    if (modeCfg?.timezoneId) {
+      contextOptions.timezoneId = modeCfg.timezoneId;
     }
 
     context = await browser.newContext(contextOptions);
@@ -450,6 +636,42 @@ export async function executeTask(
       redactedCount = await page.evaluate(applySensitiveRedactionInPage, redactSelectors);
     }
 
+    // --- Probe matchMedia, devicePixelRatio, language, timeZone before capture -
+    const modeSettings = task.modeConfig ?? task.route.modeConfig;
+    const expectedColorScheme =
+      modeSettings?.colorScheme ?? task.route.colorScheme ?? config.colorScheme;
+    if (
+      modeSettings &&
+      typeof (page as { emulateMedia?: unknown }).emulateMedia === 'function' &&
+      (modeSettings.colorScheme ||
+        modeSettings.reducedMotion ||
+        modeSettings.forcedColors ||
+        modeSettings.contrast)
+    ) {
+      await (
+        page as unknown as {
+          emulateMedia: (opts: Record<string, string | undefined>) => Promise<void>;
+        }
+      )
+        .emulateMedia({
+          ...(modeSettings.colorScheme ? { colorScheme: modeSettings.colorScheme } : {}),
+          ...(modeSettings.reducedMotion ? { reducedMotion: modeSettings.reducedMotion } : {}),
+          ...(modeSettings.forcedColors ? { forcedColors: modeSettings.forcedColors } : {}),
+          ...(modeSettings.contrast ? { contrast: modeSettings.contrast } : {}),
+        })
+        .catch(() => {});
+    }
+    await probeCaptureEnvironment(
+      page,
+      {
+        ...modeSettings,
+        ...(expectedColorScheme ? { colorScheme: expectedColorScheme } : {}),
+        devicePixelRatio: CAPTURE_DEVICE_SCALE_FACTOR,
+      },
+      task.route.path,
+      task.mode ?? task.route.mode,
+    );
+
     // --- Take screenshot (with optional stability convergence or anti-flake) ---
     let screenshotBuffer: Buffer;
     let stabilityMetadata: ScreenshotResult['stability'];
@@ -530,6 +752,12 @@ export async function executeTask(
       route: task.route,
       viewport: task.viewport,
       browser: task.browser,
+      ...(task.mode ?? task.route.mode
+        ? {
+            mode: task.mode ?? task.route.mode,
+            modeConfig: task.modeConfig ?? task.route.modeConfig,
+          }
+        : {}),
       buffer: screenshotBuffer,
       domSnapshot,
       consoleErrors,
@@ -576,7 +804,7 @@ async function executeTaskWithRetry(
     try {
       return await executeTask(task, config, browserMap);
     } catch (err) {
-      if (attempt === renderRetries) throw err;
+      if (err instanceof CaptureEnvironmentMismatchError || attempt === renderRetries) throw err;
       const message = err instanceof Error ? err.message : String(err);
       logger.warn(`Render retry ${attempt + 1}/${renderRetries} for ${task.route.path}: ${message}`);
     }

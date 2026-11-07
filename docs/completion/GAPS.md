@@ -2,6 +2,8 @@
 
 Every finding standing between the baseline (`5f0e141`, 35%) and `DEFINITION.md`.
 
+> **Reconciliation (2026-11-07):** All 28 above-the-line FINISH gaps (`G-01`–`G-28`) and all post-launch roadmap items under [#283](https://github.com/ravidsrk/frontguard/issues/283) (`#284`–`#299`, `#301`–`#310`, `#321`, including `G-34`/`#293`, `G-38`/`#296`, `G-39`/`#291`, `G-40`/`#292`, `G-41`/`#290`, and `G-42`/`#297`) are **CLOSED** in code on `main`. See [`docs/ROADMAP.md`](../ROADMAP.md) for the complete record.
+
 **Decision rules applied.** S0 → FINISH or CUT, never DEFER/ACCEPT. S1 → FINISH by default; CUT if
 the surface is not on a critical flow. S2/S3 → DEFER by default; FINISH only if ≤ S size and on a
 critical flow.

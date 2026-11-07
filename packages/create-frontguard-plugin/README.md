@@ -44,6 +44,10 @@ This creates a `frontguard-plugin-my-plugin` directory with:
 
 ## All 9 `FrontguardPlugin` Lifecycle Hooks
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/plugin-lifecycle-audits.jpg" alt="9-Hook Plugin Architecture and Unified Render Audits" width="840"/>
+</p>
+
 Frontguard plugins implement the `FrontguardPlugin` interface from `@frontguard/cli`. Every hook is optional (only `name` is required), and hooks execute in plugin registration order (`teardown` runs in reverse order):
 
 ```
