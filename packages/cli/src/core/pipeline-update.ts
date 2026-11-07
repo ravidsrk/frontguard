@@ -13,8 +13,10 @@ import { withCliTrace, type CliTrace } from '../utils/otel.js';
 import { PluginManager, type PluginContext } from './plugins.js';
 import {
   emptyBaselineManifest,
+  isNamedMode,
   stampBaselineManifest,
 } from './fingerprint.js';
+import { projectedCaptureCount } from './config.js';
 import { renderPages } from '../render/playwright.js';
 import { overflowReports } from '../render/horizontal-overflow.js';
 import { createNewPageResult } from '../diff/pixel.js';
@@ -61,7 +63,10 @@ async function writeUpdatedBaselines(
     routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
   }
 
-  logger.info(`Rendering ${routes.length} route(s) for baseline update…`);
+  const projected = projectedCaptureCount(routes, config);
+  logger.info(
+    `Projected captures: ${projected} — rendering ${routes.length} route(s) for baseline update…`,
+  );
   rp.onStageStart('render', `Capturing screenshots for ${routes.length} route(s)…`);
 
   const captureSpan = trace.start('frontguard.capture');
@@ -155,12 +160,16 @@ async function writeUpdatedBaselines(
 
       try {
         await storage.writeBaselines(
-          shots.map((shot) => ({
-            route: shot.route.path,
-            viewport: shot.viewport,
-            browser: shot.browser,
-            buffer: shot.buffer,
-          })),
+          shots.map((shot) => {
+            const shotMode = shot.mode ?? shot.route.mode;
+            return {
+              route: shot.route.path,
+              viewport: shot.viewport,
+              browser: shot.browser,
+              ...(isNamedMode(shotMode) ? { mode: shotMode } : {}),
+              buffer: shot.buffer,
+            };
+          }),
           manifest,
         );
         for (const shot of shots) {
@@ -182,12 +191,23 @@ async function writeUpdatedBaselines(
     } else {
       for (const shot of shots) {
         try {
-          await storage.writeBaseline(
-            shot.route.path,
-            shot.viewport,
-            shot.browser,
-            shot.buffer,
-          );
+          const shotMode = shot.mode ?? shot.route.mode;
+          if (isNamedMode(shotMode)) {
+            await storage.writeBaseline(
+              shot.route.path,
+              shot.viewport,
+              shot.browser,
+              shot.buffer,
+              shotMode,
+            );
+          } else {
+            await storage.writeBaseline(
+              shot.route.path,
+              shot.viewport,
+              shot.browser,
+              shot.buffer,
+            );
+          }
           written++;
           writtenScreenshots.push(shot);
 

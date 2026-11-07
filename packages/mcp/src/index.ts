@@ -19,9 +19,15 @@
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  InitializeRequestSchema,
+  LATEST_PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+  type CallToolResult,
+} from '@modelcontextprotocol/sdk/types.js';
 import { requireAuth, MissingApiKeyError, MissingApiUrlError } from './auth.js';
 import {
   CloudApiError,
@@ -58,6 +64,28 @@ import {
 
 const SERVER_NAME = '@frontguard/mcp';
 const SERVER_VERSION = '0.2.3';
+export const MCP_REGISTRY_NAME = 'io.github.ravidsrk/frontguard';
+export const SUPPORTED_MCP_PROTOCOL_VERSIONS = [
+  '2026-07-28',
+  '2025-11-25',
+  ...SUPPORTED_PROTOCOL_VERSIONS.filter((v) => v !== '2025-11-25'),
+] as const;
+
+const ServerDiscoverRequestSchema = z.object({
+  method: z.literal('server/discover'),
+  params: z
+    .object({
+      protocolVersion: z.string().optional(),
+      capabilities: z.record(z.string(), z.unknown()).optional(),
+      clientInfo: z
+        .object({
+          name: z.string(),
+          version: z.string(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
 
 const READ_INSTRUCTIONS =
   'Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, `recent_runs` to browse history, and `list_horizontal_overflow` to list visible unclipped boxes past the right edge. Horizontal overflow does not change the pixel result.';
@@ -247,6 +275,49 @@ export function createServer(): McpServer {
       async (args) => withCloudClient(async (client) => promoteBaseline(client, args)),
     );
   }
+
+  const instructions = serverInstructions();
+  const serverCapabilities = { tools: { listChanged: true } } as const;
+
+  // Negotiate both 2025-11-25 and 2026-07-28 on `initialize`
+  server.server.setRequestHandler(InitializeRequestSchema, async (request) => {
+    const requestedVersion = request.params.protocolVersion;
+    const negotiated = (SUPPORTED_MCP_PROTOCOL_VERSIONS as readonly string[]).includes(
+      requestedVersion,
+    )
+      ? requestedVersion
+      : LATEST_PROTOCOL_VERSION;
+    return {
+      protocolVersion: negotiated,
+      capabilities: serverCapabilities,
+      serverInfo: {
+        name: SERVER_NAME,
+        version: SERVER_VERSION,
+      },
+      ...(instructions ? { instructions } : {}),
+    };
+  });
+
+  // Support MCP 2026-07-28 `server/discover` initialization/discovery handshake
+  server.server.setRequestHandler(ServerDiscoverRequestSchema, async (request) => {
+    const requestedVersion = request.params?.protocolVersion;
+    const negotiated =
+      requestedVersion &&
+      (SUPPORTED_MCP_PROTOCOL_VERSIONS as readonly string[]).includes(requestedVersion)
+        ? requestedVersion
+        : '2026-07-28';
+    return {
+      protocolVersion: negotiated,
+      supportedProtocolVersions: ['2025-11-25', '2026-07-28'],
+      capabilities: serverCapabilities,
+      serverInfo: {
+        name: SERVER_NAME,
+        version: SERVER_VERSION,
+        mcpName: MCP_REGISTRY_NAME,
+      },
+      ...(instructions ? { instructions } : {}),
+    };
+  });
 
   return server;
 }

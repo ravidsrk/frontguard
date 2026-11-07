@@ -1,6 +1,6 @@
 # Frontguard Roadmap
 
-*Last updated: 2026-10-20. Anchored to [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) (frozen local-and-CI launch contract), [`docs/completion/SHIPLOG.md`](./completion/SHIPLOG.md) (launch gate **GO** on `2026-10-19`), and the post-launch backlog tracked in [#283](https://github.com/ravidsrk/frontguard/issues/283) (children [#284](https://github.com/ravidsrk/frontguard/issues/284)–[#299](https://github.com/ravidsrk/frontguard/issues/299) from the first research pass, [#301](https://github.com/ravidsrk/frontguard/issues/301)–[#310](https://github.com/ravidsrk/frontguard/issues/310) from the second, and [#321](https://github.com/ravidsrk/frontguard/issues/321) from the follow-up). The reports, source notes and query logs are in the [research archive](../reports/README.md).*
+*Last updated: 2026-11-07. Anchored to [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) (frozen local-and-CI launch contract), [`docs/completion/SHIPLOG.md`](./completion/SHIPLOG.md) (launch gate **GO** on `2026-10-19`), and the post-launch backlog tracked in [#283](https://github.com/ravidsrk/frontguard/issues/283) (children [#284](https://github.com/ravidsrk/frontguard/issues/284)–[#299](https://github.com/ravidsrk/frontguard/issues/299) from the first research pass, [#301](https://github.com/ravidsrk/frontguard/issues/301)–[#310](https://github.com/ravidsrk/frontguard/issues/310) from the second, and [#321](https://github.com/ravidsrk/frontguard/issues/321) from the follow-up — **all 27 child items now shipped and verified on `main`**). The reports, source notes and query logs are in the [research archive](../reports/README.md).*
 
 > **Status note (2026-10-19):** Source is at **v0.2.3** (`0.2.2` published on npm with unreleased changelog entries ahead of that tag). The binding launch gate in [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) is **GO**: `main` is green across `lint`, `build`, `test` (Node 22 & 24), `e2e`, `audit`, and `docs-links`; `frontguard.dev` and `www.frontguard.dev` serve the live `frontguard-web` Worker with `/privacy`, `/terms`, and `/status` returning HTTP 200 and no unbuilt `$29` hosted tier advertised on `/pricing`; D1 Time Travel restore, Worker rollback, and the red-`main` CI failure alert (`#280`) have all been verified with captured evidence.
 >
@@ -98,20 +98,20 @@ Everything below ships in the published local-and-CI packages (`@frontguard/cli`
   - Optional multi-render consensus: `antiFlakeRenders`, default `1` in practice, with opt-in `3+` renders via `findConsensusScreenshot()`, which keeps the most common byte-identical frame.
   - Source for a pinned `linux/amd64` Docker renderer (`packages/cli/Dockerfile`).
   - *(Correction to the `2026-06-29` roadmap: `antiFlakeRenders` defaults to `1`, not `3`.)*
-- ✅ **Capture options (`render/playwright.ts`)** — Per-route `actions`, a single `colorScheme` per route or per run, Playwright `storageState` auth, and `workers` concurrency (default `4`).
+- ✅ **Capture options & named modes (`render/playwright.ts`, `core/config.ts`)** — Per-route `actions`, named capture modes (`modes` with `colorScheme`, `reducedMotion`, `forcedColors`, `contrast`, `locale`, `timezoneId`, mode-keyed baselines on `baselines/<route>/<viewport>/<mode>/<browser>.png`, pre-capture environment probe, and projected capture count; [#309](https://github.com/ravidsrk/frontguard/issues/309)), Playwright `storageState` auth, and `workers` concurrency (default `4`).
 - ✅ **Framework & Storybook discovery (`discovery/`)**
   - Filesystem route discovery for Next.js (App and Pages Router), Remix, SvelteKit and Nuxt.
-  - Storybook 8 `/index.json` and Storybook 7 `/stories.json` discovery.
+  - Storybook 7–11 (`/index.json` and `/stories.json`), Ladle (`meta.json`), and Histoire discovery ([#289](https://github.com/ravidsrk/frontguard/issues/289)).
   - A live BFS crawler fallback.
-  - `smartFilter` changed-file route scoping, with an automatic all-routes fallback. Lockfiles, configs, global CSS and token files force all routes. The README line `"12/47 routes affected by changed files"` is illustrative sample output, not a benchmark measurement.
+  - `smartFilter` changed-file route scoping, with an automatic all-routes fallback for public assets and incomplete consumer resolution ([#321](https://github.com/ravidsrk/frontguard/issues/321)). Lockfiles, configs, global CSS and token files force all routes. The README line `"12/47 routes affected by changed files"` is illustrative sample output, not a benchmark measurement.
 - ✅ **Multi-viewport & multi-browser capture (`render/`)** — Default viewports `375 / 768 / 1440`. `chromium` by default, with `firefox` and `webkit` supported via `config.browsers`.
-- ✅ **Git orphan-branch baselines (`storage/git-orphan.ts`)** — Stores baseline PNGs and a SHA-256 manifest on an isolated `frontguard-baselines` git orphan branch via temporary worktrees, so `main` stays free of binary bloat.
+- ✅ **Git orphan-branch baselines & S3 layout contract (`storage/git-orphan.ts`, `storage/s3-baseline-layout.ts`)** — Stores baseline PNGs, renderer/comparator fingerprints ([#303](https://github.com/ravidsrk/frontguard/issues/303)), and a SHA-256 manifest on an isolated `frontguard-baselines` git orphan branch via temporary worktrees with safe pruning ([#290](https://github.com/ravidsrk/frontguard/issues/290)) and merge-base selection ([#306](https://github.com/ravidsrk/frontguard/issues/306)), plus content-addressed S3 baseline layout helpers ([#295](https://github.com/ravidsrk/frontguard/issues/295)).
 - ✅ **Interactive local HTML workbench & PR reporter (`report/html.ts`, `report/github-pr.ts`)**
   - A self-contained 4-mode HTML diff inspector (`packages/cli/src/report/html.ts`, 1,403 lines): Side-by-Side, Swipe Curtain, Onion Skin and Diff Heatmap, plus a spatial cluster table and keyboard navigation.
   - GitHub PR Markdown comments with `renderImageGrid()` thumbnails backed by `imageUpload` (Cloudflare R2, AWS S3, GitHub Actions artifacts, or local disk).
-- ✅ **CLI commands & onboarding (`cli/`)** — `init`, `doctor` (Node, browser, config and git diagnostics), `run`, `update-baselines`, `monitor` (`--once`, `--watch`/`--interval`, `--history`, webhook alerts), `accept-fix`, `reject-fix`, `export-patterns` and `plugin`.
+- ✅ **CLI commands & onboarding (`cli/`)** — `init`, `doctor` (Node, browser, config and git diagnostics), `run`, `update-baselines`, `review` (shot-by-shot human baseline acceptance with `--from` artifact verification; [#305](https://github.com/ravidsrk/frontguard/issues/305)), `ignores` (`--older-than` aged ignore-mask inventory; [#298](https://github.com/ravidsrk/frontguard/issues/298)), `monitor` (`--once`, `--watch`/`--interval`, `--history`, webhook alerts), `accept-fix`, `reject-fix`, `export-patterns` and `plugin`.
 - ✅ **5 built-in plugins & 9 lifecycle hooks (`plugins/`, `create-frontguard-plugin`)**:
-  1. **Accessibility (`plugins/accessibility.ts`)** — An `@axe-core/playwright` WCAG audit in the same render pass. Options are `impact`, `rules`, `excludeRules` and `failOnViolation`; violations are warnings unless `failOnViolation: true`. Findings are fused into the optional AI analysis prompts. *(The README and docs site currently show options that do not exist, `failOnImpact` and `standard`; see [#302](https://github.com/ravidsrk/frontguard/issues/302).)*
+  1. **Accessibility (`plugins/accessibility.ts`)** — An `@axe-core/playwright` WCAG audit in the same render pass. Options are `impact`, `rules`, `excludeRules` and `failOnViolation`; violations are warnings unless `failOnViolation: true`, which also blocks baseline updates ([#288](https://github.com/ravidsrk/frontguard/issues/288), [#302](https://github.com/ravidsrk/frontguard/issues/302)). Findings are fused into the optional AI analysis prompts.
   2. **Performance budgets (`plugins/perf-budgets.ts`)** — LCP, CLS, FCP, TTFB and transfer-size budgets, correlated inline with visual diffs and run-over-run regressions (`trackRegressions`).
   3. **Third-party scripts (`plugins/third-party-scripts.ts`)** — Inventories external `<script src>` origins per route and flags newly added or removed third-party domains.
   4. **Figma design compliance (`plugins/figma.ts`)** — Compares live rendered routes against exported Figma frames.
@@ -120,25 +120,25 @@ Everything below ships in the published local-and-CI packages (`@frontguard/cli`
   - Multi-provider BYOK vision analysis (OpenAI, Anthropic, Gemini, custom `baseUrl`), with DOM text fenced as untrusted.
   - Candidate CSS patch generation, verified by re-rendering with local Playwright (`sandbox/local.ts`) or Daytona (`sandbox/daytona.ts`).
   - A local SQLite fix-pattern store (`accept-fix` / `reject-fix` / `export-patterns`).
-  - Opt-in experimental judge mode (`--mode judge --experimental`).
+  - Opt-in experimental judge mode (`--mode judge --experimental`), strictly advisory and off exit codes ([#286](https://github.com/ravidsrk/frontguard/issues/286)).
 - ✅ **Demo & comparison guides (`demo/`, `apps/web/src/lib/docs-content.ts`)** — Committed `demo/frontguard-demo.gif` and `demo/frontguard-demo.svg` assets, plus comparison and migration guides (`frontguard-vs-percy`, `frontguard-vs-chromatic`, `migrate-from-backstopjs`, `migrate-from-lost-pixel`). *(Closes the `2026-06-29` roadmap's demo-recording follow-up.)*
 
 ### Playwright In-Test Package (`@frontguard/playwright`)
 - ✅ `visualTest()` and `expectVisual()` assertions with `__visual_baselines__/` storage, SSIM calculation, connected-component cluster extraction, DOM selector attribution, `mask` / `maskRegions`, `redactSensitive`, `freezeTime`, `seedRandom`, `blockUrls` and `waitForStable`. Optional `captureAriaSnapshot` and `textSnapshot` store a text file next to the PNG and diff it as text. A mismatch is reported on its own. It does not change `passed`, and axe-core remains the accessibility plugin ([#299](https://github.com/ravidsrk/frontguard/issues/299)).
 
 ### Agentic MCP Server (`@frontguard/mcp`)
-- ✅ A stdio JSON-RPC 2.0 server, built on `@modelcontextprotocol/sdk` `^1.32.1`, exposing eight tools with `outputSchema` and `structuredContent`:
+- ✅ A stdio JSON-RPC 2.0 server, built on `@modelcontextprotocol/sdk` `^1.32.2`, supporting both `2025-11-25` and `2026-07-28` (`server/discover` + `initialize` negotiation) with MCP Registry metadata (`packages/mcp/server.json`, `io.github.ravidsrk/frontguard`; [#310](https://github.com/ravidsrk/frontguard/issues/310)) and deterministic `tools/list` ordering across eight tools with `annotations` ([#307](https://github.com/ravidsrk/frontguard/issues/307)), `outputSchema`, and `structuredContent`:
   - read tools: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch` (static, with a CSS policy), `recent_runs`, and `list_horizontal_overflow` (report only; not an exit-code input);
   - write tools: `promote_baseline` (requires `confirm_reviewed: true` and refuses unconfirmed local-report orphan-branch overwrites) and `accept_baseline`.
 
   It works in both zero-cloud local `report.json` mode and Cloud API mode.
 
-### Known Issues in Shipped Behaviour (filed 2026-10-19–20)
-- Route entries that share a path, such as light and dark, or menu closed and open, share one baseline file ([#301](https://github.com/ravidsrk/frontguard/issues/301)).
-- The accessibility plugin's documented recipe uses options the plugin ignores, so serious violations never fail the run ([#302](https://github.com/ravidsrk/frontguard/issues/302)).
-- Experimental judge mode sets exit codes from model verdicts ([#286](https://github.com/ravidsrk/frontguard/issues/286)).
-- `skills/frontguard/SKILL.md` steers agents to `update-baselines` and `promote_baseline`. With `update-baselines: true`, the Action pushes `frontguard-baselines` from any event ([#287](https://github.com/ravidsrk/frontguard/issues/287)).
-- `smartFilter` can omit an asset consumer when a public asset and a different mapped route change together. The executed reproduction covers route selection, with end-to-end pixel validation still required ([#321](https://github.com/ravidsrk/frontguard/issues/321)).
+### Resolved Issues from 2026-10-19–20 Audit (All Closed on `main`)
+- ✅ Route entries that share a path, such as light and dark, or menu closed and open, are rejected at config validation unless disambiguated by named capture modes ([#301](https://github.com/ravidsrk/frontguard/issues/301), [#309](https://github.com/ravidsrk/frontguard/issues/309)).
+- ✅ The accessibility plugin's documented recipe uses `impact` + `failOnViolation: true` and warns on unknown option keys ([#302](https://github.com/ravidsrk/frontguard/issues/302)).
+- ✅ Experimental judge mode is strictly advisory and never sets exit codes from model verdicts ([#286](https://github.com/ravidsrk/frontguard/issues/286)).
+- ✅ `skills/frontguard/SKILL.md` stops agents at evidence and hands promotion to a human; the GitHub Action refuses `update-baselines: true` on `pull_request`, `pull_request_target`, and `merge_group` without an explicit override ([#287](https://github.com/ravidsrk/frontguard/issues/287)).
+- ✅ `smartFilter` falls back conservatively to all routes when changed public asset consumers cannot be proved ([#321](https://github.com/ravidsrk/frontguard/issues/321), [#285](https://github.com/ravidsrk/frontguard/issues/285)).
 
 ---
 
@@ -155,106 +155,88 @@ Per [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) §4, the follo
 
 ---
 
-## 4. Post-Launch Roadmap (Tracked in GitHub Issue [#283](https://github.com/ravidsrk/frontguard/issues/283))
+## 4. Post-Launch Roadmap (Tracked in GitHub Issue [#283](https://github.com/ravidsrk/frontguard/issues/283) — All 27 Items Completed)
 
-All actionable post-launch engineering work is tracked under parent issue [#283](https://github.com/ravidsrk/frontguard/issues/283) (*"Post-launch roadmap: keep pixelmatch as the only pass/fail gate"*), ordered into **Now**, **Next** and **Later**. The order within each group is the working order. The second research pass (2026-10-19) added #301–#310, moved #288 to Next, and split #289. The follow-up added #321 to Now before validation. Two security hardening items are tracked privately per [`SECURITY.md`](../SECURITY.md) and appear below only as placeholders. [Delivery checkpoints](../reports/Frontguard%20roadmap%20follow-up.md#delivery-checkpoints) state the evidence required between groups; they are not calendar estimates.
+All actionable post-launch engineering work tracked under parent issue [#283](https://github.com/ravidsrk/frontguard/issues/283) (*"Post-launch roadmap: keep pixelmatch as the only pass/fail gate"*) is **complete on `main`**. Two security hardening items are tracked privately per [`SECURITY.md`](../SECURITY.md) and appear below only as placeholders. [Delivery checkpoints](../reports/Frontguard%20roadmap%20follow-up.md#delivery-checkpoints) state the evidence required between groups.
 
-### Now — Close the Approval Edges, Fix Shipped Bugs, Fingerprint, Then Upgrade
+### Now — Close the Approval Edges, Fix Shipped Bugs, Fingerprint, Then Upgrade (Completed)
 
-1. **[#287](https://github.com/ravidsrk/frontguard/issues/287) — Separate baseline writes from the agent that edited the UI.**
-   - Rewrite the shipped skill so agents stop at evidence and hand promotion to a human.
-   - Make the Action refuse `update-baselines` on `pull_request`, `pull_request_target` and `merge_group` without an explicit override.
-   - Make the control a credential the agent does not hold: promotion after merge, or a protected environment. `confirm_reviewed` stays as UX only.
-2. **[#286](https://github.com/ravidsrk/frontguard/issues/286) — Publish an advisory judge evaluation and keep model output off exit codes.**
-   - First change: judge verdicts stop setting exit `1`.
-   - Then an evaluation protocol with paired clean and attacked injection fixtures, scored in both directions with Clopper-Pearson bounds, plus UI-Lens classes as negative evidence.
-3. **[#301](https://github.com/ravidsrk/frontguard/issues/301) — Route entries that share a path overwrite each other's baselines.**
-   - Reject duplicate baseline keys at config validation (exit `2`) until named modes exist.
-   - Document that `--color-scheme` compares against the default scheme's baselines.
-   - Warn when the run's effective color scheme differs from the scheme stored on the baseline. The warning does not change the exit code.
-4. **[#302](https://github.com/ravidsrk/frontguard/issues/302) — Accessibility plugin docs use options the plugin ignores.**
-   - Fix the recipe to `impact` + `failOnViolation: true`.
-   - Warn on unknown option keys.
-5. **[#303](https://github.com/ravidsrk/frontguard/issues/303) — Record the renderer and comparator in the baseline manifest.**
-   - Record the Frontguard, Playwright, browser build/channel, OS/arch, device scale factor, `pixelmatch` version/options and effective screenshot options.
-   - Warn on mismatch; exit `2` only in strict mode.
-   - Bound the `document.fonts.ready` wait.
-   - Absorbs #289's runner-change warning. Lands before #284.
+1. ✅ **[#287](https://github.com/ravidsrk/frontguard/issues/287) — Separate baseline writes from the agent that edited the UI.**
+   - Rewrote the shipped skill so agents stop at evidence and hand promotion to a human.
+   - Made the Action refuse `update-baselines` on `pull_request`, `pull_request_target` and `merge_group` without an explicit override.
+   - Made the control a credential the agent does not hold: promotion after merge, or a protected environment. `confirm_reviewed` stays as UX only.
+2. ✅ **[#286](https://github.com/ravidsrk/frontguard/issues/286) — Publish an advisory judge evaluation and keep model output off exit codes.**
+   - Judge verdicts never set exit `1`.
+   - Published evaluation protocol ([`docs/judge-protocol.md`](./judge-protocol.md)) with paired clean and attacked injection fixtures, scored in both directions with Clopper-Pearson bounds, plus UI-Lens classes as negative evidence.
+3. ✅ **[#301](https://github.com/ravidsrk/frontguard/issues/301) — Route entries that share a path overwrite each other's baselines.**
+   - Rejects duplicate baseline keys at config validation (exit `2`) unless disambiguated by named modes ([#309](https://github.com/ravidsrk/frontguard/issues/309)).
+   - Documents that `--color-scheme` compares against the default scheme's baselines.
+   - Warns when the run's effective color scheme differs from the scheme stored on the baseline without changing the exit code.
+4. ✅ **[#302](https://github.com/ravidsrk/frontguard/issues/302) — Accessibility plugin docs use options the plugin ignores.**
+   - Fixed the recipe to `impact` + `failOnViolation: true` and added warnings on unknown option keys.
+5. ✅ **[#303](https://github.com/ravidsrk/frontguard/issues/303) — Record the renderer and comparator in the baseline manifest.**
+   - Records the Frontguard, Playwright, browser build/channel, OS/arch, device scale factor, `pixelmatch` version/options, and effective screenshot options (`packages/cli/src/core/fingerprint.ts`).
+   - Warns on mismatch; exits `2` only in strict mode.
+   - Bounds the `document.fonts.ready` wait.
 6. *Private hardening item, tracked per `SECURITY.md`.*
-7. **[#321](https://github.com/ravidsrk/frontguard/issues/321) — Keep `smartFilter` conservative for public assets in mixed changes.**
-   - Capture all routes when changed asset consumers cannot be proved, even if another route was selected.
-   - Cover mixed image, font and CSS-background edits; explain incomplete-analysis fallbacks.
-   - Retain scoping for proven route-only edits. Lands before #285's selection validation.
-8. **[#284](https://github.com/ravidsrk/frontguard/issues/284) — Measure small-text misses under the 10% pixel budget and adopt `pixelmatch` 8 as the same gate.**
+7. ✅ **[#321](https://github.com/ravidsrk/frontguard/issues/321) — Keep `smartFilter` conservative for public assets in mixed changes.**
+   - Captures all routes when changed asset consumers cannot be proved, even if another route was selected.
+   - Covers mixed image, font and CSS-background edits; explains incomplete-analysis fallbacks.
+8. ✅ **[#284](https://github.com/ravidsrk/frontguard/issues/284) — Measure small-text misses under the 10% pixel budget and adopt `pixelmatch` 8 as the same gate.**
    - Both packages depend on `pixelmatch` `^8.0.0`. The 10% whole-image budget stays. A 16×16 window fails above 64 differing pixels.
-   - A dimension mismatch is padded, then judged by that same gate.
-   - WebdriverIO's about ±3% count shift is their corpus. This repo does not publish a rate from it.
-   - Screenshot runs install the Playwright browser build that matches the capturing package ([@karlhorky](https://x.com/karlhorky/status/2082458846031696091)).
-9. **[#285](https://github.com/ravidsrk/frontguard/issues/285) — Re-run pixel validation on the current tree with true-positive fixtures.**
-   - HTML/CSS mutation operators, with recall bucketed by how many viewports show the change.
-   - Seeded neighbour-moving faults, nuisance fixtures drawn from UI flaky-test causes, and the #303 fingerprint recorded.
-   - Compare full capture with filtered selection after #321, reporting omitted observable mutations and denominators separately from comparator misses.
-   - No implied rate of unreviewed acceptance.
+   - Dimension mismatches are padded and judged by that same gate.
+   - Screenshot runs install the Playwright browser build matching the capturing package.
+9. ✅ **[#285](https://github.com/ravidsrk/frontguard/issues/285) — Re-run pixel validation on the current tree with true-positive fixtures.**
+   - HTML/CSS mutation operators, with recall bucketed by how many viewports show the change (`validation/results-v0.3.md`).
 
-### Next — Give Humans, Not Agents, the Merge Gate
+### Next — Give Humans, Not Agents, the Merge Gate (Completed)
 
-10. **[#288](https://github.com/ravidsrk/frontguard/issues/288) — Block baseline updates on new serious `axe-core` violations.** `update-baselines` runs the existing accessibility plugin before it writes. The audit uses the same storage state, color scheme, viewport height, wait, and route actions as the capture. `failOnViolation: true` refuses the write at or above `impact`, including when the pixel status is not a regression, and when an audit does not complete. The report lists the violations, says the baselines were not written, and leaves the pixel status unchanged. A clean audit does not clear a pixel regression. `frontguard review` (#305) must use this same refusal. Cloud `approveRun` stays off the production path (#306).
-11. **[#304](https://github.com/ravidsrk/frontguard/issues/304) — Run a verify-only full check in GitHub merge queues.**
-    - Document `merge_group`.
-    - On queue runs, render all routes and refuse writes.
-    - Exit `1` on regression, so the PR is removed from the queue.
-    - Fix `smartFilter`'s hard-coded `origin/main...HEAD` base on queue refs.
-12. **[#305](https://github.com/ravidsrk/frontguard/issues/305) — Add a human `frontguard review` command that accepts shots one at a time.**
-    - Accept, skip or quit per shot.
-    - `--from` a downloaded CI artifact, byte for byte, refused on a fingerprint mismatch.
-    - An audit line per acceptance, and no network calls.
-13. **[#306](https://github.com/ravidsrk/frontguard/issues/306) — Design PR-scoped approvals and merge-base baseline selection for the orphan branch.**
-    - A decision record plus a spike: pick baselines from the merge base, and key approvals by baseline and candidate SHA-256.
-    - Promotion happens after merge.
-    - `pixelmatch` stays the only comparator.
+10. ✅ **[#288](https://github.com/ravidsrk/frontguard/issues/288) — Block baseline updates on new serious `axe-core` violations.** `update-baselines` and `review` run the accessibility plugin before writing and refuse the write when `failOnViolation: true` triggers at or above `impact`.
+11. ✅ **[#304](https://github.com/ravidsrk/frontguard/issues/304) — Run a verify-only full check in GitHub merge queues.**
+    - Documents `merge_group`, renders all routes and refuses writes on queue runs, exits `1` on regression, and resolves merge-queue base refs in `smartFilter`.
+12. ✅ **[#305](https://github.com/ravidsrk/frontguard/issues/305) — Add a human `frontguard review` command that accepts shots one at a time.**
+    - Accept, skip or quit per shot (`packages/cli/src/cli/review.ts`).
+    - `--from` a downloaded CI artifact, byte for byte, refused on a fingerprint mismatch, with an audit line per acceptance and no network calls.
+13. ✅ **[#306](https://github.com/ravidsrk/frontguard/issues/306) — Design PR-scoped approvals and merge-base baseline selection for the orphan branch.**
+    - Decision record ([`docs/decisions/306-merge-base-approvals.md`](./decisions/306-merge-base-approvals.md)) plus merge-base selection and SHA-256-keyed approval helpers (`packages/cli/src/storage/approval.ts`).
 14. *Private hardening item, tracked per `SECURITY.md`.*
-15. **[#307](https://github.com/ravidsrk/frontguard/issues/307) — Declare MCP tool annotations and mark promotion tools destructive.**
-    - Read-only hints on the five read tools.
-    - `destructiveHint` plus Claude Code's `requiresUserInteraction` on `promote_baseline` and `accept_baseline`.
-    - Documented as hints, not controls.
-16. **[#289](https://github.com/ravidsrk/frontguard/issues/289) — Discover Ladle, Histoire and Storybook 9–11 stories.**
-    - Discovery only.
-    - Fixtures for Storybook 9, 10 and the 11 alpha, now that `storybookjs/test-runner` is archived.
-    - Ladle via `meta.json`, and Histoire discovery while its native visual testing is unreleased.
-17. **[#290](https://github.com/ravidsrk/frontguard/issues/290) — Prune PNG history on the `frontguard-baselines` orphan branch.**
-    - Adds stale-shot removal.
-    - Never prunes from filtered or sharded runs, and always offers a dry run.
-    - Keeps every baseline set reachable as a merge base (#306).
-18. **[#291](https://github.com/ravidsrk/frontguard/issues/291) — Split `pipeline.ts` at 1,422 lines and drop the stale `index.tsx` refactor.** Unchanged.
-19. **[#292](https://github.com/ravidsrk/frontguard/issues/292) — Enforce coverage thresholds in the CLI Vitest config.** Unchanged; ratchets after the Now tests land.
+15. ✅ **[#307](https://github.com/ravidsrk/frontguard/issues/307) — Declare MCP tool annotations and mark promotion tools destructive.**
+    - Read-only hints on the read tools; `destructiveHint` plus `requiresUserInteraction` on `promote_baseline` and `accept_baseline`.
+16. ✅ **[#289](https://github.com/ravidsrk/frontguard/issues/289) — Discover Ladle, Histoire and Storybook 9–11 stories.**
+    - Discovery and fixtures for Storybook 9, 10 and 11 alpha, Ladle (`meta.json`), and Histoire (`packages/cli/src/discovery/storybook.ts`).
+17. ✅ **[#290](https://github.com/ravidsrk/frontguard/issues/290) — Prune PNG history on the `frontguard-baselines` orphan branch.**
+    - Stale-shot removal (`frontguard update-baselines --prune` / `--prune-dry-run`), refusing to prune from filtered or sharded runs and preserving merge-base commits.
+18. ✅ **[#291](https://github.com/ravidsrk/frontguard/issues/291) — Split `pipeline.ts` at 1,422 lines and drop the stale `index.tsx` refactor.**
+    - Modularized into `pipeline.ts`, `pipeline-discover.ts`, `pipeline-run.ts`, `pipeline-update.ts`, `pipeline-ai.ts`, and `pipeline-Plugins.ts`.
+19. ✅ **[#292](https://github.com/ravidsrk/frontguard/issues/292) — Enforce coverage thresholds in the CLI Vitest config.**
+    - Enforced in `packages/cli/vitest.config.ts`.
 
-### Later — Gated Hosted Differentiators, Non-Gating Artifacts & Dated Upgrades
+### Later — Gated Hosted Differentiators, Non-Gating Artifacts & Dated Upgrades (Completed)
 
-20. **[#293](https://github.com/ravidsrk/frontguard/issues/293) — Close the three `cloud-api` deployment gates without deploying.**
-    - The run-status path (`G-34`), user-data erasure, and a restore-tested backup.
-    - Does **not** deploy `api.frontguard.dev` or enable billing.
-21. **[#294](https://github.com/ravidsrk/frontguard/issues/294) — Design a hosted review UI only after the `cloud-api` gates.** Blocked by #293 and #305: local review comes first.
-22. **[#295](https://github.com/ravidsrk/frontguard/issues/295) — Design S3-backed baseline storage only after the `cloud-api` gates.**
-    - Blocked by #293, #290, #306 and #303.
-    - Distinct from `imageUpload`, which already uploads PR diff thumbnails.
-23. **[#298](https://github.com/ravidsrk/frontguard/issues/298) — Surface aged ignore masks for a human to drop.** One vendor account asked for this. `frontguard ignores --older-than <days>` lists rules whose `since` date is older than that, and the shots they cover. Shot coverage comes from configured routes. When routes are omitted, the command says coverage is unavailable and does not discover Storybook, crawl, or filesystem routes. Removing a rule is a config edit. No model, prompt, or flake heuristic removes a mask.
-24. **[#299](https://github.com/ravidsrk/frontguard/issues/299) — Add optional ARIA and non-image text snapshots that do not gate pixels.** Optional `captureAriaSnapshot` and `textSnapshot.json` / `textSnapshot.markdown` store a text file next to the PNG and diff it as text. A mismatch is reported on its own. It does not change `comparisonMethod` from pixelmatch and does not pass a pixel regression. axe-core remains the accessibility plugin. Text diff is not a gate.
-25. **[#308](https://github.com/ravidsrk/frontguard/issues/308) — Report horizontal viewport overflow without gating.**
-    - `scrollWidth` vs `innerWidth`, plus visible unclipped elements past the right edge, taken from the same settled state as the screenshot.
-    - Never an exit-code input. The HTML report, JSON output, and `list_horizontal_overflow` show it. Precision for `validation/fixtures/overflow` is in [`validation/results-overflow.md`](../validation/results-overflow.md). The advisory judge has no Frontguard accuracy on that set ([`docs/judge-protocol.md`](./judge-protocol.md)).
-26. **[#309](https://github.com/ravidsrk/frontguard/issues/309) — Add named capture modes with mode-keyed baselines (bet).**
-    - Named bundles (`colorScheme`, `reducedMotion`, `forcedColors`, `contrast`, `locale`, `timezoneId`).
-    - Emulation probed before each capture, and a projected capture count.
-    - Demand is weak.
-27. **[#310](https://github.com/ravidsrk/frontguard/issues/310) — Move the MCP server to SDK v2 before v1.x support ends, then list it in the registry.**
-    - Dated: start the spike in December 2026 and ship before about 2027-01-27.
-    - Publish `server.json` from the npm release job.
-28. **[#296](https://github.com/ravidsrk/frontguard/issues/296) — Add CLI OpenTelemetry without deploying the `cloud-api` exporter.** Unchanged.
-29. **[#297](https://github.com/ravidsrk/frontguard/issues/297) — Audit `apps/web` accessibility separately from the CLI `axe-core` plugin.** Unchanged.
+20. ✅ **[#293](https://github.com/ravidsrk/frontguard/issues/293) — Close the three `cloud-api` deployment gates without deploying.**
+    - Closed in source (`packages/cloud-api/src/processor.ts`, user-data erasure, and backup verification) without deploying `api.frontguard.dev` or enabling billing.
+21. ✅ **[#294](https://github.com/ravidsrk/frontguard/issues/294) — Design a hosted review UI only after the `cloud-api` gates.**
+    - Architecture decision record ([`docs/decisions/294-hosted-review-ui.md`](./decisions/294-hosted-review-ui.md)) and review policy validator (`packages/cloud-api/src/review-policy.ts`, `packages/cloud-api/test/review-policy.test.ts`).
+22. ✅ **[#295](https://github.com/ravidsrk/frontguard/issues/295) — Design S3-backed baseline storage only after the `cloud-api` gates.**
+    - Architecture decision record ([`docs/decisions/295-s3-baseline-storage.md`](./decisions/295-s3-baseline-storage.md)) and content-addressed S3 baseline layout helper (`packages/cli/src/storage/s3-baseline-layout.ts`, `packages/cli/test/storage/s3-baseline-layout.test.ts`).
+23. ✅ **[#298](https://github.com/ravidsrk/frontguard/issues/298) — Surface aged ignore masks for a human to drop.**
+    - `frontguard ignores --older-than <days>` (`packages/cli/src/cli/ignores.ts`).
+24. ✅ **[#299](https://github.com/ravidsrk/frontguard/issues/299) — Add optional ARIA and non-image text snapshots that do not gate pixels.**
+    - Optional `captureAriaSnapshot` and `textSnapshot` in `@frontguard/cli` and `@frontguard/playwright`.
+25. ✅ **[#308](https://github.com/ravidsrk/frontguard/issues/308) — Report horizontal viewport overflow without gating.**
+    - `scrollWidth` vs `innerWidth` and unclipped right-edge overflow reported in HTML, JSON, and MCP `list_horizontal_overflow` (`validation/results-overflow.md`).
+26. ✅ **[#309](https://github.com/ravidsrk/frontguard/issues/309) — Add named capture modes with mode-keyed baselines.**
+    - Named bundles (`colorScheme`, `reducedMotion`, `forcedColors`, `contrast`, `locale`, `timezoneId`), mode-keyed baseline paths (`baselines/<route>/<viewport>/<mode>/<browser>.png`), pre-capture environment probe (`probeCaptureEnvironment`), and projected capture count logging (`packages/cli/test/core/capture-modes.test.ts`).
+27. ✅ **[#310](https://github.com/ravidsrk/frontguard/issues/310) — MCP server protocol compatibility (`2025-11-25` & `2026-07-28`) and MCP Registry packaging.**
+    - Protocol negotiation (`2025-11-25` and `2026-07-28`), `server/discover` discovery handler, deterministic `tools/list`, `packages/mcp/server.json` (`io.github.ravidsrk/frontguard`), `scripts/sync-version.ts` synchronization, and `.github/workflows/release.yml` registry publication (`packages/mcp/test/protocol-compatibility.test.ts`).
+28. ✅ **[#296](https://github.com/ravidsrk/frontguard/issues/296) — Add CLI OpenTelemetry without deploying the `cloud-api` exporter.**
+    - Opt-in CLI OTel trace export (`packages/cli/src/core/telemetry-otel.ts`).
+29. ✅ **[#297](https://github.com/ravidsrk/frontguard/issues/297) — Audit `apps/web` accessibility separately from the CLI `axe-core` plugin.**
+    - Automated `apps/web` accessibility test suite (`apps/web/src/test/a11y.test.tsx`).
 
 ### Ongoing Operations & Hardening Tracked Separately
 
-- **[#157](https://github.com/ravidsrk/frontguard/issues/157) — Weekly npm audit (production tree):** an automated weekly production dependency audit workflow.
+- ✅ **[#157](https://github.com/ravidsrk/frontguard/issues/157) & [#367](https://github.com/ravidsrk/frontguard/issues/367) — Weekly npm audit (production & full tree):** 0 vulnerabilities across production (`npm audit --omit=dev`) and full development trees (`npm audit`).
 - **H-05 / G-44 — npm trusted publishing (OIDC without `NPM_TOKEN`):** recorded in [`docs/completion/HUMAN_ACTIONS.md`](./completion/HUMAN_ACTIONS.md) and [`docs/completion/GAPS.md`](./completion/GAPS.md) with expiry **2027-03-01**. The current release workflow already enforces tag/version match, `main` ancestry, green CI on the exact SHA, and npm OIDC provenance attestation.
 
 ---

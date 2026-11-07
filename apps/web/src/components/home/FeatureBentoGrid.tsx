@@ -188,7 +188,7 @@ export function FeatureBentoGrid() {
                 ),
               }}
             >
-              {configCopied ? "Copied ✓" : "Copy config"}
+              {configCopied ? "Copied ✓" : "Copy"}
             </button>
           </div>
 

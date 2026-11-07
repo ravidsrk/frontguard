@@ -13,7 +13,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { BaselineStorage, BaselineManifest, BrowserEngine } from '../core/types.js';
-import { emptyBaselineManifest, parseBaselineManifest } from '../core/fingerprint.js';
+import { emptyBaselineManifest, isNamedMode, parseBaselineManifest } from '../core/fingerprint.js';
+export { isNamedMode };
 import { logger } from '../utils/logger.js';
 
 /**
@@ -91,22 +92,35 @@ function sanitizeRoutePath(route: string): string {
   return sanitized.replace(/[^a-zA-Z0-9_\-\/]/g, '_');
 }
 
+function sanitizeModeName(mode: string): string {
+  return mode.trim().replace(/[^a-zA-Z0-9_\-]/g, '_') || 'default';
+}
+
 /**
  * Builds the storage path for a baseline image within the orphan branch.
  *
- * Format: `baselines/<sanitized-route>/<viewport>/<browser>.png`.
- * Color scheme, label, and pre-capture actions are not part of the key.
+ * Default mode uses `baselines/<sanitized-route>/<viewport>/<browser>.png`.
+ * Named modes use `baselines/<sanitized-route>/<viewport>/<mode>/<browser>.png`.
  */
 export function baselineStoragePath(
   route: string,
   viewport: number,
   browser: BrowserEngine,
+  mode?: string,
 ): string {
+  if (isNamedMode(mode)) {
+    return `baselines/${sanitizeRoutePath(route)}/${viewport}/${sanitizeModeName(mode)}/${browser}.png`;
+  }
   return `baselines/${sanitizeRoutePath(route)}/${viewport}/${browser}.png`;
 }
 
-function baselinePath(route: string, viewport: number, browser: BrowserEngine): string {
-  return baselineStoragePath(route, viewport, browser);
+function baselinePath(
+  route: string,
+  viewport: number,
+  browser: BrowserEngine,
+  mode?: string,
+): string {
+  return baselineStoragePath(route, viewport, browser, mode);
 }
 
 function gitErrorOutput(err: unknown): string {
@@ -316,10 +330,11 @@ export class GitOrphanStorage implements BaselineStorage {
   async readBaseline(
     route: string,
     viewport: number,
-    browser: BrowserEngine
+    browser: BrowserEngine,
+    mode?: string,
   ): Promise<Buffer | null> {
     this.ensureInitialized();
-    const path = baselinePath(route, viewport, browser);
+    const path = baselinePath(route, viewport, browser, mode);
     if (this.readRef === null) return null;
 
     try {
@@ -345,10 +360,11 @@ export class GitOrphanStorage implements BaselineStorage {
     browser: BrowserEngine,
     suffix: string,
     body?: string,
+    mode?: string,
   ): Promise<string | null> {
     this.ensureInitialized();
     if (!/^\.(aria\.txt|json|md)$/.test(suffix)) throw new Error('Unknown text snapshot');
-    const path = baselinePath(route, viewport, browser).replace(/\.png$/, suffix);
+    const path = baselinePath(route, viewport, browser, mode).replace(/\.png$/, suffix);
     if (body === undefined) {
       if (this.readRef === null) return null;
       try {
@@ -379,11 +395,12 @@ export class GitOrphanStorage implements BaselineStorage {
     route: string,
     viewport: number,
     browser: BrowserEngine,
-    buffer: Buffer
+    buffer: Buffer,
+    mode?: string,
   ): Promise<void> {
     this.ensureInitialized();
     this.ensureWritable();
-    const path = baselinePath(route, viewport, browser);
+    const path = baselinePath(route, viewport, browser, mode);
 
     await this.writeToOrphanBranch(
       (wt) => {
@@ -400,7 +417,7 @@ export class GitOrphanStorage implements BaselineStorage {
         mkdirSync(dirname(fullPath), { recursive: true });
         writeFileSync(fullPath, buffer);
       },
-      `Update baseline: ${sanitizeRoutePath(route)} @ ${viewport}px [${browser}]`
+      `Update baseline: ${sanitizeRoutePath(route)} @ ${viewport}px [${browser}]`,
     );
   }
 
@@ -413,6 +430,7 @@ export class GitOrphanStorage implements BaselineStorage {
       route: string;
       viewport: number;
       browser?: BrowserEngine;
+      mode?: string;
       buffer: Buffer;
     }>,
     manifest?: BaselineManifest,
@@ -425,7 +443,7 @@ export class GitOrphanStorage implements BaselineStorage {
       (wt) => {
         for (const entry of entries) {
           const browser = entry.browser ?? 'chromium';
-          const path = baselinePath(entry.route, entry.viewport, browser);
+          const path = baselinePath(entry.route, entry.viewport, browser, entry.mode);
           const fullPath = join(wt, path);
           if (existsSync(fullPath)) {
             try {

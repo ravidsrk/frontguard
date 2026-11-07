@@ -21,12 +21,20 @@ import type {
   BaselineManifest,
   BaselineSnapshot,
   BrowserEngine,
+  CaptureModeConfig,
   ColorScheme,
   FingerprintCheck,
   RendererFingerprint,
   Route,
   ScreenshotResult,
 } from './types.js';
+
+/**
+ * Returns true when `mode` is a named non-default capture mode.
+ */
+export function isNamedMode(mode?: string): mode is string {
+  return typeof mode === 'string' && mode.trim().length > 0 && mode.trim() !== 'default';
+}
 
 const require = createRequire(import.meta.url);
 
@@ -145,6 +153,17 @@ function browserIdentity(engine: string): RendererFingerprint['browser'] {
   return browser;
 }
 
+export function baselineSnapshotKey(
+  viewport: number,
+  browser: string,
+  mode?: string,
+): string {
+  if (isNamedMode(mode)) {
+    return `${viewport}/${mode.trim()}/${browser}`;
+  }
+  return `${viewport}/${browser}`;
+}
+
 /**
  * Fingerprint of this process. `captureRunner` is omitted unless the caller
  * knows it (`storybook`, `ladle`, `histoire`, or `routes`).
@@ -152,6 +171,7 @@ function browserIdentity(engine: string): RendererFingerprint['browser'] {
 export function currentFingerprint(
   browser: BrowserEngine | string,
   captureRunner?: string,
+  mode?: { name: string; settings: CaptureModeConfig },
 ): RendererFingerprint {
   const fingerprint: RendererFingerprint = {
     frontguard: CLI_VERSION,
@@ -169,6 +189,12 @@ export function currentFingerprint(
   const digest = process.env.FRONTGUARD_IMAGE_DIGEST?.trim();
   if (digest) fingerprint.imageDigest = digest;
   if (captureRunner) fingerprint.captureRunner = captureRunner;
+  if (mode && isNamedMode(mode.name)) {
+    fingerprint.mode = {
+      name: mode.name.trim(),
+      settings: { ...mode.settings },
+    };
+  }
   return fingerprint;
 }
 
@@ -239,18 +265,22 @@ export function stampBaselineManifest(
     const existing = routes[shot.route.path];
     const now = new Date().toISOString();
     const sha256 = createHash('sha256').update(shot.buffer).digest('hex');
-    const snapshotKey = `${shot.viewport}/${shot.browser}`;
+    const modeName = shot.mode ?? shot.route.mode;
+    const modeSettings = shot.modeConfig ?? shot.route.modeConfig ?? {};
+    const snapshotKey = baselineSnapshotKey(shot.viewport, shot.browser, modeName);
     const previous = existing?.snapshots?.[snapshotKey];
     const fingerprint = currentFingerprint(
       shot.browser,
       captureRunnerForWrite(shot.route, previous?.fingerprint?.captureRunner),
+      isNamedMode(modeName) ? { name: modeName, settings: modeSettings } : undefined,
     );
     const snapshot: BaselineSnapshot = {
       ...previous,
       sha256,
       updatedAt: now,
       fingerprint,
-      colorScheme: shot.route.colorScheme ?? globalColorScheme ?? 'light',
+      colorScheme:
+        modeSettings.colorScheme ?? shot.route.colorScheme ?? globalColorScheme ?? 'light',
     };
     routes[shot.route.path] = {
       viewports: [...new Set([...(existing?.viewports ?? []), shot.viewport])],
@@ -325,6 +355,10 @@ export function fingerprintDiffs(
   diffRecord(diffs, 'pixelmatch.options', baseline.pixelmatch?.options, current.pixelmatch?.options);
   diffRecord(diffs, 'screenshot', baseline.screenshot, current.screenshot);
   pushDiff(diffs, 'captureRunner', baseline.captureRunner, current.captureRunner);
+  if (baseline.mode || current.mode) {
+    pushDiff(diffs, 'mode.name', baseline.mode?.name, current.mode?.name);
+    diffRecord(diffs, 'mode.settings', baseline.mode?.settings, current.mode?.settings);
+  }
   return diffs;
 }
 
@@ -349,10 +383,11 @@ function snapshotFingerprint(
   route: string,
   viewport: number,
   browser: string,
+  mode?: string,
 ): RendererFingerprint | undefined {
   const snapshots = manifest?.routes?.[route]?.snapshots;
   if (!snapshots || typeof snapshots !== 'object') return undefined;
-  const snapshot = snapshots[`${viewport}/${browser}`];
+  const snapshot = snapshots[baselineSnapshotKey(viewport, browser, mode)];
   if (!snapshot || typeof snapshot !== 'object') return undefined;
   const fingerprint = snapshot.fingerprint;
   if (!fingerprint || typeof fingerprint !== 'object') return undefined;
@@ -367,11 +402,24 @@ export function noteComparedFingerprint(
 ): void {
   if (!manifestReadable) return;
   accum.compared += 1;
-  const fingerprint = snapshotFingerprint(manifest, shot.route.path, shot.viewport, shot.browser);
+  const modeName = shot.mode ?? shot.route.mode;
+  const modeSettings = shot.modeConfig ?? shot.route.modeConfig ?? {};
+  const fingerprint = snapshotFingerprint(
+    manifest,
+    shot.route.path,
+    shot.viewport,
+    shot.browser,
+    modeName,
+  );
   if (!fingerprint) return;
   accum.withFingerprint += 1;
-  const where = `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`;
-  const current = currentFingerprint(shot.browser, runtimeCaptureRunner(shot.route));
+  const modeSuffix = isNamedMode(modeName) ? ` (${modeName})` : '';
+  const where = `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]${modeSuffix}`;
+  const current = currentFingerprint(
+    shot.browser,
+    runtimeCaptureRunner(shot.route),
+    isNamedMode(modeName) ? { name: modeName, settings: modeSettings } : undefined,
+  );
   for (const diff of fingerprintDiffs(fingerprint, current)) {
     const key = `${diff.field}\0${stableString(diff.baseline)}\0${stableString(diff.current)}`;
     if (!accum.diffs.has(key)) accum.diffs.set(key, diff);

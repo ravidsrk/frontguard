@@ -20,14 +20,17 @@ import {
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  baselineSnapshotKey,
   createFingerprintAccum,
   finishFingerprintCheck,
   fingerprintMode,
   formatFingerprintWarning,
+  isNamedMode,
   missingFingerprintWarning,
   noteComparedFingerprint,
   rendererBypassReason,
 } from './fingerprint.js';
+import { projectedCaptureCount } from './config.js';
 import { smartFilter } from '../graph/filter.js';
 import { renderPages } from '../render/playwright.js';
 import { overflowReports } from '../render/horizontal-overflow.js';
@@ -283,10 +286,9 @@ async function runCapturedPipeline(
     rp.onStageComplete('filter', `${fr.length} route(s) to render (filter failed, rendering all)`);
   }
 
-  const totalCombinations =
-    fr.length * config.viewports.length * config.browsers.length;
+  const totalCombinations = projectedCaptureCount(fr, config);
   logger.info(
-    `Testing ${fr.length} route(s) × ${config.viewports.length} viewport(s) × ${config.browsers.length} browser(s) = ${totalCombinations} combination(s)`,
+    `Projected captures: ${totalCombinations} (${fr.length} route(s) × ${config.viewports.length} viewport(s) × ${config.browsers.length} browser(s))`,
   );
 
   // -----------------------------------------------------------------------
@@ -334,6 +336,9 @@ async function runCapturedPipeline(
     logger.error(`Render stage failed: ${msg}`);
     rp.onStageComplete('render', `Failed: ${msg}`);
     captureSpan.end('error', { 'frontguard.shots': shots.length });
+    if (err instanceof Error && err.name === 'CaptureEnvironmentMismatchError') {
+      throw err;
+    }
   }
 
   // Plugin hook: afterRender — can modify screenshots before comparison
@@ -422,15 +427,26 @@ async function runCapturedPipeline(
               ...(shot.redactedCount !== undefined ? { redactedCount: shot.redactedCount } : {}),
             };
           } else {
-            const baseline = await storage.readBaseline(
-              shot.route.path,
-              shot.viewport,
-              shot.browser,
-            );
+            const shotMode = shot.mode ?? shot.route.mode;
+            const baseline = isNamedMode(shotMode)
+              ? await storage.readBaseline(
+                  shot.route.path,
+                  shot.viewport,
+                  shot.browser,
+                  shotMode,
+                )
+              : await storage.readBaseline(
+                  shot.route.path,
+                  shot.viewport,
+                  shot.browser,
+                );
 
             if (!baseline) {
               // No baseline exists — this is a new page
-              diff = createNewPageResult(shot);
+              diff = {
+                ...createNewPageResult(shot),
+                ...(isNamedMode(shotMode) ? { mode: shotMode } : {}),
+              };
               logger.debug(`New page: ${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`);
             } else {
               noteComparedFingerprint(
@@ -440,11 +456,20 @@ async function runCapturedPipeline(
                 shot,
               );
               if (manifestReadable && baselineManifest) {
+                const snapKey = baselineSnapshotKey(
+                  shot.viewport,
+                  shot.browser,
+                  shotMode,
+                );
                 const stored =
-                  baselineManifest.routes?.[shot.route.path]?.snapshots?.[
-                    `${shot.viewport}/${shot.browser}`
-                  ]?.colorScheme;
-                const current = shot.route.colorScheme ?? config.colorScheme ?? 'light';
+                  baselineManifest.routes?.[shot.route.path]?.snapshots?.[snapKey]
+                    ?.colorScheme;
+                const current =
+                  shot.modeConfig?.colorScheme ??
+                  shot.route.modeConfig?.colorScheme ??
+                  shot.route.colorScheme ??
+                  config.colorScheme ??
+                  'light';
                 const pair = `${stored}:${current}`;
                 if (
                   (stored === 'light' || stored === 'dark') &&
@@ -462,6 +487,9 @@ async function runCapturedPipeline(
                 enabled: config.ssimFallback,
                 ssimThreshold: config.ssimThreshold,
               });
+              if (isNamedMode(shotMode)) {
+                diff = { ...diff, mode: shotMode };
+              }
 
               // Mark regressions vs changes based on the effective threshold
               if (

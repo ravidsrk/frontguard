@@ -71,27 +71,34 @@ export function HeroStage() {
                 "display: flex; align-items: stretch; gap: 12px; flex-wrap: wrap;",
               )}
             >
-              <button
-                type="button"
+              <div
                 onClick={() => copyInstall("npm install @frontguard/cli")}
-                aria-label="Copy command: npm install @frontguard/cli"
-                className="fg-btn-primary"
                 style={{
                   fontFamily: MONO,
                   ...s(
-                    "display: inline-flex; align-items: center; gap: 14px; padding: 13px 18px; background: var(--accent); border: 1px solid var(--accent); border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--bg); cursor: pointer;",
+                    "display: inline-flex; align-items: center; gap: 14px; padding: 10px 14px 10px 18px; background: var(--accent); border: 1px solid var(--accent); border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--bg); cursor: pointer;",
                   ),
                 }}
               >
                 <span>$ npm install @frontguard/cli</span>
-                <span
-                  style={s(
-                    "font-size: 11px; padding: 2px 7px; border-radius: 4px; background: rgba(13,12,11,0.18); color: var(--bg);",
-                  )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyInstall("npm install @frontguard/cli");
+                  }}
+                  aria-label="Copy command: npm install @frontguard/cli"
+                  className="fg-btn-primary"
+                  style={{
+                    fontFamily: MONO,
+                    ...s(
+                      "font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 4px; border: none; background: rgba(13,12,11,0.2); color: var(--bg); cursor: pointer;",
+                    ),
+                  }}
                 >
                   {installCopied ? "Copied ✓" : "Copy"}
-                </span>
-              </button>
+                </button>
+              </div>
 
               <Link
                 to="/docs/$"

@@ -1,5 +1,7 @@
 # Frontguard — Production Pending Work (Deep Inventory)
 
+> **Reconciliation (2026-11-07):** This historical inventory from `2026-06-17` has been superseded by [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md), [`docs/completion/SHIPLOG.md`](./completion/SHIPLOG.md) (launch gate **GO** on `2026-10-19`), and [`docs/ROADMAP.md`](./ROADMAP.md). All open code defects below, all 27 post-launch roadmap items under [#283](https://github.com/ravidsrk/frontguard/issues/283) (`#284`–`#299`, `#301`–`#310`, `#321`), and all `npm audit` advisories (`#157`, `#367`) are **CLOSED** on `main`. Per `DEFINITION.md` §4, `packages/cloud-api` remains source-in-repo and intentionally undeployed despite closing its code gates in `#293` and `#294`.
+
 *Compiled 2026-06-17 against `origin/main` @ `b472457` after adversarial re-check.
 This is the single canonical list of everything still blocking a honest production
 release. It reconciles three audit tracks, live repros, and the OPS queue.*

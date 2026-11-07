@@ -243,7 +243,7 @@ function DocArticle() {
             `font-family: ${MONO}; font-size: 12px; color: ${copiedPage ? '#4fb477' : '#c8c0b6'}; background: #141210; border: 1px solid ${copiedPage ? '#255c3b' : '#2a2622'}; border-radius: 4px; padding: 4px 10px; cursor: pointer;`,
           )}
         >
-          {copiedPage ? 'Copied page ✓' : copyFailed ? 'Copy failed — retry' : 'Copy page text'}
+          {copiedPage ? 'Copied page ✓' : copyFailed ? 'Copy failed — retry' : 'Copy article'}
         </button>
       </div>
 

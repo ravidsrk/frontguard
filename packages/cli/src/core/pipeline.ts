@@ -7,8 +7,22 @@
  * @module core/pipeline
  */
 
-export { defineConfig, DEFAULT_AI_MODELS } from './config.js';
-export type { UserFrontguardConfig } from './config.js';
+export {
+  defineConfig,
+  DEFAULT_AI_MODELS,
+  resolveRouteModes,
+  projectedCaptureCount,
+} from './config.js';
+export type { UserFrontguardConfig, ResolvedRouteMode } from './config.js';
+export { baselineSnapshotKey } from './fingerprint.js';
+export { isNamedMode, baselineStoragePath } from '../storage/git-orphan.js';
+export {
+  projectCaptureTasks,
+  probeCaptureEnvironment,
+  CaptureEnvironmentMismatchError,
+  type CaptureEnvironmentProbe,
+  type RenderTask,
+} from '../render/playwright.js';
 export type * from './types.js';
 export type { PluginContext, FrontguardPlugin } from './plugins.js';
 export {

@@ -73,6 +73,9 @@ const cards = (
     )
     .join('')}</div>`
 
+const figure = (src: string, alt: string, caption: string) =>
+  `<figure style="margin: 0 0 28px; border: 1px solid #2a2622; border-radius: 6px; background: #121110; overflow: hidden;"><img src="${src}" alt="${alt}" loading="lazy" style="display: block; width: 100%; height: auto; border-bottom: 1px solid #211e1b;" /><figcaption style="padding: 10px 16px; font-family: ${MONO}; font-size: 11.5px; color: #a89f94; letter-spacing: 0.02em;">${caption}</figcaption></figure>`
+
 const makeArticle = (
   id: string,
   label: string,
@@ -113,6 +116,10 @@ export const articles: Article[] = [
     ['Supported path', 'Choose your workflow', 'Quick start', 'Baseline contract'],
     `${localCliNotice}${lead(
       'Frontguard is a local-first visual regression testing toolkit for frontend teams. It renders your web pages or Storybook components in real browsers, compares pixels and perceptual similarity (SSIM, Chroma-SSIM, CW-SSIM) against reviewed baselines stored on a dedicated git orphan branch, and writes an interactive offline HTML workbench.',
+    )}${figure(
+      '/images/docs/pipeline-architecture.jpg',
+      'Frontguard 5-Stage Visual Regression Pipeline',
+      'FIG 01 · 5-STAGE PIPELINE — DISCOVER · HERMETIC RENDER · PERCEPTUAL DIFF · VISION AI & FIX · GIT CAS & REPORT',
     )}${h2('Supported path')}${p(
       'Frontguard renders configured pages, compares screenshots against reviewed baselines, and writes console, JSON, and HTML evidence. Optional model-assisted analysis runs only when you configure a provider.',
     )}${table(
@@ -178,11 +185,15 @@ export const articles: Article[] = [
     )}${code(
       'Frontguard terminal',
       `$ npx -p @frontguard/cli frontguard doctor
-$ npx -p @frontguard/cli frontguard update-baselines
+$ npx -p @frontguard/cli frontguard update-baselines --confirm-baselines
 $ git push origin frontguard-baselines
 $ npx -p @frontguard/cli frontguard run`,
     )}${h2('Baseline contract')}${p(
-      'Ordinary runs never accept CLI screenshots. Review captures first, then use frontguard update-baselines explicitly. Unaccepted new pages and regressions exit non-zero.',
+      'Ordinary runs never accept CLI screenshots. Review captures first, then use frontguard update-baselines --confirm-baselines explicitly. Unaccepted new pages and regressions exit non-zero.',
+    )}${figure(
+      '/images/docs/html-workbench-4mode-inspector.jpg',
+      'Interactive 4-Mode HTML Visual Diff Workbench',
+      'FIG 02 · INTERACTIVE HTML WORKBENCH — SIDE-BY-SIDE, SWIPE CURTAIN, ONION SKIN, DIFF FOCUS & SPATIAL CLUSTER INSPECTOR',
     )}${table(
       ['Exit Code', 'Meaning', 'When It Happens'],
       [
@@ -204,6 +215,10 @@ $ npx -p @frontguard/cli frontguard run`,
     ['CLI', 'Playwright package', 'Prerequisites', 'Verify with doctor'],
     `${localCliNotice}${lead(
       'Use Node.js 22 or newer. Install the package that matches the workflow you intend to run: @frontguard/cli for standalone route/Storybook pipelines, or @frontguard/playwright for assertions inside existing Playwright test suites.',
+    )}${figure(
+      '/images/docs/quick-start-terminal-loop.jpg',
+      'Quick Start Two-Terminal Workflow and Baseline Gate',
+      'FIG 01 · SETUP & ENVIRONMENT DIAGNOSTICS — NODE 22+, PLAYWRIGHT CHROMIUM, DOCTOR CHECKS & CLEAN GIT TREE',
     )}${h2('CLI')}${p(
       'Install @frontguard/cli as a devDependency in your project and install the Playwright Chromium browser binary used for headless rendering:',
     )}${code(
@@ -212,6 +227,8 @@ $ npx -p @frontguard/cli frontguard run`,
 $ npm install -D @frontguard/playwright
 $ npx -p @frontguard/cli playwright install --with-deps chromium
 $ npx -p @frontguard/cli frontguard doctor`,
+    )}${p(
+      'Screenshot runs install the Playwright browser build that matches @frontguard/cli. GitHub-hosted runner images update browsers on their own, and that drift flaked screenshot tests (https://x.com/karlhorky/status/2082458846031696091).',
     )}${tip(
       'LINUX vs MACOS.',
       'The --with-deps flag installs required shared libraries on Ubuntu/Debian CI runners. On macOS, Playwright prints a benign note and installs the Chromium binary cleanly.',
@@ -224,7 +241,7 @@ $ npx -p @frontguard/cli frontguard doctor`,
           '@frontguard/cli',
           'Standalone multi-route & multi-viewport visual regression runner with HTML workbench, git orphan storage, and plugins.',
           'frontguard-baselines git orphan branch',
-          'Explicitly run frontguard update-baselines (ordinary runs never overwrite baselines).',
+          'Explicitly run frontguard update-baselines --confirm-baselines (ordinary runs never overwrite baselines).',
         ],
         [
           '@frontguard/playwright',
@@ -236,7 +253,7 @@ $ npx -p @frontguard/cli frontguard doctor`,
           '@frontguard/mcp',
           '7-tool Model Context Protocol server for Claude Code, Cursor, and Windsurf.',
           'Reads ./frontguard-report/report.json locally',
-          'Agent calls promote_baseline with confirm_reviewed: true.',
+          'MCP promotion is refused in local-report mode. A human runs frontguard update-baselines --confirm-baselines. Cloud approveRun is not a production path.',
         ],
       ],
     )}${h2('Prerequisites')}${list([
@@ -244,7 +261,7 @@ $ npx -p @frontguard/cli frontguard doctor`,
       '<strong>Git repository</strong>: Required when storing baselines on the ' +
         ic('frontguard-baselines') +
         ' orphan branch. Ensure your working tree is clean before running ' +
-        ic('frontguard update-baselines') +
+        ic('frontguard update-baselines --confirm-baselines') +
         ' for the first time.',
       '<strong>Playwright Chromium</strong>: Installed once per machine or CI cache via ' +
         ic('npx -p @frontguard/cli playwright install --with-deps chromium') +
@@ -273,6 +290,10 @@ $ npx -p @frontguard/cli frontguard doctor`,
     ['Initialize', 'Accept baselines', 'Compare', 'Inspect the HTML workbench'],
     `${lead(
       'Initialize first, then run the app and Frontguard in separate terminals. This five-step walkthrough sets up deterministic visual regression testing in any web project.',
+    )}${figure(
+      '/images/docs/quick-start-terminal-loop.jpg',
+      'Quick Start Two-Terminal Workflow and Explicit Baseline Gate',
+      'FIG 01 · TWO-TERMINAL WORKFLOW — INIT & DOCTOR · APP SERVER · EXPLICIT BASELINE CAPTURE · COMPARISON EXIT CODES',
     )}${h2('Initialize')}${steps([
       {
         title: 'Generate frontguard.config.ts',
@@ -293,7 +314,7 @@ $ git add frontguard.config.ts .gitignore && git commit -m "Add Frontguard"`,
     )}${code(
       'Frontguard terminal',
       `$ npx -p @frontguard/cli frontguard doctor
-$ npx -p @frontguard/cli frontguard update-baselines
+$ npx -p @frontguard/cli frontguard update-baselines --confirm-baselines
 $ git push origin frontguard-baselines
 $ npx -p @frontguard/cli frontguard run`,
     )}${h2('Compare')}${p(
@@ -330,12 +351,16 @@ $ npx -p @frontguard/cli frontguard run`,
     ['Pipeline', 'Artifacts', 'Baseline storage', 'Next step'],
     `${lead(
       'The CLI discovers routes, renders configured browser and viewport combinations, compares pixels, optionally requests model assistance, and writes reports.',
+    )}${figure(
+      '/images/docs/pipeline-architecture.jpg',
+      'Frontguard 5-Stage Visual Regression Pipeline',
+      'FIG 01 · 5-STAGE PIPELINE — DISCOVER · HERMETIC RENDER · PERCEPTUAL DIFF · VISION AI & FIX · GIT CAS & REPORT',
     )}${h2('Pipeline')}${p(
       'When you execute frontguard run, the CLI orchestrates five deterministic stages in-process:',
     )}${steps([
       {
         title: 'Route & Story Discovery',
-        body: 'Combines explicit routes in frontguard.config.ts, automatic crawling from discover.startUrl (up to maxDepth), and Storybook story index discovery (storybook.url). When smartRender: true is enabled, the dependency graph filters routes to those affected by modified source files.',
+        body: 'Combines explicit routes in frontguard.config.ts, automatic crawling from discover.startUrl (up to maxDepth), and Storybook story index discovery (storybook.url). When smartRender: true is enabled, the dependency graph filters routes to those affected by modified source files. A deleted file, a public or static asset, an image or font with no import edge, an unresolved relative import, or a truncated graph renders every route and says why.',
       },
       {
         title: 'Hermetic Browser Rendering',
@@ -353,7 +378,11 @@ $ npx -p @frontguard/cli frontguard run`,
         title: 'Artifact Emission & Exit Gate',
         body: 'Writes the interactive HTML workbench, optional JSON/JUnit reports, and exits with a deterministic status code (0, 1, or 2).',
       },
-    ])}${h2('Artifacts')}${list([
+    ])}${h2('Artifacts')}${figure(
+      '/images/docs/html-workbench-4mode-inspector.jpg',
+      'Interactive 4-Mode HTML Visual Diff Workbench',
+      'FIG 02 · INTERACTIVE HTML WORKBENCH — 4 COMPARISON MODES, KEYBOARD NAVIGATION & VERIFIED CSS PATCHES',
+    )}${list([
       'Baselines live on the frontguard-baselines orphan branch.',
       'JSON mode writes machine-readable output to stdout.',
       'The HTML report keeps baseline, current, and diff evidence on disk.',
@@ -397,7 +426,11 @@ $ npx -p @frontguard/cli frontguard run`,
     ['Commands', 'Run flags reference', 'Threshold units', 'Exit codes', 'Monitoring'],
     `${lead(
       'The supported command surface includes run, init, update-baselines, doctor, guide, monitor, fix-pattern commands, and plugin subcommands.',
-    )}${h2('Commands')}${table(
+    )}${h2('Commands')}${figure(
+      '/images/docs/quick-start-terminal-loop.jpg',
+      'CLI Commands and Exit Code Contract',
+      'FIG 01 · CLI COMMAND WORKFLOW — INIT · DOCTOR · UPDATE-BASELINES · RUN & EXIT CODES (0 / 1 / 2)',
+    )}${table(
       ['Command', 'Description', 'Common Example'],
       [
         [
@@ -406,9 +439,9 @@ $ npx -p @frontguard/cli frontguard run`,
           'frontguard run --wait-for-stability --redact-sensitive',
         ],
         [
-          'frontguard update-baselines',
+          'frontguard update-baselines --confirm-baselines',
           'Capture current renders and commit them as accepted baselines on the frontguard-baselines orphan branch.',
-          'frontguard update-baselines --url http://localhost:3000',
+          'frontguard update-baselines --confirm-baselines --url http://localhost:3000',
         ],
         [
           'frontguard init [--ci] [--yes]',
@@ -454,7 +487,7 @@ $ npx -p @frontguard/cli frontguard run`,
     )}${code(
       'terminal',
       `$ frontguard run --url http://localhost:3000 --threshold 0.01 --wait-for-stability --redact-sensitive --color-scheme dark --freeze-time [timestamp] --seed-random [seed] --block-urls &lt;patterns...&gt;
-$ frontguard update-baselines --url http://localhost:3000
+$ frontguard update-baselines --confirm-baselines --url http://localhost:3000
 $ frontguard doctor
 $ frontguard guide [topic] --json
 $ frontguard monitor --url https://example.com --threshold 0.05
@@ -468,7 +501,7 @@ $ frontguard monitor --history`,
         ['--threshold &lt;ratio&gt;', 'number (0-1)', 'Maximum allowed changed-pixel ratio (e.g., 0.01 = 1%).'],
         ['--viewports &lt;list&gt;', 'numbers', 'Override viewport widths with one comma-separated list (e.g., --viewports 375,768,1440).'],
         ['--browsers &lt;list&gt;', 'chromium | firefox | webkit', 'Browsers to render across.'],
-        ['--color-scheme &lt;scheme&gt;', 'light | dark', 'Emulate prefers-color-scheme media query before rendering.'],
+        ['--color-scheme &lt;scheme&gt;', 'light | dark', 'Emulate prefers-color-scheme before rendering. Compares against the same baseline file as the default scheme until named capture modes exist, and warns when the stored scheme differs. The warning does not change the exit code.'],
         ['--wait-for-stability', 'boolean', 'Poll consecutive animation frames until pixel variance converges (< 0.05%) before capture.'],
         ['--redact-sensitive', 'boolean', 'Mask password/email/tel inputs and [data-frontguard-redact] elements and scrub DOM snapshots prior to capture.'],
         ['--freeze-time [timestamp]', 'boolean | number | ISO string', 'Lock page.clock and Date.now() to a fixed epoch ms or ISO 8601 timestamp (e.g., 2026-01-01T00:00:00Z).'],
@@ -550,9 +583,10 @@ $ frontguard monitor --history`,
         ['storybook', '{ url, stories?, exclude? }', 'undefined', 'Discover and render stories from a running Storybook 7/8 server.'],
         ['viewports', 'number[]', '[375, 768, 1440]', 'Viewport widths in CSS pixels.'],
         ['browsers', "Array&lt;'chromium'|'firefox'|'webkit'&gt;", "['chromium']", 'Playwright browser engines to test.'],
-        ['threshold', 'number (0-1)', '0.1', 'Changed-pixel ratio threshold (0.01 = 1%). Lower for stricter layout checks.'],
+        ['threshold', 'number (0-1)', '0.1', 'Whole-image changed-pixel ratio. 0.1 means 10% of pixels. The pixelmatch color distance is a separate hardcoded 0.1 (1 is black versus white). The Playwright per-pixel default is 0.2. A 16×16 window with more than 64 differing pixels fails even when the edit is a few percent of the image.'],
         ['ssimThreshold', 'number (0-1)', '0.98', 'SSIM fallback cutoff when ssimFallback is enabled.'],
-        ['colorScheme', "'light' | 'dark'", 'undefined', 'Emulate prefers-color-scheme during capture.'],
+        ['colorScheme', "'light' | 'dark'", 'undefined', 'Emulate prefers-color-scheme during capture. Uses the same baseline file as the default scheme unless named capture modes are configured, and warns when the stored scheme differs. The warning does not change the exit code.'],
+        ['modes', 'Record&lt;string, CaptureModeConfig&gt;', 'undefined', 'Named capture mode bundles (colorScheme, reducedMotion, forcedColors, contrast, locale, timezoneId) keyed onto baselines/&lt;route&gt;/&lt;viewport&gt;/&lt;mode&gt;/&lt;browser&gt;.png.'],
         ['waitForStability', 'boolean', 'false', 'Wait for consecutive animation frames to converge before taking the screenshot.'],
         ['redactSensitive', 'boolean', 'false', 'Mask password/email/tel inputs and [data-frontguard-redact] nodes and scrub DOM snapshots.'],
         ['freezeTime', 'boolean | number | string', 'undefined', 'Freeze page.clock and Date.now() to a fixed epoch ms or ISO 8601 date string.'],
@@ -598,7 +632,11 @@ $ frontguard monitor --history`,
     { selector: '[data-testid="live- latency-sparkline"]' },
   ],
 }`,
-    )}${h2('Optional controls')}${p(
+    )}${h2('Optional controls')}${figure(
+      '/images/docs/anti-flake-hermetic-render.jpg',
+      'Deterministic Rendering and Anti-Flake Engine',
+      'FIG 02 · DETERMINISTIC STABILIZATION GATES — CLOCK FREEZE · PRNG SEED · NETWORK GUARD · FRAME CONVERGENCE · PII REDACTION',
+    )}${p(
       'Optional controls include colorScheme (light or dark), waitForStability for multi-frame layout convergence, redactSensitive for masking password/email/token fields and scrubbing DOM snapshots, freezeTime (boolean, epoch ms number, or ISO 8601 date string), seedRandom (boolean or numeric PRNG seed), blockUrls (URL glob or substring patterns to abort before rendering), per-route actions (click, hover, fill, press, waitForSelector, wait), masks, region-scoped Chroma-SSIM (YCbCr) and CW-SSIM cluster similarity with spatial cluster.targetSelector DOM attribution, configurable multi-render consensus, telemetry opt-in, and multi-provider BYOK analysis (openai, anthropic, gemini, or custom baseUrl / FRONTGUARD_OPENAI_BASE_URL). Verify an option against the installed package version before adding it.',
     )}`,
   ),
@@ -616,6 +654,10 @@ $ frontguard monitor --history`,
       'The Playwright package stores files in __visual_baselines__ by default. Unlike ordinary CLI runs, visualTest creates a missing baseline and reports isNewBaseline: true.',
     )}${lead(
       '@frontguard/playwright lets you run perceptual visual regression assertions directly inside your existing @playwright/test suites: right after complex multi-step user journeys, authenticated session setups, or mocked network responses.',
+    )}${figure(
+      '/images/docs/playwright-storybook-workflow.jpg',
+      'Playwright and Storybook Visual Workflow',
+      'FIG 01 · @FRONTGUARD/PLAYWRIGHT & STORYBOOK — COMPONENT-SCOPED CAPTURE, SPATIAL CLUSTERS & MULTI-VIEWPORT DIFFING',
     )}${h2('Behavior')}${p(
       'When you call visualTest(page, name, options) inside a Playwright test, Frontguard captures the page (or a specific component via selector), applies any requested anti-flake overrides (freezeTime, seedRandom, blockUrls, waitForStable, redactSensitive), and compares the capture against __visual_baselines__/&lt;name&gt;-baseline.png using Pixelmatch + SSIM + 8-connected spatial diff clustering.',
     )}${h2('Example')}${code(
@@ -664,6 +706,10 @@ $ FRONTGUARD_UPDATE=1 npx playwright test`,
     ['Install', 'Configure', 'Practical test recipes', 'Review'],
     `${lead(
       'Add @frontguard/playwright to any existing @playwright/test project in two commands and start asserting component and full-page visual stability.',
+    )}${figure(
+      '/images/docs/playwright-storybook-workflow.jpg',
+      'Playwright Setup and Baseline Workflow',
+      'FIG 01 · @FRONTGUARD/PLAYWRIGHT — IN-TEST VISUAL ASSERTION & __visual_baselines__ STORAGE',
     )}${h2('Install')}${code(
       'terminal',
       `$ npm install -D @playwright/test @frontguard/playwright`,
@@ -713,6 +759,10 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
     ['Signature', 'Options', 'Result', 'Inspecting spatial clusters in tests'],
     `${lead(
       'Complete TypeScript API reference for visualTest(page, name, options), VisualTestOptions, and VisualTestResult in @frontguard/playwright.',
+    )}${figure(
+      '/images/docs/perceptual-diff-clusters.jpg',
+      'Perceptual Diff Engine and Spatial DOM-Cluster Attribution',
+      'FIG 01 · SPATIAL CLUSTERS & DOM ATTRIBUTION — PIXELMATCH, SSIM, BOUNDING BOXES & TARGET SELECTOR',
     )}${h2('Signature')}${code(
       'typescript',
       `visualTest(
@@ -721,7 +771,7 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
   options?: VisualTestOptions,
 ): Promise&lt;VisualTestResult&gt;`,
     )}${h2('Options')}${p(
-      'Options include threshold, selector (component-scoped locator capture), fullPage, mask, maskRegions, redactSensitive, waitForStable, freezeTime (boolean, epoch ms number, or ISO 8601 date string), seedRandom (boolean or numeric PRNG seed), blockUrls (URL patterns to block during capture), captureAriaSnapshot (captures Playwright ARIA tree snapshot), optional AI (openai, anthropic, gemini, or custom baseUrl), baselineDir, and update. Threshold is the fraction of pixels that may differ (0-1).',
+      'Options include threshold, selector (component-scoped locator capture), fullPage, mask, maskRegions, redactSensitive, waitForStable, freezeTime (boolean, epoch ms number, or ISO 8601 date string), seedRandom (boolean or numeric PRNG seed), blockUrls (URL patterns to block during capture), captureAriaSnapshot (stores the ARIA tree beside the PNG and diffs it as text; a mismatch does not change passed), textSnapshot (json and markdown selectors stored the same way), optional AI (openai, anthropic, gemini, or custom baseUrl), baselineDir, and update. Threshold is the fraction of pixels that may differ (0-1).',
     )}${table(
       ['Option', 'Type', 'Default', 'Description'],
       [
@@ -733,7 +783,8 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
         ['freezeTime', 'boolean | number | string', 'undefined', 'Freeze page.clock and Date.now() via epoch ms or ISO 8601 string (e.g., "2026-01-01T00:00:00Z").'],
         ['seedRandom', 'boolean | number', 'undefined', 'Override Math.random() with a deterministic Mulberry32 PRNG (true uses seed 42).'],
         ['blockUrls', 'string[]', 'undefined', 'Abort matching network requests via page.route() during capture and clean up afterward.'],
-        ['captureAriaSnapshot', 'boolean', 'false', 'Capture an accessibility ARIA role/label tree snapshot onto result.ariaSnapshot.'],
+        ['captureAriaSnapshot', 'boolean', 'false', 'Store the ARIA tree beside the PNG and diff it as text. A mismatch does not change passed. axe-core remains the accessibility plugin.'],
+        ['textSnapshot', '{ json?: string, markdown?: string }', 'undefined', 'Selectors whose text is stored as .json or .md beside the PNG. A mismatch does not change passed.'],
         ['mask', 'string[]', 'undefined', 'CSS selectors to cover with solid neutral boxes before screenshot capture.'],
         ['maskRegions', 'Array&lt;{ x, y, width, height }&gt;', 'undefined', 'Explicit pixel bounding boxes to mask out of comparison.'],
         ['ai', "boolean | { provider: 'openai'|'anthropic'|'gemini', model?, baseUrl? }", 'false', 'Run optional BYOK vision analysis when a diff exceeds threshold.'],
@@ -756,6 +807,7 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
         ['settled', 'boolean | undefined', 'Whether captures converged within maxAttempts; present when waitForStable is enabled.'],
         ['blockedRequestsCount', 'number', 'Number of network requests aborted by blockUrls.'],
         ['ariaSnapshot', 'string', 'Playwright ARIA tree YAML/text snapshot when captureAriaSnapshot: true.'],
+        ['textSnapshots', "Array<{ kind, status, path, excerpt? }>", 'Text diff beside the PNG. status is match, mismatch, new, or error. A mismatch excerpt does not change passed.'],
         ['ai', '{ classification: string, severity: string, explanation: string } | undefined', 'Optional vision model triage result when ai is enabled and a diff occurred.'],
       ],
     )}${h2('Inspecting spatial clusters in tests')}${code(
@@ -788,6 +840,10 @@ test('checkout summary layout stays locked', async ({ page }) =&gt; {
     ['Supported path', 'Two-lane governance', 'Output', 'Action status'],
     `${lead(
       'Run the CLI in any Node-based CI environment after the target application or preview URL is reachable. Keep ordinary pull-request jobs comparison-only and update baselines in a separate, explicit workflow.',
+    )}${figure(
+      '/images/docs/ci-cd-github-actions-flow.jpg',
+      'CI/CD Two-Lane Baseline Governance',
+      'FIG 01 · TWO-LANE CI/CD GOVERNANCE — LANE 1 PR COMPARISON (READ-ONLY) VS LANE 2 EXPLICIT BASELINE PROMOTION',
     )}${h2('Supported path')}${p(
       'Frontguard is designed around a strict separation between comparing screenshots on a Pull Request and promoting new baselines:',
     )}${h2('Two-lane governance')}${table(
@@ -803,7 +859,7 @@ test('checkout summary layout stays locked', async ({ page }) =&gt; {
           'Lane 2: Explicit Baseline Promotion',
           'workflow_dispatch (manual) or local developer terminal',
           'contents: write',
-          'Runs frontguard update-baselines after human review and pushes the updated manifest and deduplicated PNGs to origin/frontguard-baselines.',
+          'Runs frontguard update-baselines --confirm-baselines after human review and pushes the updated manifest and deduplicated PNGs to origin/frontguard-baselines.',
         ],
       ],
     )}${h2('Output')}${p(
@@ -830,6 +886,10 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
       'The external consumer smoke is pending, so there is no public copy-ready Action workflow yet. Use the generated CLI workflow until publication, tag advancement, and both smoke controls pass.',
     )}${lead(
       'For production repositories today, use the direct CLI workflow generated by frontguard init --ci (documented in the GitHub Actions guide). This page documents the repository-root composite action.yml contract and its permissions.',
+    )}${figure(
+      '/images/docs/ci-cd-github-actions-flow.jpg',
+      'GitHub Actions Two-Lane Baseline Governance',
+      'FIG 01 · GITHUB ACTIONS WORKFLOW — FETCH ORIGIN/FRONTGUARD-BASELINES, COMPARE IN PR, PROMOTE EXPLICITLY',
     )}${h2('Release status')}${p(
       'The repo-root action.yml is the future marketplace consumer shim. It requires contents: write only when update-baselines is true; PR reporting requires pull-requests: write. Default actions/checkout fetch-depth: 1 does not retrieve the frontguard-baselines orphan branch; the Action fetches that ref before comparing.',
     )}${h2('Permissions')}${table(
@@ -840,7 +900,9 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
         ['pull-requests: write', 'Optional PR summary comments', 'Allows posting or updating the markdown diff summary table on the Pull Request.'],
       ],
     )}${h2('Baseline updates')}${p(
-      'Updated baselines still require the workflow to push frontguard-baselines in explicit update mode. Do not infer that the public v0 ref has passed this journey until the external smoke test is recorded.',
+      'Updated baselines still require the workflow to push frontguard-baselines in explicit update mode. Do not infer that the public v0 ref has passed this journey until the external smoke test is recorded. merge_group never writes baselines, even when allow-baseline-writes is true, and the Action renders every route for that event.',
+    )}${p(
+      'Use on: [pull_request, merge_group] with an identical job name. A workflow-level paths: filter on a required check leaves the queue pending. Queue runs compare against the shared latest baseline until #306. Capture the PR head SHA and check out with fetch-depth: 0, which is the history smartFilter needs for git diff base...HEAD.',
     )}${p(
       'For a copy-ready GitHub Actions workflow using the published CLI today, see ' +
         a('/docs/guides/github-actions', 'Guides: GitHub Actions') +
@@ -861,6 +923,10 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
       'Model-assisted analysis is not required for local pixel comparison. Screenshot evidence is sent directly to the provider account you configure.',
     )}${lead(
       'When a route exceeds your pixel or SSIM threshold, Frontguard can send cropped visual evidence (baseline, current, diff, and spatial cluster selectors) to your configured vision model to classify the change and explain what shifted.',
+    )}${figure(
+      '/images/docs/perceptual-diff-clusters.jpg',
+      'Perceptual Diff Engine and Spatial DOM-Cluster Attribution',
+      'FIG 01 · PERCEPTUAL DIFF & DOM ATTRIBUTION — CHROMA-SSIM, WAVELET CW-SSIM, 8-CONNECTED CLUSTERS & SANDBOX VERIFICATION',
     )}${h2('Scope')}${p(
       'Changed screenshots can be classified as regression, intentional, or content_update with a confidence score and explanation. AI analysis runs on every diff above threshold to explain visual changes, classify severity, and suggest candidate CSS fixes. AI annotations are advisory and never silently override pass/fail exit codes.',
     )}${h2('Providers')}${p(
@@ -915,6 +981,10 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
       'Suggestion generation and sandbox verification are separate opt-ins. Suggestions can exist without verification.',
     )}${lead(
       'Frontguard can propose minimal CSS patches for detected layout regressions, test those candidate rules by injecting them into a live browser sandbox, and store accepted patterns locally in .frontguard/fix-patterns.json.',
+    )}${figure(
+      '/images/docs/closed-loop-ai-fix-sandbox.jpg',
+      'Closed-Loop AI CSS Fix and Sandbox Verification Engine',
+      'FIG 01 · CLOSED-LOOP AI CSS FIX — SPATIAL CLUSTER CONTEXT · MULTI-PROVIDER BYOK · SANDBOX RE-RENDER & PATTERN STORE',
     )}${h2('Experimental status')}${p(
       'By default, Frontguard only performs pixel and perceptual SSIM comparison. Enabling generateFixes asks the vision model for a targeted CSS rule grounded on the regressed cluster selector (cluster.targetSelector). Enabling verifyFixes opens a sandbox page, injects the candidate CSS rule, re-captures the screenshot, and re-runs the diff against your baseline.',
     )}${code(
@@ -961,7 +1031,11 @@ $ npx -p @frontguard/cli frontguard export-patterns &gt; .frontguard/shared-patt
       'OPTIONAL PLUGIN.',
       'The accessibility plugin depends on @axe-core/playwright and reports automated findings alongside a run.',
     )}${lead(
-      'Run automated axe-core accessibility checks alongside visual regression screenshots. The plugin audits captured route/viewport pairs in fresh Chromium pages after rendering.',
+      'Run automated axe-core accessibility checks alongside visual regression screenshots. The plugin audits captured route/viewport pairs in Chromium pages that use the same storage state, color scheme, viewport height, wait, and route actions as the capture.',
+    )}${figure(
+      '/images/docs/plugin-lifecycle-audits.jpg',
+      '9-Hook Plugin Architecture and WCAG Accessibility Audits',
+      'FIG 01 · UNIFIED RENDER AUDITS — @AXE-CORE/PLAYWRIGHT WCAG CHECKS IN THE AFTERRENDER HOOK',
     )}${h2('Status')}${p(
       'Install the optional dependency and import the plugin from @frontguard/cli/plugins. Automated axe results do not establish WCAG conformance and do not replace keyboard or assistive-technology review.',
     )}${h2('Use')}${code(
@@ -1008,6 +1082,10 @@ export default {
       'The plugin can collect and report selected metrics, but its failOnBudgetExceeded path is not a verified standalone CI gate in the current release.',
     )}${lead(
       'Report navigation timing, estimated LCP/CLS, resource transfer weight and request counts from captured routes. FCP is not a supported budget.',
+    )}${figure(
+      '/images/docs/plugin-lifecycle-audits.jpg',
+      '9-Hook Plugin Architecture and Performance Budgets',
+      'FIG 01 · UNIFIED RENDER AUDITS — CORE WEB VITALS (LCP, CLS, TTFB) IN THE SAME RENDER PASS',
     )}${h2('Experimental status')}${p(
       'Because Frontguard already boots Chromium and waits for network and frame convergence on every route, the performance budget plugin reads browser performance entries in the afterRender hook without launching a separate Lighthouse process.',
     )}${h2('Collecting Web Vitals in afterRender')}${code(
@@ -1056,6 +1134,10 @@ export default {
       'The plugin inventories third-party script origins and compares the stored inventory between runs.',
     )}${lead(
       'Track every external &lt;script src&gt; origin loaded across your routes and spot unexpected third-party marketing tags, chat widgets, or supply-chain drift alongside visual diffs.',
+    )}${figure(
+      '/images/docs/plugin-lifecycle-audits.jpg',
+      '9-Hook Plugin Architecture and Third-Party Script Inventory',
+      'FIG 01 · UNIFIED RENDER AUDITS — THIRD-PARTY SCRIPT ORIGIN INVENTORY & DRIFT DETECTION',
     )}${h2('Import')}${code(
       'frontguard.config.ts',
       `import { createThirdPartyScriptPlugin } from '@frontguard/cli/plugins'
@@ -1099,6 +1181,10 @@ export default {
       'The implemented path is frontguard monitor run by your own process, cron, or CI. A managed cloud scheduler is not generally available.',
     )}${lead(
       'Use frontguard monitor to run synthetic visual checks against live production or staging URLs, record timestamped run history on disk, and dispatch webhook alerts when visual drift exceeds your threshold.',
+    )}${figure(
+      '/images/docs/production-monitoring-daemon.jpg',
+      'Frontguard Monitor Production Monitoring and Alert Pipeline',
+      'FIG 01 · PRODUCTION MONITORING PIPELINE — CRON/DAEMON TRIGGER · HERMETIC CAPTURE · FLAKE TRACKER · HISTORY & WEBHOOKS',
     )}${h2('Local CLI')}${code(
       'terminal',
       `$ frontguard monitor --url https://example.com --threshold 0.05 --once
@@ -1154,6 +1240,10 @@ jobs:
     ['Current status', 'Required URL', 'API endpoints overview', 'Production warning'],
     `${cloudNotice}${lead(
       'The repository includes the Hono + Cloudflare Workers + D1 + R2 source code under packages/cloud-api for engineering evaluation and contract testing.',
+    )}${figure(
+      '/images/docs/git-cas-storage.jpg',
+      'Zero-Pollution Git Orphan and Cloud CAS Storage',
+      'FIG 01 · BASELINE STORAGE ARCHITECTURE — STAGE 1 GIT ORPHAN BRANCH (frontguard-baselines) & STAGE 3 CLOUD R2 CAS (/v1/cas)',
     )}${h2('Current status')}${p(
       'Cloudflare Worker, D1, and R2 source exists for development and contract evaluation. api.frontguard.dev is not a working hosted default.',
     )}${h2('Required URL')}${code(
@@ -1188,6 +1278,10 @@ FRONTGUARD_API_KEY=fg_live_your_token_here`,
     ['Interface', 'Lifecycle', 'Practical plugin examples', 'Compatibility'],
     `${lead(
       'Extend the CLI pipeline by selecting authentication storage state before rendering, transforming captured results, or sending a report after a run.',
+    )}${figure(
+      '/images/docs/plugin-lifecycle-audits.jpg',
+      '9-Hook Plugin Execution Pipeline',
+      'FIG 01 · 9-HOOK PLUGIN PIPELINE — SETUP · DISCOVER · RENDER · COMPARE · RUN · ERROR & REVERSE TEARDOWN',
     )}${h2('Interface')}${p(
       'Plugins are objects implementing FrontguardPlugin. Import that type from @frontguard/cli/plugins to check hook arguments and return values against your installed version.',
     )}${h2('Lifecycle')}${p(
@@ -1272,6 +1366,10 @@ export default {
       'Build against the FrontguardPlugin interface from the CLI version you install.',
     )}${lead(
       'Write a TypeScript factory returning a FrontguardPlugin object. Frontguard does not operate a plugin registry or compatibility certification service.',
+    )}${figure(
+      '/images/docs/plugin-lifecycle-audits.jpg',
+      'Plugin Scaffolder and 9-Hook Architecture',
+      'FIG 01 · CREATE-FRONTGUARD-PLUGIN — BASIC, LIFECYCLE & REPORTER TEMPLATES ACROSS 9 PIPELINE HOOKS',
     )}${h2('Current status')}${p(
       'Use the public interfaces exported by your installed CLI, add tests in the plugin repository, and follow the npm publishing process you independently verify.',
     )}${h2('Authoring a typed plugin package')}${code(
@@ -1310,6 +1408,10 @@ export function createStorageStatePlugin(options: StorageStateOptions): Frontgua
     ['Generated workflow', 'Complete PR workflow YAML', 'Baseline workflow', 'Composite Action'],
     `${lead(
       'Set up two-lane visual regression governance in GitHub Actions: a read-only Pull Request check that compares against origin/frontguard-baselines, and an explicit manual workflow for promoting new baselines.',
+    )}${figure(
+      '/images/docs/ci-cd-github-actions-flow.jpg',
+      'GitHub Actions Two-Lane Baseline Governance',
+      'FIG 01 · TWO-LANE CI/CD GOVERNANCE — COMPARISON-ONLY PR WORKFLOW & EXPLICIT BASELINE PROMOTION',
     )}${h2('Generated workflow')}${p(
       'frontguard init --ci generates a comparison-only workflow that invokes the CLI directly, uses contents: read, and uploads the HTML artifact. Configure FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY only if optional analysis is enabled.',
     )}${p(
@@ -1361,7 +1463,7 @@ jobs:
           name: frontguard-report
           path: frontguard-report/`,
     )}${h2('Baseline workflow')}${p(
-      'Baseline acceptance belongs in a separate explicit workflow: run frontguard update-baselines, review the result, then push frontguard-baselines.',
+      'Baseline acceptance belongs in a separate explicit workflow: run frontguard update-baselines --confirm-baselines, review the result, then push frontguard-baselines.',
     )}${code(
       '.github/workflows/frontguard-update-baselines.yml: Lane 2: Explicit Baseline Promotion',
       `name: Update Frontguard Baselines
@@ -1391,10 +1493,31 @@ jobs:
           npm run build
           npm run start &amp;
           npx wait-on http://localhost:3000 --timeout 60000
-          npx -p @frontguard/cli frontguard update-baselines
+          npx -p @frontguard/cli frontguard update-baselines --confirm-baselines
           git push origin frontguard-baselines:frontguard-baselines`,
     )}${h2('Composite Action')}${p(
       'The generated workflow and the repository composite Action are separate surfaces. The public Action remains pre-release pending an external consumer smoke test.',
+    )}${h2('Merge queue')}${p(
+      'Register pull_request and merge_group on the same workflow with an identical job name. GitHub waits for that name before merging the queue.',
+    )}${code(
+      '.github/workflows/frontguard.yml: pull request and merge queue',
+      `on: [pull_request, merge_group]
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # smartFilter diffs base...HEAD. fetch-depth: 1 does not contain
+          # that base commit. Capture the PR head SHA so the checkout is the
+          # pull request head, not an unexpected merge ref.
+          fetch-depth: 0
+          ref: \${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}`,
+    )}${p(
+      'A workflow-level paths: filter on that required check skips the job when the queue commit does not touch those paths, and the queue stays pending. Do not put paths: on a required Frontguard check.',
+    )}${p(
+      'Queue runs compare against the shared latest frontguard-baselines branch until #306. They do not auto-pass. update-baselines on merge_group exits 2 and pushes nothing, even when allow-baseline-writes is true. On merge_group the Action passes --all-routes and sets FRONTGUARD_DIFF_BASE from github.event.merge_group.base_sha when that SHA is present. A queued regression still exits 1 and is written to the job summary, because the payload has no pull request number.',
     )}`,
   ),
 
@@ -1411,10 +1534,14 @@ jobs:
       'Frontguard does not claim a lossless one-command BackstopJS conversion.',
     )}${lead(
       'Translate BackstopJS scenarios, viewports, selectors, and percentage thresholds into a single typed frontguard.config.ts file.',
+    )}${figure(
+      '/images/docs/migration-and-trust-boundary.jpg',
+      'Local-First Privacy Boundary and Legacy VRT Migration Workflow',
+      'FIG 01 · MIGRATION MATRIX — SCENARIOS TO ROUTES, MISMATCH THRESHOLD RATIO & GIT ORPHAN BASELINES',
     )}${h2('Scope')}${list([
       'Map scenario URLs to routes and viewport widths.',
       'Convert misMatchThreshold percentages to Frontguard ratios by dividing by 100.',
-      'Start the app, review captures, run frontguard update-baselines, and push frontguard-baselines.',
+      'Start the app, review captures, run frontguard update-baselines --confirm-baselines, and push frontguard-baselines.',
       'Keep both tools in CI until the new comparisons are independently reviewed.',
     ])}${h2('Configuration mapping')}${table(
       ['BackstopJS (backstop.json)', 'Frontguard (frontguard.config.ts)', 'Migration Notes'],
@@ -1424,7 +1551,7 @@ jobs:
         ['scenarios[].misMatchThreshold: 1.5', 'threshold: 0.015', 'Divide BackstopJS percentage (0–100) by 100 to get Frontguard ratio (0–1).'],
         ['scenarios[].hideSelectors / removeSelectors', 'ignore: [{ selector: ".ad-banner" }]', 'Masks volatile DOM elements before capture.'],
         ['scenarios[].readySelector / delay', 'actions: [{ type: "waitForSelector", selector }, { type: "wait", ms }]', 'Combine with waitForStability: true for automatic frame convergence.'],
-        ['bitmaps_reference/', 'frontguard-baselines git orphan branch', 'Managed via frontguard update-baselines; keeps main branch free of PNG blobs.'],
+        ['bitmaps_reference/', 'frontguard-baselines git orphan branch', 'Managed via frontguard update-baselines --confirm-baselines; keeps main branch free of PNG blobs.'],
       ],
     )}${code(
       'Before (backstop.json) vs After (frontguard.config.ts)',
@@ -1444,7 +1571,7 @@ export default {
   waitForStability: true,
 }`,
     )}${h2('Baseline migration')}${p(
-      'Because BackstopJS uses its own Puppeteer/Playwright viewport framing and reference directory structure, do not copy old bitmaps_reference PNGs directly. Instead, boot your application, run frontguard update-baselines once to establish fresh Chromium baselines, inspect them, and push frontguard-baselines.',
+      'Because BackstopJS uses its own Puppeteer/Playwright viewport framing and reference directory structure, do not copy old bitmaps_reference PNGs directly. Instead, boot your application, run frontguard update-baselines --confirm-baselines once to establish fresh Chromium baselines, inspect them, and push frontguard-baselines.',
     )}${h2('Thresholds')}${p(
       'BackstopJS expresses misMatchThreshold on a 0–100 percentage scale (where 0.1 means 0.1%), whereas Frontguard uses a 0–1 ratio scale (where 0.001 means 0.1% and 0.01 means 1%). Always divide your BackstopJS threshold by 100.',
     )}`,
@@ -1463,6 +1590,10 @@ export default {
       'Frontguard does not import hosted review history or automatically approve Lost Pixel snapshots.',
     )}${lead(
       'Migrate pageShots and storybookShots from lostpixel.config.ts to Frontguard routes and Storybook discovery.',
+    )}${figure(
+      '/images/docs/migration-and-trust-boundary.jpg',
+      'Local-First Privacy Boundary and Lost Pixel Migration Workflow',
+      'FIG 01 · MIGRATION MATRIX — PAGE & STORYBOOK ROUTES, VIEWPORTS & EXPLICIT BASELINE ACCEPTANCE',
     )}${h2('Scope')}${list([
       'Map page and Storybook captures to Frontguard routes.',
       'Configure viewports and thresholds explicitly.',
@@ -1491,7 +1622,7 @@ export default {
   waitForStability: true,
 }`,
     )}${h2('Baseline migration')}${p(
-      'Start your application (and Storybook if configured), run frontguard update-baselines, inspect the generated captures, and push origin/frontguard-baselines.',
+      'Start your application (and Storybook if configured), run frontguard update-baselines --confirm-baselines, inspect the generated captures, and push origin/frontguard-baselines.',
     )}${h2('Cutover')}${p(
       'Once your pull-request workflow passes cleanly against frontguard-baselines, remove the legacy Lost Pixel workflow and .lostpixel baseline directory.',
     )}`,
@@ -1507,6 +1638,10 @@ export default {
     ['Configuration', 'Tools', 'Agentic debugging workflow', 'Approval limit'],
     `${cloudNotice}${lead(
       '@frontguard/mcp gives coding agents structured access to local visual regression reports, DOM clusters and CSS patch validation. Reading local reports needs no cloud account or API key.',
+    )}${figure(
+      '/images/docs/mcp-visual-cortex.jpg',
+      'Frontguard MCP Agentic Visual Cortex Architecture',
+      'FIG 01 · @FRONTGUARD/MCP — 8-TOOL AGENTIC VISUAL CORTEX OVER STDIO JSON-RPC (LOCAL REPORT & CLOUD API MODES)',
     )}${h2('Configuration')}${p(
       'From your project directory, start the app and prepare reviewed baselines first. JSON output goes to stdout, so create the report directory and redirect it into the file MCP will read:',
     )}${code(
@@ -1529,7 +1664,7 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
   }
 }`,
     )}${p(
-      'Cloud-dependent tools require an independently verified FRONTGUARD_API_URL deployment and FRONTGUARD_API_KEY; no working hosted default is supplied.',
+      'Cloud-dependent tools require an independently verified FRONTGUARD_API_URL deployment and FRONTGUARD_API_KEY; no working hosted default is supplied. The package ships an MCP Registry server.json manifest under io.github.ravidsrk/frontguard and negotiates both 2025-11-25 and 2026-07-28 MCP protocol versions.',
     )}${h2('Tools')}${table(
       ['MCP Tool Name', 'Required Arguments', 'What It Returns to the Coding Agent'],
       [
@@ -1540,6 +1675,7 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
         ['promote_baseline', 'run_id, confirm_reviewed: true; optional routes', 'Cloud API mode only: records reviewed run approval. Refuses local-report mode; does not promote cloud PNGs.'],
         ['accept_baseline', 'run_id, confirm_all_regressions_reviewed: true', 'Records whole-run approval metadata in the local JSON report or Cloud API; does not replace screenshot baselines.'],
         ['recent_runs', 'optional repo, branch, limit', 'Lists runs, including the local run ID when reading a JSON report.'],
+        ['list_horizontal_overflow', 'optional run_id', 'Lists horizontal overflow from the JSON report. A flagged row is a visible unclipped box past the right edge. It does not change the pixel result.'],
       ],
     )}${h2('Agentic debugging workflow')}${steps([
       {
@@ -1555,7 +1691,7 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
         body: 'Call verify_css_patch with diff_id, css_patch and target_selector. Apply the reviewed code edit yourself and re-run Frontguard; CSS validation alone is not visual verification.',
       },
     ])}${h2('Approval limit')}${p(
-      'Local-report mode cannot replace PNG baselines. accept_baseline can mark the JSON report approved, but a human reviewer uses frontguard update-baselines to accept local screenshots. Cloud tools record approval metadata only, with explicit confirmation; cloud screenshot promotion is not implemented.',
+      'MCP promotion is refused in local-report mode and does not write the frontguard-baselines branch. The local write is the CLI command frontguard update-baselines --confirm-baselines, which a human runs. An agent setting confirm_reviewed: true on itself is not a human review, and an advisory caption cannot set that flag. Cloud approveRun is not a production path; do not point the MCP client at a production host. accept_baseline can mark a JSON report approved, but it does not replace screenshot baselines. Cloud tools record approval metadata only; cloud screenshot promotion is not implemented.',
     )}`,
   ),
 
@@ -1572,6 +1708,10 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
       'The CLI includes Storybook index discovery and play-function-aware capture, but the public integration journey has not been externally acceptance-tested.',
     )}${lead(
       'Point Frontguard at a running Storybook 7 or 8 server to automatically discover stories from /index.json and render each story iframe across your configured viewports.',
+    )}${figure(
+      '/images/docs/playwright-storybook-workflow.jpg',
+      'Playwright and Storybook Visual Workflow',
+      'FIG 01 · @FRONTGUARD/PLAYWRIGHT & STORYBOOK — COMPONENT-SCOPED CAPTURE, SPATIAL CLUSTERS & MULTI-VIEWPORT DIFFING',
     )}${h2('Implemented source')}${p(
       'When storybook.url is configured in frontguard.config.ts, Frontguard fetches /index.json (or legacy /stories.json), constructs isolated iframe URLs (/iframe.html?id=&lt;storyId&gt;&viewMode=story), and renders each story through the standard Playwright worker pool.',
     )}${h2('Configuration')}${code(
@@ -1611,6 +1751,10 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
     ['Status', 'Testing Netlify preview URLs with the CLI', 'Cloud requirement'],
     `${integrationNotice}${cloudNotice}${lead(
       'How to run the supported @frontguard/cli against Netlify Deploy Previews today, and the status of the checked-in Netlify build plugin source.',
+    )}${figure(
+      '/images/docs/ci-cd-github-actions-flow.jpg',
+      'CI/CD Preview URL Comparison Workflow',
+      'FIG 01 · PREVIEW DEPLOYMENT COMPARISON — COMPARE AGAINST FRONTGUARD-BASELINES WITHOUT AUTO-MUTATION',
     )}${h2('Status')}${p(
       'The checked-in Netlify plugin source is for evaluation. No marketplace listing or production PR-comment journey is claimed.',
     )}${h2('Testing Netlify preview URLs with the CLI')}${p(
@@ -1634,6 +1778,10 @@ $ npx -p @frontguard/cli frontguard run --url "$DEPLOY_PRIME_URL" --wait-for-sta
     ['Status', 'Using Slack webhooks with frontguard monitor', 'Cloud requirement'],
     `${integrationNotice}${cloudNotice}${lead(
       'Forward monitor alerts to a Slack Incoming Webhook through an adapter that translates the Frontguard JSON payload into a Slack message.',
+    )}${figure(
+      '/images/docs/production-monitoring-daemon.jpg',
+      'Production Monitoring and Slack Webhook Dispatch',
+      'FIG 01 · ALERT DISPATCH PIPELINE — THRESHOLD BREACH PAYLOADS, SNOOZE WINDOWS & SLACK NOTIFICATIONS',
     )}${h2('Status')}${p(
       'The checked-in Slack worker and OAuth source are for evaluation. No installed public app, durable alert delivery, or support commitment is claimed.',
     )}${h2('Using Slack webhooks with frontguard monitor')}${p(
@@ -1695,6 +1843,10 @@ createServer(async (req, res) =&gt; {
     ['Status', 'Testing Vercel preview URLs in GitHub Actions', 'Cloud requirement'],
     `${integrationNotice}${cloudNotice}${lead(
       'Compare Vercel preview deployments against your frontguard-baselines branch using the standard CLI in GitHub Actions.',
+    )}${figure(
+      '/images/docs/ci-cd-github-actions-flow.jpg',
+      'CI/CD Preview URL Comparison Workflow',
+      'FIG 01 · PREVIEW DEPLOYMENT COMPARISON — COMPARE VERCEL PREVIEW URLS AGAINST FRONTGUARD-BASELINES',
     )}${h2('Status')}${p(
       'The checked-in Vercel integration source is for evaluation. No marketplace installation or automatic hosted rendering journey is claimed.',
     )}${h2('Testing Vercel preview URLs in GitHub Actions')}${p(
@@ -1718,6 +1870,10 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
     ['Current limitations', 'Use today'],
     `${integrationNotice}${lead(
       'Architectural status of the checked-in GitHub App source under integrations/github-app and why teams should use the direct CLI workflow in GitHub Actions today.',
+    )}${figure(
+      '/images/docs/ci-cd-github-actions-flow.jpg',
+      'GitHub Actions and Check Run Governance',
+      'FIG 01 · GITHUB CI WORKFLOW — SUPPORTED CLI WORKFLOW VS PRE-RELEASE GITHUB APP SURFACE',
     )}${h2('Current limitations')}${list([
       'Deployment events do not resume a pending Check Run.',
       'Repository config and project baseline scope are not forwarded to cloud runs.',
@@ -1742,6 +1898,10 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
     ['Scope', 'Architectural comparison', 'Choose by workflow'],
     `${comparisonNotice}${lead(
       'Compare Frontguard’s local-first MIT CLI and git orphan-branch baselines with Argos’s hosted visual review platform.',
+    )}${figure(
+      '/images/docs/migration-and-trust-boundary.jpg',
+      'Local-First Trust Boundary and SaaS VRT Comparison',
+      'FIG 01 · ARCHITECTURAL COMPARISON — LOCAL-FIRST CLI & GIT ORPHAN BASELINES VS HOSTED SAAS WORKFLOWS',
     )}${h2('Scope')}${p(
       'Argos offers a mature hosted review workflow. Frontguard currently offers a local MIT CLI with git-native baselines and optional BYOK analysis. Choose based on whether your team needs a supported hosted review surface.',
     )}${h2('Architectural comparison')}${table(
@@ -1769,6 +1929,10 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
     ['Scope', 'Architectural comparison', 'Choose by workflow'],
     `${comparisonNotice}${lead(
       'Compare BrowserStack Percy’s cloud rendering and enterprise review dashboard with Frontguard’s local-first CLI and Playwright workflows.',
+    )}${figure(
+      '/images/docs/migration-and-trust-boundary.jpg',
+      'Local-First Trust Boundary and SaaS VRT Comparison',
+      'FIG 01 · ARCHITECTURAL COMPARISON — LOCAL-FIRST CLI & GIT ORPHAN BASELINES VS HOSTED SAAS WORKFLOWS',
     )}${h2('Scope')}${p(
       "Percy is an established BrowserStack-hosted review product. Frontguard is a local CLI and does not offer Percy's mature hosted review surface. Optional model assistance is not a substitute for that operational product.",
     )}${h2('Architectural comparison')}${table(
@@ -1795,6 +1959,10 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
     ['Scope', 'Architectural comparison', 'Choose by workflow'],
     `${comparisonNotice}${lead(
       'Compare Chromatic’s hosted Storybook publishing and UI review cloud with Frontguard’s local Storybook discovery and full-app route runner.',
+    )}${figure(
+      '/images/docs/playwright-storybook-workflow.jpg',
+      'Storybook Auto-Discovery and Local CLI Workflow',
+      'FIG 01 · STORYBOOK WORKFLOW — LOCAL STORYBOOK INDEX DISCOVERY & GIT-NATIVE BASELINES',
     )}${h2('Scope')}${p(
       'Chromatic is a hosted Storybook-centered visual review product. Frontguard can discover a running Storybook but remains a local CLI workflow without an equivalent hosted review service.',
     )}${h2('Architectural comparison')}${table(
@@ -1823,6 +1991,10 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
       'The local CLI needs no Frontguard service. Cloud source is included, but there is no supported one-command production self-host path.',
     )}${lead(
       'Remember that @frontguard/cli, @frontguard/playwright, and @frontguard/mcp (in local report mode) require zero servers or cloud backends. This page documents the optional packages/cloud-api source for engineers evaluating self-hosted Cloudflare Workers.',
+    )}${figure(
+      '/images/docs/self-host-cloud-topology.jpg',
+      'Cloud API, Docker Renderer and NPM Distribution Topology',
+      'FIG 01 · SELF-HOST EVALUATION TOPOLOGY — CLOUDFLARE WORKER API, D1, R2 CAS & PINNED DOCKER RENDERER',
     )}${h2('Current status')}${p(
       'The Compose build is not a verified clean-checkout flow and fails before the API starts because its package-scoped build context cannot access the repository OpenAPI sync script.',
     )}${h2('Architecture components')}${table(
@@ -1850,6 +2022,10 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
       'Fix generation and verification are separate opt-ins. Local and Daytona backends do not establish cross-host render equivalence.',
     )}${lead(
       'When generateFixes and verifyFixes are enabled at the config top level and ai is configured, Frontguard tests candidate CSS patches in an isolated browser render before reporting them as Verified or Unverified.',
+    )}${figure(
+      '/images/docs/closed-loop-ai-fix-sandbox.jpg',
+      'Closed-Loop AI CSS Fix and Sandbox Verification Engine',
+      'FIG 01 · FIX-VERIFICATION SANDBOX — CANDIDATE CSS INJECTION, RE-RENDER & BASELINE RE-COMPARISON',
     )}${h2('Experimental status')}${p(
       'Verification applies a candidate patch, re-renders, and compares that result against the baseline. Verified and Unverified are observations from that run, not correctness guarantees.',
     )}${h2('How CSS patch verification works')}${steps([
@@ -1889,6 +2065,10 @@ $ npx -p @frontguard/cli frontguard run --url "https://my-app-git-feat-branch.ve
       'The renderer is currently repository-source-only: no public image or cross-host byte-equivalence result is published.',
     )}${lead(
       'Because macOS CoreText and Linux FreeType rasterize fonts differently, teams comparing baselines across macOS laptops and Linux CI runners can build the local linux/amd64 Docker renderer from source.',
+    )}${figure(
+      '/images/docs/anti-flake-hermetic-render.jpg',
+      'Deterministic Rendering and Anti-Flake Engine',
+      'FIG 01 · DETERMINISTIC STABILIZATION GATES — CLOCK FREEZE · PRNG SEED · NETWORK GUARD · FRAME CONVERGENCE · PII REDACTION',
     )}${h2('Current status')}${p(
       'From a clean clone, run the complete preparation sequence below at the repository root. The Dockerfile requires the renamed npm pack tarball in its build context.',
     )}${h2('Local build')}${code(
@@ -1919,6 +2099,10 @@ $ docker image inspect frontguard/render:0.2.3`,
     ['npm registry', 'Package inventory', 'Repository manifests', 'Release status'],
     `${lead(
       'The supported distribution surface is the published npm package line. Repository manifests for Actions and integrations are available for evaluation, but marketplace and hosted onboarding remain pre-release.',
+    )}${figure(
+      '/images/docs/self-host-cloud-topology.jpg',
+      'NPM Package Line and Repository Distribution Topology',
+      'FIG 01 · DISTRIBUTION TOPOLOGY — PUBLISHED MIT NPM PACKAGES (@FRONTGUARD/CLI, PLAYWRIGHT, MCP & CREATE-PLUGIN)',
     )}${h2('npm registry')}${code(
       'terminal',
       `$ npm install -D @frontguard/cli
@@ -1952,6 +2136,10 @@ $ npx -y @frontguard/mcp  # works locally with FRONTGUARD_LOCAL_REPORT or requir
       'The published result is a local execution snapshot, not an AI-accuracy or cross-platform benchmark.',
     )}${lead(
       'Frontguard publishes raw validation artifacts in validation/results-v0.2.md rather than unverified marketing percentages.',
+    )}${figure(
+      '/images/docs/html-workbench-4mode-inspector.jpg',
+      'Interactive 4-Mode HTML Visual Diff Workbench',
+      'FIG 01 · LOCAL VALIDATION EVIDENCE — DETERMINISTIC PIXEL & SSIM COMPARISON ARTIFACTS',
     )}${h2('Published run')}${code(
       'validation/results-v0.2.md',
       `39 / 43 route rechecks completed
