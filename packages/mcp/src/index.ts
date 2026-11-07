@@ -163,120 +163,7 @@ export function mcpWritesEnabled(env: NodeJS.ProcessEnv = process.env): boolean 
   return env.FRONTGUARD_MCP_WRITES === '1';
 }
 
-/**
- * Build a fresh {@link McpServer} with Frontguard tools registered.
- * Exported so tests can drive it without spawning a subprocess.
- */
-export function createServer(): McpServer {
-  const server = new McpServer(
-    { name: SERVER_NAME, version: SERVER_VERSION },
-    {
-      capabilities: { tools: {} },
-      instructions: serverInstructions(),
-    },
-  );
-
-  server.registerTool(
-    'list_regressions',
-    {
-      ...readOnlyAnnotations('List regressions for a PR'),
-      description:
-        'Return the visual regressions Frontguard detected on a given GitHub PR (or run id). Each row carries a `diffId` you can pass to `get_suggested_fix`.',
-      inputSchema: listRegressionsInputSchema,
-      outputSchema: listRegressionsOutputSchema,
-    },
-    async (args) => withCloudClient(async (client) => listRegressions(client, args)),
-  );
-
-  server.registerTool(
-    'list_horizontal_overflow',
-    {
-      ...readOnlyAnnotations('List horizontal overflow'),
-      description:
-        'List horizontal overflow from a run. A flagged row is a visible unclipped box past the right edge, with selector and pixels. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code.',
-      inputSchema: listHorizontalOverflowInputSchema,
-      outputSchema: listHorizontalOverflowOutputSchema,
-    },
-    async (args) => withCloudClient(async (client) => listHorizontalOverflow(client, args)),
-  );
-
-  server.registerTool(
-    'get_suggested_fix',
-    {
-      ...readOnlyAnnotations('Get the suggested fix for a diff'),
-      description:
-        'Return the AI-generated patch for a single diff (keyed by the `diffId` from `list_regressions`).',
-      inputSchema: getSuggestedFixInputSchema,
-      outputSchema: getSuggestedFixOutputSchema,
-    },
-    async (args) => withCloudClient(async (client) => getSuggestedFix(client, args)),
-  );
-
-  if (mcpWritesEnabled()) {
-    server.registerTool(
-      'accept_baseline',
-      {
-        ...destructiveAnnotations('Record whole-run baseline approval'),
-        description:
-          'Record run-scoped whole-run approval after `confirm_all_regressions_reviewed: true`. Screenshot promotion is not implemented yet; use the CLI or composite Action to update baselines.',
-        inputSchema: acceptBaselineInputSchema,
-        outputSchema: acceptBaselineOutputSchema,
-      },
-      async (args) => withCloudClient(async (client) => acceptBaseline(client, args)),
-    );
-  }
-
-  server.registerTool(
-    'recent_runs',
-    {
-      ...readOnlyAnnotations('List recent Frontguard runs'),
-      description:
-        'List the most recent runs the API key has access to. Optional `repo` and `branch` filters narrow the results.',
-      inputSchema: recentRunsInputSchema,
-      outputSchema: recentRunsOutputSchema,
-    },
-    async (args) => withCloudClient(async (client) => recentRuns(client, args)),
-  );
-
-  server.registerTool(
-    'inspect_diff_cluster_dom',
-    {
-      ...readOnlyAnnotations('Inspect diff cluster and grounded DOM target'),
-      description:
-        'Inspect a specific visual regression diff cluster, returning its bounding box, AI classification, suggested fix, and grounded DOM target selector.',
-      inputSchema: inspectDiffClusterDomInputSchema,
-      outputSchema: inspectDiffClusterDomOutputSchema,
-    },
-    async (args) => withCloudClient(async (client) => inspectDiffClusterDom(client, args)),
-  );
-
-  server.registerTool(
-    'verify_css_patch',
-    {
-      ...readOnlyAnnotations('Verify a candidate CSS patch before applying'),
-      description:
-        'Validate a candidate CSS patch against a visual regression diff for syntax correctness, target selector alignment, and layout-destroying properties.',
-      inputSchema: verifyCssPatchInputSchema,
-      outputSchema: verifyCssPatchOutputSchema,
-    },
-    async (args) => withCloudClient(async (client) => verifyCssPatch(client, args)),
-  );
-
-  if (mcpWritesEnabled()) {
-    server.registerTool(
-      'promote_baseline',
-      {
-        ...destructiveAnnotations('Promote reviewed visual baselines'),
-        description:
-          'Promote reviewed visual changes to baseline after `confirm_reviewed: true`, optionally scoped to specific routes.',
-        inputSchema: promoteBaselineInputSchema,
-        outputSchema: promoteBaselineOutputSchema,
-      },
-      async (args) => withCloudClient(async (client) => promoteBaseline(client, args)),
-    );
-  }
-
-  const instructions = serverInstructions();
+function registerProtocolHandlers(server: McpServer, instructions: string): void {
   const serverCapabilities = { tools: { listChanged: true } } as const;
 
   // Negotiate both 2025-11-25 and 2026-07-28 on `initialize`
@@ -318,7 +205,129 @@ export function createServer(): McpServer {
       ...(instructions ? { instructions } : {}),
     };
   });
+}
 
+function registerCoreTools(server: McpServer, writesEnabled: boolean): void {
+  server.registerTool(
+    'list_regressions',
+    {
+      ...readOnlyAnnotations('List regressions for a PR'),
+      description:
+        'Return the visual regressions Frontguard detected on a given GitHub PR (or run id). Each row carries a `diffId` you can pass to `get_suggested_fix`.',
+      inputSchema: listRegressionsInputSchema,
+      outputSchema: listRegressionsOutputSchema,
+    },
+    async (args) => withCloudClient(async (client) => listRegressions(client, args)),
+  );
+
+  server.registerTool(
+    'list_horizontal_overflow',
+    {
+      ...readOnlyAnnotations('List horizontal overflow'),
+      description:
+        'List horizontal overflow from a run. A flagged row is a visible unclipped box past the right edge, with selector and pixels. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code.',
+      inputSchema: listHorizontalOverflowInputSchema,
+      outputSchema: listHorizontalOverflowOutputSchema,
+    },
+    async (args) => withCloudClient(async (client) => listHorizontalOverflow(client, args)),
+  );
+
+  server.registerTool(
+    'get_suggested_fix',
+    {
+      ...readOnlyAnnotations('Get the suggested fix for a diff'),
+      description:
+        'Return the AI-generated patch for a single diff (keyed by the `diffId` from `list_regressions`).',
+      inputSchema: getSuggestedFixInputSchema,
+      outputSchema: getSuggestedFixOutputSchema,
+    },
+    async (args) => withCloudClient(async (client) => getSuggestedFix(client, args)),
+  );
+
+  if (writesEnabled) {
+    server.registerTool(
+      'accept_baseline',
+      {
+        ...destructiveAnnotations('Record whole-run baseline approval'),
+        description:
+          'Record run-scoped whole-run approval after `confirm_all_regressions_reviewed: true`. Screenshot promotion is not implemented yet; use the CLI or composite Action to update baselines.',
+        inputSchema: acceptBaselineInputSchema,
+        outputSchema: acceptBaselineOutputSchema,
+      },
+      async (args) => withCloudClient(async (client) => acceptBaseline(client, args)),
+    );
+  }
+}
+
+function registerExtendedTools(server: McpServer, writesEnabled: boolean): void {
+  server.registerTool(
+    'recent_runs',
+    {
+      ...readOnlyAnnotations('List recent Frontguard runs'),
+      description:
+        'List the most recent runs the API key has access to. Optional `repo` and `branch` filters narrow the results.',
+      inputSchema: recentRunsInputSchema,
+      outputSchema: recentRunsOutputSchema,
+    },
+    async (args) => withCloudClient(async (client) => recentRuns(client, args)),
+  );
+
+  server.registerTool(
+    'inspect_diff_cluster_dom',
+    {
+      ...readOnlyAnnotations('Inspect diff cluster and grounded DOM target'),
+      description:
+        'Inspect a specific visual regression diff cluster, returning its bounding box, AI classification, suggested fix, and grounded DOM target selector.',
+      inputSchema: inspectDiffClusterDomInputSchema,
+      outputSchema: inspectDiffClusterDomOutputSchema,
+    },
+    async (args) => withCloudClient(async (client) => inspectDiffClusterDom(client, args)),
+  );
+
+  server.registerTool(
+    'verify_css_patch',
+    {
+      ...readOnlyAnnotations('Verify a candidate CSS patch before applying'),
+      description:
+        'Validate a candidate CSS patch against a visual regression diff for syntax correctness, target selector alignment, and layout-destroying properties.',
+      inputSchema: verifyCssPatchInputSchema,
+      outputSchema: verifyCssPatchOutputSchema,
+    },
+    async (args) => withCloudClient(async (client) => verifyCssPatch(client, args)),
+  );
+
+  if (writesEnabled) {
+    server.registerTool(
+      'promote_baseline',
+      {
+        ...destructiveAnnotations('Promote reviewed visual baselines'),
+        description:
+          'Promote reviewed visual changes to baseline after `confirm_reviewed: true`, optionally scoped to specific routes.',
+        inputSchema: promoteBaselineInputSchema,
+        outputSchema: promoteBaselineOutputSchema,
+      },
+      async (args) => withCloudClient(async (client) => promoteBaseline(client, args)),
+    );
+  }
+}
+
+/**
+ * Build a fresh {@link McpServer} with Frontguard tools registered.
+ * Exported so tests can drive it without spawning a subprocess.
+ */
+export function createServer(): McpServer {
+  const instructions = serverInstructions();
+  const server = new McpServer(
+    { name: SERVER_NAME, version: SERVER_VERSION },
+    {
+      capabilities: { tools: {} },
+      instructions,
+    },
+  );
+  const writesEnabled = mcpWritesEnabled();
+  registerCoreTools(server, writesEnabled);
+  registerExtendedTools(server, writesEnabled);
+  registerProtocolHandlers(server, instructions);
   return server;
 }
 

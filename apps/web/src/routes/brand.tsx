@@ -621,7 +621,7 @@ function Brand() {
           </h2>
           <div style={s('border: 1px solid #2a2622; background: #131210; padding: 20px; margin-bottom: 20px;')}>
             <div style={s(`font-family: ${MONO}; font-size: 11px; color: #8c847a; letter-spacing: 0.06em; margin-bottom: 12px;`)}>
-              OPENGRAPH &amp; HERO BANNER — /og-image.png (16:9)
+              OPENGRAPH &amp; README HERO BANNER — /images/docs/og-hero-banner.jpg (16:9)
             </div>
             <img
               src="/images/docs/og-hero-banner.jpg"

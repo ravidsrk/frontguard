@@ -49,7 +49,7 @@ WEB, gaps:
 
 MCP, what exists:
 
-- The server sets `instructions` in `createServer()` (`packages/mcp/src/index.ts`) stating its purpose and giving per-tool guidance. The four tools each have a `title`, a `description`, and a zod `inputSchema` with `.describe()` on every field. So an in-IDE client's `tools/list` returns a clear, self-describing catalog.
+- The server sets `instructions` in `createServer()` (`packages/mcp/src/index.ts`) stating its purpose and giving per-tool guidance, and registers core and extended tools (`registerCoreTools`, `registerExtendedTools`) plus MCP 2025-11-25 / 2026-07-28 protocol handlers (`registerProtocolHandlers`). Each tool has a `title`, a `description`, a zod `inputSchema` with `.describe()` on every field, and an `outputSchema`. So an in-IDE client's `tools/list` returns a clear, self-describing catalog.
 
 MCP, gaps:
 

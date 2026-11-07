@@ -158,8 +158,9 @@ export function baselineSnapshotKey(
   browser: string,
   mode?: string,
 ): string {
-  if (isNamedMode(mode)) {
-    return `${viewport}/${mode.trim()}/${browser}`;
+  const trimmed = typeof mode === 'string' ? mode.trim() : '';
+  if (trimmed.length > 0 && trimmed !== 'default') {
+    return `${viewport}/${trimmed}/${browser}`;
   }
   return `${viewport}/${browser}`;
 }
@@ -189,9 +190,10 @@ export function currentFingerprint(
   const digest = process.env.FRONTGUARD_IMAGE_DIGEST?.trim();
   if (digest) fingerprint.imageDigest = digest;
   if (captureRunner) fingerprint.captureRunner = captureRunner;
-  if (mode && isNamedMode(mode.name)) {
+  const trimmedMode = typeof mode?.name === 'string' ? mode.name.trim() : '';
+  if (mode && trimmedMode.length > 0 && trimmedMode !== 'default') {
     fingerprint.mode = {
-      name: mode.name.trim(),
+      name: trimmedMode,
       settings: { ...mode.settings },
     };
   }
@@ -265,14 +267,18 @@ export function stampBaselineManifest(
     const existing = routes[shot.route.path];
     const now = new Date().toISOString();
     const sha256 = createHash('sha256').update(shot.buffer).digest('hex');
-    const modeName = shot.mode ?? shot.route.mode;
+    const rawMode = shot.mode ?? shot.route.mode;
+    const trimmedMode = typeof rawMode === 'string' ? rawMode.trim() : '';
+    const hasNamedMode = trimmedMode.length > 0 && trimmedMode !== 'default';
     const modeSettings = shot.modeConfig ?? shot.route.modeConfig ?? {};
-    const snapshotKey = baselineSnapshotKey(shot.viewport, shot.browser, modeName);
+    const snapshotKey = hasNamedMode
+      ? `${shot.viewport}/${trimmedMode}/${shot.browser}`
+      : `${shot.viewport}/${shot.browser}`;
     const previous = existing?.snapshots?.[snapshotKey];
     const fingerprint = currentFingerprint(
       shot.browser,
       captureRunnerForWrite(shot.route, previous?.fingerprint?.captureRunner),
-      isNamedMode(modeName) ? { name: modeName, settings: modeSettings } : undefined,
+      hasNamedMode ? { name: trimmedMode, settings: modeSettings } : undefined,
     );
     const snapshot: BaselineSnapshot = {
       ...previous,
@@ -402,23 +408,25 @@ export function noteComparedFingerprint(
 ): void {
   if (!manifestReadable) return;
   accum.compared += 1;
-  const modeName = shot.mode ?? shot.route.mode;
+  const rawMode = shot.mode ?? shot.route.mode;
+  const trimmedMode = typeof rawMode === 'string' ? rawMode.trim() : '';
+  const hasNamedMode = trimmedMode.length > 0 && trimmedMode !== 'default';
   const modeSettings = shot.modeConfig ?? shot.route.modeConfig ?? {};
   const fingerprint = snapshotFingerprint(
     manifest,
     shot.route.path,
     shot.viewport,
     shot.browser,
-    modeName,
+    hasNamedMode ? trimmedMode : undefined,
   );
   if (!fingerprint) return;
   accum.withFingerprint += 1;
-  const modeSuffix = isNamedMode(modeName) ? ` (${modeName})` : '';
+  const modeSuffix = hasNamedMode ? ` (${trimmedMode})` : '';
   const where = `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]${modeSuffix}`;
   const current = currentFingerprint(
     shot.browser,
     runtimeCaptureRunner(shot.route),
-    isNamedMode(modeName) ? { name: modeName, settings: modeSettings } : undefined,
+    hasNamedMode ? { name: trimmedMode, settings: modeSettings } : undefined,
   );
   for (const diff of fingerprintDiffs(fingerprint, current)) {
     const key = `${diff.field}\0${stableString(diff.baseline)}\0${stableString(diff.current)}`;

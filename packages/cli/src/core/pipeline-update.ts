@@ -13,10 +13,8 @@ import { withCliTrace, type CliTrace } from '../utils/otel.js';
 import { PluginManager, type PluginContext } from './plugins.js';
 import {
   emptyBaselineManifest,
-  isNamedMode,
   stampBaselineManifest,
 } from './fingerprint.js';
-import { projectedCaptureCount } from './config.js';
 import { renderPages } from '../render/playwright.js';
 import { overflowReports } from '../render/horizontal-overflow.js';
 import { createNewPageResult } from '../diff/pixel.js';
@@ -63,10 +61,7 @@ async function writeUpdatedBaselines(
     routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
   }
 
-  const projected = projectedCaptureCount(routes, config);
-  logger.info(
-    `Projected captures: ${projected} — rendering ${routes.length} route(s) for baseline update…`,
-  );
+  logger.info(`Rendering ${routes.length} route(s) for baseline update…`);
   rp.onStageStart('render', `Capturing screenshots for ${routes.length} route(s)…`);
 
   const captureSpan = trace.start('frontguard.capture');
@@ -161,12 +156,14 @@ async function writeUpdatedBaselines(
       try {
         await storage.writeBaselines(
           shots.map((shot) => {
-            const shotMode = shot.mode ?? shot.route.mode;
+            const rawShotMode = shot.mode ?? shot.route.mode;
+            const shotMode = typeof rawShotMode === 'string' ? rawShotMode.trim() : '';
+            const hasNamedShotMode = shotMode.length > 0 && shotMode !== 'default';
             return {
               route: shot.route.path,
               viewport: shot.viewport,
               browser: shot.browser,
-              ...(isNamedMode(shotMode) ? { mode: shotMode } : {}),
+              ...(hasNamedShotMode ? { mode: shotMode } : {}),
               buffer: shot.buffer,
             };
           }),
@@ -191,8 +188,9 @@ async function writeUpdatedBaselines(
     } else {
       for (const shot of shots) {
         try {
-          const shotMode = shot.mode ?? shot.route.mode;
-          if (isNamedMode(shotMode)) {
+          const rawShotMode = shot.mode ?? shot.route.mode;
+          const shotMode = typeof rawShotMode === 'string' ? rawShotMode.trim() : '';
+          if (shotMode.length > 0 && shotMode !== 'default') {
             await storage.writeBaseline(
               shot.route.path,
               shot.viewport,

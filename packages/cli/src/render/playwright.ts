@@ -640,27 +640,6 @@ export async function executeTask(
     const modeSettings = task.modeConfig ?? task.route.modeConfig;
     const expectedColorScheme =
       modeSettings?.colorScheme ?? task.route.colorScheme ?? config.colorScheme;
-    if (
-      modeSettings &&
-      typeof (page as { emulateMedia?: unknown }).emulateMedia === 'function' &&
-      (modeSettings.colorScheme ||
-        modeSettings.reducedMotion ||
-        modeSettings.forcedColors ||
-        modeSettings.contrast)
-    ) {
-      await (
-        page as unknown as {
-          emulateMedia: (opts: Record<string, string | undefined>) => Promise<void>;
-        }
-      )
-        .emulateMedia({
-          ...(modeSettings.colorScheme ? { colorScheme: modeSettings.colorScheme } : {}),
-          ...(modeSettings.reducedMotion ? { reducedMotion: modeSettings.reducedMotion } : {}),
-          ...(modeSettings.forcedColors ? { forcedColors: modeSettings.forcedColors } : {}),
-          ...(modeSettings.contrast ? { contrast: modeSettings.contrast } : {}),
-        })
-        .catch(() => {});
-    }
     await probeCaptureEnvironment(
       page,
       {

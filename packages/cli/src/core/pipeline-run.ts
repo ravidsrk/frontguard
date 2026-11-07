@@ -20,17 +20,14 @@ import {
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
-  baselineSnapshotKey,
   createFingerprintAccum,
   finishFingerprintCheck,
   fingerprintMode,
   formatFingerprintWarning,
-  isNamedMode,
   missingFingerprintWarning,
   noteComparedFingerprint,
   rendererBypassReason,
 } from './fingerprint.js';
-import { projectedCaptureCount } from './config.js';
 import { smartFilter } from '../graph/filter.js';
 import { renderPages } from '../render/playwright.js';
 import { overflowReports } from '../render/horizontal-overflow.js';
@@ -286,7 +283,21 @@ async function runCapturedPipeline(
     rp.onStageComplete('filter', `${fr.length} route(s) to render (filter failed, rendering all)`);
   }
 
-  const totalCombinations = projectedCaptureCount(fr, config);
+  const globalModeCount = config.modes ? Math.max(1, Object.keys(config.modes).length) : 1;
+  const totalCombinations = fr.reduce((sum, r) => {
+    const vpCount = r.viewport && r.viewport.length > 0 ? r.viewport.length : config.viewports.length;
+    const modeCount =
+      r.modes === false
+        ? 1
+        : Array.isArray(r.modes) && r.modes.length > 0
+          ? r.modes.length
+          : r.modes && typeof r.modes === 'object'
+            ? Math.max(1, Object.keys(r.modes).length)
+            : r.mode
+              ? 1
+              : globalModeCount;
+    return sum + vpCount * modeCount * config.browsers.length;
+  }, 0);
   logger.info(
     `Projected captures: ${totalCombinations} (${fr.length} route(s) × ${config.viewports.length} viewport(s) × ${config.browsers.length} browser(s))`,
   );
@@ -427,8 +438,10 @@ async function runCapturedPipeline(
               ...(shot.redactedCount !== undefined ? { redactedCount: shot.redactedCount } : {}),
             };
           } else {
-            const shotMode = shot.mode ?? shot.route.mode;
-            const baseline = isNamedMode(shotMode)
+            const rawShotMode = shot.mode ?? shot.route.mode;
+            const shotMode = typeof rawShotMode === 'string' ? rawShotMode.trim() : '';
+            const hasNamedShotMode = shotMode.length > 0 && shotMode !== 'default';
+            const baseline = hasNamedShotMode
               ? await storage.readBaseline(
                   shot.route.path,
                   shot.viewport,
@@ -445,7 +458,7 @@ async function runCapturedPipeline(
               // No baseline exists — this is a new page
               diff = {
                 ...createNewPageResult(shot),
-                ...(isNamedMode(shotMode) ? { mode: shotMode } : {}),
+                ...(hasNamedShotMode ? { mode: shotMode } : {}),
               };
               logger.debug(`New page: ${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`);
             } else {
@@ -456,11 +469,9 @@ async function runCapturedPipeline(
                 shot,
               );
               if (manifestReadable && baselineManifest) {
-                const snapKey = baselineSnapshotKey(
-                  shot.viewport,
-                  shot.browser,
-                  shotMode,
-                );
+                const snapKey = hasNamedShotMode
+                  ? `${shot.viewport}/${shotMode}/${shot.browser}`
+                  : `${shot.viewport}/${shot.browser}`;
                 const stored =
                   baselineManifest.routes?.[shot.route.path]?.snapshots?.[snapKey]
                     ?.colorScheme;
@@ -487,7 +498,7 @@ async function runCapturedPipeline(
                 enabled: config.ssimFallback,
                 ssimThreshold: config.ssimThreshold,
               });
-              if (isNamedMode(shotMode)) {
+              if (hasNamedShotMode) {
                 diff = { ...diff, mode: shotMode };
               }
 
