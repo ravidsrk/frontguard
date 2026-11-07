@@ -92,10 +92,6 @@ function sanitizeRoutePath(route: string): string {
   return sanitized.replace(/[^a-zA-Z0-9_\-\/]/g, '_');
 }
 
-function sanitizeModeName(mode: string): string {
-  return mode.trim().replace(/[^a-zA-Z0-9_\-]/g, '_') || 'default';
-}
-
 /**
  * Builds the storage path for a baseline image within the orphan branch.
  *
@@ -108,8 +104,10 @@ export function baselineStoragePath(
   browser: BrowserEngine,
   mode?: string,
 ): string {
-  if (isNamedMode(mode)) {
-    return `baselines/${sanitizeRoutePath(route)}/${viewport}/${sanitizeModeName(mode)}/${browser}.png`;
+  const trimmed = typeof mode === 'string' ? mode.trim() : '';
+  if (trimmed.length > 0 && trimmed !== 'default') {
+    const safeMode = trimmed.replace(/[^a-zA-Z0-9_\-]/g, '_') || 'default';
+    return `baselines/${sanitizeRoutePath(route)}/${viewport}/${safeMode}/${browser}.png`;
   }
   return `baselines/${sanitizeRoutePath(route)}/${viewport}/${browser}.png`;
 }

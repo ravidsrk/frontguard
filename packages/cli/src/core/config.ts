@@ -356,21 +356,46 @@ type BaselineKeyEntry =
       modes?: string[] | false | Record<string, CaptureModeConfig>;
     };
 
-function describeRouteEntry(index: number, entry: BaselineKeyEntry): string {
-  if (typeof entry === "string") return `routes[${index}] "${entry}"`;
-  const modeNote =
-    entry.mode
+function expandBaselineKeyFiles(
+  index: number,
+  entry: BaselineKeyEntry,
+  config: {
+    viewports: number[];
+    browsers: Array<"chromium" | "firefox" | "webkit">;
+    modes?: Record<string, CaptureModeConfig>;
+  },
+): { description: string; files: string[] } {
+  const path = typeof entry === "string" ? entry : entry.path;
+  const viewports =
+    typeof entry === "string" || !entry.viewport?.length
+      ? config.viewports
+      : entry.viewport;
+  const modes = resolveRouteModes(entry, config.modes);
+  let description = `routes[${index}] "${path}"`;
+  if (typeof entry !== "string") {
+    const modeNote = entry.mode
       ? `mode=${entry.mode}`
       : Array.isArray(entry.modes) && entry.modes.length > 0
         ? `modes=${entry.modes.join("+")}`
         : "";
-  const details = [
-    modeNote,
-    entry.colorScheme ? `colorScheme=${entry.colorScheme}` : "",
-    entry.label ? `label=${entry.label}` : "",
-  ].filter(Boolean);
-  const suffix = details.length > 0 ? ` (${details.join(", ")})` : "";
-  return `routes[${index}] "${entry.path}"${suffix}`;
+    const details = [
+      modeNote,
+      entry.colorScheme ? `colorScheme=${entry.colorScheme}` : "",
+      entry.label ? `label=${entry.label}` : "",
+    ].filter(Boolean);
+    if (details.length > 0) {
+      description = `${description} (${details.join(", ")})`;
+    }
+  }
+  const files: string[] = [];
+  for (const viewport of viewports) {
+    for (const mode of modes) {
+      for (const browser of config.browsers) {
+        files.push(baselineStoragePath(path, viewport, browser, mode.name));
+      }
+    }
+  }
+  return { description, files };
 }
 
 /**
@@ -386,28 +411,17 @@ export function duplicateBaselineKeyMessage(config: {
 }): string | null {
   const seen = new Map<string, string>();
   for (const [index, entry] of (config.routes ?? []).entries()) {
-    const path = typeof entry === "string" ? entry : entry.path;
-    const viewports =
-      typeof entry === "string" || !entry.viewport?.length
-        ? config.viewports
-        : entry.viewport;
-    const modes = resolveRouteModes(entry, config.modes);
-    const description = describeRouteEntry(index, entry);
-    for (const viewport of viewports) {
-      for (const mode of modes) {
-        for (const browser of config.browsers) {
-          const file = baselineStoragePath(path, viewport, browser, mode.name);
-          const previous = seen.get(file);
-          if (previous) {
-            return (
-              `${previous} and ${description} share baseline file ${file}. ` +
-              "Color scheme, label, and actions do not get their own file yet, " +
-              "so give the entries different paths, viewports, or modes."
-            );
-          }
-          seen.set(file, description);
-        }
+    const { description, files } = expandBaselineKeyFiles(index, entry, config);
+    for (const file of files) {
+      const previous = seen.get(file);
+      if (previous) {
+        return (
+          `${previous} and ${description} share baseline file ${file}. ` +
+          "Color scheme, label, and actions do not get their own file yet, " +
+          "so give the entries different paths, viewports, or modes."
+        );
       }
+      seen.set(file, description);
     }
   }
   return null;

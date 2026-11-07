@@ -163,19 +163,51 @@ export function mcpWritesEnabled(env: NodeJS.ProcessEnv = process.env): boolean 
   return env.FRONTGUARD_MCP_WRITES === '1';
 }
 
-/**
- * Build a fresh {@link McpServer} with Frontguard tools registered.
- * Exported so tests can drive it without spawning a subprocess.
- */
-export function createServer(): McpServer {
-  const server = new McpServer(
-    { name: SERVER_NAME, version: SERVER_VERSION },
-    {
-      capabilities: { tools: {} },
-      instructions: serverInstructions(),
-    },
-  );
+function registerProtocolHandlers(server: McpServer, instructions: string): void {
+  const serverCapabilities = { tools: { listChanged: true } } as const;
 
+  // Negotiate both 2025-11-25 and 2026-07-28 on `initialize`
+  server.server.setRequestHandler(InitializeRequestSchema, async (request) => {
+    const requestedVersion = request.params.protocolVersion;
+    const negotiated = (SUPPORTED_MCP_PROTOCOL_VERSIONS as readonly string[]).includes(
+      requestedVersion,
+    )
+      ? requestedVersion
+      : LATEST_PROTOCOL_VERSION;
+    return {
+      protocolVersion: negotiated,
+      capabilities: serverCapabilities,
+      serverInfo: {
+        name: SERVER_NAME,
+        version: SERVER_VERSION,
+      },
+      ...(instructions ? { instructions } : {}),
+    };
+  });
+
+  // Support MCP 2026-07-28 `server/discover` initialization/discovery handshake
+  server.server.setRequestHandler(ServerDiscoverRequestSchema, async (request) => {
+    const requestedVersion = request.params?.protocolVersion;
+    const negotiated =
+      requestedVersion &&
+      (SUPPORTED_MCP_PROTOCOL_VERSIONS as readonly string[]).includes(requestedVersion)
+        ? requestedVersion
+        : '2026-07-28';
+    return {
+      protocolVersion: negotiated,
+      supportedProtocolVersions: ['2025-11-25', '2026-07-28'],
+      capabilities: serverCapabilities,
+      serverInfo: {
+        name: SERVER_NAME,
+        version: SERVER_VERSION,
+        mcpName: MCP_REGISTRY_NAME,
+      },
+      ...(instructions ? { instructions } : {}),
+    };
+  });
+}
+
+function registerTools(server: McpServer, writesEnabled: boolean): void {
   server.registerTool(
     'list_regressions',
     {
@@ -212,7 +244,7 @@ export function createServer(): McpServer {
     async (args) => withCloudClient(async (client) => getSuggestedFix(client, args)),
   );
 
-  if (mcpWritesEnabled()) {
+  if (writesEnabled) {
     server.registerTool(
       'accept_baseline',
       {
@@ -262,7 +294,7 @@ export function createServer(): McpServer {
     async (args) => withCloudClient(async (client) => verifyCssPatch(client, args)),
   );
 
-  if (mcpWritesEnabled()) {
+  if (writesEnabled) {
     server.registerTool(
       'promote_baseline',
       {
@@ -275,50 +307,23 @@ export function createServer(): McpServer {
       async (args) => withCloudClient(async (client) => promoteBaseline(client, args)),
     );
   }
+}
 
+/**
+ * Build a fresh {@link McpServer} with Frontguard tools registered.
+ * Exported so tests can drive it without spawning a subprocess.
+ */
+export function createServer(): McpServer {
   const instructions = serverInstructions();
-  const serverCapabilities = { tools: { listChanged: true } } as const;
-
-  // Negotiate both 2025-11-25 and 2026-07-28 on `initialize`
-  server.server.setRequestHandler(InitializeRequestSchema, async (request) => {
-    const requestedVersion = request.params.protocolVersion;
-    const negotiated = (SUPPORTED_MCP_PROTOCOL_VERSIONS as readonly string[]).includes(
-      requestedVersion,
-    )
-      ? requestedVersion
-      : LATEST_PROTOCOL_VERSION;
-    return {
-      protocolVersion: negotiated,
-      capabilities: serverCapabilities,
-      serverInfo: {
-        name: SERVER_NAME,
-        version: SERVER_VERSION,
-      },
-      ...(instructions ? { instructions } : {}),
-    };
-  });
-
-  // Support MCP 2026-07-28 `server/discover` initialization/discovery handshake
-  server.server.setRequestHandler(ServerDiscoverRequestSchema, async (request) => {
-    const requestedVersion = request.params?.protocolVersion;
-    const negotiated =
-      requestedVersion &&
-      (SUPPORTED_MCP_PROTOCOL_VERSIONS as readonly string[]).includes(requestedVersion)
-        ? requestedVersion
-        : '2026-07-28';
-    return {
-      protocolVersion: negotiated,
-      supportedProtocolVersions: ['2025-11-25', '2026-07-28'],
-      capabilities: serverCapabilities,
-      serverInfo: {
-        name: SERVER_NAME,
-        version: SERVER_VERSION,
-        mcpName: MCP_REGISTRY_NAME,
-      },
-      ...(instructions ? { instructions } : {}),
-    };
-  });
-
+  const server = new McpServer(
+    { name: SERVER_NAME, version: SERVER_VERSION },
+    {
+      capabilities: { tools: {} },
+      instructions,
+    },
+  );
+  registerTools(server, mcpWritesEnabled());
+  registerProtocolHandlers(server, instructions);
   return server;
 }
 

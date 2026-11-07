@@ -117,6 +117,16 @@ jobs:
       - name: Shellcheck release script
         run: shellcheck scripts/release.sh
 
+      - name: Verify MCP Registry server.json metadata
+        shell: bash
+        env:
+          VERSION: ${{ steps.context.outputs.version }}
+        run: |
+          set -euo pipefail
+          jq -e --arg version "$VERSION" \
+            '.name == "io.github.ravidsrk/frontguard" and .version == $version and .packages[0].version == $version' \
+            packages/mcp/server.json >/dev/null
+
       - name: Run complete local release validation
         shell: bash
         env:
@@ -269,6 +279,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify MCP Registry server.json and install pinned mcp-publisher
+        shell: bash
+        env:
+          MCP_PUBLISHER_SHA256: '09f1fa70ee146b640584274a1a6b2b8a0310b05d4321fa9224e6df6a016d67f4'
+          MCP_PUBLISHER_VERSION: 'v1.8.8'
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          jq -e --arg version "$VERSION" \
+            '.name == "io.github.ravidsrk/frontguard" and .version == $version and .packages[0].version == $version' \
+            packages/mcp/server.json >/dev/null
+          mkdir -p "$RUNNER_TEMP/mcp-publisher"
+          archive="$RUNNER_TEMP/mcp-publisher/mcp-publisher_linux_amd64.tar.gz"
+          curl -fsSL \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" \
+            -o "$archive"
+          echo "${MCP_PUBLISHER_SHA256}  ${archive}" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP/mcp-publisher" mcp-publisher
+          chmod +x "$RUNNER_TEMP/mcp-publisher/mcp-publisher"
+
       - name: Publish approved release
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -280,20 +310,10 @@ jobs:
 
       - name: Publish MCP Registry entry (server.json)
         shell: bash
-        env:
-          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          jq -e --arg version "$VERSION" \
-            '.name == "io.github.ravidsrk/frontguard" and .version == $version and .packages[0].version == $version' \
-            packages/mcp/server.json >/dev/null
-          if command -v mcp-publisher >/dev/null 2>&1; then
-            mcp-publisher login github-oidc
-            mcp-publisher publish packages/mcp/server.json
-          else
-            npx -y @modelcontextprotocol/publisher login github-oidc
-            npx -y @modelcontextprotocol/publisher publish packages/mcp/server.json
-          fi
+          "$RUNNER_TEMP/mcp-publisher/mcp-publisher" login github-oidc
+          "$RUNNER_TEMP/mcp-publisher/mcp-publisher" publish packages/mcp/server.json
 
       - name: Marketplace checklist
         run: |

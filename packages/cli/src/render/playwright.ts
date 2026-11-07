@@ -64,11 +64,29 @@ export class CaptureEnvironmentMismatchError extends Error {
 }
 
 export async function probeCaptureEnvironment(
-  page: Pick<Page, 'evaluate'>,
+  page: Pick<Page, 'evaluate'> & {
+    emulateMedia?: (opts: Record<string, string | undefined>) => Promise<void>;
+  },
   expected: CaptureModeConfig & { devicePixelRatio?: number },
   routePath = '/',
   modeName?: string,
 ): Promise<CaptureEnvironmentProbe | null> {
+  if (
+    typeof page.emulateMedia === 'function' &&
+    (expected.colorScheme ||
+      expected.reducedMotion ||
+      expected.forcedColors ||
+      expected.contrast)
+  ) {
+    await page
+      .emulateMedia({
+        ...(expected.colorScheme ? { colorScheme: expected.colorScheme } : {}),
+        ...(expected.reducedMotion ? { reducedMotion: expected.reducedMotion } : {}),
+        ...(expected.forcedColors ? { forcedColors: expected.forcedColors } : {}),
+        ...(expected.contrast ? { contrast: expected.contrast } : {}),
+      })
+      .catch(() => {});
+  }
   if (typeof page.evaluate !== 'function') return null;
   let probe: unknown;
   try {
@@ -640,29 +658,10 @@ export async function executeTask(
     const modeSettings = task.modeConfig ?? task.route.modeConfig;
     const expectedColorScheme =
       modeSettings?.colorScheme ?? task.route.colorScheme ?? config.colorScheme;
-    if (
-      modeSettings &&
-      typeof (page as { emulateMedia?: unknown }).emulateMedia === 'function' &&
-      (modeSettings.colorScheme ||
-        modeSettings.reducedMotion ||
-        modeSettings.forcedColors ||
-        modeSettings.contrast)
-    ) {
-      await (
-        page as unknown as {
-          emulateMedia: (opts: Record<string, string | undefined>) => Promise<void>;
-        }
-      )
-        .emulateMedia({
-          ...(modeSettings.colorScheme ? { colorScheme: modeSettings.colorScheme } : {}),
-          ...(modeSettings.reducedMotion ? { reducedMotion: modeSettings.reducedMotion } : {}),
-          ...(modeSettings.forcedColors ? { forcedColors: modeSettings.forcedColors } : {}),
-          ...(modeSettings.contrast ? { contrast: modeSettings.contrast } : {}),
-        })
-        .catch(() => {});
-    }
     await probeCaptureEnvironment(
-      page,
+      page as unknown as Pick<Page, 'evaluate'> & {
+        emulateMedia?: (opts: Record<string, string | undefined>) => Promise<void>;
+      },
       {
         ...modeSettings,
         ...(expectedColorScheme ? { colorScheme: expectedColorScheme } : {}),

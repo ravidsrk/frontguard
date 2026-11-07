@@ -217,7 +217,7 @@ $ npx -p @frontguard/cli frontguard run`,
       'Use Node.js 22 or newer. Install the package that matches the workflow you intend to run: @frontguard/cli for standalone route/Storybook pipelines, or @frontguard/playwright for assertions inside existing Playwright test suites.',
     )}${figure(
       '/images/docs/quick-start-terminal-loop.jpg',
-      'Quick Start Two-Terminal Workflow and Baseline Gate',
+      'Setup and Environment Diagnostics — Node 22+, Playwright Chromium, Doctor Checks and Clean Git Tree',
       'FIG 01 · SETUP & ENVIRONMENT DIAGNOSTICS — NODE 22+, PLAYWRIGHT CHROMIUM, DOCTOR CHECKS & CLEAN GIT TREE',
     )}${h2('CLI')}${p(
       'Install @frontguard/cli as a devDependency in your project and install the Playwright Chromium browser binary used for headless rendering:',
@@ -2138,7 +2138,7 @@ $ npx -y @frontguard/mcp  # works locally with FRONTGUARD_LOCAL_REPORT or requir
       'Frontguard publishes raw validation artifacts in validation/results-v0.2.md rather than unverified marketing percentages.',
     )}${figure(
       '/images/docs/html-workbench-4mode-inspector.jpg',
-      'Interactive 4-Mode HTML Visual Diff Workbench',
+      'Local Validation Evidence — Deterministic Pixel and SSIM Comparison Artifacts in the HTML Workbench',
       'FIG 01 · LOCAL VALIDATION EVIDENCE — DETERMINISTIC PIXEL & SSIM COMPARISON ARTIFACTS',
     )}${h2('Published run')}${code(
       'validation/results-v0.2.md',
