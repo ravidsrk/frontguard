@@ -252,6 +252,7 @@ describe('release workflow contract', () => {
 
   it('requires the exact VERSION tag, same-SHA main CI approval, and immutable release', () => {
     expect(releaseWorkflow).toContain('expected_tag="v$VERSION"');
+    expect(releaseWorkflow).not.toContain('steps.context.outputs.version');
     expect(releaseWorkflow).toContain('[ "$REF_NAME" = "$expected_tag" ]');
     expect(releaseWorkflow).toContain('remote_tag_sha');
     expect(releaseWorkflow).toContain('git merge-base --is-ancestor');
