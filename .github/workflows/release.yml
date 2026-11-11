@@ -376,7 +376,23 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Check Docker Hub credentials
+        id: dockerhub
+        shell: bash
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          set -euo pipefail
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::DOCKERHUB_USERNAME/DOCKERHUB_TOKEN not configured; building linux/amd64 image without pushing to Docker Hub."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Log in to Docker Hub
+        if: steps.dockerhub.outputs.enabled == 'true'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -388,7 +404,7 @@ jobs:
           context: packages/cli/docker
           file: packages/cli/docker/Dockerfile
           platforms: linux/amd64
-          push: true
+          push: ${{ steps.dockerhub.outputs.enabled == 'true' }}
           tags: |
             frontguard/render:${{ needs.validate.outputs.version }}
             frontguard/render:latest

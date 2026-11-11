@@ -61,7 +61,7 @@ require_cmd() {
 validate_iso_date() {
   node -e '
     const value = process.argv[1];
-    const parsed = new Date(`${value}T00:00:00Z`);
+    const parsed = new Date(value + "T00:00:00Z");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== value) {
       process.exit(1);
     }
