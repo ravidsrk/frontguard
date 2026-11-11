@@ -11,9 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add multi-mode capture matrices (`modes` in config and per-route overrides) with deterministic baseline keys (`[route, viewport, mode, browser]`) and pre-capture environment probes verifying `colorScheme`, `reducedMotion`, `forcedColors`, `contrast`, `devicePixelRatio`, `locale`, and `timezoneId`.
-- Add branch- and commit-scoped S3/R2 baseline storage layout (`{prefix}{branch}/{route}-{viewport}px[-{mode}]-{browser}.png` and `{prefix}commits/{sha}/...`) with traversal-safe path validation, branch fallback (`baselineBranch`), and conditional immutable writes (`If-None-Match: "*"`).
-- Add MCP protocol compatibility across `2025-11-25` and `2026-07-28` (`server/discover`), deterministic `tools/list` ordering across all 8 tools, and official MCP Registry metadata (`packages/mcp/server.json`).
 - Report horizontal overflow from the capture page: `scrollWidth` against `innerWidth`, and visible elements whose border box passes the right edge with no clipping ancestor. Clipped and transparent overflow is not flagged. Paint containment (`contain: paint`, and computed `content` or `strict`) clips a protrusion even when `overflow-x` is `visible`. `contain: layout` does not. An ancestor with `display: contents` does not clip, including when it sets `contain: paint`. The finding is in the HTML report, JSON output, and the MCP `list_horizontal_overflow` tool. It does not change the exit code.
 - Add `frontguard review`, which accepts failing, new, and missing shots one at a time. `--from` copies a downloaded CI report's PNGs byte for byte and exits 2 when the renderer fingerprint does not match. Bulk acceptance needs `--filter` or `--all`. Each acceptance prints an audit line. The command does not fetch origin. An accessibility failure refuses the write the same way `update-baselines` does.
 - Optional ARIA, JSON, and Markdown snapshots can be stored next to a PNG and diffed as text. A mismatch is reported on its own. It does not change `comparisonMethod` from pixelmatch and does not pass or fail a pixel regression. axe-core remains the accessibility plugin. Text diff is not a gate.
@@ -28,9 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Raise minimum supported Node.js engine floor from `>=20` to `>=22` across published packages and CI matrix (Node 22 and 24).
 - Compare with pixelmatch 8 (`@frontguard/cli` and `@frontguard/playwright`). The config `threshold` of `0.1` is still 10% of pixels. The pixelmatch color distance stays a separate `0.1`, and Playwright's per-pixel default of `0.2` is a third number. A 16×16 window with more than 64 differing pixels fails, so a compact text or icon edit fails while scattered speckle does not. A dimension mismatch is padded and then judged by that same gate.
-- Pin Playwright to `1.65.0` and align the rendering images and browser test
+- Pin Playwright to `1.64.1` and align the rendering images and browser test
   dependency. The Chromium upgrade comparison is recorded in
   [the dependency review](docs/reviews/dependency-cleanup-2026-10-20.md).
 

@@ -1,16 +1,15 @@
 # Changelog
 
-## 0.2.3 - 2026-11-11
+## 0.2.3 (unreleased)
 
 ### Patch Changes
 
-- Add multi-mode capture matrices (`modes`) with environment probes and branch/commit-scoped S3 baseline layout.
 - Correct the accessibility and performance plugin recipes; warn when obsolete
   or unknown accessibility options would otherwise be silently ignored.
 - Harden baseline lifecycle, exit semantics, Action integration, reporter
   composition, telemetry privacy, and public documentation for the next OSS
   beta release.
-- Pin the renderer to Playwright `1.65.0` and align the Docker and Daytona
+- Pin the renderer to Playwright `1.64.1` and align the Docker and Daytona
   browser images. Review baseline changes when adopting a new renderer.
 - Fix Daytona sandbox cleanup and CSS uploads using the SDK's typed API.
 - Update the optional native SQLite driver to `13.0.3`; verify existing fix
