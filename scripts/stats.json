@@ -1,20 +1,20 @@
 {
   "version": "0.2.3",
-  "testFiles": 72,
-  "sourceFiles": 65,
-  "plugins": 5,
+  "testFiles": 99,
+  "sourceFiles": 92,
+  "plugins": 6,
   "bundleSize": {
-    "tarballBytes": 607907,
-    "tarballKB": 594,
-    "unpackedBytes": 2310580,
-    "unpackedKB": 2256
+    "tarballBytes": 821206,
+    "tarballKB": 802,
+    "unpackedBytes": 3078737,
+    "unpackedKB": 3007
   },
   "display": {
-    "testFiles": "72 test files",
-    "sourceFiles": "65 source files",
-    "plugins": "5 built-in plugins",
+    "testFiles": "99 test files",
+    "sourceFiles": "92 source files",
+    "plugins": "6 built-in plugins",
     "version": "v0.2.3",
-    "bundle": "594KB"
+    "bundle": "802KB"
   },
   "source": "derived-from-source"
 }

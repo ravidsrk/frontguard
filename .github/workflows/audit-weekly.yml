@@ -33,6 +33,10 @@ jobs:
             const label = process.env.AUDIT_LABEL;
             const title = 'Weekly npm audit (production tree)';
 
+            const auditData = JSON.parse(fs.readFileSync('audit-current.json', 'utf8'));
+            const vulns = auditData.metadata?.vulnerabilities ?? {};
+            const hasActionableVulns = (vulns.critical ?? 0) + (vulns.high ?? 0) > 0;
+
             const { data: issues } = await github.rest.issues.listForRepo({
               owner,
               repo,
@@ -41,8 +45,8 @@ jobs:
               per_page: 1,
             });
 
-            let issueNumber;
-            if (issues.length === 0) {
+            let issueNumber = issues[0]?.number ?? null;
+            if (!issueNumber && hasActionableVulns) {
               const { data: created } = await github.rest.issues.create({
                 owner,
                 repo,
@@ -57,28 +61,28 @@ jobs:
                 ].join('\n'),
               });
               issueNumber = created.number;
-            } else {
-              issueNumber = issues[0].number;
             }
 
             let previousPath = null;
-            const { data: comments } = await github.rest.issues.listComments({
-              owner,
-              repo,
-              issue_number: issueNumber,
-              per_page: 1,
-              direction: 'desc',
-            });
+            if (issueNumber) {
+              const { data: comments } = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 1,
+                direction: 'desc',
+              });
 
-            if (comments.length > 0) {
-              const match = comments[0].body.match(/<!-- audit-metadata:([^>]+) -->/);
-              if (match) {
-                try {
-                  const decoded = Buffer.from(match[1], 'base64').toString('utf8');
-                  fs.writeFileSync('audit-previous.json', decoded);
-                  previousPath = 'audit-previous.json';
-                } catch (err) {
-                  core.warning(`Failed to decode previous audit metadata: ${err}`);
+              if (comments.length > 0) {
+                const match = comments[0].body.match(/<!-- audit-metadata:([^>]+) -->/);
+                if (match) {
+                  try {
+                    const decoded = Buffer.from(match[1], 'base64').toString('utf8');
+                    fs.writeFileSync('audit-previous.json', decoded);
+                    previousPath = 'audit-previous.json';
+                  } catch (err) {
+                    core.warning(`Failed to decode previous audit metadata: ${err}`);
+                  }
                 }
               }
             }
@@ -88,10 +92,22 @@ jobs:
 
             const { execFileSync } = require('node:child_process');
             const report = execFileSync('node', args, { encoding: 'utf8' });
+            await core.summary.addRaw(report).write();
 
-            await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number: issueNumber,
-              body: report,
-            });
+            if (issueNumber) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: report,
+              });
+              if (!hasActionableVulns) {
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  state: 'closed',
+                  state_reason: 'completed',
+                });
+              }
+            }

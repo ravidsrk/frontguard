@@ -298,6 +298,7 @@ jobs:
           echo "${MCP_PUBLISHER_SHA256}  ${archive}" | sha256sum -c -
           tar -xzf "$archive" -C "$RUNNER_TEMP/mcp-publisher" mcp-publisher
           chmod +x "$RUNNER_TEMP/mcp-publisher/mcp-publisher"
+          "$RUNNER_TEMP/mcp-publisher/mcp-publisher" validate packages/mcp/server.json
 
       - name: Publish approved release
         env:
@@ -310,8 +311,16 @@ jobs:
 
       - name: Publish MCP Registry entry (server.json)
         shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if [ "$(npm view "@frontguard/mcp@$VERSION" version 2>/dev/null || true)" = "$VERSION" ]; then
+              break
+            fi
+            sleep 5
+          done
           "$RUNNER_TEMP/mcp-publisher/mcp-publisher" login github-oidc
           "$RUNNER_TEMP/mcp-publisher/mcp-publisher" publish packages/mcp/server.json
 
@@ -361,7 +370,23 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Check Docker Hub credentials
+        id: dockerhub
+        shell: bash
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          set -euo pipefail
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "DOCKERHUB_USERNAME / DOCKERHUB_TOKEN not configured; building render image without registry push."
+          fi
+
       - name: Log in to Docker Hub
+        if: steps.dockerhub.outputs.configured == 'true'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -373,7 +398,7 @@ jobs:
           context: packages/cli/docker
           file: packages/cli/docker/Dockerfile
           platforms: linux/amd64
-          push: true
+          push: ${{ steps.dockerhub.outputs.configured == 'true' }}
           tags: |
             frontguard/render:${{ needs.validate.outputs.version }}
             frontguard/render:latest
