@@ -274,11 +274,14 @@ describe('release workflow contract', () => {
     expect(releaseJob).toContain('releaseStatus == "prepared"');
   });
 
-  it('keeps current 0.2.3 source explicitly unreleased until preparation', () => {
+  it('marks current 0.2.3 source as prepared in CHANGELOG.md with all published packages', () => {
     const currentVersion = readFileSync(path.join(repoRoot, 'VERSION'), 'utf8').trim();
     const changelog = readFileSync(path.join(repoRoot, 'CHANGELOG.md'), 'utf8');
     expect(currentVersion).toBe('0.2.3');
     expect(changelog).toContain('## [Unreleased]');
-    expect(changelog).not.toMatch(/^## \[0\.2\.3\] - \d{4}-\d{2}-\d{2}$/m);
+    expect(changelog).toMatch(/^## \[0\.2\.3\] - \d{4}-\d{2}-\d{2}$/m);
+    for (const [, name] of packages) {
+      expect(changelog).toContain(`- \`${name}@${currentVersion}\``);
+    }
   });
 });

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-11
+
 ### Added
 
 - Report horizontal overflow from the capture page: `scrollWidth` against `innerWidth`, and visible elements whose border box passes the right edge with no clipping ancestor. Clipped and transparent overflow is not flagged. Paint containment (`contain: paint`, and computed `content` or `strict`) clips a protrusion even when `overflow-x` is `visible`. `contain: layout` does not. An ancestor with `display: contents` does not clip, including when it sets `contain: paint`. The finding is in the HTML report, JSON output, and the MCP `list_horizontal_overflow` tool. It does not change the exit code.
@@ -60,6 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   custom-domain routes and HTTP security headers (`_headers`) to `apps/web`.
 - Apply supply-chain security updates and align version-sync coverage across
   workspace packages and `SECURITY.md`.
+
+### Published packages
+
+- `@frontguard/cli@0.2.3`
+- `@frontguard/playwright@0.2.3`
+- `@frontguard/mcp@0.2.3`
+- `create-frontguard-plugin@0.2.3`
+- `@frontguard/netlify-plugin@0.2.3`
 
 ## [0.2.2] - 2026-06-21
 
