@@ -120,7 +120,7 @@ jobs:
       - name: Verify MCP Registry server.json metadata
         shell: bash
         env:
-          VERSION: ${{ steps.context.outputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           jq -e --arg version "$VERSION" \
