@@ -124,7 +124,8 @@ describe('analyzeWithAI', () => {
   it('sends tall full-page screenshots within provider image limits', async () => {
     process.env.OPENAI_API_KEY = 'sk-test';
     const fetchImpl = openAIFetch();
-    await analyzeWithAI(png(1440, 12000), png(1440, 12000), { provider: 'openai' }, null, {
+    // Taller than the 5,000 px crop and wider than the 800 px downscale.
+    await analyzeWithAI(png(900, 6000), png(900, 6000), { provider: 'openai' }, null, {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
     const body = JSON.parse(String((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body));

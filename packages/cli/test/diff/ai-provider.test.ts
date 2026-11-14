@@ -435,19 +435,21 @@ describe('validateClassification', () => {
 });
 
 describe('images', () => {
+  // Small images with small limits: same arithmetic as 1600×12000 → 800×2500
+  // under the defaults, without encoding tens of megabytes in a unit test.
   it('crops tall screenshots and downscales wide ones', () => {
-    const tall = new PNG({ width: 1600, height: 12000 });
-    const out = downscaleForModel(PNG.sync.write(tall), { maxWidth: 800, maxHeight: 5000 });
-    expect(out).toMatchObject({ width: 800, height: 2500, originalWidth: 1600, originalHeight: 12000, cropped: true });
+    const tall = new PNG({ width: 320, height: 2400 });
+    const out = downscaleForModel(PNG.sync.write(tall), { maxWidth: 160, maxHeight: 1000 });
+    expect(out).toMatchObject({ width: 160, height: 500, originalWidth: 320, originalHeight: 2400, cropped: true });
     const decoded = PNG.sync.read(out.buffer);
-    expect([decoded.width, decoded.height]).toEqual([800, 2500]);
+    expect([decoded.width, decoded.height]).toEqual([160, 500]);
   });
 
   it('crops without scaling when only the height is over', () => {
-    const narrow = new PNG({ width: 400, height: 9000 });
-    expect(downscaleForModel(PNG.sync.write(narrow), { maxWidth: 800, maxHeight: 5000 })).toMatchObject({
-      width: 400,
-      height: 5000,
+    const narrow = new PNG({ width: 80, height: 1800 });
+    expect(downscaleForModel(PNG.sync.write(narrow), { maxWidth: 160, maxHeight: 1000 })).toMatchObject({
+      width: 80,
+      height: 1000,
       cropped: true,
     });
   });
