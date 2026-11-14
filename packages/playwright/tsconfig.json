@@ -12,7 +12,10 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    // rootDir is the packages/ directory because src/ai.ts imports the CLI's
+    // shared provider module (../../cli/src/diff/ai-provider.ts), which tsup
+    // bundles into dist. This config only typechecks (noEmit); tsup owns dist.
+    "rootDir": "..",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

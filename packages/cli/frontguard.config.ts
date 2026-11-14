@@ -17,6 +17,5 @@ export default {
   outputDir: '.frontguard',
   ai: {
     provider: 'openai',
-    model: 'gpt-4o',
   },
 } satisfies Partial<FrontguardConfig>;

@@ -161,6 +161,54 @@ describe('pipeline SSIM configuration', () => {
     );
   });
 
+  it('passes a usage recorder and reports aiUsage on the result', async () => {
+    mocks.analyzeWithAI.mockImplementation(async (_diff, _config, _context, options) => {
+      options.onCall({
+        label: 'analyze / @1440',
+        provider: 'openai',
+        model: 'gpt-6-luna',
+        outcome: 'ok',
+        attempts: 1,
+        latencyMs: 120,
+        inputTokens: 900,
+        outputTokens: 60,
+        structured: true,
+      });
+      return { classification: 'regression', explanation: 'x', severity: 'warning', confidence: 0.8 };
+    });
+    const aiConfig = config();
+    aiConfig.ai = { provider: 'openai', model: 'gpt-6-luna' };
+
+    const result = await runPipeline(aiConfig, reporter());
+
+    expect(result.aiUsage?.totals).toEqual({
+      calls: 1,
+      ok: 1,
+      errors: 0,
+      attempts: 1,
+      inputTokens: 900,
+      outputTokens: 60,
+      latencyMs: 120,
+    });
+    expect(result.aiUsage?.skipped.budget).toBe(0);
+  });
+
+  it('skips analyses past ai.maxCalls without touching the pixel result', async () => {
+    const aiConfig = config();
+    aiConfig.ai = { provider: 'openai', model: 'gpt-6-luna', maxCalls: 0 };
+    const output = reporter();
+
+    const result = await runPipeline(aiConfig, output);
+
+    expect(mocks.analyzeWithAI).not.toHaveBeenCalled();
+    expect(result.diffs[0]?.status).toBe('regression');
+    expect(result.diffs[0]?.aiSkipped).toBe('budget');
+    expect(result.summary.regressions).toBe(1);
+    expect(result.summary.errors).toBe(0);
+    expect(result.aiUsage).toMatchObject({ skipped: { budget: 1 }, maxCalls: 0, totals: { calls: 0 } });
+    expect(output.onStageComplete).toHaveBeenCalledWith('analyze', expect.stringContaining('1 skipped (ai.maxCalls)'));
+  });
+
   it('does not reclassify an exact 29% boundary because of ratio rounding', async () => {
     mocks.compareScreenshot.mockReturnValue({
       route: { path: '/' },

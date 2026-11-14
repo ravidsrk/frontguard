@@ -18,7 +18,7 @@ missing below, or when a backticked type name is not exported from a workspace `
 | Directory | npm package | Role | Status |
 | --- | --- | --- | --- |
 | `packages/cli` | `@frontguard/cli` | The engine: CLI commands, run pipeline, discovery, rendering, comparison, baselines, reports and plugins. Also the library entry (`dist/index.js`, `dist/plugins/index.js`) and the `frontguard-render` bin. | Published |
-| `packages/playwright` | `@frontguard/playwright` | `visualTest` and `expectVisual` assertions for Playwright Test, with file-based baselines. Self-contained: it does not import the CLI. | Published |
+| `packages/playwright` | `@frontguard/playwright` | `visualTest` and `expectVisual` assertions for Playwright Test, with file-based baselines. No runtime dependency on the CLI: tsup bundles the CLI's shared AI module (`packages/cli/src/diff/ai-provider.ts`) into its `dist`. | Published |
 | `packages/mcp` | `@frontguard/mcp` | stdio MCP server for editor agents. Reads a local CLI JSON report or the cloud API. | Published |
 | `packages/create-frontguard-plugin` | `create-frontguard-plugin` | Scaffolds a plugin project (`npm create frontguard-plugin`). | Published |
 | `packages/cloud-api` | `@frontguard/cloud-api` | Hono app for Cloudflare Workers with D1, R2, Stripe and Daytona. Runs the pinned CLI release in a sandbox. | Private, not deployed |
@@ -31,7 +31,9 @@ missing below, or when a backticked type name is not exported from a workspace `
 
 Only two workspaces import another: `integrations/slack-app` and `integrations/vercel` import the
 SSRF guard from `@frontguard/cloud-api/render-target`. The MCP server reads the CLI's JSON report
-format rather than importing the CLI, and `packages/playwright` carries its own diff and AI code.
+format rather than importing the CLI, and `packages/playwright` carries its own diff code. Its AI
+classification compiles in the CLI's `diff/ai-provider.ts` at build time, so both packages send the
+same prompt, schema and default models.
 
 Outside the workspaces:
 
@@ -71,7 +73,8 @@ Outside the workspaces:
    the `afterCompare` hook.
 6. **Analyze (optional).** With `ai` configured, `analyzeWithAI` (`diff/ai-vision.ts`) attaches
    an `aiAnalysis` classification to each changed diff. The classification never turns a failing
-   diff into a pass. A failed analysis call marks that diff as an error.
+   diff into a pass. A failed analysis call marks that diff as an error. Past `ai.maxCalls` a diff
+   is marked `aiSkipped: 'budget'` instead and keeps its pixel status (`core/ai-usage.ts`).
 7. **Fix (optional).** With `ai` and `generateFixes`, `generateFix` (`diff/ai-fix.ts`) proposes a
    CSS patch for each diff the model classified as a regression. With `verifyFixes`, `verifyFix`
    (`sandbox/verify-fix.ts`) re-renders the patch in a local or Daytona sandbox.
@@ -97,8 +100,8 @@ Every directory under `packages/cli/src/`:
 | Directory | Responsibility | Key files and exports |
 | --- | --- | --- |
 | `cli/` | Commander entry and commands: `run`, `init`, `update-baselines`, `review`, `prune-baselines`, `ignores`, `doctor`, `monitor`, `accept-fix`, `reject-fix`, `export-patterns`, `plugin`, `guide`. Exit codes and threshold parsing. The `frontguard-render` wrapper for sandboxes. | `index.ts` (`main`, `buildConfig`), `init.ts`, `doctor.ts`, `review-command.ts`, `prune-baselines.ts`, `aged-ignores.ts`, `guide.ts`, `run.ts` (Docker re-exec), `render.ts`, `exit-code.ts`, `baseline-confirm.ts`, `threshold.ts`, `load-review.ts` |
-| `core/` | Config loading and validation, shared types, the pipeline stages, plugin lifecycle and registry, renderer fingerprint. | `config.ts` (`loadConfig`, `defineConfig`), `types.ts` (`FrontguardConfig`, `Route`, `ScreenshotResult`, `DiffResult`, `RunResult`, `Reporter`, `BaselineStorage`, `AIConfig`), `pipeline.ts` (public re-exports), `pipeline-run.ts`, `pipeline-discover.ts`, `pipeline-update.ts`, `pipeline-judge.ts`, `pipeline-result.ts`, `pipeline-batch.ts`, `pipeline-errors.ts` (`UnreachableBaseUrlError`), `plugins.ts` (`FrontguardPlugin`, `PluginContext`, `PluginManager`), `plugin-registry.ts`, `fingerprint.ts` |
-| `diff/` | Pixel comparison, SSIM, region clustering, threshold maths, advisory model analysis, CSS fix generation, judge mode, validation metrics. | `pixel.ts` (`compareScreenshot`), `ssim.ts`, `regions.ts`, `threshold.ts`, `ai-vision.ts` (`analyzeWithAI`), `ai-fix.ts` (`generateFix`), `model-judge.ts`, `validation-metrics.ts` |
+| `core/` | Config loading and validation, shared types, the pipeline stages, plugin lifecycle and registry, renderer fingerprint. | `config.ts` (`loadConfig`, `defineConfig`), `types.ts` (`FrontguardConfig`, `Route`, `ScreenshotResult`, `DiffResult`, `RunResult`, `Reporter`, `BaselineStorage`, `AIConfig`), `pipeline.ts` (public re-exports), `pipeline-run.ts`, `pipeline-discover.ts`, `pipeline-update.ts`, `pipeline-judge.ts`, `pipeline-result.ts`, `pipeline-batch.ts`, `ai-usage.ts` (`AIUsageTracker`: per-call records and the `ai.maxCalls` budget), `pipeline-errors.ts` (`UnreachableBaseUrlError`), `plugins.ts` (`FrontguardPlugin`, `PluginContext`, `PluginManager`), `plugin-registry.ts`, `fingerprint.ts` |
+| `diff/` | Pixel comparison, SSIM, region clustering, threshold maths, advisory model analysis, CSS fix generation, judge mode, validation metrics. | `pixel.ts` (`compareScreenshot`), `ssim.ts`, `regions.ts`, `threshold.ts`, `ai-provider.ts` (the one model transport: `DEFAULT_AI_MODELS`, request building, structured-output schemas, response parsing, retries, `AIAnalysisError`, the `FRONTGUARD_DEBUG_AI` dump), `ai-vision.ts` (`analyzeWithAI`), `ai-fix.ts` (`generateFix`), `model-judge.ts`, `validation-metrics.ts` |
 | `discovery/` | Route discovery: crawler, filesystem routes, Storybook, Ladle and Histoire indexes, story matching, capture-runner checks. | `crawler.ts`, `filesystem.ts`, `storybook.ts`, `storybook-parameters.ts`, `ladle.ts`, `histoire.ts`, `index-json.ts`, `story-match.ts`, `story-url.ts`, `capture-runner.ts` |
 | `graph/` | Import graph and git diff to choose affected routes. | `filter.ts` (`smartFilter`), `parser.ts` (`DependencyGraph`), `resolver.ts`, `diff-base.ts` (`FRONTGUARD_DIFF_BASE`) |
 | `plugins/` | The six built-in plugins and the `@frontguard/cli/plugins` entry. | `accessibility.ts`, `figma.ts`, `monitor.ts`, `perf-budgets.ts`, `text-snapshot.ts`, `third-party-scripts.ts`, `index.ts` |
@@ -140,14 +143,14 @@ Source only. `api.frontguard.dev` does not resolve, and the deployment gates are
 | `index.ts` | Server entry: protocol negotiation, tool registration. `promote_baseline` and `accept_baseline` register only with `FRONTGUARD_MCP_WRITES=1`. |
 | `auth.ts` | Reads `FRONTGUARD_API_KEY` and `FRONTGUARD_API_URL` into `FrontguardAuth`. The server starts without them; cloud tools return a clear error. |
 | `client/cloud.ts` | `CloudClient` for the cloud API, and the local-report client for `FRONTGUARD_LOCAL_REPORT`. |
-| `tools/` | One file per tool: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `recent_runs`, `list_horizontal_overflow`, `promote_baseline`, `accept_baseline`. |
+| `tools/` | One file per tool: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `recent_runs`, `list_horizontal_overflow`, `promote_baseline`, `accept_baseline`. Shared helpers: `_paging.ts` (`limit` / `cursor` pages for the list tools), `_runs.ts` (newest run, `"latest"`), `_regression.ts`. |
 
 ## packages/playwright
 
 | Path under `src/` | Responsibility |
 | --- | --- |
 | `visual-test.ts` | `visualTest` and `expectVisual`. |
-| `diff.ts`, `ai.ts` | Pixel comparison, SSIM and clustering; optional model analysis. |
+| `diff.ts`, `ai.ts` | Pixel comparison, SSIM and clustering; optional model analysis through the CLI's shared `ai-provider.ts`, returning `aiError` when it fails. |
 | `storage.ts` | File-based `BaselineStorage` (default `__visual_baselines__/`). |
 | `text-snapshot.ts`, `types.ts`, `index.ts` | Text snapshots, `VisualTestOptions` and `VisualTestResult`, public exports. |
 
@@ -190,7 +193,10 @@ experimental judge mode under the same rule.
 **AI is optional and bring-your-own-key.** `AIConfig` selects OpenAI, Anthropic or Gemini, with a
 custom `baseUrl` for compatible endpoints or proxies. Keys come from environment variables and are
 redacted from logs and reports (`utils/redact.ts`). Without AI the CLI still discovers, renders,
-compares and reports.
+compares and reports. Every model call goes through `diff/ai-provider.ts`: requests to the
+providers' own APIs ask for schema-constrained JSON, `ai.maxCalls` caps calls per run, and the JSON
+report's `aiUsage` records each call. `npm run eval:ai --workspace=packages/cli` scores a provider
+and model.
 
 **Plugins hook into seven lifecycle points.** `FrontguardPlugin` defines `beforeDiscover`,
 `afterDiscover`, `beforeRender`, `afterRender`, `afterCompare`, `afterRun` and `onError`, plus
@@ -219,6 +225,6 @@ different browser or platform. `fingerprint: 'strict'` exits 2 on a mismatch.
 - Secrets are redacted from logs, errors and reports (`utils/redact.ts`).
 - With `redactSensitive`, password, card and one-time-code fields, and elements marked
   `data-frontguard-redact`, are masked before capture (`render/redaction.ts`).
-- Untrusted page text sent to a model is fenced and labelled as data (`diff/ai-vision.ts`).
+- Untrusted page text sent to a model is fenced and labelled as data (`wrapUntrusted` in `diff/ai-provider.ts`).
 - The cloud API and the Slack and Vercel integrations refuse private and loopback render targets
   (`packages/cloud-api/src/security/render-target.ts`).

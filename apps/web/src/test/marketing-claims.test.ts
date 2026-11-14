@@ -102,7 +102,7 @@ describe('C14 marketing claims — cross-surface Chromatic pricing (claim-9)', (
     expect(llms).not.toContain('baselineDir:')
     expect(llms).not.toContain("consensus: 'majority'")
     expect(llms).not.toContain("provider: 'auto'")
-    expect(llms).toContain("ai: { provider: 'openai', model: 'gpt-4o' }")
+    expect(llms).toContain("ai: { provider: 'openai' }")
     expect(llms).toContain("outputDir: '.frontguard/results'")
     expect(llms).not.toContain('GitHub App one-click baseline accept')
     expect(llms).toContain('thumbnails require a configured `imageUpload` backend')

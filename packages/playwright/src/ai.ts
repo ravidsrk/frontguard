@@ -1,249 +1,116 @@
-import type { AIAnalysisResult } from './types.js';
+/**
+ * Optional AI classification for `visualTest`.
+ *
+ * Uses the same transport, prompt, schema and taxonomy as the CLI: the shared
+ * provider module in `packages/cli/src/diff/ai-provider.ts` is bundled into
+ * this package at build time, so there is one implementation and no runtime
+ * dependency on `@frontguard/cli`.
+ *
+ * Failures are returned as a typed `aiError` and logged once per process, so
+ * "no AI configured" and "AI is broken" look different.
+ */
+
+import {
+  AIAnalysisError,
+  CLASSIFICATION_SCHEMA,
+  CLASSIFICATION_SYSTEM_PROMPT,
+  DEFAULT_AI_MODELS,
+  callModel,
+  parseModelJson,
+  resolveApiKey,
+  toModelImage,
+  validateClassification,
+  type AIProviderName,
+  type CallModelOptions,
+} from '../../cli/src/diff/ai-provider.js';
+import type { AIAnalysisResult, AIErrorInfo } from './types.js';
 
 export interface AIOptions {
-  provider: 'openai' | 'anthropic' | 'gemini';
+  provider: AIProviderName;
   model?: string;
   baseUrl?: string;
+  /** Output-token cap per call, including reasoning/thinking tokens. */
+  maxOutputTokens?: number;
+  /** Wall-clock limit per HTTP attempt in milliseconds. */
+  timeoutMs?: number;
 }
 
-const SYSTEM_PROMPT = `You are a visual regression testing expert. You analyze two screenshots (baseline and current) and classify the visual difference.
+/** Either a classification or the reason there is none. */
+export interface AIOutcome {
+  ai?: AIAnalysisResult;
+  aiError?: AIErrorInfo;
+}
 
-Respond in JSON with exactly these fields:
-{
-  "classification": "regression" | "intentional" | "content_update" | "layout_shift" | "style_change",
-  "severity": "critical" | "high" | "medium" | "low" | "info",
-  "explanation": "Brief description of what changed and why it matters"
-}`;
+export type AIDeps = Pick<CallModelOptions, 'fetchImpl' | 'retries' | 'backoffMs' | 'sleep' | 'env'>;
+
+const warned = new Set<string>();
+
+/** Logs an AI failure once per provider and error kind for this process. */
+export function warnOnce(error: AIErrorInfo): void {
+  const key = `${error.provider}:${error.kind}`;
+  if (warned.has(key)) return;
+  warned.add(key);
+  console.warn(`[frontguard] AI analysis unavailable (${error.provider}/${error.model}, ${error.kind}): ${error.message}`);
+}
+
+/** Test hook: forget which warnings were already printed. */
+export function resetAIWarnings(): void {
+  warned.clear();
+}
 
 /**
- * Analyze visual diff using AI vision API.
- * Returns undefined silently if no API key is configured.
+ * Classifies a baseline/current pair (and the pixel diff overlay when given).
+ * Never throws: failures come back as `aiError`.
  */
 export async function analyzeWithAI(
   baselineBuffer: Buffer,
   currentBuffer: Buffer,
-  options: AIOptions
-): Promise<AIAnalysisResult | undefined> {
+  options: AIOptions,
+  diffBuffer?: Buffer | null,
+  deps: AIDeps = {},
+): Promise<AIOutcome> {
+  const provider = options.provider;
+  const model = options.model ?? DEFAULT_AI_MODELS[provider];
   try {
-    if (options.provider === 'anthropic') {
-      return await analyzeWithAnthropic(
-        baselineBuffer,
-        currentBuffer,
-        options.model,
-        options.baseUrl
-      );
-    }
-    if (options.provider === 'gemini') {
-      return await analyzeWithGemini(
-        baselineBuffer,
-        currentBuffer,
-        options.model,
-        options.baseUrl
-      );
-    }
-    return await analyzeWithOpenAI(
-      baselineBuffer,
-      currentBuffer,
-      options.model,
-      options.baseUrl
+    const apiKey = resolveApiKey(provider, deps.env);
+    const images = [
+      toModelImage(baselineBuffer, 'baseline'),
+      toModelImage(currentBuffer, 'current'),
+      ...(diffBuffer ? [toModelImage(diffBuffer, 'diff')] : []),
+    ];
+    const imageNote =
+      images.length >= 3
+        ? 'Image 1: baseline, Image 2: current, Image 3: pixel diff overlay.'
+        : 'Image 1: baseline, Image 2: current. No pixel diff overlay was provided.';
+    const response = await callModel(
+      {
+        provider,
+        model,
+        apiKey,
+        system: CLASSIFICATION_SYSTEM_PROMPT,
+        userText: `Analyze these screenshots from a Playwright visual test. ${imageNote}`,
+        images,
+        schema: CLASSIFICATION_SCHEMA,
+        baseUrl: options.baseUrl,
+        maxOutputTokens: options.maxOutputTokens,
+        timeoutMs: options.timeoutMs,
+        label: 'playwright visualTest',
+      },
+      deps,
     );
-  } catch {
-    // AI is optional — fail silently
-    return undefined;
+    const parsed = parseModelJson(response.text, { structured: response.structured, provider });
+    return { ai: validateClassification(parsed, provider) };
+  } catch (err) {
+    const e =
+      err instanceof AIAnalysisError ? err : new AIAnalysisError(err instanceof Error ? err.message : String(err));
+    return {
+      aiError: {
+        provider,
+        model,
+        kind: e.kind,
+        ...(e.statusCode !== undefined ? { status: e.statusCode } : {}),
+        message: e.message,
+      },
+    };
   }
-}
-
-async function analyzeWithOpenAI(
-  baseline: Buffer,
-  current: Buffer,
-  model?: string,
-  baseUrl?: string
-): Promise<AIAnalysisResult | undefined> {
-  const apiKey = process.env.FRONTGUARD_OPENAI_KEY || process.env.OPENAI_API_KEY;
-  if (!apiKey) return undefined;
-
-  const endpoint = baseUrl
-    ? baseUrl.endsWith('/chat/completions')
-      ? baseUrl
-      : `${baseUrl.replace(/\/+$/, '')}/chat/completions`
-    : 'https://api.openai.com/v1/chat/completions';
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: model || 'gpt-4.1-mini',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'Compare these two screenshots. The first is the baseline, the second is the current version. Identify and classify any visual differences.' },
-            {
-              type: 'image_url',
-              image_url: { url: `data:image/png;base64,${baseline.toString('base64')}` },
-            },
-            {
-              type: 'image_url',
-              image_url: { url: `data:image/png;base64,${current.toString('base64')}` },
-            },
-          ],
-        },
-      ],
-      max_tokens: 500,
-      response_format: { type: 'json_object' },
-    }),
-  });
-
-  if (!response.ok) return undefined;
-
-  const data = (await response.json()) as {
-    choices: Array<{ message: { content: string } }>;
-  };
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) return undefined;
-
-  return JSON.parse(content) as AIAnalysisResult;
-}
-
-async function analyzeWithAnthropic(
-  baseline: Buffer,
-  current: Buffer,
-  model?: string,
-  baseUrl?: string
-): Promise<AIAnalysisResult | undefined> {
-  const apiKey = process.env.FRONTGUARD_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return undefined;
-
-  const endpoint = baseUrl
-    ? baseUrl.endsWith('/messages')
-      ? baseUrl
-      : `${baseUrl.replace(/\/+$/, '')}/messages`
-    : 'https://api.anthropic.com/v1/messages';
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: model || 'claude-sonnet-4-20250514',
-      max_tokens: 500,
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'Compare these two screenshots. The first is the baseline, the second is the current version. Identify and classify any visual differences.' },
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: 'image/png',
-                data: baseline.toString('base64'),
-              },
-            },
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: 'image/png',
-                data: current.toString('base64'),
-              },
-            },
-          ],
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) return undefined;
-
-  const data = (await response.json()) as {
-    content: Array<{ type: string; text: string }>;
-  };
-  const text = data.content?.find((c) => c.type === 'text')?.text;
-  if (!text) return undefined;
-
-  // Extract JSON from response
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return undefined;
-
-  return JSON.parse(jsonMatch[0]) as AIAnalysisResult;
-}
-
-async function analyzeWithGemini(
-  baseline: Buffer,
-  current: Buffer,
-  model?: string,
-  baseUrl?: string
-): Promise<AIAnalysisResult | undefined> {
-  const apiKey = process.env.FRONTGUARD_GEMINI_KEY || process.env.GEMINI_API_KEY;
-  if (!apiKey) return undefined;
-
-  const resolvedModel = model || 'gemini-2.5-flash';
-  const base = (baseUrl || 'https://generativelanguage.googleapis.com/v1beta').replace(/\/+$/, '');
-  const endpoint = base.includes(':generateContent')
-    ? base
-    : `${base}/models/${resolvedModel}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: SYSTEM_PROMPT }],
-      },
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: 'Compare these two screenshots. The first is the baseline, the second is the current version. Identify and classify any visual differences.',
-            },
-            {
-              inline_data: {
-                mime_type: 'image/png',
-                data: baseline.toString('base64'),
-              },
-            },
-            {
-              inline_data: {
-                mime_type: 'image/png',
-                data: current.toString('base64'),
-              },
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        responseMimeType: 'application/json',
-      },
-    }),
-  });
-
-  if (!response.ok) return undefined;
-
-  const data = (await response.json()) as {
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{ text?: string }>;
-      };
-    }>;
-  };
-  const text = data.candidates?.[0]?.content?.parts?.find((p) => typeof p.text === 'string')?.text;
-  if (!text) return undefined;
-
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return undefined;
-
-  return JSON.parse(jsonMatch[0]) as AIAnalysisResult;
 }

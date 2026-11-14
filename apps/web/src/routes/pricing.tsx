@@ -145,7 +145,7 @@ const faqs = [
   },
   {
     q: 'OpenAI or Anthropic — which should I use?',
-    a: 'Choose the provider and model explicitly in frontguard.config.ts: OpenAI (gpt-4.1-mini, gpt-4o), Anthropic (claude-sonnet-4-20250514), Google Gemini (gemini-2.5-flash / gemini-2.5-pro), and custom OpenAI-compatible baseUrl endpoints (OpenRouter, Ollama, vLLM) are all supported. When AI is enabled, Frontguard sends screenshot evidence, basic route metadata, and optional accessibility findings directly to that provider; it does not send a DOM snapshot or console log.',
+    a: 'Choose the provider in frontguard.config.ts and, optionally, the model: OpenAI (default gpt-6-luna), Anthropic (default claude-sonnet-5-5), Google Gemini (default gemini-3.5-flash-lite), and custom OpenAI-compatible baseUrl endpoints (OpenRouter, Ollama, vLLM) are all supported. Run npm run eval:ai to compare a model on your machine before switching. When AI is enabled, Frontguard sends screenshot evidence, basic route metadata, and optional accessibility findings directly to that provider; it does not send a DOM snapshot or console log.',
   },
   {
     q: 'Does Frontguard work with Storybook?',

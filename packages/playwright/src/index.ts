@@ -4,4 +4,6 @@ export type {
   VisualTestResult,
   PlaywrightDiffCluster,
   TextSnapshotDiff,
+  AIAnalysisResult,
+  AIErrorInfo,
 } from './types.js';

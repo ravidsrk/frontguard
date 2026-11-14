@@ -44,6 +44,10 @@ typecheck 18 s, lint 6 s, tests 67 s.
   `npm run check:openapi` fails on drift.
 - The GitHub Action is generated. Edit `packages/cli/action.template.yml` and
   `packages/cli/action-run.sh`, then run `node packages/cli/scripts/sync-root-action.mjs`.
+- Model calls live in one file, `packages/cli/src/diff/ai-provider.ts` (default models, request
+  shapes, schemas, retries). `@frontguard/playwright` bundles that file, so change it there, not in
+  the plugin. After an AI change, run `npm run eval:ai --workspace=packages/cli -- --mock` (no key
+  needed); with a provider key, drop `--mock` for a live score.
 
 ## Do not edit casually
 
