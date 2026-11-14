@@ -37,6 +37,7 @@ import {
 } from '../diff/pixel.js';
 import { compareDiffToThreshold } from '../diff/threshold.js';
 import { analyzeWithAI } from '../diff/ai-vision.js';
+import { AIUsageTracker, formatAIUsage } from './ai-usage.js';
 import {
   generateFix,
   FIX_CATEGORIES,
@@ -608,7 +609,8 @@ async function runCapturedPipeline(
   // -----------------------------------------------------------------------
   // Stage 5: ANALYZE (optional — AI, parallelised in batches)
   // -----------------------------------------------------------------------
-  if (config.ai) {
+  const aiUsage = config.ai ? new AIUsageTracker(config.ai.maxCalls) : undefined;
+  if (config.ai && aiUsage) {
     // Restore image buffers from temp for changed diffs so AI can analyze them
     const aiDiffs: Array<{ diff: DiffResult; index: number }> = [];
     for (let i = 0; i < diffs.length; i++) {
@@ -633,6 +635,9 @@ async function runCapturedPipeline(
 
       const aiConfig = config.ai;
       let completed = 0;
+      let analysisSkipped = 0;
+      const analyzeSpan = trace.start('frontguard.analyze');
+      const analyzeStartIndex = aiUsage.count;
 
       // Build an accessibility lookup so AI analysis can correlate a visual
       // change with known a11y issues on the same route × viewport (e.g. a
@@ -652,11 +657,20 @@ async function runCapturedPipeline(
             aiDiffs,
             AI_BATCH_SIZE,
             async ({ diff }) => {
+              if (!aiUsage.tryReserve()) {
+                // Budget reached: leave the pixel status alone and say why.
+                diff.aiSkipped = 'budget';
+                analysisSkipped++;
+                completed++;
+                rp.onStageProgress('analyze', completed, aiDiffs.length, `${diff.route.path} → skipped (ai.maxCalls)`);
+                return undefined;
+              }
               const accessibility = a11yByKey.get(`${diff.route.path}@${diff.viewport}`);
               const analysis = await analyzeWithAI(
                 diff,
                 aiConfig,
                 accessibility ? { accessibility } : undefined,
+                { onCall: aiUsage.record },
               );
               diff.aiAnalysis = analysis;
               // Pixel comparison is the pass/fail signal. Classification is
@@ -697,22 +711,31 @@ async function runCapturedPipeline(
         }
 
         timing.ai = duration;
+        const analyzed = aiDiffs.length - analysisFailures - analysisSkipped;
+        const skippedNote = analysisSkipped > 0 ? `; ${analysisSkipped} skipped (ai.maxCalls)` : '';
+        if (analysisSkipped > 0) {
+          logger.warn(
+            `Skipped ${analysisSkipped} AI analysis call(s): ai.maxCalls (${aiConfig.maxCalls}) reached. Pixel results are unchanged.`,
+          );
+        }
         if (analysisFailures > 0) {
           logger.error(`AI analysis failed for ${analysisFailures} change(s)`);
           rp.onStageComplete(
             'analyze',
-            `Analyzed ${aiDiffs.length - analysisFailures} change(s); ${analysisFailures} failed in ${duration}ms`,
+            `Analyzed ${analyzed} change(s); ${analysisFailures} failed${skippedNote} in ${duration}ms`,
           );
         } else {
           rp.onStageComplete(
             'analyze',
-            `Analyzed ${aiDiffs.length} change(s) in ${duration}ms`,
+            `Analyzed ${analyzed} change(s)${skippedNote} in ${duration}ms`,
           );
         }
+        analyzeSpan.end(analysisFailures > 0 ? 'error' : 'ok', aiUsage.spanAttributes(analyzeStartIndex));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         logger.error(`AI analysis stage failed: ${msg}`);
         rp.onStageComplete('analyze', `Failed: ${msg}`);
+        analyzeSpan.end('error', aiUsage.spanAttributes(analyzeStartIndex));
       }
 
       // Free AI buffers again after analysis — they'll be restored for reporting
@@ -727,7 +750,7 @@ async function runCapturedPipeline(
   // -----------------------------------------------------------------------
   // Stage 5.5: GENERATE FIXES (optional — AI CSS fixes for regressions)
   // -----------------------------------------------------------------------
-  if (config.ai && config.generateFixes) {
+  if (config.ai && config.generateFixes && aiUsage) {
     const aiConfig = config.ai;
     // Only attempt fixes for genuine regressions identified by AI.
     const regressionDiffs: Array<{ diff: DiffResult; index: number }> = [];
@@ -750,6 +773,9 @@ async function runCapturedPipeline(
         `Generating fixes for ${regressionDiffs.length} regression(s)…`,
       );
       let fixCompleted = 0;
+      let fixSkipped = 0;
+      const fixSpan = trace.start('frontguard.fix');
+      const fixStartIndex = aiUsage.count;
 
       // Open the local fix-pattern DB (data moat). Degrades to no-op if
       // better-sqlite3 isn't available.
@@ -760,19 +786,17 @@ async function runCapturedPipeline(
         const [, duration] = await timed(async () => {
           // Sequential to bound AI cost and (optional) sandbox usage.
           for (const { diff } of regressionDiffs) {
+            const cachedPattern = patternsOn ? lookupPattern(patternDB, diff) : null;
+            if (!cachedPattern && !aiUsage.tryReserve()) {
+              fixSkipped++;
+              fixCompleted++;
+              rp.onStageProgress('fix', fixCompleted, regressionDiffs.length, `${diff.route.path} → skipped (ai.maxCalls)`);
+              continue;
+            }
             try {
               const fix = await generateFix(diff, aiConfig, {
-                patternLookup: patternsOn
-                  ? (d) => {
-                      // We don't know the category before generating, so probe
-                      // each category's context hash for an accepted pattern.
-                      for (const cat of FIX_CATEGORIES) {
-                        const hit = patternDB.findAcceptedPattern(contextHashFor(d, cat));
-                        if (hit) return hit;
-                      }
-                      return null;
-                    }
-                  : undefined,
+                onCall: aiUsage.record,
+                patternLookup: cachedPattern ? () => cachedPattern : undefined,
               });
               if (fix) {
                 diff.suggestedFix = fix;
@@ -801,11 +825,19 @@ async function runCapturedPipeline(
           }
         });
         timing.fix = duration;
-        rp.onStageComplete('fix', `Generated fixes in ${duration}ms`);
+        if (fixSkipped > 0) {
+          logger.warn(`Skipped ${fixSkipped} fix generation call(s): ai.maxCalls (${aiConfig.maxCalls}) reached.`);
+        }
+        rp.onStageComplete(
+          'fix',
+          `Generated fixes in ${duration}ms${fixSkipped > 0 ? `; ${fixSkipped} skipped (ai.maxCalls)` : ''}`,
+        );
+        fixSpan.end('ok', aiUsage.spanAttributes(fixStartIndex));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         logger.error(`Fix generation stage failed: ${msg}`);
         rp.onStageComplete('fix', `Failed: ${msg}`);
+        fixSpan.end('error', aiUsage.spanAttributes(fixStartIndex));
       } finally {
         patternDB.close();
       }
@@ -838,6 +870,12 @@ async function runCapturedPipeline(
   timing.total = Math.round(performance.now() - totalStart);
   const result = buildResult(diffs, timing, totalStart, config);
   if (fingerprintCheck) result.fingerprintCheck = fingerprintCheck;
+  if (aiUsage) {
+    result.aiUsage = aiUsage.summary();
+    if (result.aiUsage.totals.calls > 0 || result.aiUsage.skipped.budget > 0) {
+      logger.info(`AI usage: ${formatAIUsage(result.aiUsage)}`);
+    }
+  }
 
   // Surface accessibility results (Task 5.1) from plugin metadata onto the
   // result so reporters can render them.
@@ -904,4 +942,19 @@ async function runCapturedPipeline(
     // Plugin hook: teardown — always called, even on error
     await pm.teardown();
   }
+}
+
+/**
+ * Probes each fix category's context hash for a previously accepted pattern.
+ * The category isn't known before generating, so every category is checked.
+ */
+function lookupPattern(
+  patternDB: FixPatternDB,
+  diff: DiffResult,
+): { cssPatch: string; category: (typeof FIX_CATEGORIES)[number] } | null {
+  for (const cat of FIX_CATEGORIES) {
+    const hit = patternDB.findAcceptedPattern(contextHashFor(diff, cat));
+    if (hit) return hit;
+  }
+  return null;
 }

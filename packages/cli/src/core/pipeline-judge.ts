@@ -13,6 +13,7 @@ import { withCliTrace, type CliTrace } from '../utils/otel.js';
 import { renderPages } from '../render/playwright.js';
 import { overflowReports } from '../render/horizontal-overflow.js';
 import { judgeScreenshot } from '../diff/model-judge.js';
+import { AIUsageTracker, formatAIUsage } from './ai-usage.js';
 import { fetchDesignReference } from '../plugins/figma.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -112,6 +113,8 @@ async function judgeCapturedPages(
   rp.onStageStart('analyze', `Judging ${shots.length} screenshot(s) with ${config.ai.provider}/${config.ai.model}…`);
   const judgements: JudgeResult[] = [];
   const judgeConfig = config.judge;
+  const aiUsage = new AIUsageTracker(config.ai.maxCalls);
+  const judgeSpan = trace.start('frontguard.analyze');
 
   // Cache Figma references per route (share in-flight promise across concurrent viewports).
   const referenceCache = new Map<string, Promise<Buffer | null>>();
@@ -135,8 +138,22 @@ async function judgeCapturedPages(
 
   const [judgeOutcomes, judgeDuration] = await timed(async () => {
     return processBatched(shots, AI_BATCH_SIZE, async (shot, index) => {
+      if (!aiUsage.tryReserve()) {
+        judgements.push({
+          route: shot.route,
+          viewport: shot.viewport,
+          browser: shot.browser,
+          pass: false,
+          confidence: 0,
+          issues: [],
+          withDesignReference: false,
+          skipped: 'budget',
+        });
+        rp.onStageProgress('analyze', index + 1, shots.length, `${shot.route.path} @ ${shot.viewport}px → skipped (ai.maxCalls)`);
+        return;
+      }
       const figmaReference = await referenceFor(shot.route.path);
-      const verdict = await judgeScreenshot(shot, { ai: config.ai!, figmaReference });
+      const verdict = await judgeScreenshot(shot, { ai: config.ai!, figmaReference, onCall: aiUsage.record });
       judgements.push(verdict);
       rp.onStageProgress(
         'analyze',
@@ -176,6 +193,10 @@ async function judgeCapturedPages(
   if (judgeFailures > 0) {
     logger.error(`Judge failed for ${judgeFailures} screenshot(s)`);
   }
+  if (aiUsage.skipped > 0) {
+    logger.warn(`Skipped ${aiUsage.skipped} judge call(s): ai.maxCalls (${config.ai.maxCalls}) reached.`);
+  }
+  judgeSpan.end(judgeFailures > 0 ? 'error' : 'ok', aiUsage.spanAttributes(0));
   rp.onStageComplete(
     'analyze',
     `Judged ${judgements.length} screenshot(s) in ${judgeDuration}ms${judgeFailures > 0 ? `; ${judgeFailures} failed` : ''}`,
@@ -183,6 +204,10 @@ async function judgeCapturedPages(
 
   timing.total = Math.round(performance.now() - totalStart);
   const result = buildJudgeResult(judgements, timing, totalStart, config);
+  result.aiUsage = aiUsage.summary();
+  if (result.aiUsage.totals.calls > 0 || result.aiUsage.skipped.budget > 0) {
+    logger.info(`AI usage: ${formatAIUsage(result.aiUsage)}`);
+  }
   const hx = await overflowReports(shots);
   if (hx.length > 0) result.horizontalOverflow = hx;
   await rp.onComplete(result);

@@ -72,6 +72,8 @@ interface SerializedDiff {
     confidence: number;
     suggestedFix?: string;
   };
+  /** Present when the analysis was skipped because `ai.maxCalls` was reached. */
+  aiSkipped?: 'budget';
   suggestedFix?: {
     fixType: string;
     category: string;
@@ -101,6 +103,8 @@ interface SerializedRunResult {
   horizontalOverflow?: RunResult['horizontalOverflow'];
   perf?: RunResult['perf'];
   thirdPartyScripts?: RunResult['thirdPartyScripts'];
+  /** Model-call accounting: one record per call, totals, and budget skips. */
+  aiUsage?: RunResult['aiUsage'];
   config: {
     baseUrl: string;
     viewports: number[];
@@ -128,6 +132,7 @@ function serializeRunResult(result: RunResult): SerializedRunResult {
     ...(result.horizontalOverflow ? { horizontalOverflow: result.horizontalOverflow } : {}),
     perf: result.perf,
     thirdPartyScripts: result.thirdPartyScripts,
+    ...(result.aiUsage ? { aiUsage: result.aiUsage } : {}),
     config: {
       baseUrl: result.config.baseUrl,
       viewports: result.config.viewports,
@@ -187,6 +192,10 @@ function serializeDiff(diff: DiffResult): SerializedDiff {
       confidence: diff.aiAnalysis.confidence,
       suggestedFix: diff.aiAnalysis.suggestedFix,
     };
+  }
+
+  if (diff.aiSkipped) {
+    serialized.aiSkipped = diff.aiSkipped;
   }
 
   if (diff.suggestedFix) {

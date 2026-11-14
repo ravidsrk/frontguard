@@ -22,7 +22,7 @@ export function buildJudgeResult(
   config: FrontguardConfig,
 ): RunResult {
   const errors = judgements.filter((j) => j.error).length;
-  const failed = judgements.filter((j) => !j.pass && !j.error).length;
+  const failed = judgements.filter((j) => !j.pass && !j.error && !j.skipped).length;
   const passed = judgements.filter((j) => j.pass).length;
   const warningPasses = judgements.filter(
     (j) => j.pass && j.issues.some((i) => i.severity === 'warning'),
