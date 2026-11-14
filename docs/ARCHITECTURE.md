@@ -143,7 +143,7 @@ Source only. `api.frontguard.dev` does not resolve, and the deployment gates are
 | `index.ts` | Server entry: protocol negotiation, tool registration. `promote_baseline` and `accept_baseline` register only with `FRONTGUARD_MCP_WRITES=1`. |
 | `auth.ts` | Reads `FRONTGUARD_API_KEY` and `FRONTGUARD_API_URL` into `FrontguardAuth`. The server starts without them; cloud tools return a clear error. |
 | `client/cloud.ts` | `CloudClient` for the cloud API, and the local-report client for `FRONTGUARD_LOCAL_REPORT`. |
-| `tools/` | One file per tool: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `recent_runs`, `list_horizontal_overflow`, `promote_baseline`, `accept_baseline`. |
+| `tools/` | One file per tool: `list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `recent_runs`, `list_horizontal_overflow`, `promote_baseline`, `accept_baseline`. Shared helpers: `_paging.ts` (`limit` / `cursor` pages for the list tools), `_runs.ts` (newest run, `"latest"`), `_regression.ts`. |
 
 ## packages/playwright
 

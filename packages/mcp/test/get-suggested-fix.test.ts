@@ -1,7 +1,7 @@
 /**
  * Regression test for mcp-2: when the cloud-api wire returns a result with a
  * populated `suggestedFix`, `get_suggested_fix` must return that object — not
- * the canned `{ fix: null, reason: 'Re-run with an ai provider…' }`.
+ * the canned `{ fix: null, reason: 'No AI fix available…' }`.
  *
  * The cloud-api now plumbs suggestedFix end to end, so this exercises the MCP
  * side reading it back off the wire.

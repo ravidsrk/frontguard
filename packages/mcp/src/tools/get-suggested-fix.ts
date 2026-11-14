@@ -20,6 +20,10 @@ export const getSuggestedFixInputSchema = {
 
 export type GetSuggestedFixInput = { diff_id: string };
 
+/** Fixes exist only when the run had an `ai` provider and fix generation on. */
+export const NO_FIX_REASON =
+  'No AI fix available for this diff. Fixes need an `ai` provider and `generateFixes: true` (or `--generate-fixes`) on the run that produced the report; re-run with both to generate suggestions.';
+
 export interface SuggestedFixResult {
   diffId: string;
   runId: string;
@@ -99,8 +103,7 @@ export async function getSuggestedFix(
       viewport,
       browser: match.browser,
       fix: null,
-      reason:
-        'No AI fix available for this diff. Re-run with an `ai` provider configured to generate suggestions.',
+      reason: NO_FIX_REASON,
     };
   }
 

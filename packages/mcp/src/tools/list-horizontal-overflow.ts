@@ -5,11 +5,16 @@
  * already carries `horizontalOverflow`. A flagged row is a visible unclipped
  * box past the right edge. Nothing here changes a pixel status or an exit code.
  *
+ * Only flagged rows are returned by default, largest element `overflowPx`
+ * first, in pages of `limit` rows (#379).
+ *
  * @module tools/list-horizontal-overflow
  */
 
 import { z } from 'zod';
 import type { CloudClient, CloudHorizontalOverflow } from '../client/cloud.js';
+import { pageCursorInput, pageLimitInput, paginate } from './_paging.js';
+import { newestRun } from './_runs.js';
 
 export const listHorizontalOverflowInputSchema = {
   run_id: z
@@ -17,16 +22,39 @@ export const listHorizontalOverflowInputSchema = {
     .min(1)
     .optional()
     .describe('Run id. Omit it to read the newest run, including the local report.'),
+  flagged_only: z
+    .boolean()
+    .default(true)
+    .describe(
+      'Return only flagged rows (a visible unclipped box past the right edge). Default true. Pass false to include rows that only scroll.',
+    ),
+  limit: pageLimitInput,
+  cursor: pageCursorInput,
 } as const;
 
 export type ListHorizontalOverflowInput = {
   run_id?: string;
+  /** Default true. */
+  flagged_only?: boolean;
+  /** Rows per page. Default 25, max 200. */
+  limit?: number;
+  /** `nextCursor` from the previous page. */
+  cursor?: string;
 };
 
 export interface ListHorizontalOverflowResult {
-  count: number;
-  flagged: number;
   runId: string | null;
+  /** The filter applied to `rows`. */
+  flaggedOnly: boolean;
+  /** Rows matching the filter in the whole run. */
+  total: number;
+  /** Rows in this page. */
+  count: number;
+  /** Flagged rows in the whole run, whatever the filter. */
+  flagged: number;
+  /** Pass back as `cursor` for the next page; null on the last page. */
+  nextCursor: string | null;
+  /** Largest element `overflowPx` first. */
   rows: CloudHorizontalOverflow[];
   notFound?: { reason: string };
 }
@@ -47,34 +75,62 @@ const rowSchema = z.object({
 });
 
 export const listHorizontalOverflowOutputSchema = z.object({
+  runId: z.string().nullable(),
+  flaggedOnly: z.boolean(),
+  total: z.number().int().nonnegative(),
   count: z.number().int().nonnegative(),
   flagged: z.number().int().nonnegative(),
-  runId: z.string().nullable(),
+  nextCursor: z.string().nullable(),
   rows: z.array(rowSchema),
   notFound: z.object({ reason: z.string() }).optional(),
 });
+
+function largestOverflowPx(row: CloudHorizontalOverflow): number {
+  let largest = 0;
+  for (const el of row.elements) {
+    if (Number.isFinite(el.overflowPx) && el.overflowPx > largest) largest = el.overflowPx;
+  }
+  return largest;
+}
 
 export async function listHorizontalOverflow(
   client: CloudClient,
   input: ListHorizontalOverflowInput,
 ): Promise<ListHorizontalOverflowResult> {
+  const flaggedOnly = input.flagged_only ?? true;
   const run = input.run_id
     ? await client.getRun(input.run_id)
-    : (await client.listRuns()).runs[0];
+    : newestRun((await client.listRuns()).runs);
   if (!run) {
     return {
+      runId: null,
+      flaggedOnly,
+      total: 0,
       count: 0,
       flagged: 0,
-      runId: null,
+      nextCursor: null,
       rows: [],
       notFound: { reason: 'No run found' },
     };
   }
-  const rows = run.horizontalOverflow ?? [];
-  return {
-    count: rows.length,
-    flagged: rows.filter((row) => row.flagged).length,
+  const all = run.horizontalOverflow ?? [];
+  // Array#sort is stable, so rows with equal overflow keep report order.
+  const rows = (flaggedOnly ? all.filter((row) => row.flagged) : [...all]).sort(
+    (a, b) => largestOverflowPx(b) - largestOverflowPx(a),
+  );
+  const page = paginate(rows, {
     runId: run.id,
-    rows,
+    limit: input.limit,
+    cursor: input.cursor,
+    filter: flaggedOnly ? 'flagged' : 'all',
+  });
+  return {
+    runId: run.id,
+    flaggedOnly,
+    total: page.total,
+    count: page.count,
+    flagged: all.filter((row) => row.flagged).length,
+    nextCursor: page.nextCursor,
+    rows: page.rows,
   };
 }

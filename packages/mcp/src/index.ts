@@ -1,11 +1,14 @@
 /**
  * Frontguard MCP server — stdio entry.
  *
- * Registers read tools (`list_regressions`, `inspect_diff_cluster_dom`,
- * `get_suggested_fix`, `verify_css_patch`, `recent_runs`) and connects them
- * to a stdio transport. `promote_baseline` and `accept_baseline` are registered
- * only when `FRONTGUARD_MCP_WRITES=1`, so editor agents (Claude Code, Cursor,
- * Copilot) can call the read tools in-loop without a baseline write.
+ * Registers six read tools (`list_regressions`, `list_horizontal_overflow`,
+ * `get_suggested_fix`, `recent_runs`, `inspect_diff_cluster_dom`,
+ * `verify_css_patch`) and connects them to a stdio transport.
+ * `promote_baseline` and `accept_baseline` are registered only when
+ * `FRONTGUARD_MCP_WRITES=1`, so editor agents (Claude Code, Cursor, Copilot)
+ * can call the read tools in-loop without a baseline write. Both write tools
+ * record whole-run approval through the same endpoint; neither promotes
+ * screenshots.
  * Supports both Cloud API mode and local CLI report mode (`FRONTGUARD_LOCAL_REPORT`).
  *
  * The server starts even without `FRONTGUARD_API_KEY` set — the SDK lists
@@ -32,6 +35,7 @@ import { requireAuth, MissingApiKeyError, MissingApiUrlError } from './auth.js';
 import {
   CloudApiError,
   CloudClient,
+  cloudApiErrorHint,
   createLocalReportClient,
   resolveLocalReportPath,
 } from './client/cloud.js';
@@ -88,7 +92,7 @@ const ServerDiscoverRequestSchema = z.object({
 });
 
 const READ_INSTRUCTIONS =
-  'Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, `recent_runs` to browse history, and `list_horizontal_overflow` to list visible unclipped boxes past the right edge. Horizontal overflow does not change the pixel result.';
+  'Use `list_regressions` to see what visual regressions a PR or run has (`pr_id: "latest"` reads the newest run, or the local report), `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the stored AI patch for a specific diff, `verify_css_patch` to statically check candidate CSS fixes (it renders nothing; re-run `frontguard run` to confirm pixels), `recent_runs` to browse history, and `list_horizontal_overflow` to list visible unclipped boxes past the right edge. Horizontal overflow does not change the pixel result. The two list tools return at most `limit` rows (default 25, max 200) with `total` and `nextCursor`; pass `nextCursor` back as `cursor` for the next page.';
 
 /** Instructions match the tools this process actually registers. */
 export function serverInstructions(env: NodeJS.ProcessEnv = process.env): string {
@@ -96,7 +100,7 @@ export function serverInstructions(env: NodeJS.ProcessEnv = process.env): string
     return (
       'Frontguard MCP server. ' +
       READ_INSTRUCTIONS +
-      ' Write tools are enabled: `promote_baseline` promotes reviewed visual changes, and `accept_baseline` records whole-run approval. A human still confirms baseline files with `frontguard update-baselines --confirm-baselines`.'
+      ' Write tools are enabled: `promote_baseline` and `accept_baseline` both record whole-run approval through the same endpoint and promote no screenshots. A human still confirms baseline files with `frontguard update-baselines --confirm-baselines`.'
     );
   }
   return (
@@ -213,7 +217,7 @@ function registerCoreTools(server: McpServer, writesEnabled: boolean): void {
     {
       ...readOnlyAnnotations('List regressions for a PR'),
       description:
-        'Return the visual regressions Frontguard detected on a given GitHub PR (or run id). Each row carries a `diffId` you can pass to `get_suggested_fix`.',
+        'Return the visual regressions Frontguard detected for a GitHub PR number, a run id, or `"latest"` (the newest run; in local-report mode, the report\'s run). Rows come worst first (regression and error before changed, then by `diffPercentage`), at most `limit` per page (default 25, max 200); pass `nextCursor` back as `cursor` for more. Run fields (`runId`, `reportUrl`, PR, repo, commit) are top level. Each row carries a `diffId` for `inspect_diff_cluster_dom`, `get_suggested_fix` and `verify_css_patch`, plus a `clusterCount`.',
       inputSchema: listRegressionsInputSchema,
       outputSchema: listRegressionsOutputSchema,
     },
@@ -225,7 +229,7 @@ function registerCoreTools(server: McpServer, writesEnabled: boolean): void {
     {
       ...readOnlyAnnotations('List horizontal overflow'),
       description:
-        'List horizontal overflow from a run. A flagged row is a visible unclipped box past the right edge, with selector and pixels. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code.',
+        'List horizontal overflow from a run (the newest run when `run_id` is omitted). A flagged row is a visible unclipped box past the right edge, with selector and pixels. Only flagged rows are returned unless `flagged_only` is false. Rows come largest element `overflowPx` first, at most `limit` per page (default 25, max 200); pass `nextCursor` back as `cursor` for more. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code.',
       inputSchema: listHorizontalOverflowInputSchema,
       outputSchema: listHorizontalOverflowOutputSchema,
     },
@@ -237,7 +241,7 @@ function registerCoreTools(server: McpServer, writesEnabled: boolean): void {
     {
       ...readOnlyAnnotations('Get the suggested fix for a diff'),
       description:
-        'Return the AI-generated patch for a single diff (keyed by the `diffId` from `list_regressions`).',
+        'Return the AI-generated patch for a single diff (keyed by the `diffId` from `list_regressions`). Fixes exist only when the run had an `ai` provider and `generateFixes: true`; otherwise `fix` is null and `reason` says why.',
       inputSchema: getSuggestedFixInputSchema,
       outputSchema: getSuggestedFixOutputSchema,
     },
@@ -287,9 +291,9 @@ function registerExtendedTools(server: McpServer, writesEnabled: boolean): void 
   server.registerTool(
     'verify_css_patch',
     {
-      ...readOnlyAnnotations('Verify a candidate CSS patch before applying'),
+      ...readOnlyAnnotations('Statically check a candidate CSS patch'),
       description:
-        'Validate a candidate CSS patch against a visual regression diff for syntax correctness, target selector alignment, and layout-destroying properties.',
+        'Statically check a candidate CSS patch for a diff from `list_regressions`: brace balance and declaration syntax, a deny list (`@import`, external `url()`, `expression()`, `display: none !important`, hiding root containers), and whether `target_selector` matches a selector recorded for the diff. It renders nothing and cannot confirm a visual fix: `staticCheck: "pass"` comes with `rendered: false`, so apply the patch locally and re-run `frontguard run` to confirm the pixels.',
       inputSchema: verifyCssPatchInputSchema,
       outputSchema: verifyCssPatchOutputSchema,
     },
@@ -300,9 +304,9 @@ function registerExtendedTools(server: McpServer, writesEnabled: boolean): void 
     server.registerTool(
       'promote_baseline',
       {
-        ...destructiveAnnotations('Promote reviewed visual baselines'),
+        ...destructiveAnnotations('Record run approval (promotes no screenshots)'),
         description:
-          'Promote reviewed visual changes to baseline after `confirm_reviewed: true`, optionally scoped to specific routes.',
+          'Record whole-run approval for a reviewed run after `confirm_reviewed: true`. It calls the same endpoint as `accept_baseline` and promotes no screenshots (`screenshotsPromoted: false`). `routes` does not scope the approval: the call is refused unless every changed route in the run is included. Refused in local-report mode. A human updates baseline files with `frontguard update-baselines --confirm-baselines`.',
         inputSchema: promoteBaselineInputSchema,
         outputSchema: promoteBaselineOutputSchema,
       },
@@ -346,8 +350,9 @@ async function withCloudClient<T extends object>(
       ? createLocalReportClient(localReportPath)
       : new CloudClient(requireAuth());
     const data = await fn(client);
+    // Compact JSON: the text block lands in the agent's context (#379).
     return {
-      content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify(data) }],
       structuredContent: data as Record<string, unknown>,
     };
   } catch (err) {
@@ -365,12 +370,7 @@ function toolError(err: unknown): CallToolResult {
   if (err instanceof CloudApiError) {
     return {
       isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `Frontguard cloud-api error (${err.status}): ${err.body || err.message}`,
-        },
-      ],
+      content: [{ type: 'text', text: cloudApiErrorText(err) }],
     };
   }
   const message = err instanceof Error ? err.message : String(err);
@@ -378,6 +378,22 @@ function toolError(err: unknown): CallToolResult {
     isError: true,
     content: [{ type: 'text', text: `Frontguard MCP error: ${message}` }],
   };
+}
+
+/**
+ * One short line for a cloud-api failure: method, path, status, a hint for
+ * the status, and the body without markup, capped (#379). A proxy's 502 page
+ * would otherwise put kilobytes of HTML into the agent's context.
+ */
+function cloudApiErrorText(err: CloudApiError): string {
+  const path = err.path.length > 120 ? `${err.path.slice(0, 119)}…` : err.path;
+  const hint = cloudApiErrorHint(err.status, err.mode);
+  const source = err.mode === 'local-report' ? 'local report' : 'cloud-api';
+  return [
+    `Frontguard ${source} error: ${err.method} ${path} returned ${err.status}.`,
+    ...(hint ? [hint] : []),
+    ...(err.summary ? [`Body: ${err.summary}`] : []),
+  ].join(' ');
 }
 
 /** Process entry — connects the server to stdio. */

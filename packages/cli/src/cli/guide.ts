@@ -57,7 +57,7 @@ export default defineConfig({
 \`colorScheme\` and \`--color-scheme\` change emulation only. Until named capture modes exist, that run compares against the same baseline file as the default scheme (\`baselines/<route>/<viewport>/<browser>.png\`) and warns when the stored scheme differs. The warning does not change the exit code. Two route entries that share a path, viewport, and browser are a config error.
 
 ## 2. Automatic Route & Storybook Discovery
-- **Filesystem discovery**: Automatically detects Next.js App Router (including route groups and parallel slot filtering), Next.js Pages, Remix (\`_index\` and pathless layouts), SvelteKit, Astro, and Nuxt routes when \`routes\` is omitted.
+- **Filesystem discovery**: Automatically detects Next.js App Router (including route groups and parallel slot filtering), Next.js Pages, Remix (\`_index\` and pathless layouts), SvelteKit, and Nuxt routes when \`routes\` is omitted.
 - **Crawler discovery**: Set \`discover: { startUrl: 'http://localhost:3000', maxDepth: 3, maxRoutes: 50, exclude: ['/admin/*'] }\`.
 - **Storybook**: Set \`storybook: { url: 'http://localhost:6006', stories: ['Components/*'] }\`. Storybook 7 is read from \`/stories.json\`. Storybook 8, 9, 10, and 11 alpha share \`/index.json\`, so they use the same parser. The renderer awaits each story's \`play()\` function before capture.
 - **Ladle** (off unless set): \`ladle: { dir: 'build' }\` or \`ladle: { url: 'http://localhost:61000' }\` reads \`meta.json\`. Stories open at \`/?story=<id>&mode=preview\` and wait for \`[data-storyloaded]\`.
@@ -116,16 +116,23 @@ Add \`@frontguard/mcp\` to \`.mcp.json\` or \`.cursor/mcp.json\`:
 }
 \`\`\`
 
-Works against local CLI reports (\`./frontguard-report/report.json\` or \`FRONTGUARD_LOCAL_REPORT\`) with zero cloud account required, or against Frontguard Cloud when \`FRONTGUARD_API_KEY\` is set.
+Works against local CLI reports (\`./frontguard-report/report.json\` or \`FRONTGUARD_LOCAL_REPORT\`) with zero cloud account required, or against Frontguard Cloud when \`FRONTGUARD_API_URL\` and \`FRONTGUARD_API_KEY\` are set (there is no hosted default).
 
-## 2. Available Tools (8 Tools)
-1. \`list_regressions\`: List visual regressions for a run ID, PR number, or latest local report.
-2. \`inspect_diff_cluster_dom\`: Inspect spatial \`DiffCluster\` bounding boxes, target CSS selectors, AI classification, and localized similarity metrics for a \`diff_id\`.
-3. \`get_suggested_fix\`: Retrieve the candidate CSS/HTML patch, confidence score, and verification status for a \`diff_id\`.
-4. \`verify_css_patch\`: Validate a candidate CSS patch against the target selector (checking balanced braces, selector alignment, and guarding against layout-destroying rules like \`display: none !important\` or external \`@import\`).
-5. \`promote_baseline\` and \`accept_baseline\` are not part of the agent workflow. They are unregistered unless \`FRONTGUARD_MCP_WRITES=1\`. \`confirm_reviewed: true\` is UX only — an agent setting it is not a human review. Local-report mode refuses promotion. A human writes baselines with \`frontguard update-baselines --confirm-baselines\`. Cloud \`approveRun\` is not a production path.
-6. \`recent_runs\`: List recent visual test runs and their pass/regression counts.
-7. \`list_horizontal_overflow\`: List visible unclipped boxes past the right edge. It does not change the pixel exit code.`,
+## 2. Available Tools (six read tools)
+1. \`list_regressions\`: List regression rows for \`pr_id\`: a PR number, a run ID (a local report is \`run_local\` unless it sets an id), or \`"latest"\` for the newest run, which in local-report mode is the report's run. Rows come worst first, each with a \`diffId\` and a \`clusterCount\`. Optional \`repo\`, \`limit\` (default 25, max 200), and \`cursor\` (pass back \`nextCursor\` for the next page).
+2. \`inspect_diff_cluster_dom\`: Inspect spatial \`DiffCluster\` bounding boxes, recorded target CSS selectors, AI classification, explanation, and suggested fix for a \`diff_id\`; optional \`cluster_id\`.
+3. \`get_suggested_fix\`: Retrieve the stored candidate CSS/HTML patch and its confidence score for a \`diff_id\`. Fixes exist only when the run had an \`ai\` provider and \`generateFixes: true\`.
+4. \`verify_css_patch\`: Statically check a candidate patch (\`diff_id\`, \`target_selector\`, \`css_patch\`): balanced braces, selector alignment with the recorded target, and a deny list for layout-destroying rules like \`display: none !important\` or external \`@import\`. It renders nothing: \`staticCheck: "pass"\` comes with \`rendered: false\`.
+5. \`recent_runs\`: List recent visual test runs and their regression counts; optional \`repo\`, \`branch\`, \`limit\`.
+6. \`list_horizontal_overflow\`: List visible unclipped boxes past the right edge, flagged rows only unless \`flagged_only\` is false, paged with \`limit\` and \`cursor\`. It does not change the pixel exit code.
+
+\`promote_baseline\` and \`accept_baseline\` are not part of the agent workflow. They are unregistered unless \`FRONTGUARD_MCP_WRITES=1\`, both record whole-run approval through the same endpoint, and neither promotes screenshots. \`confirm_reviewed: true\` is UX only — an agent setting it is not a human review. Local-report mode refuses promotion. A human writes baselines with \`frontguard update-baselines --confirm-baselines\`. Cloud \`approveRun\` is not a production path.
+
+## 3. Agent Loop
+1. Call \`list_regressions\` with \`{"pr_id": "latest"}\`.
+2. For each row, call \`inspect_diff_cluster_dom\` with \`{"diff_id": "<diffId>"}\`.
+3. Check a candidate fix with \`verify_css_patch\`, apply it, and re-run \`frontguard run\` to confirm the pixels.
+4. Stop. A human reviews the report and updates baselines.`,
   },
   {
     id: 'playwright',

@@ -24,12 +24,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@frontguard/playwright` uses the CLI's prompt, schema, taxonomy (`regression` / `intentional` / `content_update`; severity `critical` / `warning` / `info`) and defaults, adds `confidence`, sends the pixel diff overlay, and crops screenshots to 5,000 px tall and 800 px wide before sending.
 - The fix prompt no longer says it receives a git diff. A `gitDiff` passed through the library API is fenced and capped. Judge mode fences the route path like analysis does.
 - Removed the unmaintained `validate-ai*.ts` scripts and their March 2026 results; `eval:ai` replaces them.
+- `@frontguard/mcp` list tools are bounded. `list_regressions` and `list_horizontal_overflow` take `limit` (default 25, max 200) and `cursor`, and return `total`, `count` (rows in this page) and `nextCursor`. A cursor from a different run, filter or report revision is refused. `list_regressions` sorts regression and error rows before changed rows, then by `diffPercentage`; `list_horizontal_overflow` returns flagged rows only unless `flagged_only` is false, largest overflow first.
+- `list_regressions` moves run fields (`runId`, `reportUrl`, `prNumber`, `repo`, `commitSha`) to the top level, adds `clusterCount` to each row, accepts `pr_id: "latest"` (the newest run, or the local report's run), and drops the ignored `branch` input.
+- `verify_css_patch` returns `staticCheck` (`pass` | `fail`), `rendered: false` and `nextStep` instead of `recommendation`, and says it renders nothing. `promote_baseline` returns `approvalRecorded: true`, `screenshotsPromoted: false` and `reviewedRoutes` instead of `promoted` and `promotedRoutes`.
+- MCP text blocks are compact JSON. Cloud-api errors drop HTML, cap the body at 300 characters, name the method and path, and add a hint for the status; local-report errors get a local hint.
 
 ### Fixed
 
 - AI analysis with `provider: 'anthropic'` and no `model` failed on every run because the default model was retired on 2026-06-15.
 - `@frontguard/playwright` no longer drops AI failures silently.
 - The docs no longer say the model receives cropped Set-of-Mark evidence. It receives the downscaled baseline, current and diff screenshots plus the DOM selectors under each changed cluster.
+- The agent skill's MCP reference, `frontguard guide mcp`, `agents.md`, `llms.txt`, `llms-full.txt` and the MCP docs page listed tools and parameters the server does not have (`get_diff_details`, `accept_suggestion`, `run_visual_check`, `pr_or_run_id`). A contract test now checks every documented tool and example argument against the live server.
+- `get_suggested_fix` says fixes need an `ai` provider and `generateFixes: true`; `list_regressions` names the report's run id when nothing matches in local-report mode.
+
 
 ## [0.2.3] - 2026-11-11
 
