@@ -2,6 +2,10 @@
 
 Thanks for your interest in contributing! Here's how to get started.
 
+- [AGENTS.md](./AGENTS.md): the short version for coding agents, with the verify and test commands.
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md): package map, run flow and module tables.
+- [docs/README.md](./docs/README.md): index of every maintained doc.
+
 ## Development setup
 
 ```bash
@@ -24,6 +28,9 @@ npm test
 
 ## Project structure
 
+The full map, with a module table for each package, is in
+[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+
 ```
 packages/
 ├── cli/                          # @frontguard/cli — the visual regression engine
@@ -33,7 +40,7 @@ packages/
 │   ├── src/discovery/            # Route discovery (crawler, filesystem, storybook, ladle, histoire)
 │   ├── src/render/               # Playwright renderer + Docker-renderer adapter
 │   ├── src/sandbox/              # Local + Daytona fix-verification sandboxes
-│   ├── src/plugins/              # accessibility, perf-budgets, third-party, monitor, figma
+│   ├── src/plugins/              # accessibility, figma, monitor, perf-budgets, text-snapshot, third-party-scripts
 │   ├── src/storage/              # Baseline orphan branch + fix-pattern DB
 │   ├── docker/                   # Pinned render environment (Dockerfile + compose)
 │   └── bin/frontguard-render     # Thin render binary used by the Daytona sandbox
@@ -49,11 +56,13 @@ integrations/
 └── vercel/                       # Vercel OAuth + custom-domain preview support
 
 apps/
-└── web/                          # frontguard.dev — TanStack Start on Cloudflare Workers
+├── web/                          # frontguard.dev — TanStack Start on Cloudflare Workers
+└── demo/                         # Small Next.js target app for exercising the CLI
 
-demo/                             # VHS tape + rendered demo GIF + fg-demo recording wrapper
+demo/                             # Pre-release demo gate card (GIF + editable SVG source)
 validation/                       # OSS-repo harness + measured results (results-v0.2.md)
-scripts/                          # stats.ts, release.sh, build-daytona-snapshot.ts
+scripts/                          # sync-version.ts, sync-openapi.mjs, release.sh, stats.ts; tests in scripts/test/
+docs/                             # Maintained docs (index: docs/README.md); history in docs/archive/
 ```
 
 ## Running in development
@@ -76,22 +85,37 @@ npm run typecheck
 ## Tests
 
 ```bash
+# Build, then version and OpenAPI sync, lint, typecheck and doc links,
+# then all tests. Stops at the first failure.
+npm run verify
+
+# Only the static checks (what the CI lint job runs)
+npm run verify:static
+
 # Run all tests
 npm test
 
-# Run specific test file
-npx vitest test/diff/pixel.test.ts
+# Run one workspace's tests
+npm test --workspace=packages/cli
+
+# Run one test file, from inside its package so that package's config applies
+cd packages/cli && npx vitest run test/diff/pixel.test.ts
 
 # Watch mode
-npx vitest --watch
+cd packages/cli && npx vitest
+npm run test:watch --workspace=apps/web
 ```
+
+Don't run `npx vitest` from the repository root. It ignores each workspace's config,
+so suites that rely on it fail.
 
 ## Submitting a PR
 
 1. Fork the repo and create a branch from `main`
 2. Make your changes
 3. Add or update tests as needed
-4. Run `npm test` and `npm run lint` — ensure both pass
+4. Run `npm run verify` and make sure it passes. It covers the build, static checks and
+   tests that CI gates on; CI also runs the e2e, bundle-size and `npm audit` jobs.
 5. Write a clear PR description explaining what and why
 6. Submit the PR
 

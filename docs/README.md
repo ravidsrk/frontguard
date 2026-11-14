@@ -9,6 +9,7 @@ Every maintained doc under `docs/`, one line each. User-facing docs are publishe
 - [ARCHITECTURE.md](ARCHITECTURE.md): package map, module tables and the design decisions behind them.
 - [ROADMAP.md](ROADMAP.md): current scope, shipped post-launch work and what stays undeployed.
 - [../CONTRIBUTING.md](../CONTRIBUTING.md): development setup, tests and the pull-request checklist.
+- [../AGENTS.md](../AGENTS.md): verify and test commands for coding agents, and what not to edit.
 
 ## Decisions
 

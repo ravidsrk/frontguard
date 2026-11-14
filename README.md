@@ -470,4 +470,4 @@ OTEL_EXPORTER_OTLP_HEADERS=api-key=replace-me
 
 ## Contributing & License
 
-Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and guidelines. Released under the [MIT License](./LICENSE).
+Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and guidelines, and [AGENTS.md](./AGENTS.md) for the verify and test commands coding agents should run. Released under the [MIT License](./LICENSE).
