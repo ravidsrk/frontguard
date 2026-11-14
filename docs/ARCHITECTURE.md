@@ -37,7 +37,7 @@ Outside the workspaces:
 
 | Path | Contents |
 | --- | --- |
-| `action.yml`, `action-run.sh` | Repo-root composite Action, generated from `packages/cli/action.template.yml` by `packages/cli/scripts/sync-root-action.mjs`. |
+| `action.yml`, `action-run.sh` | Repo-root composite Action. `packages/cli/scripts/sync-root-action.mjs` generates `action.yml` from `packages/cli/action.template.yml` and copies `packages/cli/action-run.sh`, so edit the `packages/cli` files. |
 | `scripts/` | Repo scripts: `sync-version.ts`, `sync-openapi.mjs`, `release.sh`, `stats.ts`, `ci-failure-alert.mjs`. Tests for them and for repo structure live in `scripts/test/`. |
 | `validation/` | Harness that runs the CLI against real open-source frontends, plus recorded results. |
 | `skills/frontguard/` | Agent skill for Frontguard users, with task references. |
