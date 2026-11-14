@@ -1,6 +1,6 @@
 # X practitioner notes: visual regression, for a Frontguard post-launch roadmap
 
-> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../docs/ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
+> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../../ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
 
 Scope: X posts from 2025-01-01 through 2026-10-19 (today 2026-10-19). No older posts turned out to be useful on these questions. Keyword search for “Percy”, “Chromatic”, and “Lost Pixel” was badly polluted by personal names, a photography account, a Twitch channel, and an NFT project. Semantic search often returned posts that echoed the query and had near-zero engagement. Those are cited below as single posts, not as a market. Tool-reported like and view counts are marked as tool figures. Vendor and product accounts are labeled as vendor claims.
 

@@ -1,6 +1,6 @@
 /**
  * Run from the repository root:
- *   node --import tsx 'research_notes/Frontguard roadmap follow-up/smart-filter-repro.mjs'
+ *   node --import tsx 'docs/archive/research_notes/Frontguard roadmap follow-up/smart-filter-repro.mjs'
  *
  * Uses the real smartFilter, parser and resolver with a disposable git repository.
  * No browser, network, dependency installation or application server is needed.
@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { smartFilter } from '../../packages/cli/src/graph/filter.ts';
+import { smartFilter } from '../../../../packages/cli/src/graph/filter.ts';
 
 const originalDirectory = process.cwd();
 const fixtureDirectory = mkdtempSync(join(tmpdir(), 'frontguard-filter-evidence-'));

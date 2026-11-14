@@ -39,7 +39,7 @@ Full procedures: [`docs/arch-ops-actions.md`](./arch-ops-actions.md).
 |-----|------|
 | [`adversarial-review-fresh.md`](./adversarial-review-fresh.md) | Frozen review spec |
 | [`arch-build-readiness.md`](./arch-build-readiness.md) | T_FINAL acceptance output |
-| [`DECISIONS.md`](./DECISIONS.md) | Run decisions + worker-launch notes |
+| [`DECISIONS.md`](../DECISIONS.md) | Run decisions + worker-launch notes |
 
 ## Changelog
 

@@ -1,6 +1,6 @@
 # MCP spec and ecosystem evolution through 2026-10-19, and agent-side visual verification tooling
 
-> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../docs/ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
+> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../../ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
 
 Method and dating: every source below was fetched on **2026-10-19**. That covers web pages via WebFetch, GitHub files and metadata via authenticated read-only `gh api` calls against default branches, npm registry JSON, and MCP Registry API responses. GitHub links point to the file that was read. Where a GitHub file is also published on a website (for example modelcontextprotocol.io or code.visualstudio.com), the GitHub source is cited because that is what was read. "Inference" marks my reasoning, not something a source says. "Vendor claim" marks marketing or self-reported statements. Star counts and release lists are `gh api` snapshots taken on 2026-10-19.
 

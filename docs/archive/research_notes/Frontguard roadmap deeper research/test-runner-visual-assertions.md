@@ -1,6 +1,6 @@
 # Test runners with built-in screenshot / visual assertions (state as of 2026-10-19)
 
-> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../docs/ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
+> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../../ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
 
 Conventions used in these notes:
 - Fetch date: every source below was fetched on 2026-10-19. "npm registry" means `npm view <pkg> ...` output on that date. GitHub files were read through `gh api repos/{owner}/{repo}/contents/{path}` on the default branch unless a ref is named, and are cited with their github.com URL.

@@ -198,7 +198,7 @@ or marketplace submit. Full procedures in
 | [`production-pending.md`](./production-pending.md) | Frozen REVIEW_DOC inventory (do not modify) |
 | [`production-close-progress.md`](./production-close-progress.md) | Coordinator task ledger |
 | [`fix-progress.md`](./fix-progress.md) | 49-finding close-index |
-| [`launch-readiness.md`](./launch-readiness.md) | Go/no-go narrative |
+| [`launch-readiness.md`](../launch-readiness.md) | Go/no-go narrative |
 | [`arch-ops-actions.md`](./arch-ops-actions.md) | OPS procedure detail |
 
 ---

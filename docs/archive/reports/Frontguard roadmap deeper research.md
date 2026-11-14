@@ -1,13 +1,13 @@
 # Lock the approval path before widening capture
 
-> Publication note (2026-10-20): This is a historical planning draft from 2026-10-19. Its proposed issue counts, options and statements about what was filed are superseded by [the current roadmap](../docs/ROADMAP.md) and [the archive index](README.md). Do not paste draft specifications unchanged. Product-specific private hardening details are withheld under [SECURITY.md](../SECURITY.md).
+> Publication note (2026-10-20): This is a historical planning draft from 2026-10-19. Its proposed issue counts, options and statements about what was filed are superseded by [the current roadmap](../../ROADMAP.md) and [the archive index](README.md). Do not paste draft specifications unchanged. Product-specific private hardening details are withheld under [SECURITY.md](../../../SECURITY.md).
 > Filed mapping: N1 → #303, N3 → #304, N4 → #305, N5 → #306, N7 → #307, N8 → #308, N9 → #309, N10 → #310. Verification also filed #301 and #302. Two other items remain private.
 
 The second pass prioritizes the approval boundary (#287), advisory-only judge output (#286), and renderer provenance (#303), followed by the pixel budget and validation (#284, #285). Public proposals are mapped to their filed issues in the publication note below. Two product-specific hardening findings are tracked privately under SECURITY.md; their details are withheld from this public copy. The strongest support comes from platform documentation and repository checks; direct demand remains limited.
 
 ## Ten new issues join, and three filed ones move
 
-This is the planning draft from the second pass, before filing. Its provisional labels and counts are historical. The final pass filed ten public issues (#301–#310), including two correctness bugs found during verification, and kept two hardening items private. The current ordering is in [docs/ROADMAP.md](../docs/ROADMAP.md).
+This is the planning draft from the second pass, before filing. Its provisional labels and counts are historical. The final pass filed ten public issues (#301–#310), including two correctness bugs found during verification, and kept two hardening items private. The current ordering is in [docs/ROADMAP.md](../../ROADMAP.md).
 
 | # | Issue | Status | Change in this pass | Blocked by or depends on |
 | --- | --- | --- | --- | --- |
@@ -52,17 +52,17 @@ Weigh each signal by where it comes from, because the eight notes files mix very
 | Papers | UI-Lens (CVPR 2026) and VERVE/STVR (journals) are substantial; MIXVRT, ReBDiff, ReDeFix and a 6-page preprint are small | Strong to weak by paper |
 | This worktree | Skill, judge exit codes, Action push, comment escaping, manifest fields | Strong, but grep-level reads |
 
-`docs/ROADMAP.md` needs edits beyond the reorder. It cites `diff/ai-classifier.ts`, but the classifier lives in `diff/ai-vision.ts`. Its line that model output "never silently passes a failing pixel check" holds only on the default compare path; judge mode sets exit codes from model verdicts until #286 lands. It lists `captureAriaSnapshot` without saying that nothing stores or diffs the result. Section 5's not-on-roadmap list should absorb the do-not-build findings at the end of this report ([ROADMAP](../docs/ROADMAP.md)). Tracking issue #283 should take the new children in the order above, add "blocked by" links, and carry the verification checklist from the next section.
+`docs/ROADMAP.md` needs edits beyond the reorder. It cites `diff/ai-classifier.ts`, but the classifier lives in `diff/ai-vision.ts`. Its line that model output "never silently passes a failing pixel check" holds only on the default compare path; judge mode sets exit codes from model verdicts until #286 lands. It lists `captureAriaSnapshot` without saying that nothing stores or diffs the result. Section 5's not-on-roadmap list should absorb the do-not-build findings at the end of this report ([ROADMAP](../../ROADMAP.md)). Tracking issue #283 should take the new children in the order above, add "blocked by" links, and carry the verification checklist from the next section.
 
 ## Repository checks overturn four assumptions behind Now
 
 The notes lean on many claims about current Frontguard behaviour that their authors could not verify. A read-only spot check of this worktree resolved most of them. Four results change the plan.
 
-The skill steers agents into the write the roadmap is trying to remove. `skills/frontguard/SKILL.md` tells an agent to work `list_regressions → inspect_diff_cluster_dom → verify_css_patch → promote_baseline`. Its first workflow is "Record or update baselines" with `npx frontguard update-baselines` ([SKILL.md](../skills/frontguard/SKILL.md)).
+The skill steers agents into the write the roadmap is trying to remove. `skills/frontguard/SKILL.md` tells an agent to work `list_regressions → inspect_diff_cluster_dom → verify_css_patch → promote_baseline`. Its first workflow is "Record or update baselines" with `npx frontguard update-baselines` ([SKILL.md](../../../skills/frontguard/SKILL.md)).
 
-Judge mode puts model output on the exit code. `buildJudgeResult` maps failing judgements to `regressions`, and `comparisonExitCode` turns any regression into exit **1**. That violates the rule that model output stays off exit codes ([pipeline.ts](../packages/cli/src/core/pipeline.ts), [exit-code.ts](../packages/cli/src/cli/exit-code.ts)). The default path is clean: there, `aiAnalysis` only chooses which diffs get fix generation, and status comes from the pixel diff and the threshold.
+Judge mode puts model output on the exit code. `buildJudgeResult` maps failing judgements to `regressions`, and `comparisonExitCode` turns any regression into exit **1**. That violates the rule that model output stays off exit codes ([pipeline.ts](../../../packages/cli/src/core/pipeline.ts), [exit-code.ts](../../../packages/cli/src/cli/exit-code.ts)). The default path is clean: there, `aiAnalysis` only chooses which diffs get fix generation, and status comes from the pixel diff and the threshold.
 
-The Action writes the shared baseline from any event. With `update-baselines: true`, `action-run.sh` runs `frontguard run --update-baselines` and then `git push origin frontguard-baselines`, with no event check ([action-run.sh](../action-run.sh)).
+The Action writes the shared baseline from any event. With `update-baselines: true`, `action-run.sh` runs `frontguard run --update-baselines` and then `git push origin frontguard-baselines`, with no event check ([action-run.sh](../../../action-run.sh)).
 
 A further product-specific finding is tracked privately; details are withheld under SECURITY.md.
 
@@ -72,23 +72,23 @@ Table A lists what the spot check found for each claim. Every row is a grep-leve
 
 | Claim the notes relied on | Spot-check finding (2026-10-19) | Effect |
 | --- | --- | --- |
-| Pixelmatch pin unknown (earlier pass) or assumed to be 7.2 (test-runner notes) | `^7.2.0` in `packages/cli` and `packages/playwright`; lockfile resolves **7.2.0** ([cli package.json](../packages/cli/package.json)) | #284 is a major bump |
+| Pixelmatch pin unknown (earlier pass) or assumed to be 7.2 (test-runner notes) | `^7.2.0` in `packages/cli` and `packages/playwright`; lockfile resolves **7.2.0** ([cli package.json](../../../packages/cli/package.json)) | #284 is a major bump |
 | Agents are kept away from promotion | Skill ends the agent path at `promote_baseline` and runs `update-baselines` | #287 must rewrite the skill |
 | Judge mode cannot move exit codes | Failing verdicts become `regressions`, exit 1 | #286's first change |
-| `update-baselines` might write the shared branch from PRs | Action pushes on any event; CLI `update-baselines` has no confirmation ([cli/index.ts](../packages/cli/src/cli/index.ts)) | #287, N3, N5 |
-| MCP ships `outputSchema` and `structuredContent` | All seven tools do, with a JSON text mirror; none declares annotations; SDK `^1.32.1`; no `mcpName` or `server.json` ([mcp index.ts](../packages/mcp/src/index.ts)) | N7, N10 |
+| `update-baselines` might write the shared branch from PRs | Action pushes on any event; CLI `update-baselines` has no confirmation ([cli/index.ts](../../../packages/cli/src/cli/index.ts)) | #287, N3, N5 |
+| MCP ships `outputSchema` and `structuredContent` | All seven tools do, with a JSON text mirror; none declares annotations; SDK `^1.32.1`; no `mcpName` or `server.json` ([mcp index.ts](../../../packages/mcp/src/index.ts)) | N7, N10 |
 | MCP tools render pages | None launch a browser; `verify_css_patch` is static | Drop the origin-restriction candidate |
-| Regression rows carry image paths | Rows carry ids, route, viewport, status, diff percentage, classification, `hasSuggestedFix`, `reportUrl`; no image paths ([list-regressions.ts](../packages/mcp/src/tools/list-regressions.ts)) | Deferred |
+| Regression rows carry image paths | Rows carry ids, route, viewport, status, diff percentage, classification, `hasSuggestedFix`, `reportUrl`; no image paths ([list-regressions.ts](../../../packages/mcp/src/tools/list-regressions.ts)) | Deferred |
 | CLI may not fail closed on zero captures | Exit 2 when total is 0 or errors exist; Action errors on `TOTAL -eq 0` and on an unpublished baseline branch | Drop the candidate |
 | `merge_group` support | No occurrence anywhere in the tree | N3 |
-| `smartFilter` misses global changes | Lockfiles, `package.json`, framework, Tailwind, PostCSS and TS configs, global CSS, theme and token files force all routes; an empty affected set renders all; base is `origin/main...HEAD`, then `HEAD~1` ([resolver.ts](../packages/cli/src/graph/resolver.ts)) | Mostly shipped; queue and shallow cases go to N3 |
-| A SHA-256 manifest ships | Schema version, `createdBy`, `updatedAt`, `sourceCommitSha`, `sourceBranch`, and a SHA-256 of each snapshot's PNG buffer; no browser, Playwright, OS, scale factor or comparator ([types.ts](../packages/cli/src/core/types.ts)) | N1; N5 builds on `sourceCommitSha` |
-| A single `colorScheme` ships | Context gets viewport, `storageState` and `colorScheme` only; path is `baselines/<route>/<viewport>/<browser>.png` ([git-orphan.ts](../packages/cli/src/storage/git-orphan.ts)) | N9 |
-| Capture options and font waits | `page.screenshot({ fullPage: true, type: 'png' })`; animations frozen by injected CSS; `document.fonts.ready` awaited with no timeout ([playwright.ts](../packages/cli/src/render/playwright.ts)) | N1 |
-| Size mismatches handled like peers | Both images padded to the larger size and marked `changed`; the pipeline upgrades to `regression` only above the threshold ([pixel.ts](../packages/cli/src/diff/pixel.ts)) | #284 |
+| `smartFilter` misses global changes | Lockfiles, `package.json`, framework, Tailwind, PostCSS and TS configs, global CSS, theme and token files force all routes; an empty affected set renders all; base is `origin/main...HEAD`, then `HEAD~1` ([resolver.ts](../../../packages/cli/src/graph/resolver.ts)) | Mostly shipped; queue and shallow cases go to N3 |
+| A SHA-256 manifest ships | Schema version, `createdBy`, `updatedAt`, `sourceCommitSha`, `sourceBranch`, and a SHA-256 of each snapshot's PNG buffer; no browser, Playwright, OS, scale factor or comparator ([types.ts](../../../packages/cli/src/core/types.ts)) | N1; N5 builds on `sourceCommitSha` |
+| A single `colorScheme` ships | Context gets viewport, `storageState` and `colorScheme` only; path is `baselines/<route>/<viewport>/<browser>.png` ([git-orphan.ts](../../../packages/cli/src/storage/git-orphan.ts)) | N9 |
+| Capture options and font waits | `page.screenshot({ fullPage: true, type: 'png' })`; animations frozen by injected CSS; `document.fonts.ready` awaited with no timeout ([playwright.ts](../../../packages/cli/src/render/playwright.ts)) | N1 |
+| Size mismatches handled like peers | Both images padded to the larger size and marked `changed`; the pipeline upgrades to `regression` only above the threshold ([pixel.ts](../../../packages/cli/src/diff/pixel.ts)) | #284 |
 | Multi-render consensus | `antiFlakeRenders` keeps the most common byte-identical frame; the `flaky` status type exists but nothing assigns it | #285 measures; reporting deferred |
-| No ARIA capture | `@frontguard/playwright` captures an ARIA string and returns it; nothing stores or diffs it; the CLI has none ([visual-test.ts](../packages/playwright/src/visual-test.ts)) | #299 |
-| Action pins browsers | `playwright install --with-deps` runs from `@frontguard/cli@0.2.3`'s own Playwright ([action.yml](../action.yml)) | #284's pin criterion is met |
+| No ARIA capture | `@frontguard/playwright` captures an ARIA string and returns it; nothing stores or diffs it; the CLI has none ([visual-test.ts](../../../packages/playwright/src/visual-test.ts)) | #299 |
+| Action pins browsers | `playwright install --with-deps` runs from `@frontguard/cli@0.2.3`'s own Playwright ([action.yml](../../../action.yml)) | #284's pin criterion is met |
 
 
 Table B lists claims the spot check did not settle. Resolve each one against the code before filing the issue named in the last column.
@@ -143,7 +143,7 @@ Two capture hazards fail silently or hang. Frontguard awaits `document.fonts.rea
 
 #### Private hardening item
 
-Product-specific details are withheld under [SECURITY.md](../SECURITY.md). This item is tracked privately.
+Product-specific details are withheld under [SECURITY.md](../../../SECURITY.md). This item is tracked privately.
 
 ### Next: give humans, not agents, the merge gate
 
@@ -232,7 +232,7 @@ Three teams show the field reality. MyVision approved with a `vrt-approved` labe
 
 #### Private hardening item
 
-Product-specific details are withheld under [SECURITY.md](../SECURITY.md). This item is tracked privately.
+Product-specific details are withheld under [SECURITY.md](../../../SECURITY.md). This item is tracked privately.
 
 #### N7. Declare MCP tool annotations, with promotion tools marked destructive
 
@@ -263,7 +263,7 @@ The spec calls annotations untrusted hints, and the maintainers' post says plain
 
 **Placement:** Later. It is a deterministic answer to the class of bugs the advisory model is worst at, but nobody has asked for it. **Signal:** moderate: a CVPR benchmark and a journal study, plus one small preprint. **Depends on:** #285 and #286 fixtures.
 
-**Problem.** The classifier's system prompt asks the model to spot "text clipping/overflow … content overlapping, responsive breakage" ([ai-vision.ts](../packages/cli/src/diff/ai-vision.ts)). UI-Lens tested nine models on balanced sets drawn from **8,151** expert-annotated interfaces. It found accuracy near chance for text overflow (**50.04%**), cropped content (**54.07%**) and container overlap (**54.14%**) ([UI-Lens](https://openaccess.thecvf.com/content/CVPR2026/papers/Xiang_UI-Lens_Assessing_General_MLLMs_Potential_to_Automate_UI_Display_Quality_CVPR_2026_paper.pdf)).
+**Problem.** The classifier's system prompt asks the model to spot "text clipping/overflow … content overlapping, responsive breakage" ([ai-vision.ts](../../../packages/cli/src/diff/ai-vision.ts)). UI-Lens tested nine models on balanced sets drawn from **8,151** expert-annotated interfaces. It found accuracy near chance for text overflow (**50.04%**), cropped content (**54.07%**) and container overlap (**54.14%**) ([UI-Lens](https://openaccess.thecvf.com/content/CVPR2026/papers/Xiang_UI-Lens_Assessing_General_MLLMs_Potential_to_Automate_UI_Display_Quality_CVPR_2026_paper.pdf)).
 
 DOM geometry is reliable for one of these classes. VERVE's manual classification of **469** ReDeCheck reports across **45** pages found viewport protrusion visible to humans in **32 of 57** reports. Element collision was visible in 9 of 43, and element protrusion in 3 of 90 (derived counts) ([VERVE](https://eprints.whiterose.ac.uk/165542/8/stvr.1756.pdf)). In a 6-page preprint on 307 Chromatic PRs, layout was the largest class of flagged issues at **39.7%** ([arXiv 2608.07020](https://arxiv.org/abs/2608.07020)).
 

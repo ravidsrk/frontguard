@@ -1,6 +1,6 @@
 # 2025–2026 GitHub landscape for visual regression tools
 
-> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../docs/ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
+> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../../ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
 
 Scope is repository and official-doc evidence checked on 2026-10-19. Star counts and `pushed_at` dates are point-in-time GitHub REST API results from that day, not a ranking. “Latest GitHub Release” is not the same as the latest npm publish when a project stopped cutting GitHub releases. Vendor comparison blogs are labeled as marketing.
 

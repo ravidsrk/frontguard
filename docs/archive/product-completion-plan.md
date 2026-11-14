@@ -21,7 +21,7 @@
 # Frontguard — Product-Completion Plan
 
 *Authored 2026-06-14 by the orchestration coordinator. Anchored to
-[`docs/research.md`](./research.md) (mid-2026 competitive bar) and
+[`docs/research.md`](../research.md) (mid-2026 competitive bar) and
 [`docs/adversarial-review.md`](./adversarial-review.md) (audit of the current
 codebase). **This document is the frozen boundary.** Every item in §IN and
 §FIX is built to full depth in the build that follows. Nothing in IN may

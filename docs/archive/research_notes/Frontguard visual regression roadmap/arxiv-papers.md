@@ -1,6 +1,6 @@
 # Visual regression, snapshot testing, and UI image-change literature (through 2026-10-19)
 
-> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../docs/ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
+> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../../ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
 
 Scope is academic work on visual regression testing (VRT), snapshot testing, web UI image-change captioning, screenshot diffing, and UI display-defect detection. Product context: Frontguard’s pass/fail signal is pixelmatch. Model output is advisory only and is not an accuracy claim. Metrics below are copied from an arXiv abstract, HTML, or PDF page that was opened. Numbers seen only in a secondary summary are not used.
 

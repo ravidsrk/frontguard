@@ -1,6 +1,6 @@
 # Capture matrices (theme, locale, viewport, device, accessibility modes) and rendering determinism for screenshot visual regression, as of 2026-10-19
 
-> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../docs/ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
+> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../../ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
 
 How to read these notes:
 - **Fetch date:** every source below was retrieved on **2026-10-19** in this session, through WebFetch, WebSearch, or read-only `gh api` calls against public GitHub repos.

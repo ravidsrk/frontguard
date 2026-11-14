@@ -1,6 +1,6 @@
 # Keep pixelmatch and file the gaps
 
-> Publication note (2026-10-20): This is a historical planning draft from 2026-10-19. Its proposed issue counts, options and statements about what was filed are superseded by [the current roadmap](../docs/ROADMAP.md) and [the archive index](README.md). Do not paste draft specifications unchanged. Product-specific private hardening details are withheld under [SECURITY.md](../SECURITY.md).
+> Publication note (2026-10-20): This is a historical planning draft from 2026-10-19. Its proposed issue counts, options and statements about what was filed are superseded by [the current roadmap](../../ROADMAP.md) and [the archive index](README.md). Do not paste draft specifications unchanged. Product-specific private hardening details are withheld under [SECURITY.md](../../../SECURITY.md).
 > Corrections confirmed in the second pass: accessibility options are `impact` and `failOnViolation`; `@frontguard/playwright` already captures ARIA; `promote_baseline` refuses local-report writes. See #302, #299 and #287.
 
 File five Now issues that make the existing pixelmatch gate harder to fool and harder for an agent to rewrite, and file nothing that replaces that gate. Frontguard already ships the local table stakes a 2026 CLI is judged on, so Storybook discovery, SSIM, ignore masks, axe-core, anti-flake controls, Firefox and WebKit capture, changed-file scoping, local MCP report reads, and the experimental judge stay off the tracker as new capabilities. The papers support an advisory description after a pixel failure and refuse a model pass: WUICC-bench is synthetic single edits on LLM-made pages, and LLMShot is 17 iOS failures that must not be generalized to web pixel diffs. X adds only thin warnings — pin the browser, do not trust one global ratio, and do not let the authoring agent be the only approver — and it does not show a Lost Pixel migration or a Chromatic price revolt. Hosted review and S3 baselines can be filed only as Later, behind user-data erasure, a restore-tested backup, and the fix that stops a run from reporting `completed` without having compared. Marketplace installs, billing, weekly npm audit (open issue **#157**), and npm trusted publishing are not new issues; the token migration is already human-action record **H-05**, which the notes track as **G-44**, expiry **2027-03-01**. Launch completeness does not move: `docs/completion/DEFINITION.md` already calls an excellent local-and-CI CLI complete. The definition’s god-file counts are stale: `packages/cli/src/core/pipeline.ts` measures **1422** lines, not 1328, and `apps/web/src/routes/index.tsx` measures **91**, not 1811.
@@ -86,7 +86,7 @@ These five are post-launch. They do not change the claim that the local CLI is a
 
 Frontguard’s default `threshold` of **0.1** means **10%** changed pixels, a whole-image ratio. WUICC’s own pixel arm shows a fixed tolerance barely suppresses non-meaningful edits and starts missing real ones, and two X anecdotes point the same slider in opposite directions: about 0.1 aimed at font false positives, and `maxDiffPixelRatio: 0.001` missing a copy change. Pixelmatch **v8.0.0** (**6 October 2026**) is the maintainer’s answer to scattered noise, via OKLab + HyAB and `windowSize`, while remaining a pixel library. The notes never read the v8 changelog and never record Frontguard’s pin, so the issue starts by recording the pin. SSIM can already override a borderline pixel result to pass; this issue must count that override, not add a third signal. Argos’s extra passes are threshold policy on odiff, described by Argos and not independently read, and they are not a reason to leave pixelmatch.
 
-**Sources.** [README threshold and exit codes](../README.md); [packages/cli/src/diff/pixel.ts](../packages/cli/src/diff/pixel.ts); [npm pixelmatch 8.0.0](https://www.npmjs.com/package/pixelmatch); [@mourner on v8](https://x.com/mourner/status/2107473428949414020); [@nekko1119](https://x.com/nekko1119/status/2052433893345886583); [@aria_ai_tools](https://x.com/aria_ai_tools/status/2100365431890735138); [WUICC Table VI](https://arxiv.org/html/2607.01728v1); [Playwright visual comparisons](https://playwright.dev/docs/test-snapshots).
+**Sources.** [README threshold and exit codes](../../../README.md); [packages/cli/src/diff/pixel.ts](../../../packages/cli/src/diff/pixel.ts); [npm pixelmatch 8.0.0](https://www.npmjs.com/package/pixelmatch); [@mourner on v8](https://x.com/mourner/status/2107473428949414020); [@nekko1119](https://x.com/nekko1119/status/2052433893345886583); [@aria_ai_tools](https://x.com/aria_ai_tools/status/2100365431890735138); [WUICC Table VI](https://arxiv.org/html/2607.01728v1); [Playwright visual comparisons](https://playwright.dev/docs/test-snapshots).
 
 **Acceptance criteria.**
 
@@ -102,7 +102,7 @@ Frontguard’s default `threshold` of **0.1** means **10%** changed pixels, a wh
 
 The only recorded external pixel run is **2026-06-20**, CLI **0.2.0**, macOS **25.5.0**, Node **22.15**, Chromium only, AI off, viewports **375 / 768 / 1440**. Five repos were attempted, **two** booted, **43** recheck routes were measured, **39 of 43** had a baseline, and recheck positives were **0**, which the file calls a **0.0%** pixel false-positive rate. True-positive rate was not measured. SSIM fallback was not exercised. Three repos never booted. The published line is now **0.2.2** plus unreleased changelog entries, so that **0.0%** is not a measurement of this tree. README already warns, in coarser language, that the run is not an AI or cross-OS benchmark. Quoting **0.0%** without the caveats overclaims it. The harness script already exists.
 
-**Sources.** [validation/results-v0.2.md](../validation/results-v0.2.md); [README caveat](../README.md); [G-22 in GAPS.md](../docs/completion/GAPS.md).
+**Sources.** [validation/results-v0.2.md](../../../validation/results-v0.2.md); [README caveat](../../../README.md); [G-22 in GAPS.md](../completion/GAPS.md).
 
 **Acceptance criteria.**
 
@@ -118,7 +118,7 @@ The only recorded external pixel run is **2026-06-20**, CLI **0.2.0**, macOS **2
 
 Model output is documented as advisory and unmeasured. G-22 says the v0.2 file ran with AI disabled. WUICC-bench is the public web comparison that can score a captioner on no-change suppression and change recall at the same time, and it still does not authorize a gate: best BLEU-4 is **0.2571**, the data are single synthetic edits, and zero-shot VLMs miss one side of the tradeoff. LLMShot shows why a semantic score and a prompt-ignore rule are unsafe, on a corpus that does not transfer. VisRefiner can be a side probe because it publishes paired renders and layout scores, not because a Design2Code average is a regression F1. XBIDetective’s **79%** on real cross-browser pairs is a caution, not a target to beat and then ship. No opened paper reports the probability a human would accept a given pixelmatch diff. Until an in-repo eval exists, the experimental judge must not move an exit code or a baseline.
 
-**Sources.** [README on the judge](../README.md); [model-judge.ts](../packages/cli/src/diff/model-judge.ts); [WUICC](https://arxiv.org/html/2607.01728v1); [LLMShot](https://arxiv.org/html/2507.10062v2); [VisRefiner](https://arxiv.org/html/2602.05998v1); [XBIDetective](https://arxiv.org/html/2512.15804v1); [G-22](../docs/completion/GAPS.md).
+**Sources.** [README on the judge](../../../README.md); [model-judge.ts](../../../packages/cli/src/diff/model-judge.ts); [WUICC](https://arxiv.org/html/2607.01728v1); [LLMShot](https://arxiv.org/html/2507.10062v2); [VisRefiner](https://arxiv.org/html/2602.05998v1); [XBIDetective](https://arxiv.org/html/2512.15804v1); [G-22](../completion/GAPS.md).
 
 **Acceptance criteria.**
 
@@ -134,7 +134,7 @@ Model output is documented as advisory and unmeasured. G-22 says the v0.2 file r
 
 Argos and Happo put approval on a different credential from reads, and Argos tells operators to keep a human on write actions. Happo’s accept is the signed-in user, and a new accessibility violation can still block it. X’s repeated low-reach advice is the same shape: the agent that edited the UI should not be the only thing that can accept the next baseline. One contrary post wants in-chat approve/reject. A later read of the tool corrected the inventory. `promote_baseline` already requires `confirm_reviewed: true` and refuses local-report mode, telling the caller to run `frontguard update-baselines`. That CLI command has no confirm flag. `confirm_reviewed` is also a boolean the same agent can set, so it is not a separate credential. The issue is the CLI write path and the self-asserted flag, not a missing MCP tool. This is the local equivalent of a review action. It is not a remote MCP product.
 
-**Sources.** [packages/mcp/README.md](../packages/mcp/README.md); [Argos MCP](https://argos-ci.com/docs/agents/mcp-server); [Happo MCP](https://happo.io/docs/mcp); [@gregberge_ on merge rights](https://x.com/gregberge_/status/2111026114911232398); [@Antoniocoppe](https://x.com/Antoniocoppe/status/2100979189583118650). The contrary one-off is [@nandanpri](https://x.com/nandanpri/status/2096542768210280675).
+**Sources.** [packages/mcp/README.md](../../../packages/mcp/README.md); [Argos MCP](https://argos-ci.com/docs/agents/mcp-server); [Happo MCP](https://happo.io/docs/mcp); [@gregberge_ on merge rights](https://x.com/gregberge_/status/2111026114911232398); [@Antoniocoppe](https://x.com/Antoniocoppe/status/2100979189583118650). The contrary one-off is [@nandanpri](https://x.com/nandanpri/status/2096542768210280675).
 
 **Acceptance criteria.**
 
@@ -150,7 +150,7 @@ Argos and Happo put approval on a different credential from reads, and Argos tel
 
 Happo’s `blockApproval` refuses acceptance when new accessibility violations appear, and it also blocks on render errors. Frontguard already runs axe-core and documents `failOnImpact: 'serious'`. The notes do not show that an axe violation is wired to block baseline promotion. Those are different controls: a pixel-clean page can still be a new serious accessibility regression, and an axe failure must not be laundered into a new baseline. The evidence is Happo’s docs, not a practitioner study. The CLI plugin is the implementation surface. The marketing site is a different issue, filed later.
 
-**Sources.** [packages/cli/src/plugins/accessibility.ts](../packages/cli/src/plugins/accessibility.ts); [Happo MCP](https://happo.io/docs/mcp); [happo README on blockApproval](https://raw.githubusercontent.com/happo/happo/main/README.md). The landscape note that the wiring was not shown is in the GitHub research section “capabilities whose own docs tie them to a hosted app.”
+**Sources.** [packages/cli/src/plugins/accessibility.ts](../../../packages/cli/src/plugins/accessibility.ts); [Happo MCP](https://happo.io/docs/mcp); [happo README on blockApproval](https://raw.githubusercontent.com/happo/happo/main/README.md). The landscape note that the wiring was not shown is in the GitHub research section “capabilities whose own docs tie them to a hosted app.”
 
 **Acceptance criteria.**
 
@@ -167,7 +167,7 @@ Happo’s `blockApproval` refuses acceptance when new accessibility violations a
 
 The GitHub gap left by Lost Pixel’s **22 April 2026** archive is not pixel diff and not Storybook screenshots. It is a maintained MIT CLI that also discovers Ladle and Histoire. Frontguard already discovers Storybook 8 `/index.json` and Storybook 7 `/stories.json`. Loki does not list those targets and has not released since **August 2024**. storycap captures and does not compare. Argos marketing, not the overview doc, says Ladle and Histoire on Argos need a Playwright test. No maintained runner was found in the search, which is not a census. X did not discuss the shutdown at all, so this is a supply-side gap, not a demand thread. The same Argos thread is the source for the capture warning: **16 of 22** shots were 1px off across Storybook runners, and `storybookjs/test-runner` support was described as ended at **0.26.0** in September 2026. That repo was archived **30 September 2026**.
 
-**Sources.** [Lost Pixel package.json](https://raw.githubusercontent.com/lost-pixel/lost-pixel/main/package.json); [announcement](https://www.lost-pixel.com/blog/lost-pixel-team-is-joining-figma); [storybook discovery](../packages/cli/src/discovery/storybook.ts); [Loki](https://github.com/oblador/loki/blob/master/packages/loki/README.md); [Argos thread](https://x.com/gregberge_/status/2110303101538451874); [test-runner archive](https://github.com/storybookjs/test-runner). The Argos compare-page claim is marketing ([compare page](https://argos-ci.com/compare/lost-pixel)).
+**Sources.** [Lost Pixel package.json](https://raw.githubusercontent.com/lost-pixel/lost-pixel/main/package.json); [announcement](https://www.lost-pixel.com/blog/lost-pixel-team-is-joining-figma); [storybook discovery](../../../packages/cli/src/discovery/storybook.ts); [Loki](https://github.com/oblador/loki/blob/master/packages/loki/README.md); [Argos thread](https://x.com/gregberge_/status/2110303101538451874); [test-runner archive](https://github.com/storybookjs/test-runner). The Argos compare-page claim is marketing ([compare page](https://argos-ci.com/compare/lost-pixel)).
 
 **Acceptance criteria.**
 
@@ -182,7 +182,7 @@ The GitHub gap left by Lost Pixel’s **22 April 2026** archive is not pixel dif
 
 G-41 says PNG baseline growth will bloat git history and needs a documented pruning story. That pruning is not implemented for git PNG baselines. The cloud scheduler’s `pruneForUser` / `pruneMonitorRuns` deletes monitor-run history per plan, which is a different store. `git worktree prune` in the orphan storage module is housekeeping, not retention. The orphan branch already exists so `main` does not carry binary bloat; it does not cap its own history. X returned no posts about git LFS or screenshot repo growth, including a semantic search that drifted into unrelated game-binary takes. The issue is a local retention tool plus a doc, not a move to object storage. reg-suit’s S3 plugin is the alternative this issue refuses.
 
-**Sources.** [G-41](../docs/completion/GAPS.md); [git-orphan.ts](../packages/cli/src/storage/git-orphan.ts); [DEFINITION on S3 baselines](../docs/completion/DEFINITION.md); [reg-suit README](https://github.com/reg-viz/reg-suit/blob/master/README.md).
+**Sources.** [G-41](../completion/GAPS.md); [git-orphan.ts](../../../packages/cli/src/storage/git-orphan.ts); [DEFINITION on S3 baselines](../completion/DEFINITION.md); [reg-suit README](https://github.com/reg-viz/reg-suit/blob/master/README.md).
 
 **Acceptance criteria.**
 
@@ -197,7 +197,7 @@ G-41 says PNG baseline growth will bloat git history and needs a documented prun
 
 DEFINITION §4 and G-39 file a god-file refactor and quote `pipeline.ts` at **1328** lines and web `index.tsx` at **1811**. Measured on **2026-10-19** in this worktree, `packages/cli/src/core/pipeline.ts` is **1422** lines and `apps/web/src/routes/index.tsx` is **91**. The definition text is stale. The route file is not a god file anymore. `docs-content.ts` at **2000** and `html.ts` at **1403** are larger and were not the §4 examples; they are not new god-file issues. The pipeline split is still open, it has no GitHub issue, and it is maintenance rather than a research finding. External papers and posts do not motivate the line count.
 
-**Sources.** [DEFINITION.md §4](../docs/completion/DEFINITION.md); [G-39](../docs/completion/GAPS.md); measured `wc -l` recorded in the shipped-inventory note.
+**Sources.** [DEFINITION.md §4](../completion/DEFINITION.md); [G-39](../completion/GAPS.md); measured `wc -l` recorded in the shipped-inventory note.
 
 **Acceptance criteria.**
 
@@ -212,7 +212,7 @@ DEFINITION §4 and G-39 file a god-file refactor and quote `pipeline.ts` at **13
 
 G-40 says no coverage thresholds are enforced. `packages/cli/vitest.config.ts` has no `thresholds` or `coverage` match. DEFINITION lists this as post-launch and non-blocking. It has no GitHub issue. Nothing in the arXiv set, the GitHub landscape, or the X sample argues for a coverage number. The reason to file it is that the completion contract already named it and the tracker does not contain it. Put it after the pixel-gate issues so a coverage ratchet does not outrank a wrong baseline.
 
-**Sources.** [G-40](../docs/completion/GAPS.md); [DEFINITION §4](../docs/completion/DEFINITION.md).
+**Sources.** [G-40](../completion/GAPS.md); [DEFINITION §4](../completion/DEFINITION.md).
 
 **Acceptance criteria.**
 
@@ -230,7 +230,7 @@ Hosted review and S3 baselines are competitive differentiators. Argos, Happo, Ch
 
 DEFINITION’s hard gate is unchanged: do not deploy `cloud-api` until a user-data erasure path exists, a restore-tested backup exists, and a run can never report `completed` without having compared. G-34 names that status bug at `daytona-runner.ts:209`. The inventory did not re-read that line, and it did not prove erasure or a restore test. ROADMAP and the cloud README still talk as if `api.frontguard.dev` and billing are live. That is a docs conflict, not evidence the gates are met. Cloud source for a dashboard and for billing can exist and still be forbidden to deploy. This issue is the prerequisite for any hosted UI or S3 baseline store. It is not a feature launch.
 
-**Sources.** [DEFINITION §4](../docs/completion/DEFINITION.md); [G-34 and surrounding deferrals](../docs/completion/GAPS.md); [cloud-api README](../packages/cloud-api/README.md).
+**Sources.** [DEFINITION §4](../completion/DEFINITION.md); [G-34 and surrounding deferrals](../completion/GAPS.md); [cloud-api README](../../../packages/cloud-api/README.md).
 
 **Acceptance criteria.**
 
@@ -245,7 +245,7 @@ DEFINITION’s hard gate is unchanged: do not deploy `cloud-api` until a user-da
 
 A pull-request review that approves a change without a local git update is how Argos, Happo, Chromatic, and Percy work, and it is what VRT and Pixeleye claim to self-host. Pixeleye’s claim is weak: last push **2025-09-29**, and self-host still needs RabbitMQ, Ory Kratos, Postgres, S3, and SMTP. Argos will not support the install. Frontguard’s 0.2.0 changelog already describes a cloud dashboard with a side-by-side viewer. DEFINITION says that source must not count as the product being complete and must not be deployed early. File the UI as a later differentiator whose first sentence is the gate dependency. Local HTML review already exists.
 
-**Sources.** [Argos overview](https://argos-ci.com/docs); [Happo MCP](https://happo.io/docs/mcp); [VRT README](https://github.com/Visual-Regression-Tracker/Visual-Regression-Tracker/blob/master/README.md); [Pixeleye README](https://github.com/pixeleye-io/pixeleye/blob/main/README.md); [CHANGELOG dashboard lines](../CHANGELOG.md); [DEFINITION §4](../docs/completion/DEFINITION.md).
+**Sources.** [Argos overview](https://argos-ci.com/docs); [Happo MCP](https://happo.io/docs/mcp); [VRT README](https://github.com/Visual-Regression-Tracker/Visual-Regression-Tracker/blob/master/README.md); [Pixeleye README](https://github.com/pixeleye-io/pixeleye/blob/main/README.md); [CHANGELOG dashboard lines](../../../CHANGELOG.md); [DEFINITION §4](../completion/DEFINITION.md).
 
 **Acceptance criteria.**
 
@@ -260,7 +260,7 @@ A pull-request review that approves a change without a local git update is how A
 
 reg-suit, Argos’s production description, Pixeleye, and VRT keep baselines outside git. Frontguard’s orphan branch is the local answer, and `imageUpload` already sends PR images to R2, S3, GitHub Actions artifacts, or disk. DEFINITION lists “S3-backed baseline storage” on its own as out of scope. Collapsing those two features is the mistake to prevent. X did not produce a git-bloat complaint that would pull this forward. Chromatic making non-UI builds free is a hosted-billing change, not a storage design.
 
-**Sources.** [reg-suit](https://github.com/reg-viz/reg-suit/blob/master/README.md); [Argos overview](https://argos-ci.com/docs); [CHANGELOG imageUpload](../CHANGELOG.md); [DEFINITION §4](../docs/completion/DEFINITION.md); [G-41](../docs/completion/GAPS.md).
+**Sources.** [reg-suit](https://github.com/reg-viz/reg-suit/blob/master/README.md); [Argos overview](https://argos-ci.com/docs); [CHANGELOG imageUpload](../../../CHANGELOG.md); [DEFINITION §4](../completion/DEFINITION.md); [G-41](../completion/GAPS.md).
 
 **Acceptance criteria.**
 
@@ -275,7 +275,7 @@ reg-suit, Argos’s production description, Pixeleye, and VRT keep baselines out
 
 DEFINITION lists OpenTelemetry instrumentation as post-launch. The cloud package already exports OTLP/HTTP JSON via `fetch` and stays silent without an endpoint. The CLI has no tracer. Root overrides pin `@opentelemetry/sdk-node` and exporters that G-38 says are unused. Filing “add OpenTelemetry from scratch” would ignore the cloud file. Filing “turn on the cloud exporter in production” would skip the deploy gates. The honest issue is CLI-only instrumentation, later, with the conflict between G-38 and `otel/index.ts` written down.
 
-**Sources.** [packages/cloud-api/src/otel/index.ts](../packages/cloud-api/src/otel/index.ts); [G-38](../docs/completion/GAPS.md); [DEFINITION §4](../docs/completion/DEFINITION.md).
+**Sources.** [packages/cloud-api/src/otel/index.ts](../../../packages/cloud-api/src/otel/index.ts); [G-38](../completion/GAPS.md); [DEFINITION §4](../completion/DEFINITION.md).
 
 **Acceptance criteria.**
 
@@ -289,7 +289,7 @@ DEFINITION lists OpenTelemetry instrumentation as post-launch. The cloud package
 
 G-42 says `apps/web` has no axe, keyboard, or contrast proof. The site mentions axe in docs and marketing copy only. The CLI plugin does not test the marketing site. This is post-launch hygiene from DEFINITION, not a visual-regression paper. It stays later so it is not mistaken for the promotion-blocking issue, which is Now and which is about the product plugin.
 
-**Sources.** [G-42](../docs/completion/GAPS.md); [docs-content.ts axe mentions](../apps/web/src/lib/docs-content.ts).
+**Sources.** [G-42](../completion/GAPS.md); [docs-content.ts axe mentions](../../../apps/web/src/lib/docs-content.ts).
 
 **Acceptance criteria.**
 
@@ -303,7 +303,7 @@ G-42 says `apps/web` has no axe, keyboard, or contrast proof. The site mentions 
 
 The only statement that a locked region must become a diff again, or the suite “goes blind,” is @MythiliRaju5, a SmartUI-adjacent account, at or under **1** like ([post](https://x.com/MythiliRaju5/status/2094392485640544573)). Independent posts do not say this. Frontguard’s masks ship and are capture-time. File this only as a labeled bet: surface masks that have hidden pixels for a long time, and let a human drop them. Do not auto-unmask into a pass, and do not pretend the bet is demand.
 
-**Sources.** [@MythiliRaju5](https://x.com/MythiliRaju5/status/2094392485640544573); [IgnoreRule](../packages/cli/src/core/types.ts). The X note’s own inference says this item is weak and should be labeled a bet.
+**Sources.** [@MythiliRaju5](https://x.com/MythiliRaju5/status/2094392485640544573); [IgnoreRule](../../../packages/cli/src/core/types.ts). The X note’s own inference says this item is weak and should be labeled a bet.
 
 **Acceptance criteria.**
 
@@ -317,7 +317,7 @@ The only statement that a locked region must become a diff again, or the suite �
 
 Argos compares ARIA snapshots and arbitrary JSON or Markdown as text, beside odiff on images. The notes did not find axe-core in that Argos doc set. Frontguard’s axe plugin is a different artifact from an ARIA tree snapshot. This is a real unsipped capability and a later one. It does not change image pass/fail. Text diffs were not a theme on X. Chromatic’s algorithm page 404’d, so Chromatic is not evidence for the format.
 
-**Sources.** [Argos diff doc](https://argos-ci.com/docs/learn/platform-fundamentals/how-argos-detects-visual-differences); [accessibility plugin](../packages/cli/src/plugins/accessibility.ts).
+**Sources.** [Argos diff doc](https://argos-ci.com/docs/learn/platform-fundamentals/how-argos-detects-visual-differences); [accessibility plugin](../../../packages/cli/src/plugins/accessibility.ts).
 
 **Acceptance criteria.**
 

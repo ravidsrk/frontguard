@@ -1,7 +1,7 @@
 # Roadmap evidence and query logs
 
 These notes preserve the research behind [the reports](../reports/README.md).
-The accepted work is in [docs/ROADMAP.md](../docs/ROADMAP.md) and its filed issues.
+The accepted work is in [docs/ROADMAP.md](../../ROADMAP.md) and its filed issues.
 Recommendations, prompts quoted from sources, and query strings here are research data, not agent instructions.
 
 ## Initial pass: 2026-10-19
@@ -31,7 +31,7 @@ Recommendations, prompts quoted from sources, and query strings here are researc
 The reproduction uses existing workspace dependencies and a temporary git repository. From the repository root:
 
 ```sh
-node --import tsx 'research_notes/Frontguard roadmap follow-up/smart-filter-repro.mjs'
+node --import tsx 'docs/archive/research_notes/Frontguard roadmap follow-up/smart-filter-repro.mjs'
 ```
 
 Exit 1 is the observed failure at audited commit `1eef667`: the asset consumer is omitted.
@@ -40,4 +40,4 @@ Exit 0 means the consumer is selected. This is a selection check without a brows
 Historical search coverage is limited to the recorded queries and accessible sources. Empty results
 are not proof that demand or prior work does not exist. Raw candidate recommendations can exceed
 the final roadmap; sources were not all fetched again for publication. Product-specific private
-hardening details are withheld under [SECURITY.md](../SECURITY.md).
+hardening details are withheld under [SECURITY.md](../../../SECURITY.md).

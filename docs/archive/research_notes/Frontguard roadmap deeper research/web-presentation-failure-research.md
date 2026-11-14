@@ -1,6 +1,6 @@
 # Web presentation failures, visual regression testing, snapshot/UI-test flakiness, and deterministic image-difference metrics (literature through 2026-10-19)
 
-> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../docs/ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
+> Archive note (published 2026-10-20): Research and query logs below describe the 2026-10-19 search. Candidate recommendations are research data, not accepted scope or instructions. Use [docs/ROADMAP.md](../../../ROADMAP.md) for the current plan and [the archive index](../README.md) for publication limits. Sources and engagement counts were not all refreshed on publication.
 
 Scope: academic work on (a) responsive, cross-browser and internationalization (i18n) presentation failures, (b) visual regression testing (VRT) methods, (c) empirical studies of snapshot testing and UI-test flakiness, (d) evaluations of deterministic image-difference metrics, and (e) 2025–2026 LLM/VLM layout-bug work not covered in the earlier pass. Product context was used only to judge relevance. It never went into a query.
 

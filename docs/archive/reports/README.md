@@ -1,7 +1,7 @@
 # Roadmap research archive
 
 Published on 2026-10-20. The accepted priorities and dependencies live in
-[docs/ROADMAP.md](../docs/ROADMAP.md), with GitHub issue [#283](https://github.com/ravidsrk/frontguard/issues/283)
+[docs/ROADMAP.md](../../ROADMAP.md), with GitHub issue [#283](https://github.com/ravidsrk/frontguard/issues/283)
 as the tracker. Research candidates in this archive do not add product scope by themselves.
 
 | Report | Research date | Outcome |
@@ -20,8 +20,8 @@ observations from 2026-10-19, not a current survey. Vendor documentation describ
 academic metrics do not establish Frontguard's accuracy.
 
 This public archive omits product-specific details of two private hardening items, following
-[SECURITY.md](../SECURITY.md) and decision A-21 in
-[ASSUMPTIONS.md](../docs/completion/ASSUMPTIONS.md). Those details remain in private tracking.
+[SECURITY.md](../../../SECURITY.md) and decision A-21 in
+[ASSUMPTIONS.md](../completion/ASSUMPTIONS.md). Those details remain in private tracking.
 Public literature and already disclosed third-party findings remain in the notes.
 
 The 2026-10-20 X refresh was limited: treg returned HTTP 401 on its pilot request and direct post
