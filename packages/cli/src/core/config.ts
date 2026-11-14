@@ -10,6 +10,7 @@
 
 import { z } from "zod";
 import { baselineStoragePath } from "../storage/git-orphan.js";
+import { DEFAULT_AI_MODELS } from "../diff/ai-provider.js";
 import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
@@ -74,12 +75,11 @@ const discoverSchema = z.object({
   exclude: z.array(z.string()).default([]),
 });
 
-/** Default AI model identifiers per provider when omitted in configuration. */
-export const DEFAULT_AI_MODELS: Record<"openai" | "anthropic" | "gemini", string> = {
-  openai: "gpt-4.1-mini",
-  anthropic: "claude-sonnet-4-20250514",
-  gemini: "gemini-2.5-flash",
-};
+/**
+ * Default AI model identifiers per provider when omitted in configuration.
+ * Defined once in `diff/ai-provider.ts`, which the Playwright plugin shares.
+ */
+export { DEFAULT_AI_MODELS };
 
 /** Zod schema for AI configuration. */
 const aiConfigSchema = z
@@ -87,11 +87,17 @@ const aiConfigSchema = z
     provider: z.enum(["openai", "anthropic", "gemini"]),
     model: z.string().min(1, "AI model must not be empty").optional(),
     baseUrl: z.string().url().optional(),
+    maxOutputTokens: z.number().int().positive().optional(),
+    timeoutMs: z.number().int().positive().optional(),
+    maxCalls: z.number().int().nonnegative().optional(),
   })
   .transform((val) => ({
     provider: val.provider,
     model: val.model ?? DEFAULT_AI_MODELS[val.provider],
     ...(val.baseUrl !== undefined ? { baseUrl: val.baseUrl } : {}),
+    ...(val.maxOutputTokens !== undefined ? { maxOutputTokens: val.maxOutputTokens } : {}),
+    ...(val.timeoutMs !== undefined ? { timeoutMs: val.timeoutMs } : {}),
+    ...(val.maxCalls !== undefined ? { maxCalls: val.maxCalls } : {}),
   }));
 
 /** Zod schema for an ignore rule. */

@@ -7,6 +7,7 @@
  * @module core/types
  */
 
+import type { AICallRecord } from '../diff/ai-provider.js';
 import type { FrontguardPlugin } from './plugins.js';
 import type { BoundingBox, DiffCluster } from '../diff/regions.js';
 import type { DOMElementBox, ClusteredDOMElement } from '../render/dom-elements.js';
@@ -195,10 +196,45 @@ export type AIProvider = 'openai' | 'anthropic' | 'gemini';
 export interface AIConfig {
   /** AI provider to use for diff analysis. */
   provider: AIProvider;
-  /** Model identifier (e.g. `'gpt-4.1-mini'`, `'claude-sonnet-4-20250514'`, `'gemini-2.5-flash'`). */
+  /** Model identifier. Defaults to `DEFAULT_AI_MODELS[provider]`. */
   model?: string;
-  /** Optional custom API base URL (e.g. OpenRouter, LiteLLM, vLLM, or custom Gemini proxy). */
+  /**
+   * Optional custom API base URL (e.g. OpenRouter, LiteLLM, vLLM, or custom Gemini proxy).
+   * Custom endpoints get the prompt-only JSON contract; structured outputs are
+   * requested from the providers' own APIs only.
+   */
   baseUrl?: string;
+  /** Output-token cap per call, including reasoning/thinking tokens. Default 8192. */
+  maxOutputTokens?: number;
+  /** Wall-clock limit per HTTP attempt in milliseconds. Default 120000. */
+  timeoutMs?: number;
+  /**
+   * Maximum model calls per run (analysis, fix generation and judge combined).
+   * Calls past the cap are skipped and reported; pixel results do not change.
+   * Unset means no cap.
+   */
+  maxCalls?: number;
+}
+
+export type { AICallRecord, AIErrorKind } from '../diff/ai-provider.js';
+
+/** Model-call accounting for one run (`RunResult.aiUsage`). */
+export interface AIUsageSummary {
+  /** One record per logical model call (all attempts). */
+  calls: AICallRecord[];
+  totals: {
+    calls: number;
+    ok: number;
+    errors: number;
+    attempts: number;
+    inputTokens: number;
+    outputTokens: number;
+    latencyMs: number;
+  };
+  /** Calls not made because `ai.maxCalls` was reached. */
+  skipped: { budget: number };
+  /** The configured cap, when one was set. */
+  maxCalls?: number;
 }
 
 /**
@@ -691,6 +727,8 @@ export interface DiffResult {
   currentImage?: Buffer;
   /** AI-powered analysis of the visual change, if available. */
   aiAnalysis?: AIAnalysis;
+  /** Set when AI analysis was skipped because `ai.maxCalls` was reached. Pixel status is unchanged. */
+  aiSkipped?: 'budget';
   /** Error message when `status` is `'error'`. */
   error?: string;
   /** SSIM score when SSIM fallback was computed (0–1). */
@@ -810,6 +848,8 @@ export interface JudgeResult {
   rawResponse?: string;
   /** Error message if the judgement failed. */
   error?: string;
+  /** Set when the judgement was skipped because `ai.maxCalls` was reached. */
+  skipped?: 'budget';
 }
 
 // ---------------------------------------------------------------------------
@@ -984,6 +1024,8 @@ export interface RunResult {
   thirdPartyScripts?: ThirdPartyScriptResult[];
   /** Model-as-judge verdicts (Task 8.4), if judge mode ran. */
   judgements?: JudgeResult[];
+  /** Model-call accounting (calls, tokens, latency, budget skips), when AI is configured. */
+  aiUsage?: AIUsageSummary;
 }
 
 /**

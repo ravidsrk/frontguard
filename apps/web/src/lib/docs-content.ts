@@ -372,7 +372,7 @@ $ npx -p @frontguard/cli frontguard run`,
       },
       {
         title: 'Optional BYOK Vision Triage & Fix Sandbox',
-        body: 'When ai is configured, sends cropped Set-of-Mark evidence to OpenAI, Anthropic, Google Gemini, or a custom OpenAI-compatible baseUrl. If generateFixes and verifyFixes are enabled, tests candidate CSS patches in an isolated Playwright or Daytona sandbox.',
+        body: 'When ai is configured, sends the baseline, current and diff screenshots (downscaled) with the DOM selectors under each changed cluster to OpenAI, Anthropic, Google Gemini, or a custom OpenAI-compatible baseUrl. If generateFixes and verifyFixes are enabled, tests candidate CSS patches in an isolated Playwright or Daytona sandbox.',
       },
       {
         title: 'Artifact Emission & Exit Gate',
@@ -559,10 +559,9 @@ $ frontguard monitor --history`,
   blockUrls: ['*google-analytics.com*', '*intercom.io*'],
   threshold: 0.01,
   ai: {
-    provider: 'gemini',
-    model: 'gemini-2.5-flash',
-    // Or provider: 'openai' ('gpt-4.1-mini', 'gpt-4o') with optional baseUrl for OpenRouter / Ollama / vLLM,
-    // or provider: 'anthropic' ('claude-sonnet-4-20250514')
+    provider: 'gemini', // default model 'gemini-3.5-flash-lite'
+    // Or provider: 'openai' (default 'gpt-6-luna') with optional baseUrl for OpenRouter / Ollama / vLLM,
+    // or provider: 'anthropic' (default 'claude-sonnet-5-5')
   },
   ignore: [
     { selector: '.live- visitor-counter' },
@@ -593,7 +592,7 @@ $ frontguard monitor --history`,
         ['seedRandom', 'boolean | number', 'undefined', 'Override Math.random() with a seeded Mulberry32 PRNG.'],
         ['blockUrls', 'string[]', '[]', 'Abort third-party URLs matching glob/substring patterns before capture.'],
         ['ignore', 'Array&lt;{ selector: string }&gt;', '[]', 'Hide or mask volatile DOM elements (e.g., live tickers, video players) during capture.'],
-        ['ai', '{ provider, model?, baseUrl? }', 'undefined', 'Optional BYOK vision triage (openai, anthropic, gemini).'],
+        ['ai', '{ provider, model?, baseUrl?, maxCalls?, maxOutputTokens?, timeoutMs? }', 'undefined', 'Optional BYOK vision triage (openai, anthropic, gemini). maxCalls caps model calls per run; skipped calls are reported in aiUsage and leave pixel results unchanged.'],
         ['plugins', 'FrontguardPlugin[]', '[]', 'Registered 9-hook lifecycle plugins (accessibility, performance budgets, script inventory, custom).'],
         ['outputDir', 'string', "'./frontguard-report'", 'Directory for HTML and images. JSON output is written to stdout; redirect it to save a file.'],
       ],
@@ -787,7 +786,7 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
         ['textSnapshot', '{ json?: string, markdown?: string }', 'undefined', 'Selectors whose text is stored as .json or .md beside the PNG. A mismatch does not change passed.'],
         ['mask', 'string[]', 'undefined', 'CSS selectors to cover with solid neutral boxes before screenshot capture.'],
         ['maskRegions', 'Array&lt;{ x, y, width, height }&gt;', 'undefined', 'Explicit pixel bounding boxes to mask out of comparison.'],
-        ['ai', "boolean | { provider: 'openai'|'anthropic'|'gemini', model?, baseUrl? }", 'false', 'Run optional BYOK vision analysis when a diff exceeds threshold.'],
+        ['ai', "boolean | { provider: 'openai'|'anthropic'|'gemini', model?, baseUrl?, maxOutputTokens?, timeoutMs? }", 'false', 'Run optional BYOK vision analysis when a diff exceeds threshold. A failure is returned as aiError and logged once per run.'],
         ['baselineDir', 'string', "'__visual_baselines__'", 'Directory where baseline, actual, and diff PNGs are stored.'],
         ['update', 'boolean', 'process.env.FRONTGUARD_UPDATE === "1"', 'Overwrite the existing baseline PNG with the current capture.'],
       ],
@@ -922,21 +921,21 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
       'OPTIONAL BYOK.',
       'Model-assisted analysis is not required for local pixel comparison. Screenshot evidence is sent directly to the provider account you configure.',
     )}${lead(
-      'When a route exceeds your pixel or SSIM threshold, Frontguard can send cropped visual evidence (baseline, current, diff, and spatial cluster selectors) to your configured vision model to classify the change and explain what shifted.',
+      'When a route exceeds your pixel or SSIM threshold, Frontguard can send visual evidence (the baseline, current and diff screenshots, downscaled to 800 px wide and cropped to 5,000 px tall, plus the DOM selectors under each changed cluster) to your configured vision model to classify the change and explain what shifted.',
     )}${figure(
       '/images/docs/perceptual-diff-clusters.jpg',
       'Perceptual Diff Engine and Spatial DOM-Cluster Attribution',
       'FIG 01 · PERCEPTUAL DIFF & DOM ATTRIBUTION — CHROMA-SSIM, WAVELET CW-SSIM, 8-CONNECTED CLUSTERS & SANDBOX VERIFICATION',
     )}${h2('Scope')}${p(
-      'Changed screenshots can be classified as regression, intentional, or content_update with a confidence score and explanation. AI analysis runs on every diff above threshold to explain visual changes, classify severity, and suggest candidate CSS fixes. AI annotations are advisory and never silently override pass/fail exit codes.',
+      'Changed screenshots can be classified as regression, intentional, or content_update with a confidence score and explanation. AI analysis runs on every diff above threshold, up to ai.maxCalls per run, to explain visual changes, classify severity, and suggest candidate CSS fixes. AI annotations are advisory and never silently override pass/fail exit codes. A run whose model calls fail exits 2 so a broken provider is never silent; calls skipped by ai.maxCalls leave the pixel result unchanged.',
     )}${h2('Providers')}${p(
-      "Supported providers include OpenAI (provider: 'openai', models such as 'gpt-4.1-mini' or 'gpt-4o', env FRONTGUARD_OPENAI_KEY), Anthropic (provider: 'anthropic', model 'claude-sonnet-4-20250514', env FRONTGUARD_ANTHROPIC_KEY), Google Gemini (provider: 'gemini', model 'gemini-2.5-flash', env FRONTGUARD_GEMINI_KEY), and OpenAI-compatible custom endpoints via baseUrl or FRONTGUARD_OPENAI_BASE_URL for OpenRouter, Ollama, and vLLM.",
+      "Supported providers include OpenAI (provider: 'openai', default model 'gpt-6-luna', env FRONTGUARD_OPENAI_KEY), Anthropic (provider: 'anthropic', default model 'claude-sonnet-5-5', env FRONTGUARD_ANTHROPIC_KEY), Google Gemini (provider: 'gemini', default model 'gemini-3.5-flash-lite', env FRONTGUARD_GEMINI_KEY), and OpenAI-compatible custom endpoints via baseUrl or FRONTGUARD_OPENAI_BASE_URL for OpenRouter, Ollama, and vLLM. Set model to use any other model your provider serves. Requests to the providers' own APIs ask for schema-constrained JSON; custom endpoints get the same prompt without a schema.",
     )}${table(
       ['Provider', 'Config provider', 'Default / Recommended Model', 'Environment Variable'],
       [
-        ['Google Gemini', "'gemini'", "'gemini-2.5-flash'", 'FRONTGUARD_GEMINI_KEY (or GEMINI_API_KEY)'],
-        ['OpenAI', "'openai'", "'gpt-4.1-mini' or 'gpt-4o'", 'FRONTGUARD_OPENAI_KEY (or OPENAI_API_KEY)'],
-        ['Anthropic', "'anthropic'", "'claude-sonnet-4-20250514'", 'FRONTGUARD_ANTHROPIC_KEY (or ANTHROPIC_API_KEY)'],
+        ['Google Gemini', "'gemini'", "'gemini-3.5-flash-lite'", 'FRONTGUARD_GEMINI_KEY (or GEMINI_API_KEY)'],
+        ['OpenAI', "'openai'", "'gpt-6-luna'", 'FRONTGUARD_OPENAI_KEY (or OPENAI_API_KEY)'],
+        ['Anthropic', "'anthropic'", "'claude-sonnet-5-5'", 'FRONTGUARD_ANTHROPIC_KEY (or ANTHROPIC_API_KEY)'],
         ['OpenRouter / Ollama / vLLM', "'openai' + baseUrl", 'Any vision-capable model ID', 'FRONTGUARD_OPENAI_KEY + FRONTGUARD_OPENAI_BASE_URL'],
       ],
     )}${h2('Configuration examples')}${code(
@@ -946,10 +945,10 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
   baseUrl: 'http://localhost:3000',
   redactSensitive: true, // Always mask PII before sending crops to an external LLM
   ai: {
-    provider: 'gemini',
-    model: 'gemini-2.5-flash',
-    // Or provider: 'openai', model: 'gpt-4.1-mini' | 'gpt-4o', baseUrl: 'https://openrouter.ai/api/v1'
-    // Or provider: 'anthropic', model: 'claude-sonnet-4-20250514'
+    provider: 'gemini', // default model 'gemini-3.5-flash-lite'
+    // Or provider: 'openai' (default 'gpt-6-luna'), optionally with baseUrl: 'https://openrouter.ai/api/v1'
+    // Or provider: 'anthropic' (default 'claude-sonnet-5-5')
+    maxCalls: 50, // optional cap on model calls per run
   },
 }`,
     )}${code(
@@ -964,7 +963,7 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
   },
 }`,
     )}${h2('Evidence limits')}${p(
-      'Frontguard has not published a model precision/recall benchmark. The current validation run had AI disabled, so it cannot support an accuracy claim.',
+      'Frontguard has not published a model precision/recall figure. npm run eval:ai --workspace=packages/cli measures per-class precision and recall for a provider and model on synthetic and rendered cases (add --mock to check the plumbing without a key), and a weekly workflow runs it for each provider whose key is configured. Treat those results as a regression check for the default models, not as an accuracy claim for your pages.',
     )}`,
   ),
 
@@ -993,8 +992,7 @@ $ npx -p @frontguard/cli frontguard run --output json &gt; ./frontguard-result.j
   version: 1,
   baseUrl: 'http://localhost:3000',
   ai: {
-    provider: 'openai',
-    model: 'gpt-4.1-mini',
+    provider: 'openai', // default model 'gpt-6-luna'
   },
   generateFixes: true, // Opt-in 1: generate candidate CSS patch
   verifyFixes: true,   // Opt-in 2: inject CSS in sandbox & re-compare against baseline

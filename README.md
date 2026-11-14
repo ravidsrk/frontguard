@@ -241,14 +241,19 @@ export default {
   baseUrl: 'http://localhost:3000',
   redactSensitive: true,
   ai: {
-    provider: 'openai',
-    model: 'gpt-4o', // Or 'gpt-4.1-mini'
-    // Or provider: 'gemini', model: 'gemini-2.5-flash' (env: FRONTGUARD_GEMINI_KEY)
-    // Or provider: 'anthropic', model: 'claude-sonnet-4-20250514' (env: FRONTGUARD_ANTHROPIC_KEY)
-    // Or point baseUrl at OpenRouter, local Ollama ('http://localhost:11434/v1'), or vLLM
+    provider: 'openai', // default model: 'gpt-6-luna' (env: FRONTGUARD_OPENAI_KEY)
+    // Or provider: 'anthropic' — default 'claude-sonnet-5-5' (env: FRONTGUARD_ANTHROPIC_KEY)
+    // Or provider: 'gemini' — default 'gemini-3.5-flash-lite' (env: FRONTGUARD_GEMINI_KEY)
+    // model: '…',            // any model your provider serves
+    // baseUrl: 'http://localhost:11434/v1', // OpenRouter, Ollama, vLLM, LiteLLM
+    // maxCalls: 50,          // cap model calls per run; skipped calls are reported
+    // maxOutputTokens: 8192, // per call, including reasoning/thinking tokens
+    // timeoutMs: 120000,     // per HTTP attempt
   },
 }
 ```
+
+Requests to the providers' own APIs ask for schema-constrained JSON. Custom `baseUrl` endpoints get the same prompt without a schema. Each run's JSON report includes `aiUsage`: one record per model call (tokens, latency, attempts, outcome). Set `FRONTGUARD_DEBUG_AI=1` to write each request (images replaced by size and hash) and raw response to `.frontguard-debug/ai/`. Check a model before switching to it with `npm run eval:ai --workspace=packages/cli -- --provider <name> --model <id>`.
 
 ### 5. Connecting AI Coding Agents via `@frontguard/mcp` (Zero-Key Local Mode)
 
@@ -435,7 +440,7 @@ When enabled, the CLI POSTs one JSON event to `https://telemetry.frontguard.dev/
 
 Full schema: [docs/telemetry.md](./docs/telemetry.md).
 
-Capture and compare traces are separate from those events. They are sent only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, as OTLP/HTTP JSON to that collector. Each span records a screenshot count and no URL, path, or image.
+Capture and compare traces are separate from those events. They are sent only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, as OTLP/HTTP JSON to that collector. Spans record counts only — screenshots, and for model calls the number of calls, errors, skips and tokens — and no URL, path, prompt, or image.
 
 ## Environment Variables
 
@@ -445,6 +450,7 @@ FRONTGUARD_OPENAI_KEY=sk-...
 FRONTGUARD_ANTHROPIC_KEY=...
 FRONTGUARD_GEMINI_KEY=AIza...
 FRONTGUARD_OPENAI_BASE_URL=https://openrouter.ai/api/v1 # optional OpenAI-compatible endpoint
+FRONTGUARD_DEBUG_AI=1 # optional: dump each model request/response to .frontguard-debug/ai/
 
 # Local Report Mode for @frontguard/mcp (optional, auto-detects ./frontguard-report/report.json)
 FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json

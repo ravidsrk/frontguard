@@ -156,9 +156,9 @@ export default {
 
   // AI analysis (optional, BYOK: 'openai' | 'anthropic' | 'gemini', plus optional custom baseUrl)
   ai: {
-    provider: "openai",
-    model: "gpt-4o",
+    provider: "openai", // default model "gpt-6-luna"; set model to use another
     // baseUrl: "https://openrouter.ai/api/v1", // OpenRouter, Ollama, or vLLM
+    // maxCalls: 50, // cap model calls per run; skipped calls are reported in aiUsage
   },
 
   // Ignore dynamic content. `since` is the date the rule was added.
