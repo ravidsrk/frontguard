@@ -174,9 +174,57 @@ describe('list_regressions', () => {
     expect(row.viewport).toBe(1280);
     expect(row.status).toBe('regression');
     expect(row.hasSuggestedFix).toBe(true);
+    expect(row.clusterCount).toBe(1);
     expect(row.prNumber).toBe(42);
     expect(row.repo).toBe('acme/shop');
     expect(row.diffId).toBe('run_pr42:/pricing:1280');
+  });
+
+  it('resolves pr_id "latest" to the newest run by createdAt, not list order', async () => {
+    const client = buildClient({ approved: [] });
+    // The stub lists run_pr42 (2026-06-10) before run_pr99 (2026-06-11).
+    const out = await listRegressions(client, { pr_id: 'latest' });
+    expect(out.runId).toBe('run_pr99');
+    expect(out.notFound).toBeUndefined();
+
+    const inRepo = await listRegressions(client, { pr_id: 'latest', repo: 'acme/shop' });
+    expect(inRepo.runId).toBe('run_pr99');
+
+    const otherRepo = await listRegressions(client, { pr_id: 'latest', repo: 'someone/else' });
+    expect(otherRepo.runId).toBe(null);
+    expect(otherRepo.notFound?.reason).toMatch(/pr_id=latest repo=someone\/else/);
+  });
+
+  it('resolves pr_id "latest" to the local report run', async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'fg-mcp-latest-'));
+    const reportPath = join(tmpDir, 'report.json');
+    writeFileSync(
+      reportPath,
+      JSON.stringify({
+        diffs: [
+          { route: '/', viewport: 1280, status: 'pass', diffPercentage: 0 },
+          {
+            route: '/pricing',
+            viewport: 1280,
+            browser: 'chromium',
+            status: 'regression',
+            diffPercentage: 0.04,
+            clusters: [
+              { id: 1, bbox: { x: 0, y: 0, width: 10, height: 10 } },
+              { id: 2, bbox: { x: 20, y: 0, width: 10, height: 10 } },
+            ],
+          },
+        ],
+      }),
+    );
+    try {
+      const out = await listRegressions(createLocalReportClient(reportPath), { pr_id: 'latest' });
+      expect(out.runId).toBe('run_local');
+      expect(out.regressions.map((row) => row.diffId)).toEqual(['run_local:/pricing:1280:chromium']);
+      expect(out.regressions[0].clusterCount).toBe(2);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it('resolves a bare run id directly', async () => {
@@ -1057,5 +1105,24 @@ describe('list_horizontal_overflow', () => {
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+
+  it('reads the newest run by createdAt when run_id is omitted', async () => {
+    const overflowRow = {
+      route: '/',
+      viewport: 375,
+      innerWidth: 375,
+      scrollWidth: 420,
+      flagged: true,
+      elements: [{ selector: '.hero', overflowPx: 45 }],
+    };
+    const older = { ...OTHER_RUN, id: 'run_old', createdAt: '2026-06-01T00:00:00.000Z', horizontalOverflow: [] };
+    const newer = { ...OTHER_RUN, id: 'run_new', createdAt: '2026-06-02T00:00:00.000Z', horizontalOverflow: [overflowRow] };
+    const client = new CloudClient(AUTH, {
+      fetch: (async () => Response.json({ runs: [older, newer], total: 2 })) as typeof fetch,
+    });
+    const listed = await listHorizontalOverflow(client, {});
+    expect(listed.runId).toBe('run_new');
+    expect(listed.rows).toEqual([overflowRow]);
   });
 });

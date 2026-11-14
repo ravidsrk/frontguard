@@ -10,6 +10,7 @@
 import { z } from 'zod';
 import type { CloudClient, CloudRun } from '../client/cloud.js';
 import { isRegressionResult } from './_regression.js';
+import { matchesRepo } from './_runs.js';
 
 export const recentRunsInputSchema = {
   repo: z
@@ -83,11 +84,6 @@ export const recentRunsOutputSchema = z.object({
 
 function regressionsCount(run: CloudRun): number {
   return (run.results ?? []).filter(isRegressionResult).length;
-}
-
-function matchesRepo(run: CloudRun, repo: string): boolean {
-  if (!run.github) return false;
-  return `${run.github.owner}/${run.github.repo}` === repo;
 }
 
 function matchesBranch(run: CloudRun, branch: string): boolean {

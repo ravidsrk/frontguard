@@ -213,7 +213,7 @@ function registerCoreTools(server: McpServer, writesEnabled: boolean): void {
     {
       ...readOnlyAnnotations('List regressions for a PR'),
       description:
-        'Return the visual regressions Frontguard detected on a given GitHub PR (or run id). Each row carries a `diffId` you can pass to `get_suggested_fix`.',
+        'Return the visual regressions Frontguard detected for a GitHub PR number, a run id, or `"latest"` (the newest run; in local-report mode, the report\'s run). Each row carries a `diffId` for `inspect_diff_cluster_dom`, `get_suggested_fix` and `verify_css_patch`, plus a `clusterCount`.',
       inputSchema: listRegressionsInputSchema,
       outputSchema: listRegressionsOutputSchema,
     },

@@ -10,6 +10,7 @@
 
 import { z } from 'zod';
 import type { CloudClient, CloudHorizontalOverflow } from '../client/cloud.js';
+import { newestRun } from './_runs.js';
 
 export const listHorizontalOverflowInputSchema = {
   run_id: z
@@ -60,7 +61,7 @@ export async function listHorizontalOverflow(
 ): Promise<ListHorizontalOverflowResult> {
   const run = input.run_id
     ? await client.getRun(input.run_id)
-    : (await client.listRuns()).runs[0];
+    : newestRun((await client.listRuns()).runs);
   if (!run) {
     return {
       count: 0,
