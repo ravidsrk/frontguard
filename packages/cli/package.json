@@ -24,6 +24,7 @@
     "dev": "tsup --watch",
     "test": "vitest run --pool=forks --exclude='test/e2e/**'",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "eval:ai": "tsx scripts/eval-ai.ts",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "node ./scripts/check-readme-version.mjs && npm run build"

@@ -1,0 +1,98 @@
+name: AI eval
+
+# Live eval of the default vision models (npm run eval:ai). Needs provider keys
+# as repository secrets: FRONTGUARD_OPENAI_KEY, FRONTGUARD_ANTHROPIC_KEY,
+# FRONTGUARD_GEMINI_KEY. A provider without a key is skipped with a notice.
+# The mock eval (no keys) runs on every PR inside `npm test`.
+
+on:
+  schedule:
+    # Monday 10:00 America/Los_Angeles (PDT, UTC-7)
+    - cron: '0 17 * * 1'
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: 'openai, anthropic, gemini, or all'
+        required: false
+        default: all
+      model:
+        description: 'Model override (blank = Frontguard default)'
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'packages/cli/src/diff/ai-*.ts'
+      - 'packages/cli/src/diff/model-judge.ts'
+      - 'packages/cli/scripts/eval/**'
+      - 'packages/cli/scripts/eval-ai.ts'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-ai-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [openai, anthropic, gemini]
+    env:
+      PROVIDER: ${{ matrix.provider }}
+      SELECTED: ${{ github.event.inputs.provider || 'all' }}
+      MODEL: ${{ github.event.inputs.model || '' }}
+      FRONTGUARD_OPENAI_KEY: ${{ secrets.FRONTGUARD_OPENAI_KEY }}
+      FRONTGUARD_ANTHROPIC_KEY: ${{ secrets.FRONTGUARD_ANTHROPIC_KEY }}
+      FRONTGUARD_GEMINI_KEY: ${{ secrets.FRONTGUARD_GEMINI_KEY }}
+    steps:
+      - name: Check provider key
+        id: key
+        run: |
+          if [ "$SELECTED" != "all" ] && [ "$SELECTED" != "$PROVIDER" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          var="FRONTGUARD_$(echo "$PROVIDER" | tr '[:lower:]' '[:upper:]')_KEY"
+          if [ -z "${!var}" ]; then
+            echo "::notice title=AI eval skipped::$var is not set as a repository secret; skipping $PROVIDER."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.run == 'true'
+      - uses: actions/setup-node@v7
+        if: steps.key.outputs.run == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.key.outputs.run == 'true'
+        run: npm ci
+      - name: Install Playwright Chromium
+        if: steps.key.outputs.run == 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Run eval
+        if: steps.key.outputs.run == 'true'
+        run: |
+          args=(--provider "$PROVIDER" --fixes --out "$RUNNER_TEMP/eval-$PROVIDER.json")
+          if [ -n "$MODEL" ]; then args+=(--model "$MODEL"); fi
+          npm run eval:ai --workspace=packages/cli -- "${args[@]}" | tee "$RUNNER_TEMP/eval-$PROVIDER.txt"
+      - name: Summary
+        if: always() && steps.key.outputs.run == 'true'
+        run: |
+          {
+            echo "### AI eval: $PROVIDER"
+            echo '```'
+            cat "$RUNNER_TEMP/eval-$PROVIDER.txt" 2>/dev/null || echo "no output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always() && steps.key.outputs.run == 'true'
+        with:
+          name: eval-ai-${{ matrix.provider }}
+          path: ${{ runner.temp }}/eval-${{ matrix.provider }}.*
+          retention-days: 90
