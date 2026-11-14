@@ -1,7 +1,16 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { analyzeWithAI } from '../src/ai.js';
+import { PNG } from 'pngjs';
+import { analyzeWithAI, resetAIWarnings, warnOnce } from '../src/ai.js';
+import { CLASSIFICATIONS, SEVERITIES, DEFAULT_AI_MODELS } from '../../cli/src/diff/ai-provider.js';
 
-const img = Buffer.from('fake-png');
+function png(width: number, height: number): Buffer {
+  const p = new PNG({ width, height });
+  p.data.fill(180);
+  return PNG.sync.write(p);
+}
+
+const img = png(20, 20);
+const NO_RETRY = { retries: 0 };
 
 const AI_ENV = [
   'FRONTGUARD_OPENAI_KEY',
@@ -19,6 +28,7 @@ beforeEach(() => {
     saved[k] = process.env[k];
     delete process.env[k];
   }
+  resetAIWarnings();
 });
 
 afterEach(() => {
@@ -31,174 +41,114 @@ afterEach(() => {
 
 const validResult = {
   classification: 'regression',
-  severity: 'high',
+  severity: 'warning',
   explanation: 'Header color changed',
+  confidence: 0.7,
+  suggestedFix: null,
 };
 
-describe('analyzeWithAI — OpenAI', () => {
-  it('returns undefined when no API key is set', async () => {
-    const res = await analyzeWithAI(img, img, { provider: 'openai' });
-    expect(res).toBeUndefined();
-  });
+function openAIFetch(content: unknown = validResult) {
+  return vi.fn(async () =>
+    new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }), { status: 200 }),
+  );
+}
 
-  it('parses a valid JSON response and defaults to gpt-4.1-mini', async () => {
-    process.env.OPENAI_API_KEY = 'sk-test';
-    const spy = vi.fn(async () =>
-      new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(validResult) } }] }), { status: 200 }),
-    );
-    globalThis.fetch = spy as unknown as typeof fetch;
+describe('analyzeWithAI', () => {
+  it('returns a config error, not silence, when no API key is set', async () => {
     const res = await analyzeWithAI(img, img, { provider: 'openai' });
-    expect(res).toEqual(validResult);
-    expect(spy).toHaveBeenCalledWith(
-      'https://api.openai.com/v1/chat/completions',
-      expect.objectContaining({
-        method: 'POST',
-        body: expect.stringContaining('"model":"gpt-4.1-mini"'),
-      }),
-    );
-  });
-
-  it('supports custom baseUrl and model for OpenAI', async () => {
-    process.env.FRONTGUARD_OPENAI_KEY = 'sk-custom';
-    const spy = vi.fn(async () =>
-      new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(validResult) } }] }), { status: 200 }),
-    );
-    globalThis.fetch = spy as unknown as typeof fetch;
-    const res = await analyzeWithAI(img, img, {
+    expect(res.ai).toBeUndefined();
+    expect(res.aiError).toMatchObject({
       provider: 'openai',
-      model: 'gpt-4o',
-      baseUrl: 'https://proxy.example.com/v1/',
+      model: DEFAULT_AI_MODELS.openai,
+      kind: 'config',
+      message: expect.stringContaining('FRONTGUARD_OPENAI_KEY'),
     });
-    expect(res).toEqual(validResult);
-    expect(spy).toHaveBeenCalledWith(
-      'https://proxy.example.com/v1/chat/completions',
-      expect.objectContaining({
-        body: expect.stringContaining('"model":"gpt-4o"'),
-      }),
-    );
   });
 
-  it('returns undefined on a non-ok response', async () => {
+  it('classifies with the shared prompt, schema and default model', async () => {
     process.env.OPENAI_API_KEY = 'sk-test';
-    globalThis.fetch = vi.fn(async () => new Response('err', { status: 500 })) as typeof fetch;
-    expect(await analyzeWithAI(img, img, { provider: 'openai' })).toBeUndefined();
+    const fetchImpl = openAIFetch();
+    const res = await analyzeWithAI(img, img, { provider: 'openai' }, png(20, 20), {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    expect(res.ai).toEqual({
+      classification: 'regression',
+      severity: 'warning',
+      explanation: 'Header color changed',
+      confidence: 0.7,
+    });
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://api.openai.com/v1/chat/completions');
+    const body = JSON.parse(String(init.body));
+    expect(body.model).toBe(DEFAULT_AI_MODELS.openai);
+    expect(body.response_format.json_schema.name).toBe('frontguard_classification');
+    expect(body.messages[0].content).toContain('visual regression reviewer');
+    // baseline, current and the pixel diff overlay
+    expect(body.messages[1].content.filter((c: { type: string }) => c.type === 'image_url')).toHaveLength(3);
   });
 
-  it('returns undefined when content is missing', async () => {
-    process.env.OPENAI_API_KEY = 'sk-test';
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ choices: [] }), { status: 200 })) as typeof fetch;
-    expect(await analyzeWithAI(img, img, { provider: 'openai' })).toBeUndefined();
+  it.each([
+    [404, 'not_found', /Frontguard's default anthropic model/],
+    [401, 'auth', /Authentication failed/],
+  ])('reports HTTP %s as %s with an actionable message', async (status, kind, message) => {
+    process.env.FRONTGUARD_ANTHROPIC_KEY = 'k';
+    const fetchImpl = vi.fn(async () => new Response('{"error":{"message":"x"}}', { status }));
+    const res = await analyzeWithAI(img, img, { provider: 'anthropic' }, null, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      ...NO_RETRY,
+    });
+    expect(res.aiError).toMatchObject({ provider: 'anthropic', kind, status });
+    expect(res.aiError?.message).toMatch(message);
   });
 
-  it('fails silently (undefined) when fetch throws', async () => {
+  it('reports timeouts', async () => {
+    process.env.FRONTGUARD_GEMINI_KEY = 'k';
+    const fetchImpl = vi.fn(async () => {
+      throw new DOMException('aborted', 'AbortError');
+    });
+    const res = await analyzeWithAI(img, img, { provider: 'gemini', timeoutMs: 10 }, null, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      ...NO_RETRY,
+    });
+    expect(res.aiError).toMatchObject({ kind: 'timeout', status: 408 });
+  });
+
+  it('rejects answers outside the shared taxonomy', async () => {
     process.env.OPENAI_API_KEY = 'sk-test';
-    globalThis.fetch = vi.fn(async () => {
-      throw new Error('network down');
-    }) as typeof fetch;
-    expect(await analyzeWithAI(img, img, { provider: 'openai' })).toBeUndefined();
+    const res = await analyzeWithAI(img, img, { provider: 'openai' }, null, {
+      fetchImpl: openAIFetch({ ...validResult, classification: 'layout_shift' }) as unknown as typeof fetch,
+    });
+    expect(res.aiError).toMatchObject({ kind: 'invalid_output' });
+  });
+
+  it('sends tall full-page screenshots within provider image limits', async () => {
+    process.env.OPENAI_API_KEY = 'sk-test';
+    const fetchImpl = openAIFetch();
+    await analyzeWithAI(png(1440, 12000), png(1440, 12000), { provider: 'openai' }, null, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    const body = JSON.parse(String((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    for (const part of body.messages[1].content.filter((c: { type: string }) => c.type === 'image_url')) {
+      const decoded = PNG.sync.read(Buffer.from(part.image_url.url.split(',')[1], 'base64'));
+      expect(decoded.width).toBeLessThanOrEqual(800);
+      expect(decoded.height).toBeLessThanOrEqual(8000);
+    }
+  });
+
+  it('uses the same taxonomy as the CLI', () => {
+    expect([...CLASSIFICATIONS]).toEqual(['regression', 'intentional', 'content_update']);
+    expect([...SEVERITIES]).toEqual(['critical', 'warning', 'info']);
   });
 });
 
-describe('analyzeWithAI — Anthropic', () => {
-  it('returns undefined when no API key is set', async () => {
-    expect(await analyzeWithAI(img, img, { provider: 'anthropic' })).toBeUndefined();
-  });
-
-  it('extracts JSON embedded in the text response and supports custom baseUrl', async () => {
-    process.env.ANTHROPIC_API_KEY = 'sk-ant';
-    const spy = vi.fn(async () =>
-      new Response(
-        JSON.stringify({ content: [{ type: 'text', text: `Here: ${JSON.stringify(validResult)}` }] }),
-        { status: 200 },
-      ),
-    );
-    globalThis.fetch = spy as unknown as typeof fetch;
-    const res = await analyzeWithAI(img, img, {
-      provider: 'anthropic',
-      baseUrl: 'https://anthropic-proxy.example.com/v1',
-    });
-    expect(res).toEqual(validResult);
-    expect(spy).toHaveBeenCalledWith(
-      'https://anthropic-proxy.example.com/v1/messages',
-      expect.any(Object),
-    );
-  });
-
-  it('returns undefined when no JSON is present in the text', async () => {
-    process.env.ANTHROPIC_API_KEY = 'sk-ant';
-    globalThis.fetch = vi.fn(async () =>
-      new Response(JSON.stringify({ content: [{ type: 'text', text: 'no json here' }] }), { status: 200 }),
-    ) as typeof fetch;
-    expect(await analyzeWithAI(img, img, { provider: 'anthropic' })).toBeUndefined();
-  });
-
-  it('returns undefined on a non-ok response', async () => {
-    process.env.ANTHROPIC_API_KEY = 'sk-ant';
-    globalThis.fetch = vi.fn(async () => new Response('err', { status: 429 })) as typeof fetch;
-    expect(await analyzeWithAI(img, img, { provider: 'anthropic' })).toBeUndefined();
-  });
-});
-
-describe('analyzeWithAI — Gemini', () => {
-  it('returns undefined when no Gemini API key is set', async () => {
-    expect(await analyzeWithAI(img, img, { provider: 'gemini' })).toBeUndefined();
-  });
-
-  it('calls Gemini 2.5 Flash by default and parses JSON response', async () => {
-    process.env.FRONTGUARD_GEMINI_KEY = 'gm-key-123';
-    const spy = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          candidates: [
-            {
-              content: {
-                parts: [{ text: JSON.stringify(validResult) }],
-              },
-            },
-          ],
-        }),
-        { status: 200 },
-      ),
-    );
-    globalThis.fetch = spy as unknown as typeof fetch;
-
-    const res = await analyzeWithAI(img, img, { provider: 'gemini' });
-    expect(res).toEqual(validResult);
-    expect(spy).toHaveBeenCalledWith(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=gm-key-123',
-      expect.objectContaining({
-        method: 'POST',
-      }),
-    );
-  });
-
-  it('supports GEMINI_API_KEY fallback and custom baseUrl + model', async () => {
-    process.env.GEMINI_API_KEY = 'gm-fallback';
-    const spy = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          candidates: [
-            {
-              content: {
-                parts: [{ text: `\`\`\`json\n${JSON.stringify(validResult)}\n\`\`\`` }],
-              },
-            },
-          ],
-        }),
-        { status: 200 },
-      ),
-    );
-    globalThis.fetch = spy as unknown as typeof fetch;
-
-    const res = await analyzeWithAI(img, img, {
-      provider: 'gemini',
-      model: 'gemini-2.5-pro',
-      baseUrl: 'https://gemini-gateway.example.com/v1beta/',
-    });
-    expect(res).toEqual(validResult);
-    expect(spy).toHaveBeenCalledWith(
-      'https://gemini-gateway.example.com/v1beta/models/gemini-2.5-pro:generateContent?key=gm-fallback',
-      expect.any(Object),
-    );
+describe('warnOnce', () => {
+  it('warns once per provider and error kind', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = { provider: 'openai' as const, model: 'm', kind: 'auth' as const, message: 'bad key' };
+    warnOnce(error);
+    warnOnce(error);
+    warnOnce({ ...error, kind: 'timeout' });
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(spy.mock.calls[0][0]).toContain('[frontguard] AI analysis unavailable (openai/m, auth): bad key');
   });
 });
