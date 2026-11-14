@@ -372,7 +372,7 @@ This block is sample output, not a measured run. `smartFilter` falls back to ren
 
 ## Built in the Open
 
-The MIT-licensed repository contains the CLI, optional AI pipeline, cloud API source, integrations, MCP server, and Docker renderer source. The local CLI is the supported product path. Hosted, MCP, GitHub App, and Docker Compose onboarding remain pre-release; see the [launch audit](./docs/launch-audit-2026-08.md) for the unresolved acceptance work.
+The MIT-licensed repository contains the CLI, optional AI pipeline, cloud API source, integrations, MCP server, and Docker renderer source. The local CLI is the supported product path. Hosted, MCP, GitHub App, and Docker Compose onboarding remain pre-release; see the [August 2026 launch audit](./docs/archive/launch-audit-2026-08.md) for the acceptance work it left open.
 
 AI is optional; without it, the CLI performs local pixel comparison and writes local reports. Cloud source and the [self-host guide](https://frontguard.dev/docs/self-host) are available for evaluation, not as a verified production quick start.
 
@@ -462,11 +462,12 @@ OTEL_EXPORTER_OTLP_HEADERS=api-key=replace-me
 ## Documentation & Internal References
 
 - **Interactive Developer Docs:** [frontguard.dev/docs](https://frontguard.dev/docs)
-- [Product deep-dive](./docs/PRODUCT.md) — Architecture decisions and design rationale
+- [Architecture](./docs/ARCHITECTURE.md) — Package map, module tables and design decisions
+- [Docs index](./docs/README.md) — Every maintained doc, plus the archive of dated plans and logs
 - [Research](./docs/research.md) — Competitive landscape and pricing citations
 - [Validation results](./validation/results-v0.2.md) — Recorded local harness run
 - [Telemetry schema](./docs/telemetry.md) — Opt-in anonymous event contract
 
 ## Contributing & License
 
-Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and guidelines. Released under the [MIT License](./LICENSE).
+Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and guidelines, and [AGENTS.md](./AGENTS.md) for the verify and test commands coding agents should run. Released under the [MIT License](./LICENSE).

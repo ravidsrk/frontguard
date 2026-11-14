@@ -33,10 +33,6 @@ const CLAIM_SURFACES = [
   path.join(REPO_ROOT, 'docs/design-extract/source/Pricing.dc.html'),
   path.join(REPO_ROOT, 'docs/design-extract/source/Comparisons.dc.html'),
   path.join(REPO_ROOT, 'docs/design-extract/source/Docs.dc.html'),
-  path.join(REPO_ROOT, 'docs/design-extract/tanstack/src/routes/index.tsx'),
-  path.join(REPO_ROOT, 'docs/design-extract/tanstack/src/routes/pricing.tsx'),
-  path.join(REPO_ROOT, 'docs/design-extract/tanstack/src/routes/comparisons.tsx'),
-  path.join(REPO_ROOT, 'docs/design-extract/tanstack/src/lib/docs-content.ts'),
 ]
 
 function readUtf8(filePath: string) {

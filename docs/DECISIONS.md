@@ -28,7 +28,7 @@ Each decision: `## YYYY-MM-DD — short title` followed by **Context**, **Decisi
 
 **Context**: Workers will branch from `origin/main` and need to see live build context.
 
-**Decision**: `docs/ship-progress.md` and `docs/DECISIONS.md` are authored in the coordinator workspace and merged to main as ordinary commits as the build progresses, so every worker worktree branched after that point inherits the latest state.
+**Decision**: `docs/archive/ship-progress.md` and `docs/DECISIONS.md` are authored in the coordinator workspace and merged to main as ordinary commits as the build progresses, so every worker worktree branched after that point inherits the latest state.
 
 **Rejected**: Keeping tracking docs in a sidecar branch (workers wouldn't see them); only updating them post-build (then they'd be retrospective, not a live record).
 
@@ -63,7 +63,7 @@ Each decision: `## YYYY-MM-DD — short title` followed by **Context**, **Decisi
 ## 2026-06-17 — Adversarial remediation kickoff (autonomous)
 
 **Context**: The post-ship adversarial audit produced 49 confirmed findings
-(22 P0 / 15 P1 / 12 P2) in docs/adversarial-v020-postship.md. User invoked
+(22 P0 / 15 P1 / 12 P2) in docs/archive/adversarial-v020-postship.md. User invoked
 `/orchestration` to drive an autonomous remediation that closes every finding
 via the PR-per-task pipeline (BUILD → VERIFY → REVIEW → SHIP), preserving all
 commits via merge commits, never squash.
