@@ -1,7 +1,7 @@
 # Incident: `main` CI is red
 
 This is the operator note for a failed CI workflow on `main`. It does not replace
-`docs/completion/HUMAN_ACTIONS.md`.
+`docs/archive/completion/HUMAN_ACTIONS.md`.
 
 ## How you hear about it
 
@@ -47,7 +47,7 @@ host back at `frontguard.pages.dev`.
 
 Rehearsed on 2026-10-19 against a scratch Worker named
 `frontguard-rollback-drill`, then deleted. Transcript:
-`docs/completion/evidence/T-23-rollback.txt`. The rehearsal did not touch
+`docs/archive/completion/evidence/T-23-rollback.txt`. The rehearsal did not touch
 `frontguard-web`.
 
 From a checkout that contains `apps/web/wrangler.jsonc`, with the account id
@@ -72,7 +72,7 @@ restored version.
 
 Rehearsed on 2026-10-19 against scratch database `frontguard-restore-drill`
 (created, restored, deleted). Transcript:
-`docs/completion/evidence/T-22-d1-restore.txt`. There is no production D1.
+`docs/archive/completion/evidence/T-22-d1-restore.txt`. There is no production D1.
 `packages/cloud-api/wrangler.toml` still has
 `database_id = "REPLACE_WITH_D1_DATABASE_ID"`. Do not deploy `cloud-api`, and
 do not attach `api.frontguard.dev`, until that id is a real database you mean

@@ -28,6 +28,9 @@
     "sync-version:check": "npx tsx scripts/sync-version.ts --check",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "check:openapi": "node scripts/sync-openapi.mjs --check",
+    "verify:static": "npm run sync-version:check && npm run check:openapi && npm run lint && npm run typecheck && node apps/web/scripts/check-doc-links.mjs",
+    "verify": "npm run build && npm run verify:static && npm test",
     "release": "npm run build && changeset publish",
     "version-packages": "changeset version",
     "prepare": "husky"

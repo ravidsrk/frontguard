@@ -1,6 +1,6 @@
 /**
  * Regression guards for action/packaging hygiene findings:
- * SEC-1, DEP-1, OPS-4, COU-1 (docs/adversarial-review-fresh.md §1).
+ * SEC-1, DEP-1, OPS-4, COU-1 (docs/archive/adversarial-review-fresh.md §1).
  */
 import { describe, it, expect } from 'vitest';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

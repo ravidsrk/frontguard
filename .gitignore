@@ -45,6 +45,8 @@ Thumbs.db
 .turbo/
 .vercel/
 .netlify/
+# Local wrangler state, e.g. packages/cloud-api/.wrangler/ after `npm run dev:api`
+.wrangler/
 
 # Release artifacts (scripts/release.sh)
 .release-notes/
