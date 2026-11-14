@@ -1668,14 +1668,14 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
     )}${h2('Tools')}${table(
       ['MCP Tool Name', 'Required Arguments', 'What It Returns to the Coding Agent'],
       [
-        ['list_regressions', 'pr_id; optional repo, branch', 'Lists regressions and their diffId values. Use a PR number or a run ID returned by recent_runs; branch is currently reserved.'],
+        ['list_regressions', 'pr_id; optional repo, branch, limit, cursor', 'Lists regressions and their diffId values, worst first, 25 per page by default (max 200). Use a PR number or a run ID returned by recent_runs; branch is currently reserved. Pass nextCursor back as cursor for the next page.'],
         ['inspect_diff_cluster_dom', 'diff_id; optional cluster_id', 'Returns captured DOM clusters, bounding boxes, selectors and diff evidence.'],
         ['get_suggested_fix', 'diff_id', 'Returns a stored suggested fix if one exists.'],
         ['verify_css_patch', 'diff_id, css_patch, target_selector', 'Validates CSS syntax, target alignment and safety against the report. It does not render or apply the patch.'],
         ['promote_baseline', 'run_id, confirm_reviewed: true; optional routes', 'Cloud API mode only: records reviewed run approval. Refuses local-report mode; does not promote cloud PNGs.'],
         ['accept_baseline', 'run_id, confirm_all_regressions_reviewed: true', 'Records whole-run approval metadata in the local JSON report or Cloud API; does not replace screenshot baselines.'],
         ['recent_runs', 'optional repo, branch, limit', 'Lists runs, including the local run ID when reading a JSON report.'],
-        ['list_horizontal_overflow', 'optional run_id', 'Lists horizontal overflow from the JSON report. A flagged row is a visible unclipped box past the right edge. It does not change the pixel result.'],
+        ['list_horizontal_overflow', 'optional run_id, flaggedOnly, limit, cursor', 'Lists horizontal overflow from the JSON report, largest overflow first, 25 per page by default (max 200). A flagged row is a visible unclipped box past the right edge; only flagged rows are returned unless flaggedOnly is false. It does not change the pixel result.'],
       ],
     )}${h2('Agentic debugging workflow')}${steps([
       {

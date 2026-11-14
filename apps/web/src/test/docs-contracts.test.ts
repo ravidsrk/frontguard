@@ -98,11 +98,12 @@ describe('copyable documentation contracts', () => {
       const schema = schemas[name as keyof typeof schemas];
       expect(schema, name).toBeDefined();
       const requiredText = inputs.startsWith('optional ') ? '' : inputs.split(';')[0];
-      const required = requiredText.match(/\b[a-z_]+\b/g)?.filter((key) => key !== 'true') ?? [];
+      // Input names are snake_case or camelCase (`flaggedOnly`).
+      const required = requiredText.match(/\b[a-z][a-zA-Z_]*\b/g)?.filter((key) => key !== 'true') ?? [];
       expect(required.sort(), name).toEqual(
         Object.entries(schema).filter(([, value]) => !value.isOptional()).map(([key]) => key).sort(),
       );
-      const documented = inputs.match(/\b[a-z_]+\b/g)?.filter((key) => !['true', 'optional'].includes(key)) ?? [];
+      const documented = inputs.match(/\b[a-z][a-zA-Z_]*\b/g)?.filter((key) => !['true', 'optional'].includes(key)) ?? [];
       expect([...new Set(documented)].sort(), name).toEqual(Object.keys(schema).sort());
     }
   });

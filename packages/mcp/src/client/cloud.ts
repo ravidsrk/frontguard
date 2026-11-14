@@ -109,15 +109,60 @@ export interface CloudClientOptions {
   mode?: 'local-report' | 'cloud-api';
 }
 
+/** Cloud error bodies are cut to this many characters before they reach the agent (#379). */
+export const ERROR_BODY_LIMIT = 300;
+
+/**
+ * Turn a raw cloud-api error body into one short line: drop scripts, styles
+ * and tags (proxies answer 502 with whole HTML pages), collapse whitespace,
+ * and cap the result at `limit` characters.
+ */
+export function summarizeErrorBody(body: string, limit: number = ERROR_BODY_LIMIT): string {
+  const looksLikeHtml = /<!doctype|<\/?[a-z][a-z0-9]*(?:\s[^>]*)?\/?>/i.test(body);
+  const plain = looksLikeHtml
+    ? body
+        .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+        .replace(/<!--[\s\S]*?-->/g, ' ')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/<[^>]*$/, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/&amp;/gi, '&')
+    : body;
+  const text = plain.replace(/\s+/g, ' ').trim();
+  return text.length > limit ? `${text.slice(0, limit - 1).trimEnd()}…` : text;
+}
+
+/** What an agent (or its user) should check for a given cloud-api status. */
+export function cloudApiErrorHint(status: number): string | null {
+  if (status === 401 || status === 403) return 'Check FRONTGUARD_API_KEY.';
+  if (status === 404) return 'Check the run id and FRONTGUARD_API_URL.';
+  if (status === 429 || status >= 500) {
+    return 'The cloud-api is unavailable. Retry later or check FRONTGUARD_API_URL.';
+  }
+  if (status >= 200 && status < 300) {
+    return 'The response was not JSON. Check that FRONTGUARD_API_URL points at a Frontguard cloud-api.';
+  }
+  return null;
+}
+
 export class CloudApiError extends Error {
+  /** {@link body} without markup, capped at {@link ERROR_BODY_LIMIT} characters. */
+  public readonly summary: string;
+
   constructor(
     public status: number,
     public method: string,
     public path: string,
     public body: string,
   ) {
-    super(`Frontguard cloud-api ${method} ${path} failed: ${status} ${body}`);
+    const summary = summarizeErrorBody(body);
+    super(`Frontguard cloud-api ${method} ${path} failed: ${status} ${summary}`);
     this.name = 'CloudApiError';
+    this.summary = summary;
   }
 }
 
@@ -177,7 +222,7 @@ export class CloudClient {
     try {
       return JSON.parse(text) as T;
     } catch {
-      throw new CloudApiError(res.status, method, path, `non-JSON body: ${text.slice(0, 200)}`);
+      throw new CloudApiError(res.status, method, path, `non-JSON body: ${text}`);
     }
   }
 }

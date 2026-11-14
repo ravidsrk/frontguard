@@ -37,11 +37,11 @@
   "tools": [
     {
       "name": "list_regressions",
-      "description": "Return the visual regressions Frontguard detected for a GitHub PR number, a run id, or `\"latest\"` (the newest run; in local-report mode, the report's run). Each row carries a `diffId` for `inspect_diff_cluster_dom`, `get_suggested_fix` and `verify_css_patch`, plus a `clusterCount`."
+      "description": "Return the visual regressions Frontguard detected for a GitHub PR number, a run id, or `\"latest\"` (the newest run; in local-report mode, the report's run). Rows come worst first (regression and error before changed, then by `diffPercentage`), at most `limit` per page (default 25, max 200); pass `nextCursor` back as `cursor` for more. Run fields (`runId`, `reportUrl`, PR, repo, commit) are top level. Each row carries a `diffId` for `inspect_diff_cluster_dom`, `get_suggested_fix` and `verify_css_patch`, plus a `clusterCount`."
     },
     {
       "name": "list_horizontal_overflow",
-      "description": "List horizontal overflow from a run. A flagged row is a visible unclipped box past the right edge, with selector and pixels. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code."
+      "description": "List horizontal overflow from a run (the newest run when `run_id` is omitted). A flagged row is a visible unclipped box past the right edge, with selector and pixels. Only flagged rows are returned unless `flaggedOnly` is false. Rows come largest element `overflowPx` first, at most `limit` per page (default 25, max 200); pass `nextCursor` back as `cursor` for more. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code."
     },
     {
       "name": "get_suggested_fix",

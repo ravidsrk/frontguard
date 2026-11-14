@@ -175,9 +175,16 @@ describe('list_regressions', () => {
     expect(row.status).toBe('regression');
     expect(row.hasSuggestedFix).toBe(true);
     expect(row.clusterCount).toBe(1);
-    expect(row.prNumber).toBe(42);
-    expect(row.repo).toBe('acme/shop');
     expect(row.diffId).toBe('run_pr42:/pricing:1280');
+    // Run-level fields live once at the top level, not on every row (#379).
+    expect(out.prNumber).toBe(42);
+    expect(out.repo).toBe('acme/shop');
+    expect(out.commitSha).toBe('abc1234');
+    expect(out.reportUrl).toBe('https://api.frontguard.dev/v1/reports/run_pr42');
+    expect(row).not.toHaveProperty('runId');
+    expect(row).not.toHaveProperty('reportUrl');
+    expect(out.total).toBe(1);
+    expect(out.nextCursor).toBe(null);
   });
 
   it('resolves pr_id "latest" to the newest run by createdAt, not list order', async () => {
@@ -1092,14 +1099,21 @@ describe('list_horizontal_overflow', () => {
     );
     try {
       const client = createLocalReportClient(reportPath);
+      // Flagged rows only by default (#379).
       const listed = await listHorizontalOverflow(client, {});
       expect(listHorizontalOverflowOutputSchema.parse(listed)).toMatchObject({
-        count: 2,
+        flaggedOnly: true,
+        total: 1,
+        count: 1,
         flagged: 1,
+        nextCursor: null,
         runId: 'run_local',
       });
       expect(listed.rows[0]?.elements[0]?.selector).toBe('[data-testid="wide"]');
-      expect(listed.rows[1]?.flagged).toBe(false);
+
+      const everything = await listHorizontalOverflow(client, { flaggedOnly: false });
+      expect(everything).toMatchObject({ flaggedOnly: false, total: 2, count: 2, flagged: 1 });
+      expect(everything.rows.map((row) => row.flagged)).toEqual([true, false]);
       const run = await client.getRun('run_local');
       expect(run.results?.[0]?.status).toBe('pass');
     } finally {

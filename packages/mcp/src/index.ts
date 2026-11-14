@@ -32,6 +32,7 @@ import { requireAuth, MissingApiKeyError, MissingApiUrlError } from './auth.js';
 import {
   CloudApiError,
   CloudClient,
+  cloudApiErrorHint,
   createLocalReportClient,
   resolveLocalReportPath,
 } from './client/cloud.js';
@@ -88,7 +89,7 @@ const ServerDiscoverRequestSchema = z.object({
 });
 
 const READ_INSTRUCTIONS =
-  'Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, `recent_runs` to browse history, and `list_horizontal_overflow` to list visible unclipped boxes past the right edge. Horizontal overflow does not change the pixel result.';
+  'Use `list_regressions` to see what visual regressions a PR has, `inspect_diff_cluster_dom` to inspect cluster bounding boxes and grounded DOM targets, `get_suggested_fix` to read the AI patch for a specific diff, `verify_css_patch` to validate candidate CSS fixes, `recent_runs` to browse history, and `list_horizontal_overflow` to list visible unclipped boxes past the right edge. Horizontal overflow does not change the pixel result. The two list tools return at most `limit` rows (default 25, max 200) with `total` and `nextCursor`; pass `nextCursor` back as `cursor` for the next page.';
 
 /** Instructions match the tools this process actually registers. */
 export function serverInstructions(env: NodeJS.ProcessEnv = process.env): string {
@@ -213,7 +214,7 @@ function registerCoreTools(server: McpServer, writesEnabled: boolean): void {
     {
       ...readOnlyAnnotations('List regressions for a PR'),
       description:
-        'Return the visual regressions Frontguard detected for a GitHub PR number, a run id, or `"latest"` (the newest run; in local-report mode, the report\'s run). Each row carries a `diffId` for `inspect_diff_cluster_dom`, `get_suggested_fix` and `verify_css_patch`, plus a `clusterCount`.',
+        'Return the visual regressions Frontguard detected for a GitHub PR number, a run id, or `"latest"` (the newest run; in local-report mode, the report\'s run). Rows come worst first (regression and error before changed, then by `diffPercentage`), at most `limit` per page (default 25, max 200); pass `nextCursor` back as `cursor` for more. Run fields (`runId`, `reportUrl`, PR, repo, commit) are top level. Each row carries a `diffId` for `inspect_diff_cluster_dom`, `get_suggested_fix` and `verify_css_patch`, plus a `clusterCount`.',
       inputSchema: listRegressionsInputSchema,
       outputSchema: listRegressionsOutputSchema,
     },
@@ -225,7 +226,7 @@ function registerCoreTools(server: McpServer, writesEnabled: boolean): void {
     {
       ...readOnlyAnnotations('List horizontal overflow'),
       description:
-        'List horizontal overflow from a run. A flagged row is a visible unclipped box past the right edge, with selector and pixels. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code.',
+        'List horizontal overflow from a run (the newest run when `run_id` is omitted). A flagged row is a visible unclipped box past the right edge, with selector and pixels. Only flagged rows are returned unless `flaggedOnly` is false. Rows come largest element `overflowPx` first, at most `limit` per page (default 25, max 200); pass `nextCursor` back as `cursor` for more. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code.',
       inputSchema: listHorizontalOverflowInputSchema,
       outputSchema: listHorizontalOverflowOutputSchema,
     },
@@ -346,8 +347,9 @@ async function withCloudClient<T extends object>(
       ? createLocalReportClient(localReportPath)
       : new CloudClient(requireAuth());
     const data = await fn(client);
+    // Compact JSON: the text block lands in the agent's context (#379).
     return {
-      content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify(data) }],
       structuredContent: data as Record<string, unknown>,
     };
   } catch (err) {
@@ -365,12 +367,7 @@ function toolError(err: unknown): CallToolResult {
   if (err instanceof CloudApiError) {
     return {
       isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `Frontguard cloud-api error (${err.status}): ${err.body || err.message}`,
-        },
-      ],
+      content: [{ type: 'text', text: cloudApiErrorText(err) }],
     };
   }
   const message = err instanceof Error ? err.message : String(err);
@@ -378,6 +375,21 @@ function toolError(err: unknown): CallToolResult {
     isError: true,
     content: [{ type: 'text', text: `Frontguard MCP error: ${message}` }],
   };
+}
+
+/**
+ * One short line for a cloud-api failure: method, path, status, a hint for
+ * the status, and the body without markup, capped (#379). A proxy's 502 page
+ * would otherwise put kilobytes of HTML into the agent's context.
+ */
+function cloudApiErrorText(err: CloudApiError): string {
+  const path = err.path.length > 120 ? `${err.path.slice(0, 119)}…` : err.path;
+  const hint = cloudApiErrorHint(err.status);
+  return [
+    `Frontguard cloud-api error: ${err.method} ${path} returned ${err.status}.`,
+    ...(hint ? [hint] : []),
+    ...(err.summary ? [`Body: ${err.summary}`] : []),
+  ].join(' ');
 }
 
 /** Process entry — connects the server to stdio. */
