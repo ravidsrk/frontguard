@@ -7,6 +7,3 @@
 
 # Dated plans, progress logs, audits and research. History only.
 /docs/archive/
-
-# Old synthetic AI-validation outputs written by packages/cli/scripts/validate-ai.ts.
-/packages/cli/validation-results/
