@@ -1,10 +1,10 @@
 # Frontguard Roadmap
 
-*Last updated: 2026-11-07. Anchored to [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) (frozen local-and-CI launch contract), [`docs/completion/SHIPLOG.md`](./completion/SHIPLOG.md) (launch gate **GO** on `2026-10-19`), and the post-launch backlog tracked in [#283](https://github.com/ravidsrk/frontguard/issues/283) (children [#284](https://github.com/ravidsrk/frontguard/issues/284)–[#299](https://github.com/ravidsrk/frontguard/issues/299) from the first research pass, [#301](https://github.com/ravidsrk/frontguard/issues/301)–[#310](https://github.com/ravidsrk/frontguard/issues/310) from the second, and [#321](https://github.com/ravidsrk/frontguard/issues/321) from the follow-up — **all 27 child items now shipped and verified on `main`**). The reports, source notes and query logs are in the [research archive](../reports/README.md).*
+*Last updated: 2026-11-07. Anchored to [`docs/archive/completion/DEFINITION.md`](./archive/completion/DEFINITION.md) (frozen local-and-CI launch contract), [`docs/archive/completion/SHIPLOG.md`](./archive/completion/SHIPLOG.md) (launch gate **GO** on `2026-10-19`), and the post-launch backlog tracked in [#283](https://github.com/ravidsrk/frontguard/issues/283) (children [#284](https://github.com/ravidsrk/frontguard/issues/284)–[#299](https://github.com/ravidsrk/frontguard/issues/299) from the first research pass, [#301](https://github.com/ravidsrk/frontguard/issues/301)–[#310](https://github.com/ravidsrk/frontguard/issues/310) from the second, and [#321](https://github.com/ravidsrk/frontguard/issues/321) from the follow-up — **all 27 child items now shipped and verified on `main`**). The reports, source notes and query logs are in the [research archive](archive/reports/README.md).*
 
-> **Status note (2026-10-19):** Source is at **v0.2.3** (`0.2.2` published on npm with unreleased changelog entries ahead of that tag). The binding launch gate in [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) is **GO**: `main` is green across `lint`, `build`, `test` (Node 22 & 24), `e2e`, `audit`, and `docs-links`; `frontguard.dev` and `www.frontguard.dev` serve the live `frontguard-web` Worker with `/privacy`, `/terms`, and `/status` returning HTTP 200 and no unbuilt `$29` hosted tier advertised on `/pricing`; D1 Time Travel restore, Worker rollback, and the red-`main` CI failure alert (`#280`) have all been verified with captured evidence.
+> **Status note (2026-10-19):** Source is at **v0.2.3** (`0.2.2` published on npm with unreleased changelog entries ahead of that tag). The binding launch gate in [`docs/archive/completion/DEFINITION.md`](./archive/completion/DEFINITION.md) is **GO**: `main` is green across `lint`, `build`, `test` (Node 22 & 24), `e2e`, `audit`, and `docs-links`; `frontguard.dev` and `www.frontguard.dev` serve the live `frontguard-web` Worker with `/privacy`, `/terms`, and `/status` returning HTTP 200 and no unbuilt `$29` hosted tier advertised on `/pricing`; D1 Time Travel restore, Worker rollback, and the red-`main` CI failure alert (`#280`) have all been verified with captured evidence.
 >
-> **Supersession of the `2026-06-29` roadmap:** Earlier revisions of this file described `packages/cloud-api`, Stripe billing, and the GitHub App / Slack / Vercel / Netlify integrations as a live, shipped cloud platform and listed `$29/mo Pro` / `$49/mo Monitoring` / `$99/mo Business` pricing. Per [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) §0 and §4, Frontguard's completed scope is an **excellent local-and-CI visual regression CLI**. The cloud service and marketplace integrations exist as **source in this repository** and are **not deployed** (`api.frontguard.dev` does not resolve; hosted plans are not generally available). Deploying `cloud-api` is forbidden until the three hard gates in [#293](https://github.com/ravidsrk/frontguard/issues/293) are closed.
+> **Supersession of the `2026-06-29` roadmap:** Earlier revisions of this file described `packages/cloud-api`, Stripe billing, and the GitHub App / Slack / Vercel / Netlify integrations as a live, shipped cloud platform and listed `$29/mo Pro` / `$49/mo Monitoring` / `$99/mo Business` pricing. Per [`docs/archive/completion/DEFINITION.md`](./archive/completion/DEFINITION.md) §0 and §4, Frontguard's completed scope is an **excellent local-and-CI visual regression CLI**. The cloud service and marketplace integrations exist as **source in this repository** and are **not deployed** (`api.frontguard.dev` does not resolve; hosted plans are not generally available). Deploying `cloud-api` is forbidden until the three hard gates in [#293](https://github.com/ravidsrk/frontguard/issues/293) are closed.
 
 ---
 
@@ -14,7 +14,7 @@ Visual regression testing fails in practice when teams either drown in subpixel 
 
 Two research passes on **2026-10-19** covered GitHub projects and trackers, arXiv papers, platform and vendor docs, CVEs, and practitioner posts on X. Searches were by category only. Every source cited in the children of [#283](https://github.com/ravidsrk/frontguard/issues/283) was re-fetched and matched to its claim before filing.
 
-A bounded follow-up on **2026-10-20** checked the merged roadmap and open tracker, revisited primary sources, and executed the route-selection reproduction below. The [published reports](../reports/README.md) distinguish historical drafts from accepted scope. The X refresh was blocked by authentication and access errors; earlier X evidence retains its 2026-10-19 date, with no new demand claims from the follow-up.
+A bounded follow-up on **2026-10-20** checked the merged roadmap and open tracker, revisited primary sources, and executed the route-selection reproduction below. The [published reports](archive/reports/README.md) distinguish historical drafts from accepted scope. The X refresh was blocked by authentication and access errors; earlier X evidence retains its 2026-10-19 date, with no new demand claims from the follow-up.
 
 1. **Deterministic `pixelmatch` stays the only pass/fail gate:**
    - **GitHub landscape (first pass):**
@@ -78,9 +78,9 @@ A bounded follow-up on **2026-10-20** checked the merged roadmap and open tracke
    - **Approval belongs to a human.** The shipped agent skill and the Action do not enforce that yet ([#287](https://github.com/ravidsrk/frontguard/issues/287)).
 
 4. **The follow-up found a route-selection gap.**
-   - Changing a public SVG used by `/` alongside a source edit to `/about` selects only `/about`. The real parser and resolver reproduced the omission at `main` commit `1eef667`; the empty-set fallback does not protect a nonempty but incomplete selection ([#321](https://github.com/ravidsrk/frontguard/issues/321), [executable evidence](../research_notes/Frontguard%20roadmap%20follow-up/smart-filter-repro.mjs)). No browser or end-to-end CLI verdict was measured.
+   - Changing a public SVG used by `/` alongside a source edit to `/about` selects only `/about`. The real parser and resolver reproduced the omission at `main` commit `1eef667`; the empty-set fallback does not protect a nonempty but incomplete selection ([#321](https://github.com/ravidsrk/frontguard/issues/321), [executable evidence](archive/research_notes/Frontguard%20roadmap%20follow-up/smart-filter-repro.mjs)). No browser or end-to-end CLI verdict was measured.
    - [Chromatic documents external assets that escape dependency tracing](https://docs.chromatic.com/docs/turbosnap/setup/). [The empirical VRT study](https://arxiv.org/html/2608.07020v1) reports non-local regressions; its review-time associations do not establish causality. #285 must measure omitted observable mutations separately from pixel-comparator misses.
-   - [VISTA](https://arxiv.org/html/2605.26144v1) and [UI2App](https://arxiv.org/html/2607.06306v1) separately assess visual resemblance and interaction behavior in generated apps. They support keeping evaluation dimensions separate, without validating a replacement regression gate. Their limits and relevance are recorded in the [follow-up report](../reports/Frontguard%20roadmap%20follow-up.md).
+   - [VISTA](https://arxiv.org/html/2605.26144v1) and [UI2App](https://arxiv.org/html/2607.06306v1) separately assess visual resemblance and interaction behavior in generated apps. They support keeping evaluation dimensions separate, without validating a replacement regression gate. Their limits and relevance are recorded in the [follow-up report](archive/reports/Frontguard%20roadmap%20follow-up.md).
 
 ---
 
@@ -144,7 +144,7 @@ Everything below ships in the published local-and-CI packages (`@frontguard/cli`
 
 ## 3. Source-in-Repo — Gated & Not Deployed in Production
 
-Per [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) §4, the following subsystems exist as tested source code in the monorepo but are **not deployed as live production services**. They must not be advertised as generally available until their post-launch gates are met:
+Per [`docs/archive/completion/DEFINITION.md`](./archive/completion/DEFINITION.md) §4, the following subsystems exist as tested source code in the monorepo but are **not deployed as live production services**. They must not be advertised as generally available until their post-launch gates are met:
 
 - 🔒 **`packages/cloud-api` (Hono / Cloudflare Worker, D1, R2, GitHub OAuth, Cron scheduler, Slack/email/PagerDuty alerting, hand-rolled OTLP/HTTP exporter in `src/otel/index.ts`)** — Not deployed (`api.frontguard.dev` does not resolve). Hard-gated on [#293](https://github.com/ravidsrk/frontguard/issues/293):
   - (a) a user-data erasure path;
@@ -157,7 +157,7 @@ Per [`docs/completion/DEFINITION.md`](./completion/DEFINITION.md) §4, the follo
 
 ## 4. Post-Launch Roadmap (Tracked in GitHub Issue [#283](https://github.com/ravidsrk/frontguard/issues/283) — All 27 Items Completed)
 
-All actionable post-launch engineering work tracked under parent issue [#283](https://github.com/ravidsrk/frontguard/issues/283) (*"Post-launch roadmap: keep pixelmatch as the only pass/fail gate"*) is **complete on `main`**. Two security hardening items are tracked privately per [`SECURITY.md`](../SECURITY.md) and appear below only as placeholders. [Delivery checkpoints](../reports/Frontguard%20roadmap%20follow-up.md#delivery-checkpoints) state the evidence required between groups.
+All actionable post-launch engineering work tracked under parent issue [#283](https://github.com/ravidsrk/frontguard/issues/283) (*"Post-launch roadmap: keep pixelmatch as the only pass/fail gate"*) is **complete on `main`**. Two security hardening items are tracked privately per [`SECURITY.md`](../SECURITY.md) and appear below only as placeholders. [Delivery checkpoints](archive/reports/Frontguard%20roadmap%20follow-up.md#delivery-checkpoints) state the evidence required between groups.
 
 ### Now — Close the Approval Edges, Fix Shipped Bugs, Fingerprint, Then Upgrade (Completed)
 
@@ -198,7 +198,7 @@ All actionable post-launch engineering work tracked under parent issue [#283](ht
     - Accept, skip or quit per shot (`packages/cli/src/cli/review.ts`).
     - `--from` a downloaded CI artifact, byte for byte, refused on a fingerprint mismatch, with an audit line per acceptance and no network calls.
 13. ✅ **[#306](https://github.com/ravidsrk/frontguard/issues/306) — Design PR-scoped approvals and merge-base baseline selection for the orphan branch.**
-    - Decision record ([`docs/decisions/306-merge-base-approvals.md`](./decisions/306-merge-base-approvals.md)) plus merge-base selection and SHA-256-keyed approval helpers (`packages/cli/src/storage/approval.ts`).
+    - Decision record ([`docs/decisions/306-pr-scoped-approvals.md`](./decisions/306-pr-scoped-approvals.md)) plus merge-base selection and SHA-256-keyed approval helpers (`packages/cli/src/storage/baseline-selection.ts`).
 14. *Private hardening item, tracked per `SECURITY.md`.*
 15. ✅ **[#307](https://github.com/ravidsrk/frontguard/issues/307) — Declare MCP tool annotations and mark promotion tools destructive.**
     - Read-only hints on the read tools; `destructiveHint` plus `requiresUserInteraction` on `promote_baseline` and `accept_baseline`.
@@ -237,7 +237,7 @@ All actionable post-launch engineering work tracked under parent issue [#283](ht
 ### Ongoing Operations & Hardening Tracked Separately
 
 - ✅ **[#157](https://github.com/ravidsrk/frontguard/issues/157) & [#367](https://github.com/ravidsrk/frontguard/issues/367) — Weekly npm audit (production & full tree):** 0 vulnerabilities across production (`npm audit --omit=dev`) and full development trees (`npm audit`).
-- **H-05 / G-44 — npm trusted publishing (OIDC without `NPM_TOKEN`):** recorded in [`docs/completion/HUMAN_ACTIONS.md`](./completion/HUMAN_ACTIONS.md) and [`docs/completion/GAPS.md`](./completion/GAPS.md) with expiry **2027-03-01**. The current release workflow already enforces tag/version match, `main` ancestry, green CI on the exact SHA, and npm OIDC provenance attestation.
+- **H-05 / G-44 — npm trusted publishing (OIDC without `NPM_TOKEN`):** recorded in [`docs/archive/completion/HUMAN_ACTIONS.md`](./archive/completion/HUMAN_ACTIONS.md) and [`docs/archive/completion/GAPS.md`](./archive/completion/GAPS.md) with expiry **2027-03-01**. The current release workflow already enforces tag/version match, `main` ancestry, green CI on the exact SHA, and npm OIDC provenance attestation.
 
 ---
 

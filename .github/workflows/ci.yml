@@ -58,15 +58,11 @@ jobs:
           node-version: 22
           cache: 'npm'
       - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      # Fails if VERSION drifted from any version-coupled file (package.json,
-      # action.yml, Dockerfile, README, cli/mcp version constants).
-      - run: npm run sync-version:check
-      - name: Verify OpenAPI contract sync
-        run: |
-          node scripts/sync-openapi.mjs
-          git diff --exit-code packages/cloud-api/src/openapi.json
+      # The same static gate contributors run locally (root package.json),
+      # stopping at the first failure: VERSION drift in any version-coupled
+      # file, cloud-api OpenAPI drift from apps/web/public/openapi.json, lint,
+      # typecheck, and the docs link guard. `npm run verify` adds build and tests.
+      - run: npm run verify:static
 
   docs-links:
     # Guards apps/web docs-content.ts against broken internal /docs links
