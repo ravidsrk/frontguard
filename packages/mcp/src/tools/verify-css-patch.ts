@@ -1,7 +1,10 @@
 /**
- * `verify_css_patch` — validate a candidate CSS patch against a visual
- * regression diff for syntax correctness, selector alignment, and
- * dangerous layout-destroying properties.
+ * `verify_css_patch` — statically check a candidate CSS patch against a
+ * visual regression diff: syntax, selector alignment with the targets
+ * recorded for the diff, and a deny list of layout-destroying rules.
+ *
+ * Nothing is rendered (#383). A static pass is not a visual fix: the agent
+ * applies the patch and re-runs `frontguard run` to confirm the pixels.
  *
  * @module tools/verify-css-patch
  */
@@ -24,23 +27,34 @@ export type VerifyCssPatchInput = {
 
 export interface VerifyCssPatchResult {
   diffId: string;
+  /** `pass` only when the syntax is valid, nothing is denied, and the selector matches. */
+  staticCheck: 'pass' | 'fail';
+  /** Always false: this tool renders nothing, so pixels are unconfirmed. */
+  rendered: false;
   validSyntax: boolean;
   selectorMatchedTarget: boolean;
   dangerousProperties: string[];
   normalizedPatch: string;
-  recommendation: 'apply' | 'refine' | 'reject';
   reason: string;
+  /** What to do next: refine and re-check, or apply locally and re-run `frontguard run`. */
+  nextStep: string;
 }
 
 export const verifyCssPatchOutputSchema = z.object({
   diffId: z.string(),
+  staticCheck: z.enum(['pass', 'fail']),
+  rendered: z.literal(false),
   validSyntax: z.boolean(),
   selectorMatchedTarget: z.boolean(),
   dangerousProperties: z.array(z.string()),
   normalizedPatch: z.string(),
-  recommendation: z.enum(['apply', 'refine', 'reject']),
   reason: z.string(),
+  nextStep: z.string(),
 });
+
+/** `nextStep` after a static pass. Only a render can confirm a visual fix. */
+export const VERIFY_CSS_PASS_NEXT_STEP =
+  'Apply the patch locally and re-run `frontguard run` to confirm the pixels.';
 
 function stripCssComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -298,45 +312,57 @@ export async function verifyCssPatch(
         selectorsEqualOrTokenMatch(ruleSel, targetSelector),
       ));
 
+  const knownTargets = Array.from(
+    new Set([...(recordedTarget ? [recordedTarget] : []), ...clusterTargets]),
+  );
   let selectorMatchedTarget =
     isValidSelectorSyntax(targetSelector) && patchSelectorsAlignWithTarget;
-  if (selectorMatchedTarget && (recordedTarget || clusterTargets.length > 0)) {
-    const knownTargets = [
-      ...(recordedTarget ? [recordedTarget] : []),
-      ...clusterTargets,
-    ];
+  if (selectorMatchedTarget && knownTargets.length > 0) {
     selectorMatchedTarget = knownTargets.some((known) =>
       selectorsEqualOrTokenMatch(known, targetSelector),
     );
   }
+  const knownTargetList = knownTargets
+    .slice(0, 5)
+    .map((t) => `"${t}"`)
+    .join(', ');
 
-  let recommendation: 'apply' | 'refine' | 'reject';
   let reason: string;
+  let nextStep: string;
 
   if (!validSyntax) {
-    recommendation = 'reject';
     reason = 'CSS patch has invalid syntax or unbalanced braces.';
+    nextStep =
+      'Fix the CSS: balanced braces, one rule (or bare declarations), each declaration written as `property: value;`. Then call verify_css_patch again.';
   } else if (dangerousProperties.length > 0) {
-    recommendation = 'reject';
     reason = `CSS patch contains dangerous properties or directives: ${dangerousProperties.join(', ')}.`;
+    nextStep = `Remove ${dangerousProperties.join(', ')} from the patch, then call verify_css_patch again.`;
+  } else if (!patchSelectorsAlignWithTarget) {
+    reason = `Rule selector in css_patch does not match target_selector "${targetSelector}".`;
+    nextStep = `Use "${targetSelector}" as the rule selector in css_patch, or pass bare declarations, then call verify_css_patch again.`;
   } else if (!selectorMatchedTarget) {
-    recommendation = 'refine';
-    reason = !patchSelectorsAlignWithTarget
-      ? `Rule selector in css_patch does not match target_selector "${targetSelector}".`
-      : `Target selector "${targetSelector}" does not align with recorded diff target "${recordedTarget ?? 'unknown'}".`;
+    reason = `Target selector "${targetSelector}" does not match a selector recorded for this diff (${knownTargetList}).`;
+    nextStep = `Target a recorded selector (${knownTargetList}; see inspect_diff_cluster_dom) in target_selector and css_patch, then call verify_css_patch again.`;
   } else {
-    recommendation = 'apply';
     reason =
-      'CSS patch syntax is valid, free of dangerous properties, and aligned with the target selector.';
+      knownTargets.length > 0
+        ? 'Static checks passed: valid syntax, no denied properties, and target_selector matches a selector recorded for this diff. Nothing was rendered, so the pixels are unconfirmed.'
+        : 'Static checks passed: valid syntax and no denied properties. No target selector is recorded for this diff, so target_selector was only compared with the patch. Nothing was rendered, so the pixels are unconfirmed.';
+    nextStep = VERIFY_CSS_PASS_NEXT_STEP;
   }
+
+  const staticCheck: 'pass' | 'fail' =
+    validSyntax && dangerousProperties.length === 0 && selectorMatchedTarget ? 'pass' : 'fail';
 
   return {
     diffId: match.diffId ?? diffIdFor(runId, match),
+    staticCheck,
+    rendered: false,
     validSyntax,
     selectorMatchedTarget,
     dangerousProperties,
     normalizedPatch,
-    recommendation,
     reason,
+    nextStep,
   };
 }

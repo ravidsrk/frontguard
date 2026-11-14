@@ -199,7 +199,10 @@ export class CloudClient {
     );
   }
 
-  /** Alias for approveBaseline used by promote_baseline. */
+  /**
+   * Alias for approveBaseline used by promote_baseline. Same endpoint, so it
+   * records approval only and promotes no screenshots.
+   */
   async approveRun(runId: string): Promise<{ approved: boolean; runId: string }> {
     return this.approveBaseline(runId);
   }

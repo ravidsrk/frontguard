@@ -31,11 +31,6 @@ export const listRegressionsInputSchema = {
     .describe(
       'Optional `owner/name` filter — disambiguates when the same PR number exists across multiple repos.',
     ),
-  branch: z
-    .string()
-    .min(1)
-    .optional()
-    .describe('Reserved for future use; ignored by the current cloud-api.'),
   limit: pageLimitInput,
   cursor: pageCursorInput,
 } as const;
@@ -43,7 +38,6 @@ export const listRegressionsInputSchema = {
 export type ListRegressionsInput = {
   pr_id: number | string;
   repo?: string;
-  branch?: string;
   /** Rows per page. Default 25, max 200. */
   limit?: number;
   /** `nextCursor` from the previous page. */
@@ -141,14 +135,32 @@ function matchesPrFilter(run: CloudRun, prId: number | string, repo?: string): b
   return run.github.prNumber === prNumber;
 }
 
+/**
+ * Why nothing matched, in terms of the mode. A local report is one run, so
+ * name its id; in cloud mode the run may simply not exist yet.
+ */
+function notFoundReason(
+  client: CloudClient,
+  input: ListRegressionsInput,
+  runs: readonly CloudRun[],
+): string {
+  const query = `pr_id=${input.pr_id}${input.repo ? ` repo=${input.repo}` : ''}`;
+  if (client.mode === 'local-report') {
+    const reportRunId = runs[0]?.id ?? 'run_local';
+    return `No run in the local report matches ${query}. The report's run id is "${reportRunId}". Call list_regressions with pr_id: "latest"${input.repo ? ' and no repo filter' : ''} to read it.`;
+  }
+  return `No Frontguard run found for ${query}. The CI integration may not have completed yet.`;
+}
+
 export async function listRegressions(
   client: CloudClient,
   input: ListRegressionsInput,
 ): Promise<ListRegressionsResult> {
   let run: CloudRun | null = null;
+  let runs: CloudRun[] = [];
 
   if (input.pr_id === LATEST_RUN) {
-    const { runs } = await client.listRuns();
+    runs = (await client.listRuns()).runs;
     const repo = input.repo;
     run = newestRun(repo ? runs.filter((r) => matchesRepo(r, repo)) : runs);
   } else if (
@@ -163,7 +175,7 @@ export async function listRegressions(
   }
 
   if (!run && input.pr_id !== LATEST_RUN) {
-    const { runs } = await client.listRuns();
+    runs = (await client.listRuns()).runs;
     run = newestRun(runs.filter((r) => matchesPrFilter(r, input.pr_id, input.repo)));
   }
 
@@ -175,9 +187,7 @@ export async function listRegressions(
       count: 0,
       nextCursor: null,
       regressions: [],
-      notFound: {
-        reason: `No Frontguard run found for pr_id=${input.pr_id}${input.repo ? ` repo=${input.repo}` : ''}. The CI integration may not have completed yet.`,
-      },
+      notFound: { reason: notFoundReason(client, input, runs) },
     };
   }
 

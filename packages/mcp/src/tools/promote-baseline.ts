@@ -1,6 +1,11 @@
 /**
- * `promote_baseline` — promote reviewed visual changes to baseline after
- * explicit confirmation, optionally scoped to a subset of routes.
+ * `promote_baseline` — record whole-run approval for a reviewed run.
+ *
+ * Despite the name, it promotes no screenshots (#383). It calls the same
+ * `POST /v1/baselines/:runId/approve` endpoint as `accept_baseline`, and
+ * that endpoint only records approval. `routes` cannot scope the approval:
+ * the call is refused unless every changed route in the run is listed.
+ * Local-report mode refuses it outright.
  *
  * @module tools/promote-baseline
  */
@@ -9,14 +14,16 @@ import { z } from 'zod';
 import type { CloudClient, CloudRun } from '../client/cloud.js';
 
 export const promoteBaselineInputSchema = {
-  run_id: z.string().min(1).describe('Run ID or PR number whose baselines should be promoted.'),
+  run_id: z.string().min(1).describe('Run id or PR number of the reviewed run.'),
   routes: z
     .array(z.string().min(1))
     .optional()
-    .describe('Optional subset of route paths to promote (defaults to all changed/new routes in the run).'),
+    .describe(
+      'Optional list of reviewed route paths. It does not scope the approval, which is whole-run: the call is refused unless every changed route in the run is listed. Defaults to all changed routes.',
+    ),
   confirm_reviewed: z
     .boolean()
-    .describe('Must be true to confirm visual changes were reviewed before promotion.'),
+    .describe('Must be true to confirm the visual changes were reviewed before approval is recorded.'),
 } as const;
 
 export type PromoteBaselineInput = {
@@ -26,16 +33,21 @@ export type PromoteBaselineInput = {
 };
 
 export interface PromoteBaselineResult {
-  promoted: boolean;
+  /** Whole-run approval was recorded. */
+  approvalRecorded: true;
+  /** Always false: the approve endpoint does not promote screenshots. */
+  screenshotsPromoted: false;
   runId: string;
-  promotedRoutes: string[];
+  /** Routes the caller reviewed (all changed routes when `routes` is omitted). */
+  reviewedRoutes: string[];
   mode: 'local-report' | 'cloud-api';
 }
 
 export const promoteBaselineOutputSchema = z.object({
-  promoted: z.boolean(),
+  approvalRecorded: z.literal(true),
+  screenshotsPromoted: z.literal(false),
   runId: z.string(),
-  promotedRoutes: z.array(z.string()),
+  reviewedRoutes: z.array(z.string()),
   mode: z.enum(['local-report', 'cloud-api']),
 });
 
@@ -64,7 +76,7 @@ export async function promoteBaseline(
 ): Promise<PromoteBaselineResult> {
   if (input.confirm_reviewed !== true) {
     throw new Error(
-      'confirm_reviewed must be true — review visual changes before promoting baselines.',
+      'confirm_reviewed must be true — review visual changes before recording approval.',
     );
   }
 
@@ -87,7 +99,7 @@ export async function promoteBaseline(
     );
     if (unselectedChangedRoutes.length > 0) {
       throw new Error(
-        `Cannot partially promote routes [${Array.from(routeSet).join(', ')}] because cloud baseline approval is whole-run and would also approve unreviewed routes: ${unselectedChangedRoutes.join(', ')}. Include all changed routes or promote locally via CLI.`,
+        `Cannot partially promote routes [${Array.from(routeSet).join(', ')}] because cloud baseline approval is whole-run and would also approve unreviewed routes: ${unselectedChangedRoutes.join(', ')}. Include all changed routes, or have a human update baselines locally with the CLI.`,
       );
     }
   }
@@ -96,7 +108,7 @@ export async function promoteBaseline(
     routeSet ? routeSet.has(r.route) : r.status !== 'pass' && r.status !== 'unchanged',
   );
 
-  const promotedRoutes = Array.from(
+  const reviewedRoutes = Array.from(
     new Set(
       matchingDiffs.length > 0
         ? matchingDiffs.map((r) => r.route)
@@ -106,12 +118,14 @@ export async function promoteBaseline(
     ),
   );
 
+  // Same endpoint as accept_baseline. It records approval and promotes nothing.
   await client.approveRun(run.id);
 
   return {
-    promoted: true,
+    approvalRecorded: true,
+    screenshotsPromoted: false,
     runId: run.id,
-    promotedRoutes,
+    reviewedRoutes,
     mode: client.mode ?? 'cloud-api',
   };
 }

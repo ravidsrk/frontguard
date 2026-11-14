@@ -1668,7 +1668,7 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
     )}${h2('Tools')}${table(
       ['MCP Tool Name', 'Required Arguments', 'What It Returns to the Coding Agent'],
       [
-        ['list_regressions', 'pr_id; optional repo, branch, limit, cursor', 'Lists regressions and their diffId values, worst first, 25 per page by default (max 200). Use a PR number or a run ID returned by recent_runs; branch is currently reserved. Pass nextCursor back as cursor for the next page.'],
+        ['list_regressions', 'pr_id; optional repo, limit, cursor', 'Lists regressions and their diffId values, worst first, 25 per page by default (max 200). Use a PR number or a run ID returned by recent_runs. Pass nextCursor back as cursor for the next page.'],
         ['inspect_diff_cluster_dom', 'diff_id; optional cluster_id', 'Returns captured DOM clusters, bounding boxes, selectors and diff evidence.'],
         ['get_suggested_fix', 'diff_id', 'Returns a stored suggested fix if one exists.'],
         ['verify_css_patch', 'diff_id, css_patch, target_selector', 'Validates CSS syntax, target alignment and safety against the report. It does not render or apply the patch.'],

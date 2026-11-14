@@ -535,7 +535,7 @@ describe('inspect_diff_cluster_dom', () => {
 });
 
 describe('verify_css_patch', () => {
-  it('recommends apply for a valid, grounded CSS patch and preserves string whitespace', async () => {
+  it('passes the static check for a valid, grounded CSS patch without claiming a render, and preserves string whitespace', async () => {
     const client = buildClient({ approved: [] });
     const out = await verifyCssPatch(client, {
       diff_id: 'run_pr42:/pricing:1280',
@@ -546,7 +546,10 @@ describe('verify_css_patch', () => {
     expect(out.selectorMatchedTarget).toBe(true);
     expect(out.dangerousProperties).toEqual([]);
     expect(out.normalizedPatch).toContain('"a   b"');
-    expect(out.recommendation).toBe('apply');
+    expect(out.staticCheck).toBe('pass');
+    expect(out.rendered).toBe(false);
+    expect(out.nextStep).toMatch(/re-run `frontguard run` to confirm the pixels/);
+    expect(out).not.toHaveProperty('recommendation');
   });
 
   it('rejects a CSS patch with unbalanced braces or malformed property names', async () => {
@@ -557,8 +560,9 @@ describe('verify_css_patch', () => {
       css_patch: '.pricing-card { overflow: hidden;',
     });
     expect(out.validSyntax).toBe(false);
-    expect(out.recommendation).toBe('reject');
+    expect(out.staticCheck).toBe('fail');
     expect(out.reason).toMatch(/unbalanced braces|invalid syntax/i);
+    expect(out.nextStep).toMatch(/Fix the CSS/);
 
     const badProp = await verifyCssPatch(client, {
       diff_id: 'run_pr42:/pricing:1280',
@@ -566,7 +570,7 @@ describe('verify_css_patch', () => {
       css_patch: '.pricing-card { color red: blue; }',
     });
     expect(badProp.validSyntax).toBe(false);
-    expect(badProp.recommendation).toBe('reject');
+    expect(badProp.staticCheck).toBe('fail');
   });
 
   it('rejects dangerous @import and external url() injection', async () => {
@@ -579,10 +583,11 @@ describe('verify_css_patch', () => {
     });
     expect(out.dangerousProperties).toContain('@import');
     expect(out.dangerousProperties).toContain('url()');
-    expect(out.recommendation).toBe('reject');
+    expect(out.staticCheck).toBe('fail');
+    expect(out.nextStep).toMatch(/^Remove @import, url\(\)/);
   });
 
-  it('recommends refine when target_selector or rule selector does not match recorded diff target', async () => {
+  it('fails the static check when target_selector or rule selector does not match recorded diff target', async () => {
     const client = buildClient({ approved: [] });
     const out = await verifyCssPatch(client, {
       diff_id: 'run_pr42:/pricing:1280',
@@ -591,7 +596,9 @@ describe('verify_css_patch', () => {
     });
     expect(out.validSyntax).toBe(true);
     expect(out.selectorMatchedTarget).toBe(false);
-    expect(out.recommendation).toBe('refine');
+    expect(out.staticCheck).toBe('fail');
+    expect(out.reason).toContain('".pricing-card"');
+    expect(out.nextStep).toMatch(/Target a recorded selector \(".pricing-card"; see inspect_diff_cluster_dom\)/);
 
     const mismatchedRule = await verifyCssPatch(client, {
       diff_id: 'run_pr42:/pricing:1280',
@@ -600,7 +607,8 @@ describe('verify_css_patch', () => {
     });
     expect(mismatchedRule.validSyntax).toBe(true);
     expect(mismatchedRule.selectorMatchedTarget).toBe(false);
-    expect(mismatchedRule.recommendation).toBe('refine');
+    expect(mismatchedRule.staticCheck).toBe('fail');
+    expect(mismatchedRule.nextStep).toMatch(/Use ".pricing-card" as the rule selector/);
   });
 });
 
@@ -634,7 +642,7 @@ describe('promote_baseline', () => {
     }
   });
 
-  it('promotes changed routes when confirm_reviewed is true', async () => {
+  it('records approval for the changed routes when confirm_reviewed is true, and promotes nothing', async () => {
     const state: StubState = { approved: [] };
     const client = buildClient(state);
     const out = await promoteBaseline(client, {
@@ -642,9 +650,10 @@ describe('promote_baseline', () => {
       confirm_reviewed: true,
     });
     expect(out).toEqual({
-      promoted: true,
+      approvalRecorded: true,
+      screenshotsPromoted: false,
       runId: 'run_pr42',
-      promotedRoutes: ['/pricing'],
+      reviewedRoutes: ['/pricing'],
       mode: 'cloud-api',
     });
     expect(state.approved).toEqual(['run_pr42']);
@@ -658,9 +667,10 @@ describe('promote_baseline', () => {
       routes: ['/pricing'],
       confirm_reviewed: true,
     });
-    expect(out.promoted).toBe(true);
+    expect(out.approvalRecorded).toBe(true);
+    expect(out.screenshotsPromoted).toBe(false);
     expect(out.runId).toBe('run_pr42');
-    expect(out.promotedRoutes).toEqual(['/pricing']);
+    expect(out.reviewedRoutes).toEqual(['/pricing']);
     expect(state.approved).toEqual(['run_pr42']);
 
     await expect(
@@ -747,6 +757,7 @@ describe('MCP server tools/list + tools/call', () => {
     expect(instructions).toMatch(/not registered/);
     expect(instructions).toMatch(/update-baselines --confirm-baselines/);
     expect(instructions).not.toMatch(/`promote_baseline` promotes/);
+    expect(instructions).not.toMatch(/Write tools are enabled/);
     await client.close();
     await server.close();
   });
@@ -779,7 +790,7 @@ describe('MCP server tools/list + tools/call', () => {
       ['get_suggested_fix', 'Get the suggested fix for a diff'],
       ['recent_runs', 'List recent Frontguard runs'],
       ['inspect_diff_cluster_dom', 'Inspect diff cluster and grounded DOM target'],
-      ['verify_css_patch', 'Verify a candidate CSS patch before applying'],
+      ['verify_css_patch', 'Statically check a candidate CSS patch'],
       ['list_horizontal_overflow', 'List horizontal overflow'],
     ] as const;
     for (const [name, title] of readOnly) {
@@ -796,7 +807,7 @@ describe('MCP server tools/list + tools/call', () => {
     }
 
     const destructive = [
-      ['promote_baseline', 'Promote reviewed visual baselines'],
+      ['promote_baseline', 'Record run approval (promotes no screenshots)'],
       ['accept_baseline', 'Record whole-run baseline approval'],
     ] as const;
     for (const [name, title] of destructive) {
@@ -815,8 +826,9 @@ describe('MCP server tools/list + tools/call', () => {
     const instructions = client.getInstructions() ?? '';
     expect(instructions.length).toBeGreaterThan(0);
     expect(instructions.length).toBeLessThan(4096);
-    expect(instructions).toMatch(/`promote_baseline` promotes/);
-    expect(instructions).toMatch(/`accept_baseline` records/);
+    expect(instructions).toMatch(/`promote_baseline` and `accept_baseline` both record whole-run approval/);
+    expect(instructions).toMatch(/promote no screenshots/);
+    expect(instructions).not.toMatch(/`promote_baseline` promotes/);
 
     await client.close();
     await server.close();
