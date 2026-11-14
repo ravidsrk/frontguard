@@ -35,7 +35,7 @@
 | `get_suggested_fix` | `diff_id` | The stored AI patch, or `fix: null` with a reason. Fixes exist only when the run had an `ai` provider and `generateFixes: true` |
 | `verify_css_patch` | `diff_id`, `target_selector`, `css_patch` | A static check: brace balance and declaration syntax, a deny list (`@import`, external `url()`, root `display: none`), and whether `target_selector` matches a selector recorded for the diff. It renders nothing: `staticCheck: "pass"` comes with `rendered: false` |
 | `recent_runs` | optional `repo`, `branch`, `limit` (default 10, max 50) | Newest-first run summaries with `runId` and `regressionsCount` |
-| `list_horizontal_overflow` | optional `run_id` (newest run when omitted), `flaggedOnly` (default true), `limit`, `cursor` | Visible unclipped boxes past the right edge, largest `overflowPx` first. It does not change the pixel result |
+| `list_horizontal_overflow` | optional `run_id` (newest run when omitted), `flagged_only` (default true), `limit`, `cursor` | Visible unclipped boxes past the right edge, largest `overflowPx` first. It does not change the pixel result |
 | `promote_baseline` | `run_id`, `confirm_reviewed: true`; optional `routes` | Not an agent step. Unregistered unless `FRONTGUARD_MCP_WRITES=1`. Records whole-run approval through the same endpoint as `accept_baseline` and promotes no screenshots. Local-report mode refuses it and does not write `frontguard-baselines`. `confirm_reviewed: true` is UX only, not a human review |
 | `accept_baseline` | `run_id`, `confirm_all_regressions_reviewed: true` | Not an agent step. Unregistered unless `FRONTGUARD_MCP_WRITES=1`. Records whole-run approval metadata; screenshot promotion is not implemented |
 

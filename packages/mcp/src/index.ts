@@ -229,7 +229,7 @@ function registerCoreTools(server: McpServer, writesEnabled: boolean): void {
     {
       ...readOnlyAnnotations('List horizontal overflow'),
       description:
-        'List horizontal overflow from a run (the newest run when `run_id` is omitted). A flagged row is a visible unclipped box past the right edge, with selector and pixels. Only flagged rows are returned unless `flaggedOnly` is false. Rows come largest element `overflowPx` first, at most `limit` per page (default 25, max 200); pass `nextCursor` back as `cursor` for more. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code.',
+        'List horizontal overflow from a run (the newest run when `run_id` is omitted). A flagged row is a visible unclipped box past the right edge, with selector and pixels. Only flagged rows are returned unless `flagged_only` is false. Rows come largest element `overflowPx` first, at most `limit` per page (default 25, max 200); pass `nextCursor` back as `cursor` for more. scrollWidth and innerWidth are recorded. This does not change the pixel result or the exit code.',
       inputSchema: listHorizontalOverflowInputSchema,
       outputSchema: listHorizontalOverflowOutputSchema,
     },

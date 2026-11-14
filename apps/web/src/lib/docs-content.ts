@@ -1675,7 +1675,7 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
         ['promote_baseline', 'run_id, confirm_reviewed: true; optional routes', 'Write tool, registered only with FRONTGUARD_MCP_WRITES=1; agents should not call it. Cloud API mode only: records whole-run approval through the same endpoint as accept_baseline and promotes no screenshots. routes must include every changed route. Refuses local-report mode.'],
         ['accept_baseline', 'run_id, confirm_all_regressions_reviewed: true', 'Write tool, registered only with FRONTGUARD_MCP_WRITES=1. Records whole-run approval metadata in the local JSON report or Cloud API; does not replace screenshot baselines.'],
         ['recent_runs', 'optional repo, branch, limit', 'Lists runs, including the local run ID when reading a JSON report.'],
-        ['list_horizontal_overflow', 'optional run_id, flaggedOnly, limit, cursor', 'Lists horizontal overflow from the JSON report, largest overflow first, 25 per page by default (max 200). A flagged row is a visible unclipped box past the right edge; only flagged rows are returned unless flaggedOnly is false. It does not change the pixel result.'],
+        ['list_horizontal_overflow', 'optional run_id, flagged_only, limit, cursor', 'Lists horizontal overflow from the JSON report, largest overflow first, 25 per page by default (max 200). A flagged row is a visible unclipped box past the right edge; only flagged rows are returned unless flagged_only is false. It does not change the pixel result.'],
       ],
     )}${h2('Agentic debugging workflow')}${steps([
       {

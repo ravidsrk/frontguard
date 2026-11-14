@@ -209,7 +209,7 @@ describe('paged list tools against a 600-row local report (#379)', () => {
     const routes = [...first.rows, ...second.rows].map((row) => row.route);
     expect(new Set(routes).size).toBe(30);
 
-    const all = await listHorizontalOverflow(localClient, { flaggedOnly: false, limit: 200 });
+    const all = await listHorizontalOverflow(localClient, { flagged_only: false, limit: 200 });
     expect(all).toMatchObject({ total: 150, count: 150, flagged: 30, nextCursor: null });
   });
 
@@ -217,7 +217,7 @@ describe('paged list tools against a 600-row local report (#379)', () => {
     const localClient = createLocalReportClient(reportPath);
     const flagged = await listHorizontalOverflow(localClient, { limit: 5 });
     await expect(
-      listHorizontalOverflow(localClient, { flaggedOnly: false, cursor: flagged.nextCursor! }),
+      listHorizontalOverflow(localClient, { flagged_only: false, cursor: flagged.nextCursor! }),
     ).rejects.toThrow(/different filters/);
 
     const regressions = await listRegressions(localClient, { pr_id: 'latest', limit: 5 });

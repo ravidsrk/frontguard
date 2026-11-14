@@ -57,7 +57,7 @@ export default defineConfig({
 \`colorScheme\` and \`--color-scheme\` change emulation only. Until named capture modes exist, that run compares against the same baseline file as the default scheme (\`baselines/<route>/<viewport>/<browser>.png\`) and warns when the stored scheme differs. The warning does not change the exit code. Two route entries that share a path, viewport, and browser are a config error.
 
 ## 2. Automatic Route & Storybook Discovery
-- **Filesystem discovery**: Automatically detects Next.js App Router (including route groups and parallel slot filtering), Next.js Pages, Remix (\`_index\` and pathless layouts), SvelteKit, Astro, and Nuxt routes when \`routes\` is omitted.
+- **Filesystem discovery**: Automatically detects Next.js App Router (including route groups and parallel slot filtering), Next.js Pages, Remix (\`_index\` and pathless layouts), SvelteKit, and Nuxt routes when \`routes\` is omitted.
 - **Crawler discovery**: Set \`discover: { startUrl: 'http://localhost:3000', maxDepth: 3, maxRoutes: 50, exclude: ['/admin/*'] }\`.
 - **Storybook**: Set \`storybook: { url: 'http://localhost:6006', stories: ['Components/*'] }\`. Storybook 7 is read from \`/stories.json\`. Storybook 8, 9, 10, and 11 alpha share \`/index.json\`, so they use the same parser. The renderer awaits each story's \`play()\` function before capture.
 - **Ladle** (off unless set): \`ladle: { dir: 'build' }\` or \`ladle: { url: 'http://localhost:61000' }\` reads \`meta.json\`. Stories open at \`/?story=<id>&mode=preview\` and wait for \`[data-storyloaded]\`.
@@ -124,7 +124,7 @@ Works against local CLI reports (\`./frontguard-report/report.json\` or \`FRONTG
 3. \`get_suggested_fix\`: Retrieve the stored candidate CSS/HTML patch and its confidence score for a \`diff_id\`. Fixes exist only when the run had an \`ai\` provider and \`generateFixes: true\`.
 4. \`verify_css_patch\`: Statically check a candidate patch (\`diff_id\`, \`target_selector\`, \`css_patch\`): balanced braces, selector alignment with the recorded target, and a deny list for layout-destroying rules like \`display: none !important\` or external \`@import\`. It renders nothing: \`staticCheck: "pass"\` comes with \`rendered: false\`.
 5. \`recent_runs\`: List recent visual test runs and their regression counts; optional \`repo\`, \`branch\`, \`limit\`.
-6. \`list_horizontal_overflow\`: List visible unclipped boxes past the right edge, flagged rows only unless \`flaggedOnly\` is false, paged with \`limit\` and \`cursor\`. It does not change the pixel exit code.
+6. \`list_horizontal_overflow\`: List visible unclipped boxes past the right edge, flagged rows only unless \`flagged_only\` is false, paged with \`limit\` and \`cursor\`. It does not change the pixel exit code.
 
 \`promote_baseline\` and \`accept_baseline\` are not part of the agent workflow. They are unregistered unless \`FRONTGUARD_MCP_WRITES=1\`, both record whole-run approval through the same endpoint, and neither promotes screenshots. \`confirm_reviewed: true\` is UX only — an agent setting it is not a human review. Local-report mode refuses promotion. A human writes baselines with \`frontguard update-baselines --confirm-baselines\`. Cloud \`approveRun\` is not a production path.
 

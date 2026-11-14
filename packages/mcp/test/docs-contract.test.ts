@@ -437,7 +437,7 @@ describe('agent-facing MCP docs match the live server (#378)', () => {
     expect(found).toMatch(/tool table lists \[get_diff_details, list_regressions\]/);
     expect(found).toMatch(/`list_regressions` example .* fails the input schema: pr_id: .*Unrecognized key: "pr_or_run_id"/);
     expect(found).toMatch(/marks `target_selector` as optional/);
-    expect(found).toMatch(/leaves out input `flaggedOnly` of `list_horizontal_overflow`/);
+    expect(found).toMatch(/leaves out input `flagged_only` of `list_horizontal_overflow`/);
     expect(found).toMatch(/uses the call form/);
     expect(found).toMatch(/calls unregistered tool `run_visual_check`/);
   });

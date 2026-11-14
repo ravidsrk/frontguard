@@ -194,7 +194,7 @@ visual:
 - `inspect_diff_cluster_dom(diff_id, cluster_id?)` — cluster bounding boxes with recorded target selectors, classification, explanation, and suggested fix
 - `get_suggested_fix(diff_id)` — the stored AI patch; fixes exist only when the run had an `ai` provider and `generateFixes: true`
 - `verify_css_patch(diff_id, target_selector, css_patch)` — a static check of syntax, a deny list, and the recorded target selector; it renders nothing, so re-run `frontguard run` to confirm the pixels
-- `list_horizontal_overflow(run_id?, flaggedOnly?, limit?, cursor?)` — visible unclipped boxes past the right edge, flagged rows only by default; this does not change the pixel result
+- `list_horizontal_overflow(run_id?, flagged_only?, limit?, cursor?)` — visible unclipped boxes past the right edge, flagged rows only by default; this does not change the pixel result
 - `recent_runs(repo?, branch?, limit?)`
 - `promote_baseline(run_id, routes?, confirm_reviewed: true)` — write tool: records whole-run cloud approval through the same endpoint as `accept_baseline` and promotes no screenshots; refused in local report mode
 - `accept_baseline(run_id, confirm_all_regressions_reviewed: true)` — write tool: run-scoped cloud approval metadata, not per-diff

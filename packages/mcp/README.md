@@ -128,7 +128,7 @@ Six read tools are always registered. `promote_baseline` and `accept_baseline` e
 | `promote_baseline` | `run_id`, `confirm_reviewed: true`, optional `routes` | records whole-run approval in Cloud API mode through the same endpoint as `accept_baseline`, and promotes no screenshots (`approvalRecorded: true`, `screenshotsPromoted: false`). `routes` must include every changed route; refuses local-report mode |
 | `accept_baseline` | `run_id`, `confirm_all_regressions_reviewed: true` | records approval metadata for the **entire run** in the JSON report or Cloud API; screenshot promotion is not implemented |
 | `recent_runs` | optional `repo`, `branch`, `limit` | newest-first run summary list from the Cloud API or local report |
-| `list_horizontal_overflow` | optional `run_id`, `flaggedOnly` (default true), `limit` (default 25, max 200), `cursor` | visible unclipped boxes past the right edge, largest `overflowPx` first, plus `scrollWidth` and `innerWidth`. It does not change the pixel result |
+| `list_horizontal_overflow` | optional `run_id`, `flagged_only` (default true), `limit` (default 25, max 200), `cursor` | visible unclipped boxes past the right edge, largest `overflowPx` first, plus `scrollWidth` and `innerWidth`. It does not change the pixel result |
 
 Every tool returns `structuredContent` and the same object as compact JSON in the MCP `text` content channel; agents parse either directly. The two list tools return at most `limit` rows with `total`, `count`, and `nextCursor`; pass `nextCursor` back as `cursor` until it is `null`. Cloud API errors name the method and path, add a hint for the status code, and keep at most 300 characters of the response body.
 

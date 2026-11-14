@@ -1123,7 +1123,7 @@ describe('list_horizontal_overflow', () => {
       });
       expect(listed.rows[0]?.elements[0]?.selector).toBe('[data-testid="wide"]');
 
-      const everything = await listHorizontalOverflow(client, { flaggedOnly: false });
+      const everything = await listHorizontalOverflow(client, { flagged_only: false });
       expect(everything).toMatchObject({ flaggedOnly: false, total: 2, count: 2, flagged: 1 });
       expect(everything.rows.map((row) => row.flagged)).toEqual([true, false]);
       const run = await client.getRun('run_local');

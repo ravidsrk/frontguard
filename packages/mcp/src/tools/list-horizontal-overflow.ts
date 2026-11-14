@@ -22,7 +22,7 @@ export const listHorizontalOverflowInputSchema = {
     .min(1)
     .optional()
     .describe('Run id. Omit it to read the newest run, including the local report.'),
-  flaggedOnly: z
+  flagged_only: z
     .boolean()
     .default(true)
     .describe(
@@ -35,7 +35,7 @@ export const listHorizontalOverflowInputSchema = {
 export type ListHorizontalOverflowInput = {
   run_id?: string;
   /** Default true. */
-  flaggedOnly?: boolean;
+  flagged_only?: boolean;
   /** Rows per page. Default 25, max 200. */
   limit?: number;
   /** `nextCursor` from the previous page. */
@@ -97,7 +97,7 @@ export async function listHorizontalOverflow(
   client: CloudClient,
   input: ListHorizontalOverflowInput,
 ): Promise<ListHorizontalOverflowResult> {
-  const flaggedOnly = input.flaggedOnly ?? true;
+  const flaggedOnly = input.flagged_only ?? true;
   const run = input.run_id
     ? await client.getRun(input.run_id)
     : newestRun((await client.listRuns()).runs);
