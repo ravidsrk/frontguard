@@ -121,7 +121,10 @@ jobs:
         #   bin at 399557 bytes. Named capture modes (#309) and S3 baseline
         #   layout (#295) measure the library entry at 227403 bytes and the
         #   published bin at 408601 bytes, so the ceilings are 230KB and
-        #   410KB. No dependency is inlined.
+        #   410KB. The shared AI transport with structured outputs and
+        #   per-call accounting (#376, #382, #386) measures the library entry
+        #   at 238648 bytes and the published bin at 419685 bytes, so the
+        #   ceilings are 245KB and 425KB. No dependency is inlined.
         # dist/cli/index.js  — the actual published bin (bin.frontguard). This
         #   was previously UNGATED, so the artifact users install could grow
         #   without limit while CI guarded only the library entry. The same
@@ -145,8 +148,8 @@ jobs:
             fi
           }
           status=0
-          check packages/cli/dist/index.js     230000 "library entry" || status=1
-          check packages/cli/dist/cli/index.js 410000 "published bin" || status=1
+          check packages/cli/dist/index.js     245000 "library entry" || status=1
+          check packages/cli/dist/cli/index.js 425000 "published bin" || status=1
           exit $status
 
   audit:

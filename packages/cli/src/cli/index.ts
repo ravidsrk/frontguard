@@ -398,16 +398,18 @@ export async function main(argv?: string[]): Promise<number> {
           const js = judgeResult.summary;
           const judgements = judgeResult.judgements ?? [];
           const withNotes = judgements.filter(
-            (judgement) => !judgement.error && judgement.issues.length > 0,
+            (judgement) => !judgement.error && !judgement.skipped && judgement.issues.length > 0,
           ).length;
           const withoutNotes = judgements.filter(
-            (judgement) => !judgement.error && judgement.issues.length === 0,
+            (judgement) => !judgement.error && !judgement.skipped && judgement.issues.length === 0,
           ).length;
+          const skipped = judgements.filter((judgement) => judgement.skipped).length;
           logger.info('');
           logger.info('─'.repeat(60));
           logger.info(
             `Judge notes: ${js.total} reviewed, ${withoutNotes} without notes, ` +
-              `${withNotes} with notes, ${js.errors} errors`,
+              `${withNotes} with notes, ${js.errors} errors` +
+              (skipped > 0 ? `, ${skipped} skipped (ai.maxCalls)` : ''),
           );
           logger.info('─'.repeat(60));
           exitCode = comparisonExitCode(js);

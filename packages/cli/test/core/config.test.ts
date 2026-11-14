@@ -293,20 +293,40 @@ describe('judge config and mergeConfigs', () => {
       baseUrl: 'http://localhost:3000',
       ai: { provider: 'openai' },
     });
-    expect(openaiCfg.ai?.model).toBe('gpt-4.1-mini');
+    expect(openaiCfg.ai?.model).toBe('gpt-6-luna');
 
     const anthropicCfg = configSchema.parse({
       baseUrl: 'http://localhost:3000',
       ai: { provider: 'anthropic' },
     });
-    expect(anthropicCfg.ai?.model).toBe('claude-sonnet-4-20250514');
+    expect(anthropicCfg.ai?.model).toBe('claude-sonnet-5-5');
 
     const geminiCfg = configSchema.parse({
       baseUrl: 'http://localhost:3000',
       ai: { provider: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models' },
     });
-    expect(geminiCfg.ai?.model).toBe('gemini-2.5-flash');
+    expect(geminiCfg.ai?.model).toBe('gemini-3.5-flash-lite');
     expect(geminiCfg.ai?.baseUrl).toBe('https://generativelanguage.googleapis.com/v1beta/models');
+  });
+
+  it('accepts the AI budget and request limits', () => {
+    const cfg = configSchema.parse({
+      baseUrl: 'http://localhost:3000',
+      ai: { provider: 'anthropic', maxCalls: 0, maxOutputTokens: 2048, timeoutMs: 30_000 },
+    });
+    expect(cfg.ai).toEqual({
+      provider: 'anthropic',
+      model: 'claude-sonnet-5-5',
+      maxCalls: 0,
+      maxOutputTokens: 2048,
+      timeoutMs: 30_000,
+    });
+    expect(() =>
+      configSchema.parse({ baseUrl: 'http://localhost:3000', ai: { provider: 'openai', maxCalls: -1 } }),
+    ).toThrow();
+    expect(() =>
+      configSchema.parse({ baseUrl: 'http://localhost:3000', ai: { provider: 'openai', maxOutputTokens: 0 } }),
+    ).toThrow();
   });
 
   it('validates ISO string freezeTime, seedRandom, and blockUrls', () => {

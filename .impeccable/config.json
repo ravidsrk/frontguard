@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "createdAt": "2026-11-14T17:43:12.841Z",
+        "reason": "agent decision: packages/cli/scripts/eval/ui.ts is an eval fixture that renders offline with system fonts so screenshots stay deterministic; not product UI"
+      }
+    ]
+  }
+}

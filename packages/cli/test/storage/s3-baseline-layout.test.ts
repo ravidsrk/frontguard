@@ -100,7 +100,7 @@ describe('S3-compatible baseline storage design record & spike (#295)', () => {
         target,
         pngBytes,
         actorKind: 'model',
-        reviewerId: 'gpt-4.1-mini',
+        reviewerId: 'gpt-6-luna',
         confirmBaselines: true,
         modelDecision: 'intentional',
         sourceCommitSha: 'abc1234',

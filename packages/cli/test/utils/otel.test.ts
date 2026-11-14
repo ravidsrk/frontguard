@@ -56,6 +56,29 @@ describe('CLI OTLP traces', () => {
     expect(body).not.toContain('https://otel.example');
   });
 
+  it('exports only allowed numeric AI attributes', async () => {
+    const fetchImpl = okFetch();
+    const trace = createCliTrace(env, fetchImpl);
+    trace.start('frontguard.analyze').end('ok', {
+      'frontguard.ai.calls': 3,
+      'frontguard.ai.input_tokens': 4200.4,
+      'frontguard.ai.output_tokens': 180,
+      'frontguard.ai.skipped': 1,
+      'frontguard.ai.errors': -2,
+      'frontguard.route': 7,
+    });
+    await trace.flush();
+
+    const span = JSON.parse(posted(fetchImpl).body).resourceSpans[0].scopeSpans[0].spans[0];
+    expect(span.name).toBe('frontguard.analyze');
+    expect(span.attributes).toEqual([
+      { key: 'frontguard.ai.calls', value: { intValue: '3' } },
+      { key: 'frontguard.ai.input_tokens', value: { intValue: '4200' } },
+      { key: 'frontguard.ai.output_tokens', value: { intValue: '180' } },
+      { key: 'frontguard.ai.skipped', value: { intValue: '1' } },
+    ]);
+  });
+
   it('does not append /v1/traces twice', async () => {
     const fetchImpl = okFetch();
     const trace = createCliTrace(

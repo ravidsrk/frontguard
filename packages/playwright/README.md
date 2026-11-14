@@ -119,8 +119,9 @@ test('checkout flow', async ({ page }) => {
 
   if (!result.passed) {
     console.log(result.ai?.classification); // 'regression' | 'intentional' | 'content_update'
-    console.log(result.ai?.severity);       // 'critical' | 'high' | 'medium' | 'low'
+    console.log(result.ai?.severity);       // 'critical' | 'warning' | 'info'
     console.log(result.ai?.explanation);    // Human-readable explanation
+    console.log(result.aiError?.message);   // Why there is no classification, if AI failed
   }
   expect(result.passed).toBe(true);
 });
@@ -141,7 +142,7 @@ test('checkout flow', async ({ page }) => {
 | `seedRandom` | `boolean \| number` | `false` | Seed `Math.random()` with a deterministic PRNG (`true` uses default seed, or pass a numeric seed) |
 | `blockUrls` | `string[]` | `[]` | URL glob or substring patterns to abort before rendering (e.g. analytics, ads, live chat widgets) |
 | `captureAriaSnapshot` | `boolean` | `false` | Store the ARIA tree beside the PNG and diff it as text. A mismatch does not change `passed`. axe-core remains the CLI accessibility plugin. |
-| `ai` | `boolean \| { provider: 'openai' \| 'anthropic' \| 'gemini'; model?: string; baseUrl?: string }` | `false` | Enable AI analysis of visual diffs (`openai`, `anthropic`, `gemini`, or custom OpenAI-compatible `baseUrl`) |
+| `ai` | `boolean \| { provider: 'openai' \| 'anthropic' \| 'gemini'; model?: string; baseUrl?: string; maxOutputTokens?: number; timeoutMs?: number }` | `false` | Enable AI analysis of visual diffs (`openai`, `anthropic`, `gemini`, or custom OpenAI-compatible `baseUrl`). Default models: `gpt-6-luna`, `claude-sonnet-5-5`, `gemini-3.5-flash-lite` |
 | `textSnapshot` | `{ json?: string; markdown?: string }` | `undefined` | Selectors whose text is stored as `.json` or `.md` beside the PNG. A mismatch does not change `passed`. A selector failure during comparison is `status: "error"`. Update throws before the baseline write. |
 | `baselineDir` | `string` | `__visual_baselines__` | Directory for baseline images |
 | `update` | `boolean` | `false` | Update baselines instead of comparing |
@@ -171,12 +172,13 @@ test('homepage with AI analysis', async ({ page }) => {
 });
 // result.ai = {
 //   classification: 'regression',
-//   severity: 'high',
-//   explanation: 'The navigation bar has shifted 20px down, pushing all content below the fold.'
+//   severity: 'warning',
+//   explanation: 'The navigation bar has shifted down, pushing all content below the fold.',
+//   confidence: 0.82,
 // }
 ```
 
-AI is **always optional** — if no API key is set, it silently skips analysis. Your tests still work.
+AI is **always optional** and never changes `passed`: pixels decide. When AI was requested but could not answer — no API key, an invalid or retired model, a timeout — the result carries `aiError` (`provider`, `model`, `kind`, `status`, `message`) and the plugin logs one warning per error kind per run. It uses the same prompt, schema, taxonomy and default models as `@frontguard/cli`, crops screenshots to 5,000 px tall and downscales them to 800 px wide before sending.
 
 ## Update Baselines
 

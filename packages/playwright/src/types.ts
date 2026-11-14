@@ -14,8 +14,21 @@ export interface VisualTestOptions {
   mask?: string[];
   /** Mask regions by coordinates */
   maskRegions?: Array<{ x: number; y: number; width: number; height: number }>;
-  /** Enable AI analysis of visual diffs */
-  ai?: boolean | { provider: 'openai' | 'anthropic' | 'gemini'; model?: string; baseUrl?: string };
+  /**
+   * Enable AI analysis of visual diffs. `true` uses OpenAI with its default model.
+   * Failures are reported in `result.aiError` and logged once per run.
+   */
+  ai?:
+    | boolean
+    | {
+        provider: 'openai' | 'anthropic' | 'gemini';
+        model?: string;
+        baseUrl?: string;
+        /** Output-token cap per call, including reasoning/thinking tokens. */
+        maxOutputTokens?: number;
+        /** Wall-clock limit per HTTP attempt in milliseconds. */
+        timeoutMs?: number;
+      };
   /** Freeze Date.now() during screenshot (boolean, epoch ms, or ISO date string) */
   freezeTime?: boolean | number | string;
   /** Seed Math.random() with a deterministic Mulberry32 PRNG before capture */
@@ -49,11 +62,10 @@ export interface VisualTestResult {
   baselinePath: string;
   currentPath: string;
   diffPath?: string;
-  ai?: {
-    classification: string;
-    severity: string;
-    explanation: string;
-  };
+  /** Advisory classification; `passed` is decided by pixels alone. */
+  ai?: AIAnalysisResult;
+  /** Why `ai` is missing when AI analysis was requested. */
+  aiError?: AIErrorInfo;
   ssim?: number;
   isNewBaseline: boolean;
   settled?: boolean;
@@ -86,8 +98,33 @@ export interface CompareResult {
 
 export type DiffOutput = CompareResult;
 
+/** Same taxonomy as the CLI's `aiAnalysis`. */
 export interface AIAnalysisResult {
-  classification: string;
-  severity: string;
+  classification: 'regression' | 'intentional' | 'content_update';
+  severity: 'critical' | 'warning' | 'info';
   explanation: string;
+  confidence: number;
+  suggestedFix?: string;
+}
+
+/** Why an AI classification is missing. */
+export interface AIErrorInfo {
+  provider: 'openai' | 'anthropic' | 'gemini';
+  model: string;
+  kind:
+    | 'config'
+    | 'auth'
+    | 'not_found'
+    | 'rate_limit'
+    | 'server'
+    | 'timeout'
+    | 'network'
+    | 'bad_request'
+    | 'refusal'
+    | 'truncated'
+    | 'empty'
+    | 'invalid_output';
+  /** HTTP status, when the provider answered. */
+  status?: number;
+  message: string;
 }

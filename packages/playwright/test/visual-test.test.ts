@@ -139,6 +139,38 @@ describe('visualTest', () => {
     expect(fs.existsSync(result.diffPath!)).toBe(true);
   });
 
+  it('reports a missing AI key on the result and warns once', async () => {
+    const saved = { ...process.env };
+    for (const k of ['FRONTGUARD_OPENAI_KEY', 'OPENAI_API_KEY']) delete process.env[k];
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { resetAIWarnings } = await import('../src/ai.js');
+      resetAIWarnings();
+      await visualTest(createMockPage(createPNG(50, 50, [255, 0, 0, 255])), 'ai-error', { baselineDir: TEST_BASELINE_DIR });
+      const page = createMockPage(createPNG(50, 50, [0, 0, 255, 255]));
+      const first = await visualTest(page, 'ai-error', { baselineDir: TEST_BASELINE_DIR, ai: true });
+      const second = await visualTest(page, 'ai-error', { baselineDir: TEST_BASELINE_DIR, ai: true });
+
+      expect(first.passed).toBe(false);
+      expect(first.ai).toBeUndefined();
+      expect(first.aiError).toMatchObject({ provider: 'openai', kind: 'config' });
+      expect(second.aiError?.kind).toBe('config');
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      process.env = saved;
+    }
+  });
+
+  it('does not call the model when pixels pass', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const img = createPNG(50, 50, [10, 10, 10, 255]);
+    await visualTest(createMockPage(img), 'ai-pass', { baselineDir: TEST_BASELINE_DIR });
+    const result = await visualTest(createMockPage(img), 'ai-pass', { baselineDir: TEST_BASELINE_DIR, ai: true });
+    expect(result.passed).toBe(true);
+    expect(result.aiError).toBeUndefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it('update mode overwrites baseline', async () => {
     const img1 = createPNG(100, 100, [255, 0, 0, 255]);
     const img2 = createPNG(100, 100, [0, 0, 255, 255]);

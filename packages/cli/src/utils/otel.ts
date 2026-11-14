@@ -5,7 +5,8 @@
  * not use the `@opentelemetry/*` SDK. Those root package overrides exist
  * because `@daytona/sdk` depends on them. The cloud API already has its own
  * hand-rolled metrics exporter in `packages/cloud-api/src/otel/index.ts`.
- * Spans carry a screenshot count and no URL, path, DOM, or image bytes.
+ * Spans carry counts only: screenshots, and for model calls the number of calls,
+ * errors, budget skips and tokens. No URL, path, DOM, prompt, or image bytes.
  *
  * @module utils/otel
  */
@@ -15,6 +16,16 @@ import { CLI_VERSION } from '../version.js';
 
 const EXPORT_TIMEOUT_MS = 1500;
 const SHOTS_ATTRIBUTE = 'frontguard.shots';
+
+/** The only attributes a span may carry. All are non-negative integers. */
+const ALLOWED_ATTRIBUTES: ReadonlySet<string> = new Set([
+  SHOTS_ATTRIBUTE,
+  'frontguard.ai.calls',
+  'frontguard.ai.errors',
+  'frontguard.ai.input_tokens',
+  'frontguard.ai.output_tokens',
+  'frontguard.ai.skipped',
+]);
 
 /** Ends a span. A second call is ignored. */
 export interface CliSpan {
@@ -33,7 +44,7 @@ interface RecordedSpan {
   startMs: number;
   endMs?: number;
   status?: 'ok' | 'error';
-  shots?: number;
+  attributes?: Record<string, number>;
 }
 
 const NOOP_SPAN: CliSpan = { end() {} };
@@ -70,17 +81,23 @@ function parseOtlpHeaders(raw: string | undefined): Record<string, string> {
   return headers;
 }
 
-function shotCount(attributes: Record<string, number> | undefined): number | undefined {
-  const value = attributes?.[SHOTS_ATTRIBUTE];
-  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
-  return value;
+/** Keeps allowed, finite, non-negative attributes, rounded to integers. */
+function allowedAttributes(attributes: Record<string, number> | undefined): Record<string, number> | undefined {
+  if (!attributes) return undefined;
+  const kept: Record<string, number> = {};
+  for (const [key, value] of Object.entries(attributes)) {
+    if (!ALLOWED_ATTRIBUTES.has(key)) continue;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) continue;
+    kept[key] = Math.round(value);
+  }
+  return Object.keys(kept).length > 0 ? kept : undefined;
 }
 
 function spanPayload(traceId: string, span: RecordedSpan): unknown {
-  const attributes =
-    span.shots === undefined
-      ? []
-      : [{ key: SHOTS_ATTRIBUTE, value: { intValue: String(span.shots) } }];
+  const attributes = Object.entries(span.attributes ?? {}).map(([key, value]) => ({
+    key,
+    value: { intValue: String(value) },
+  }));
   return {
     traceId,
     spanId: span.spanId,
@@ -125,7 +142,7 @@ export function createCliTrace(
           if (span.endMs !== undefined) return;
           span.endMs = Math.max(span.startMs, Date.now());
           span.status = status;
-          span.shots = shotCount(attributes);
+          span.attributes = allowedAttributes(attributes);
         },
       };
     },

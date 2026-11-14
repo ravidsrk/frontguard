@@ -269,7 +269,7 @@ export default defineConfig({
   blockUrls: ['*://*.google-analytics.com/*'],
   threshold: 0.01,
   // Optional BYOK: 'openai' | 'anthropic' | 'gemini' ( + custom baseUrl )
-  ai: { provider: 'gemini', model: 'gemini-2.5-flash' },
+  ai: { provider: 'gemini', model: 'gemini-3.5-flash-lite' },
 })`;
 
 export const CONFIG_HTML = `<span style="color:#e8862e">import</span> { defineConfig } <span style="color:#e8862e">from</span> <span style="color:#4fb477">'@frontguard/cli'</span>
@@ -296,7 +296,7 @@ export const CONFIG_HTML = `<span style="color:#e8862e">import</span> { defineCo
   blockUrls: [<span style="color:#4fb477">'*://*.google-analytics.com/*'</span>],
   threshold: <span style="color:#f5f1ea">0.01</span>,
   <span style="color:#a89f94">// Optional BYOK: 'openai' | 'anthropic' | 'gemini' ( + custom baseUrl )</span>
-  ai: { provider: <span style="color:#4fb477">'gemini'</span>, model: <span style="color:#4fb477">'gemini-2.5-flash'</span> },
+  ai: { provider: <span style="color:#4fb477">'gemini'</span>, model: <span style="color:#4fb477">'gemini-3.5-flash-lite'</span> },
 })`;
 
 export const TOP_THREE_FEATURES = [

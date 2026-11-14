@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { test as playwrightTest, type Page, type TestInfo } from '@playwright/test';
 import type { VisualTestOptions, VisualTestResult } from './types.js';
 import { compareImages } from './diff.js';
-import { analyzeWithAI } from './ai.js';
+import { analyzeWithAI, warnOnce } from './ai.js';
 import { BaselineStorage } from './storage.js';
 import { recordTextSnapshots } from './text-snapshot.js';
 import type { TextSnapshotKind } from './types.js';
@@ -510,7 +510,12 @@ export async function visualTest(
   // AI analysis if enabled and diff detected
   if (opts.ai && !diff.passed) {
     const aiOpts = typeof opts.ai === 'object' ? opts.ai : { provider: 'openai' as const };
-    result.ai = await analyzeWithAI(baseline, current, aiOpts);
+    const outcome = await analyzeWithAI(baseline, current, aiOpts, diff.diffBuffer);
+    if (outcome.ai) result.ai = outcome.ai;
+    if (outcome.aiError) {
+      result.aiError = outcome.aiError;
+      warnOnce(outcome.aiError);
+    }
   }
 
   return result;

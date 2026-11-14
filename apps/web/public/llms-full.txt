@@ -105,7 +105,7 @@ export default defineConfig({
   viewports: [375, 768, 1440],
   browsers: ['chromium', 'firefox', 'webkit'],
   antiFlakeRenders: 3,
-  ai: { provider: 'openai', model: 'gpt-4o' },
+  ai: { provider: 'openai' }, // default model gpt-6-luna; set model to override
   outputDir: '.frontguard/results',
 });
 ```
@@ -113,6 +113,7 @@ export default defineConfig({
 ### Environment variables
 
 - `FRONTGUARD_OPENAI_KEY` / `FRONTGUARD_ANTHROPIC_KEY` / `FRONTGUARD_GEMINI_KEY` — AI provider key (`FRONTGUARD_OPENAI_BASE_URL` for custom OpenAI-compatible endpoints). The Playwright plugin also accepts unprefixed `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` when present. `frontguard doctor` reads exactly the same names the runtime reads.
+- `FRONTGUARD_DEBUG_AI=1` — write each model request (images replaced by size and hash) and raw response to `.frontguard-debug/ai/`.
 - `FRONTGUARD_LOCAL_REPORT` — local JSON report path (defaults to `./frontguard-report/report.json`) for `@frontguard/mcp` local mode.
 - `FRONTGUARD_API_URL` / `FRONTGUARD_API_KEY` — a verified self-hosted or future hosted cloud endpoint.
 

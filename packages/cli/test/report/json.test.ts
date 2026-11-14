@@ -77,6 +77,40 @@ describe('JSONReporter', () => {
     spy.mockRestore();
   });
 
+  it('serializes model-call accounting and budget skips', () => {
+    const reporter = new JSONReporter();
+    const aiUsage = {
+      calls: [
+        {
+          label: 'analyze /about @1440',
+          provider: 'openai' as const,
+          model: 'gpt-6-luna',
+          outcome: 'ok' as const,
+          attempts: 1,
+          latencyMs: 800,
+          inputTokens: 2400,
+          outputTokens: 90,
+          structured: true,
+        },
+      ],
+      totals: { calls: 1, ok: 1, errors: 0, attempts: 1, inputTokens: 2400, outputTokens: 90, latencyMs: 800 },
+      skipped: { budget: 1 },
+      maxCalls: 1,
+    };
+    const result = makeRunResult(
+      [makeDiff({ route: { path: '/pricing' }, status: 'regression', aiSkipped: 'budget' })],
+      { aiUsage },
+    );
+
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    reporter.onComplete(result);
+    const parsed = JSON.parse(spy.mock.calls[0][0] as string);
+
+    expect(parsed.aiUsage).toEqual(aiUsage);
+    expect(parsed.diffs[0].aiSkipped).toBe('budget');
+    spy.mockRestore();
+  });
+
   it('contains summary with correct counts', () => {
     const reporter = new JSONReporter();
     const diffs = [
