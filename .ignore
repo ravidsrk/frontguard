@@ -1,0 +1,12 @@
+# Paths that search tools should skip. ripgrep, fd, and agent search tools
+# built on them read this file. Git does not, so everything here stays tracked.
+# To search these paths anyway, run `rg --no-ignore` or `fd --no-ignore`.
+
+# Vendored design skill (about 20 MB, includes a prebuilt binary).
+/.agent/
+
+# Dated plans, progress logs, audits and research. History only.
+/docs/archive/
+
+# Old synthetic AI-validation outputs written by packages/cli/scripts/validate-ai.ts.
+/packages/cli/validation-results/
