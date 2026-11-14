@@ -251,7 +251,7 @@ $ npx -p @frontguard/cli frontguard doctor`,
         ],
         [
           '@frontguard/mcp',
-          '7-tool Model Context Protocol server for Claude Code, Cursor, and Windsurf.',
+          'Model Context Protocol server for Claude Code, Cursor, and Windsurf: six read tools, plus two write tools only with FRONTGUARD_MCP_WRITES=1.',
           'Reads ./frontguard-report/report.json locally',
           'MCP promotion is refused in local-report mode. A human runs frontguard update-baselines --confirm-baselines. Cloud approveRun is not a production path.',
         ],
@@ -1637,11 +1637,11 @@ export default {
     'Integrations',
     ['Configuration', 'Tools', 'Agentic debugging workflow', 'Approval limit'],
     `${cloudNotice}${lead(
-      '@frontguard/mcp gives coding agents structured access to local visual regression reports, DOM clusters and CSS patch validation. Reading local reports needs no cloud account or API key.',
+      '@frontguard/mcp gives coding agents structured access to local visual regression reports, diff clusters and static CSS patch checks. Reading local reports needs no cloud account or API key.',
     )}${figure(
       '/images/docs/mcp-visual-cortex.jpg',
       'Frontguard MCP Agentic Visual Cortex Architecture',
-      'FIG 01 · @FRONTGUARD/MCP — 8-TOOL AGENTIC VISUAL CORTEX OVER STDIO JSON-RPC (LOCAL REPORT & CLOUD API MODES)',
+      'FIG 01 · @FRONTGUARD/MCP — SIX READ TOOLS OVER STDIO JSON-RPC (LOCAL REPORT & CLOUD API MODES)',
     )}${h2('Configuration')}${p(
       'From your project directory, start the app and prepare reviewed baselines first. JSON output goes to stdout, so create the report directory and redirect it into the file MCP will read:',
     )}${code(
@@ -1668,12 +1668,12 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
     )}${h2('Tools')}${table(
       ['MCP Tool Name', 'Required Arguments', 'What It Returns to the Coding Agent'],
       [
-        ['list_regressions', 'pr_id; optional repo, limit, cursor', 'Lists regressions and their diffId values, worst first, 25 per page by default (max 200). Use a PR number or a run ID returned by recent_runs. Pass nextCursor back as cursor for the next page.'],
-        ['inspect_diff_cluster_dom', 'diff_id; optional cluster_id', 'Returns captured DOM clusters, bounding boxes, selectors and diff evidence.'],
-        ['get_suggested_fix', 'diff_id', 'Returns a stored suggested fix if one exists.'],
-        ['verify_css_patch', 'diff_id, css_patch, target_selector', 'Validates CSS syntax, target alignment and safety against the report. It does not render or apply the patch.'],
-        ['promote_baseline', 'run_id, confirm_reviewed: true; optional routes', 'Cloud API mode only: records reviewed run approval. Refuses local-report mode; does not promote cloud PNGs.'],
-        ['accept_baseline', 'run_id, confirm_all_regressions_reviewed: true', 'Records whole-run approval metadata in the local JSON report or Cloud API; does not replace screenshot baselines.'],
+        ['list_regressions', 'pr_id; optional repo, limit, cursor', 'Lists regressions worst first, each with a diffId and a clusterCount, 25 per page by default (max 200). Use a PR number, a run ID returned by recent_runs, or "latest" for the newest run (the report\'s run in local-report mode). Pass nextCursor back as cursor for the next page.'],
+        ['inspect_diff_cluster_dom', 'diff_id; optional cluster_id', 'Returns the diff clusters with bounding boxes and recorded target selectors, plus the classification, explanation and suggested fix.'],
+        ['get_suggested_fix', 'diff_id', 'Returns a stored suggested fix if one exists. Fixes exist only when the run had an ai provider and generateFixes: true.'],
+        ['verify_css_patch', 'diff_id, css_patch, target_selector', 'Statically checks CSS syntax, a deny list, and whether target_selector matches a selector recorded for the diff. It renders nothing and does not apply the patch: staticCheck pass comes with rendered: false.'],
+        ['promote_baseline', 'run_id, confirm_reviewed: true; optional routes', 'Write tool, registered only with FRONTGUARD_MCP_WRITES=1; agents should not call it. Cloud API mode only: records whole-run approval through the same endpoint as accept_baseline and promotes no screenshots. routes must include every changed route. Refuses local-report mode.'],
+        ['accept_baseline', 'run_id, confirm_all_regressions_reviewed: true', 'Write tool, registered only with FRONTGUARD_MCP_WRITES=1. Records whole-run approval metadata in the local JSON report or Cloud API; does not replace screenshot baselines.'],
         ['recent_runs', 'optional repo, branch, limit', 'Lists runs, including the local run ID when reading a JSON report.'],
         ['list_horizontal_overflow', 'optional run_id, flaggedOnly, limit, cursor', 'Lists horizontal overflow from the JSON report, largest overflow first, 25 per page by default (max 200). A flagged row is a visible unclipped box past the right edge; only flagged rows are returned unless flaggedOnly is false. It does not change the pixel result.'],
       ],
@@ -1684,14 +1684,14 @@ npx -p @frontguard/cli frontguard run --output json &gt; frontguard-report/repor
       },
       {
         title: 'Inspect regressions',
-        body: 'Call recent_runs, then list_regressions with pr_id set to the returned run ID. Pass a returned diffId as the diff_id input to inspect_diff_cluster_dom or get_suggested_fix.',
+        body: `Call ${ic('list_regressions')} with ${ic('{"pr_id": "latest"}')} for the newest run, or with a run ID from recent_runs. Rows come worst first; pass nextCursor back as cursor for more. Pass a returned diffId as the diff_id input to inspect_diff_cluster_dom or get_suggested_fix.`,
       },
       {
-        title: 'Validate and re-run',
-        body: 'Call verify_css_patch with diff_id, css_patch and target_selector. Apply the reviewed code edit yourself and re-run Frontguard; CSS validation alone is not visual verification.',
+        title: 'Check and re-run',
+        body: 'Call verify_css_patch with diff_id, css_patch and target_selector. It is a static check and renders nothing. When staticCheck is pass, apply the reviewed code edit yourself and re-run Frontguard to confirm the pixels.',
       },
     ])}${h2('Approval limit')}${p(
-      'MCP promotion is refused in local-report mode and does not write the frontguard-baselines branch. The local write is the CLI command frontguard update-baselines --confirm-baselines, which a human runs. An agent setting confirm_reviewed: true on itself is not a human review, and an advisory caption cannot set that flag. Cloud approveRun is not a production path; do not point the MCP client at a production host. accept_baseline can mark a JSON report approved, but it does not replace screenshot baselines. Cloud tools record approval metadata only; cloud screenshot promotion is not implemented.',
+      'promote_baseline and accept_baseline are registered only when FRONTGUARD_MCP_WRITES=1, and agents should not call them. MCP promotion is refused in local-report mode and does not write the frontguard-baselines branch. The local write is the CLI command frontguard update-baselines --confirm-baselines, which a human runs. An agent setting confirm_reviewed: true on itself is not a human review, and an advisory caption cannot set that flag. Cloud approveRun is not a production path; do not point the MCP client at a production host. accept_baseline can mark a JSON report approved, but it does not replace screenshot baselines. Cloud tools record approval metadata only; cloud screenshot promotion is not implemented.',
     )}`,
   ),
 
@@ -2113,7 +2113,7 @@ $ npx -y @frontguard/mcp  # works locally with FRONTGUARD_LOCAL_REPORT or requir
       [
         ['@frontguard/cli', 'frontguard', 'Core CLI runner, orphan-branch baseline manager, 4-mode HTML workbench, and built-in plugins.'],
         ['@frontguard/playwright', 'import { visualTest }', 'In-test visual regression helper for @playwright/test suites.'],
-        ['@frontguard/mcp', 'frontguard-mcp (stdio)', '7-tool Model Context Protocol server for AI coding agents.'],
+        ['@frontguard/mcp', 'frontguard-mcp (stdio)', 'Model Context Protocol server for AI coding agents: six read tools, plus two write tools only with FRONTGUARD_MCP_WRITES=1.'],
         ['create-frontguard-plugin', 'create-frontguard-plugin', 'CLI scaffolder for custom TypeScript lifecycle plugins.'],
       ],
     )}${h2('Repository manifests')}${p(

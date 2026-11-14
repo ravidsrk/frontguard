@@ -10,7 +10,7 @@
   <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/mcp-visual-cortex.jpg" alt="Frontguard MCP Agentic Visual Cortex Architecture" width="840"/>
 </p>
 
-Frontguard runs your visual-regression checks locally or in CI. The expensive part of that loop isn't the screenshots — it's the agent context-switch between "agent sees diff" and "agent inspects the report, DOM cluster, and suggested fix." This MCP server collapses that loop with **8 tools** across **Local Report Mode** (zero Cloud API key required) and **Cloud API Mode**: the agent calls `list_regressions`, inspects spatial diff clusters and DOM nodes with `inspect_diff_cluster_dom`, retrieves patches via `get_suggested_fix`, validates candidate CSS via `verify_css_patch`, and records explicit approval metadata. Local screenshot baselines are updated through the CLI review workflow.
+Frontguard runs your visual-regression checks locally or in CI. The expensive part of that loop isn't the screenshots — it's the agent context-switch between "agent sees diff" and "agent inspects the report, DOM cluster, and suggested fix." This MCP server collapses that loop with **six read tools** across **Local Report Mode** (zero Cloud API key required) and **Cloud API Mode**: the agent calls `list_regressions`, inspects spatial diff clusters and their recorded selectors with `inspect_diff_cluster_dom`, retrieves stored patches via `get_suggested_fix`, and statically checks candidate CSS via `verify_css_patch`. Two write tools that record approval metadata are registered only with `FRONTGUARD_MCP_WRITES=1`. Local screenshot baselines are updated through the CLI review workflow.
 
 Published to the [MCP Registry (`io.github.ravidsrk/frontguard`)](https://registry.modelcontextprotocol.io/?q=io.github.ravidsrk%2Ffrontguard) via `server.json`, negotiating both `2025-11-25` and `2026-07-28` MCP protocol versions.
 
@@ -28,7 +28,7 @@ The server speaks JSON-RPC over **stdio** — your MCP client (the editor) launc
 
 ### Local Report Mode (Zero Cloud API Key Required)
 
-When `FRONTGUARD_LOCAL_REPORT` is set (or when `./frontguard-report/report.json` exists in the working directory and no `FRONTGUARD_API_URL` is configured), `@frontguard/mcp` reads your local CLI report without needing an API server or key. It cannot promote local baselines. Generate the file first from your project directory:
+When `FRONTGUARD_LOCAL_REPORT` is set (or when `./frontguard-report/report.json` exists in the working directory and `FRONTGUARD_API_KEY` is not set), `@frontguard/mcp` reads your local CLI report without needing an API server or key. It cannot promote local baselines. Generate the file first from your project directory:
 
 ```bash
 mkdir -p frontguard-report
@@ -111,24 +111,26 @@ Add an entry to `~/.claude/mcp.json` (or your project-scoped `.mcp.json`):
 }
 ```
 
-## Tools (8 Tools)
+## Tools
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ravidsrk/frontguard/main/apps/web/public/images/docs/closed-loop-ai-fix-sandbox.jpg" alt="Closed-Loop AI CSS Fix and Sandbox Verification Engine" width="840"/>
 </p>
 
+Six read tools are always registered. `promote_baseline` and `accept_baseline` exist only when the server starts with `FRONTGUARD_MCP_WRITES=1`.
+
 | Tool | Input | Returns |
 |------|-------|---------|
-| `list_regressions` | `pr_id` (PR number or run ID from `recent_runs`), optional `repo` | regressions on the PR or local report with stable `diffId`s and cluster counts |
-| `inspect_diff_cluster_dom` | `diff_id` from `list_regressions`, optional `cluster_id` | connected-component diff bounding boxes, Chroma/CW-SSIM scores, `targetSelector`, and intersecting DOM nodes |
-| `get_suggested_fix` | `diff_id` from `list_regressions` | AI-generated patch (`fixType`, `patch`, `confidence`, `explanation`) |
-| `verify_css_patch` | `diff_id`, `css_patch`, `target_selector` | validates candidate CSS syntax, safety, and target selector presence against the captured DOM snapshot |
-| `promote_baseline` | `run_id`, `confirm_reviewed: true`, optional `routes` | records reviewed run approval in Cloud API mode; refuses local-report mode and does not promote cloud PNGs |
+| `list_regressions` | `pr_id` (PR number, run ID from `recent_runs`, or `"latest"` for the newest run, which in local-report mode is the report's run), optional `repo`, `limit` (default 25, max 200), `cursor` | regression rows, worst first, with stable `diffId`s and a `clusterCount` each; run fields (`runId`, `reportUrl`, PR, repo, commit) once at the top level |
+| `inspect_diff_cluster_dom` | `diff_id` from `list_regressions`, optional `cluster_id` | connected-component diff bounding boxes with recorded `targetSelector`s, plus the diff's classification, explanation, and suggested fix |
+| `get_suggested_fix` | `diff_id` from `list_regressions` | AI-generated patch (`fixType`, `patch`, `confidence`, `explanation`), or `fix: null` with a reason; fixes exist only when the run had an `ai` provider and `generateFixes: true` |
+| `verify_css_patch` | `diff_id`, `css_patch`, `target_selector` | a static check of CSS syntax, a deny list, and whether `target_selector` matches a selector recorded for the diff. It renders nothing: `staticCheck` is `pass` or `fail`, `rendered` is always `false`, and `nextStep` says what to do next |
+| `promote_baseline` | `run_id`, `confirm_reviewed: true`, optional `routes` | records whole-run approval in Cloud API mode through the same endpoint as `accept_baseline`, and promotes no screenshots (`approvalRecorded: true`, `screenshotsPromoted: false`). `routes` must include every changed route; refuses local-report mode |
 | `accept_baseline` | `run_id`, `confirm_all_regressions_reviewed: true` | records approval metadata for the **entire run** in the JSON report or Cloud API; screenshot promotion is not implemented |
 | `recent_runs` | optional `repo`, `branch`, `limit` | newest-first run summary list from the Cloud API or local report |
-| `list_horizontal_overflow` | optional `run_id` | visible unclipped boxes past the right edge, plus `scrollWidth` and `innerWidth`. It does not change the pixel result |
+| `list_horizontal_overflow` | optional `run_id`, `flaggedOnly` (default true), `limit` (default 25, max 200), `cursor` | visible unclipped boxes past the right edge, largest `overflowPx` first, plus `scrollWidth` and `innerWidth`. It does not change the pixel result |
 
-Every tool returns JSON in the MCP `text` content channel; agents parse it directly.
+Every tool returns `structuredContent` and the same object as compact JSON in the MCP `text` content channel; agents parse either directly. The two list tools return at most `limit` rows with `total`, `count`, and `nextCursor`; pass `nextCursor` back as `cursor` until it is `null`. Cloud API errors name the method and path, add a hint for the status code, and keep at most 300 characters of the response body.
 
 Tool `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `openWorldHint`) are untrusted hints and do not enforce anything. An untrusted server can lie. When writes are enabled, `promote_baseline` and `accept_baseline` also set `_meta["anthropic/requiresUserInteraction"]` so Claude Code prompts a person; that flag is a hint too. The control is [#287](https://github.com/ravidsrk/frontguard/issues/287).
 
@@ -148,10 +150,11 @@ Cloud `approveRun` records approval metadata. It is not a production path. Do no
 
 ## Example agent prompts
 
-- _"What regressed in my latest local run (or on PR 42 in acme/shop)?"_ → calls `list_regressions({ pr_id: 'run_local' })` or `list_regressions({ pr_id: 42, repo: 'acme/shop' })`.
-- _"Inspect the DOM around the first diff cluster and show the suggested fix."_ → calls `inspect_diff_cluster_dom({ diff_id })` and `get_suggested_fix({ diff_id })`.
-- _"Verify this candidate CSS patch against the diff cluster."_ → calls `verify_css_patch({ diff_id, css_patch, target_selector })`.
-- _"Record approval for the reviewed cloud run."_ → calls `promote_baseline({ run_id, confirm_reviewed: true })` or `accept_baseline({ run_id, confirm_all_regressions_reviewed: true })`. These record approval metadata only; local report approval does not replace PNG baselines. A human uses the CLI `frontguard update-baselines` workflow for local baseline writes.
+- _"What regressed in my latest local run?"_ → calls `list_regressions` with `{"pr_id": "latest"}`.
+- _"What regressed on PR 42 in acme/shop?"_ → calls `list_regressions` with `{"pr_id": 42, "repo": "acme/shop"}`.
+- _"Inspect the DOM around the first diff cluster and show the suggested fix."_ → calls `inspect_diff_cluster_dom` with `{"diff_id": "run_local:/pricing:1440:chromium"}`, then `get_suggested_fix` with the same `diff_id`.
+- _"Check this candidate CSS patch against the diff cluster."_ → calls `verify_css_patch` with `{"diff_id": "run_local:/pricing:1440:chromium", "target_selector": ".pricing-card", "css_patch": ".pricing-card { min-width: 0; }"}`. A static `pass` is not a visual fix; re-run `frontguard run` to confirm the pixels.
+- _"Record approval for the reviewed cloud run."_ → an agent should not do this. With writes enabled, `promote_baseline` and `accept_baseline` record approval metadata only, and local report approval does not replace PNG baselines. A human uses the CLI `frontguard update-baselines` workflow for local baseline writes.
 
 ## Modes: Local Report Mode vs Cloud API Mode
 
@@ -206,7 +209,7 @@ EOF
 cd /tmp/mcp-test && cat init.jsonl | node /path/to/frontguard/packages/mcp/dist/index.js
 ```
 
-Stdout should contain JSON-RPC `result` frames (the five read-only tools; `promote_baseline` and `accept_baseline` only when `FRONTGUARD_MCP_WRITES=1`). Stderr
+Stdout should contain JSON-RPC `result` frames (the six read tools; `promote_baseline` and `accept_baseline` only when `FRONTGUARD_MCP_WRITES=1`). Stderr
 should show `frontguard-mcp v… starting on stdio`. Published `npx -y
 @frontguard/mcp@0.2.0` is the known before-state (empty stdout); verify against
 your local `dist/index.js` build instead.

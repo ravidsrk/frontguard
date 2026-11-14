@@ -188,16 +188,16 @@ visual:
 
 ## MCP server
 
-`@frontguard/mcp` exposes 8 tools to in-IDE agents (Claude Code, Cursor, Cline, Copilot) across local report mode (`FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json` or automatic fallback when `./frontguard-report/report.json` is present) and a verified Cloud API deployment (`FRONTGUARD_API_URL` + `FRONTGUARD_API_KEY`). There is no live default hosted endpoint, and `accept_baseline` currently records cloud approval without promoting screenshots:
+`@frontguard/mcp` exposes six read tools to in-IDE agents (Claude Code, Cursor, Cline, Copilot) across local report mode (`FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json` or automatic fallback when `./frontguard-report/report.json` is present and `FRONTGUARD_API_KEY` is unset) and a verified Cloud API deployment (`FRONTGUARD_API_URL` + `FRONTGUARD_API_KEY`). Two write tools are registered only with `FRONTGUARD_MCP_WRITES=1`, and agents should not call them. There is no live default hosted endpoint, and neither write tool promotes screenshots:
 
-- `list_regressions(pr_id, repo?)`
-- `inspect_diff_cluster_dom(diff_id, cluster_id?)`
-- `get_suggested_fix(diff_id)`
-- `verify_css_patch(diff_id, css_patch, target_selector?)`
-- `list_horizontal_overflow(run_id?)` — visible unclipped boxes past the right edge; this does not change the pixel result
-- `promote_baseline(diff_id, confirm_reviewed: true)` — promotes a verified local screenshot into the local baseline store
-- `accept_baseline(run_id, confirm_all_regressions_reviewed: true)` — run-scoped cloud approval metadata, not per-diff
+- `list_regressions(pr_id, repo?, limit?, cursor?)` — `pr_id` is a PR number, a run id, or `"latest"` (the newest run; in local report mode, the report's run). Rows come worst first, 25 per page by default (max 200), each with a `diffId` and `clusterCount`; pass `nextCursor` back as `cursor`
+- `inspect_diff_cluster_dom(diff_id, cluster_id?)` — cluster bounding boxes with recorded target selectors, classification, explanation, and suggested fix
+- `get_suggested_fix(diff_id)` — the stored AI patch; fixes exist only when the run had an `ai` provider and `generateFixes: true`
+- `verify_css_patch(diff_id, target_selector, css_patch)` — a static check of syntax, a deny list, and the recorded target selector; it renders nothing, so re-run `frontguard run` to confirm the pixels
+- `list_horizontal_overflow(run_id?, flaggedOnly?, limit?, cursor?)` — visible unclipped boxes past the right edge, flagged rows only by default; this does not change the pixel result
 - `recent_runs(repo?, branch?, limit?)`
+- `promote_baseline(run_id, routes?, confirm_reviewed: true)` — write tool: records whole-run cloud approval through the same endpoint as `accept_baseline` and promotes no screenshots; refused in local report mode
+- `accept_baseline(run_id, confirm_all_regressions_reviewed: true)` — write tool: run-scoped cloud approval metadata, not per-diff
 
 ```bash
 FRONTGUARD_LOCAL_REPORT=./frontguard-report/report.json npx -y @frontguard/mcp
@@ -237,7 +237,7 @@ Yes. `frontguard init` detects `.storybook/main.ts` and scaffolds a Storybook-aw
 
 ### Is there an MCP server?
 
-`@frontguard/mcp` exposes 8 tools (`list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `list_horizontal_overflow`, `promote_baseline`, `accept_baseline`, `recent_runs`) and supports local report mode via `FRONTGUARD_LOCAL_REPORT`. Horizontal overflow does not change the pixel result.
+`@frontguard/mcp` exposes six read tools (`list_regressions`, `inspect_diff_cluster_dom`, `get_suggested_fix`, `verify_css_patch`, `list_horizontal_overflow`, `recent_runs`) and supports local report mode via `FRONTGUARD_LOCAL_REPORT`. `promote_baseline` and `accept_baseline` are registered only with `FRONTGUARD_MCP_WRITES=1`. Horizontal overflow does not change the pixel result.
 
 ### Data retention?
 
