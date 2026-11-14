@@ -102,11 +102,13 @@ export interface CloudListRunsResponse {
 // Client
 // ---------------------------------------------------------------------------
 
+export type CloudClientMode = 'local-report' | 'cloud-api';
+
 export interface CloudClientOptions {
   /** Override the global `fetch` (used by tests). */
   fetch?: typeof fetch;
   /** Execution mode of this client instance. */
-  mode?: 'local-report' | 'cloud-api';
+  mode?: CloudClientMode;
 }
 
 /** Cloud error bodies are cut to this many characters before they reach the agent (#379). */
@@ -136,8 +138,20 @@ export function summarizeErrorBody(body: string, limit: number = ERROR_BODY_LIMI
   return text.length > limit ? `${text.slice(0, limit - 1).trimEnd()}…` : text;
 }
 
-/** What an agent (or its user) should check for a given cloud-api status. */
-export function cloudApiErrorHint(status: number): string | null {
+/**
+ * What an agent (or its user) should check for a given status. A local
+ * report has no API key or URL, so only its 404 gets a hint, and that hint
+ * points at the report instead of FRONTGUARD_API_URL.
+ */
+export function cloudApiErrorHint(
+  status: number,
+  mode: CloudClientMode = 'cloud-api',
+): string | null {
+  if (mode === 'local-report') {
+    return status === 404
+      ? 'Check the run id. A local report holds one run; list_regressions with pr_id "latest" returns its diffIds.'
+      : null;
+  }
   if (status === 401 || status === 403) return 'Check FRONTGUARD_API_KEY.';
   if (status === 404) return 'Check the run id and FRONTGUARD_API_URL.';
   if (status === 429 || status >= 500) {
@@ -158,9 +172,13 @@ export class CloudApiError extends Error {
     public method: string,
     public path: string,
     public body: string,
+    /** Which client failed: the cloud-api or the local report adapter. */
+    public mode: CloudClientMode = 'cloud-api',
   ) {
     const summary = summarizeErrorBody(body);
-    super(`Frontguard cloud-api ${method} ${path} failed: ${status} ${summary}`);
+    super(
+      `Frontguard ${mode === 'local-report' ? 'local report' : 'cloud-api'} ${method} ${path} failed: ${status} ${summary}`,
+    );
     this.name = 'CloudApiError';
     this.summary = summary;
   }
@@ -168,7 +186,7 @@ export class CloudApiError extends Error {
 
 export class CloudClient {
   private readonly fetchImpl: typeof fetch;
-  public readonly mode: 'local-report' | 'cloud-api';
+  public readonly mode: CloudClientMode;
 
   constructor(
     private readonly auth: FrontguardAuth,
@@ -219,13 +237,13 @@ export class CloudClient {
     });
     const text = await res.text();
     if (!res.ok) {
-      throw new CloudApiError(res.status, method, path, text || res.statusText);
+      throw new CloudApiError(res.status, method, path, text || res.statusText, this.mode);
     }
     if (!text) return undefined as T;
     try {
       return JSON.parse(text) as T;
     } catch {
-      throw new CloudApiError(res.status, method, path, `non-JSON body: ${text}`);
+      throw new CloudApiError(res.status, method, path, `non-JSON body: ${text}`, this.mode);
     }
   }
 }
@@ -399,6 +417,13 @@ function readHorizontalOverflow(raw: unknown): CloudHorizontalOverflow[] | undef
 /** Creates a {@link CloudClient}-compatible adapter backed by a local CLI report file. */
 export function createLocalReportClient(reportPath: string): CloudClient {
   let approvedInMemory = false;
+  const runNotFound = (requestedId: string, runId: string): Response =>
+    new Response(
+      JSON.stringify({
+        error: `Run ${requestedId} is not in the local report. The report's run id is ${runId}.`,
+      }),
+      { status: 404 },
+    );
 
   const localFetch: typeof fetch = async (input, init) => {
     const url = new URL(typeof input === 'string' ? input : input.toString());
@@ -416,13 +441,13 @@ export function createLocalReportClient(reportPath: string): CloudClient {
       if (requestedId === run.id || requestedId === 'run_local' || requestedId === 'local') {
         return new Response(JSON.stringify(run), { status: 200 });
       }
-      return new Response(JSON.stringify({ error: 'Run not found' }), { status: 404 });
+      return runNotFound(requestedId, run.id);
     }
     const approveMatch = url.pathname.match(/^\/v1\/baselines\/([^/]+)\/approve$/);
     if (method === 'POST' && approveMatch) {
       const requestedId = decodeURIComponent(approveMatch[1]);
       if (requestedId !== run.id && requestedId !== 'run_local' && requestedId !== 'local') {
-        return new Response(JSON.stringify({ error: 'Run not found' }), { status: 404 });
+        return runNotFound(requestedId, run.id);
       }
       approvedInMemory = true;
       try {

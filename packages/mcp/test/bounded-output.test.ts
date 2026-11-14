@@ -162,6 +162,25 @@ describe('paged list tools against a 600-row local report (#379)', () => {
     }
   });
 
+  it('gives a local-report 404 a local hint instead of pointing at FRONTGUARD_API_URL', async () => {
+    const { client, close } = await connect();
+    try {
+      const res = (await client.callTool({
+        name: 'inspect_diff_cluster_dom',
+        arguments: { diff_id: 'run_other:/pricing:1440' },
+      })) as CallToolResult;
+      expect(res.isError).toBe(true);
+      const text = textOf(res);
+      expect(text).toMatch(/^Frontguard local report error: GET \/v1\/runs\/run_other returned 404\./);
+      expect(text).toContain('list_regressions with pr_id "latest"');
+      expect(text).toContain("The report's run id is run_local.");
+      expect(text).not.toContain('FRONTGUARD_API_URL');
+      expect(text).not.toContain('cloud-api');
+    } finally {
+      await close();
+    }
+  });
+
   it('rejects a limit above 200', async () => {
     const { client, close } = await connect();
     try {

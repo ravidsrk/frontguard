@@ -387,9 +387,10 @@ function toolError(err: unknown): CallToolResult {
  */
 function cloudApiErrorText(err: CloudApiError): string {
   const path = err.path.length > 120 ? `${err.path.slice(0, 119)}…` : err.path;
-  const hint = cloudApiErrorHint(err.status);
+  const hint = cloudApiErrorHint(err.status, err.mode);
+  const source = err.mode === 'local-report' ? 'local report' : 'cloud-api';
   return [
-    `Frontguard cloud-api error: ${err.method} ${path} returned ${err.status}.`,
+    `Frontguard ${source} error: ${err.method} ${path} returned ${err.status}.`,
     ...(hint ? [hint] : []),
     ...(err.summary ? [`Body: ${err.summary}`] : []),
   ].join(' ');
