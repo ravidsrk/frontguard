@@ -10,7 +10,7 @@
  *   4. No forbidden doc patterns (fake CLI flags, invented commands, stale paths).
  *
  * Scans: apps/web/src/lib/docs-content.ts, apps/web/public/llms*.txt,
- * integration READMEs (github/netlify/vercel), and design-extract doc snapshots.
+ * integration READMEs (github/netlify/vercel), and the design-extract Docs page source.
  *
  * Exits 1 with a report on violation; exits 0 when clean.
  */
@@ -71,7 +71,6 @@ const SCAN_TARGETS = [
   { path: join(REPO_ROOT, 'integrations/netlify/README.md'), label: 'integrations/netlify/README.md', lines: true },
   { path: join(REPO_ROOT, 'integrations/vercel/README.md'), label: 'integrations/vercel/README.md', lines: true },
   { path: join(REPO_ROOT, 'docs/design-extract/source/Docs.dc.html'), label: 'docs/design-extract/source/Docs.dc.html', lines: true },
-  { path: join(REPO_ROOT, 'docs/design-extract/tanstack/src/lib/docs-content.ts'), label: 'docs/design-extract/tanstack/src/lib/docs-content.ts', lines: true },
 ];
 
 const violations = [];

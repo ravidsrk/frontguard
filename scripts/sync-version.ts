@@ -165,17 +165,6 @@ const FILE_EDITS: Array<{ file: string; edits: RequiredEdit[] }> = [
     ],
   },
   {
-    file: "docs/design-extract/tanstack/src/lib/docs-content.ts",
-    edits: [
-      {
-        find: /frontguard\/render:\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/g,
-        replace: `frontguard/render:${version}`,
-        label: "TanStack mirror renderer tag",
-        expected: 2,
-      },
-    ],
-  },
-  {
     file: "packages/cli/docker/docker-compose.yml",
     edits: [
       {
