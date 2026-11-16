@@ -36,7 +36,7 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@daytona/sdk": "^0.231.0",
+    "@daytona/sdk": "^0.231.1",
     "hono": "^4.13.17",
     "zod": "^4.6.7"
   },
