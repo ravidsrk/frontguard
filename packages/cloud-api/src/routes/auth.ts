@@ -25,14 +25,35 @@ import {
 import { generateApiKey, hashKey } from '../auth/keys.js';
 import {
   createSessionCookie,
+  CSRF_FIELD,
+  CSRF_HEADER,
   SESSION_COOKIE,
   SESSION_MAX_AGE,
   sessionSecret,
+  verifyCsrfToken,
+  verifySessionCookie,
 } from '../auth/session.js';
+import { clientIpFromHeaders, enforceRateLimit } from '../rate-limit.js';
 
 type Variables = { store: Store };
 
 export const authRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+
+// Rate limit auth endpoints per client IP to throttle OAuth / logout abuse.
+authRoutes.use('*', async (c, next) => {
+  const ip = clientIpFromHeaders((name) => c.req.header(name));
+  const blocked = enforceRateLimit(c, `auth:${ip}`);
+  if (blocked) return blocked;
+  await next();
+});
+
+/** Validates that a post-login redirect target stays strictly under `/dashboard`. */
+function isSafeDashboardRedirect(value: string | undefined): value is string {
+  if (!value) return false;
+  if (value !== '/dashboard' && !value.startsWith('/dashboard/')) return false;
+  if (value.startsWith('//') || value.includes('\\') || /[\r\n\x00-\x1f]/.test(value)) return false;
+  return true;
+}
 
 /** Resolves OAuth config from env, or null if not configured. */
 function oauthConfig(env: Bindings | undefined): GitHubOAuthConfig | null {
@@ -63,9 +84,9 @@ authRoutes.get('/github', (c) => {
     maxAge: 600,
     secure: isProduction(c.env),
   });
-  // Remember a post-login redirect (e.g. the dashboard) across the round-trip.
+  // Remember a validated post-login redirect (e.g. the dashboard) across the round-trip.
   const redirect = c.req.query('redirect');
-  if (redirect) {
+  if (isSafeDashboardRedirect(redirect)) {
     setCookie(c, REDIRECT_COOKIE, redirect, {
       httpOnly: true,
       sameSite: 'Lax',
@@ -131,8 +152,8 @@ authRoutes.get('/github/callback', async (c) => {
   // and redirect there instead of returning JSON. The redirect target is read
   // from the query param or the short-lived cookie set in GET /auth/github.
   const redirect = c.req.query('redirect') ?? getCookie(c, REDIRECT_COOKIE);
-  if (redirect && redirect.startsWith('/dashboard')) {
-    deleteCookie(c, REDIRECT_COOKIE, { path: '/' });
+  deleteCookie(c, REDIRECT_COOKIE, { path: '/' });
+  if (isSafeDashboardRedirect(redirect)) {
     const value = await createSessionCookie(user.id, sessionSecret(c.env));
     setCookie(c, SESSION_COOKIE, value, {
       httpOnly: true,
@@ -170,4 +191,63 @@ authRoutes.get('/github/callback', async (c) => {
         }),
     mode: isProduction(c.env) ? 'production' : 'dev',
   });
+});
+
+// POST /auth/logout — clear the browser session cookie (CSRF-protected).
+authRoutes.post('/logout', async (c) => {
+  const secFetchSite = c.req.header('sec-fetch-site');
+  if (secFetchSite && secFetchSite !== 'same-origin' && secFetchSite !== 'none') {
+    return c.json({ error: 'Cross-site logout request rejected' }, 403);
+  }
+  const origin = c.req.header('origin');
+  if (origin) {
+    const reqOrigin = new URL(c.req.url).origin;
+    let apiOrigin: string | null = null;
+    if (c.env?.API_BASE_URL) {
+      try {
+        apiOrigin = new URL(c.env.API_BASE_URL).origin;
+      } catch {
+        apiOrigin = null;
+      }
+    }
+    if (origin !== reqOrigin && origin !== apiOrigin) {
+      return c.json({ error: 'Cross-origin logout request rejected' }, 403);
+    }
+  }
+
+  const sessionCookie = getCookie(c, SESSION_COOKIE);
+  if (sessionCookie) {
+    const secret = sessionSecret(c.env);
+    const uid = await verifySessionCookie(sessionCookie, secret);
+    if (uid) {
+      let csrfToken = c.req.header(CSRF_HEADER);
+      if (!csrfToken) {
+        const ct = c.req.header('content-type') ?? '';
+        if (ct.includes('application/x-www-form-urlencoded') || ct.includes('multipart/form-data')) {
+          const body = await c.req.parseBody().catch(() => ({}));
+          const raw = (body as Record<string, unknown>)[CSRF_FIELD];
+          if (typeof raw === 'string') csrfToken = raw;
+        } else if (ct.includes('application/json')) {
+          const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+          if (typeof body[CSRF_FIELD] === 'string') csrfToken = body[CSRF_FIELD];
+        }
+      }
+      if (!csrfToken || !(await verifyCsrfToken(sessionCookie, csrfToken, secret))) {
+        return c.json({ error: 'Invalid or missing CSRF token' }, 403);
+      }
+    }
+  }
+
+  deleteCookie(c, SESSION_COOKIE, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'Lax',
+    secure: isProduction(c.env),
+  });
+
+  const accept = c.req.header('accept') ?? '';
+  if (accept.includes('application/json')) {
+    return c.json({ loggedOut: true });
+  }
+  return c.redirect('/dashboard', 302);
 });

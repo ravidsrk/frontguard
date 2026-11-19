@@ -69,6 +69,7 @@ export async function sendInviteEmail(
         subject: `You've been invited to ${teamName} on Frontguard`,
         html: buildInviteHtml(acceptUrl, teamName, invitation.role),
       }),
+      signal: AbortSignal.timeout(10_000),
     });
     return { ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}` };
   } catch (err) {

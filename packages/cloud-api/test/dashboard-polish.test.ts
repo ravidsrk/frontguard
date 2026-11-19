@@ -18,6 +18,8 @@ import {
   getMemoryScreenshotStore,
 } from '../src/storage/screenshots.js';
 import {
+  CSRF_HEADER,
+  createCsrfToken,
   createSessionCookie,
   INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD,
 } from '../src/auth/session.js';
@@ -27,9 +29,17 @@ import type { ScreenshotRecord } from '../src/db/store.js';
 import type { IgnoreMask } from '../src/db/masks.js';
 import type { RunAttachment } from '../src/db/attachments.js';
 
-async function sessionHeader(userId: string): Promise<{ Cookie: string }> {
+async function sessionHeader(
+  userId: string,
+  plan = 'business',
+): Promise<{ Cookie: string; [CSRF_HEADER]: string }> {
+  const store = getMemoryStore();
+  if (!(await store.getUser(userId))) {
+    await store.createUser({ id: userId, plan, createdAt: '2026-01-01T00:00:00Z' });
+  }
   const value = await createSessionCookie(userId, INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD);
-  return { Cookie: `fg_session=${value}` };
+  const csrf = await createCsrfToken(value, INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD);
+  return { Cookie: `fg_session=${value}`, [CSRF_HEADER]: csrf };
 }
 
 function makeMonitor(over: Partial<Monitor> = {}): Monitor {

@@ -230,16 +230,24 @@ describe('/v1/monitors routes (dev mode)', () => {
   });
 
   it('sends a test alert to configured channels', async () => {
-    const id = await createMonitor(auth(), { alerts: { slack: 'https://hooks.example.com/x' } });
+    const slackUrl = 'https://hooks.slack.com/services/T00/B00/XXX';
+    const realFetch = globalThis.fetch;
     let calls = 0;
     let payload = '';
-    const realFetch = globalThis.fetch;
-    globalThis.fetch = (async (_input, init) => {
+    globalThis.fetch = (async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
+        return new Response(
+          JSON.stringify({ Status: 0, Answer: [{ type: 1, data: '54.230.1.1' }] }),
+          { status: 200, headers: { 'Content-Type': 'application/dns-json' } },
+        );
+      }
       calls++;
       payload = String(init?.body);
       return new Response('{}', { status: 200 });
     }) as unknown as typeof fetch;
     try {
+      const id = await createMonitor(auth(), { alerts: { slack: slackUrl } });
       const res = await app.request(`/v1/monitors/${id}/test-alert`, { method: 'POST', headers: auth() });
       expect(res.status).toBe(200);
       const body = await res.json();

@@ -13,8 +13,17 @@ import type { ScreenshotRecord, ScreenshotDecision } from '../db/store.js';
 import type { IgnoreMask } from '../db/masks.js';
 import type { RunAttachment } from '../db/attachments.js';
 import { attachmentLabel } from '../db/attachments.js';
+import { CSRF_FIELD, CSRF_HEADER } from '../auth/session.js';
 import type { Run } from '../types.js';
 import { flakeScore, renderFlakeBadge } from './flake.js';
+
+/** Optional per-request security context for rendered dashboard HTML pages. */
+export interface RenderSecurityOptions {
+  /** Session-bound CSRF token embedded in POST forms and fetch calls. */
+  csrfToken?: string;
+  /** Per-response CSP nonce applied to inline `<script>` elements. */
+  cspNonce?: string;
+}
 
 /** Slugifies a route path the same way screenshotKey() does. */
 function routeSlug(route: string): string {
@@ -40,7 +49,38 @@ export interface SpendCap {
 }
 
 export function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Serialises a JS value safely for embedding inside an inline `<script>` tag.
+ * Escapes `<`, `>`, `&`, and Unicode line/paragraph separators so attacker-
+ * controlled strings can never break out via `</script>`, `<!--`, or line breaks.
+ */
+export function safeJsonForScript(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+function csrfInput(csrfToken?: string): string {
+  return csrfToken ? `<input type="hidden" name="${CSRF_FIELD}" value="${escapeHtml(csrfToken)}"/>` : '';
+}
+
+function scriptOpen(cspNonce?: string): string {
+  return cspNonce ? `<script nonce="${escapeHtml(cspNonce)}">` : '<script>';
+}
+
+function encodePathSegment(segment: string): string {
+  return escapeHtml(encodeURIComponent(segment));
 }
 
 /** Shared warm industrial dark-theme stylesheet used across all dashboard pages. */
@@ -280,6 +320,7 @@ export function renderDashboard(
   sessioned = false,
   flakeByMonitor: Record<string, number> = {},
   spend?: SpendCap,
+  security?: RenderSecurityOptions,
 ): string {
   const passing = monitors.filter((m) => m.lastStatus === 'passed').length;
   const failing = monitors.filter((m) => m.lastStatus === 'regression').length;
@@ -287,17 +328,19 @@ export function renderDashboard(
 
   const actionsCol = sessioned ? '<th>Actions</th>' : '';
   const colspan = sessioned ? 8 : 7;
+  const hiddenCsrf = csrfInput(security?.csrfToken);
 
   const monitorRows = monitors.length
     ? monitors
         .map((m) => {
+          const mid = encodePathSegment(m.id);
           const nameCell = sessioned
-            ? `<a href="/dashboard/monitors/${escapeHtml(m.id)}" class="mname">${escapeHtml(m.name)}</a>`
+            ? `<a href="/dashboard/monitors/${mid}" class="mname">${escapeHtml(m.name)}</a>`
             : `<div class="mname">${escapeHtml(m.name)}</div>`;
           const actions = sessioned
             ? `<td><div class="actions">
-          <form class="inline" method="post" action="/dashboard/monitors/${escapeHtml(m.id)}/toggle"><button type="submit">${m.enabled ? 'Disable' : 'Enable'}</button></form>
-          <form class="inline" method="post" action="/dashboard/monitors/${escapeHtml(m.id)}/delete"><button type="submit" class="danger">Delete</button></form>
+          <form class="inline" method="post" action="/dashboard/monitors/${mid}/toggle">${hiddenCsrf}<button type="submit">${m.enabled ? 'Disable' : 'Enable'}</button></form>
+          <form class="inline" method="post" action="/dashboard/monitors/${mid}/delete">${hiddenCsrf}<button type="submit" class="danger">Delete</button></form>
         </div></td>`
             : '';
           const flake = renderFlakeBadge(flakeByMonitor[m.id] ?? 100);
@@ -325,7 +368,7 @@ export function renderDashboard(
           const regr = r.results?.filter((x) => x.classification === 'regression').length ?? 0;
           const urlEl =
             sessioned && r.id
-              ? `<a href="/dashboard/runs/${escapeHtml(r.id)}" class="aurl">${escapeHtml(r.url)}</a>`
+              ? `<a href="/dashboard/runs/${encodePathSegment(r.id)}" class="aurl">${escapeHtml(r.url)}</a>`
               : `<span class="aurl">${escapeHtml(r.url)}</span>`;
           return `<li>
           <span class="atime">${relativeTime(r.completedAt ?? r.createdAt, now)}</span>
@@ -336,11 +379,14 @@ export function renderDashboard(
         .join('\n')
     : '<li class="empty">No recent runs.</li>';
 
-  const createForm = sessioned ? renderCreateForm() : '';
+  const createForm = sessioned ? renderCreateForm(security?.csrfToken) : '';
   const spendChip = sessioned ? renderSpendChip(spend) : '';
   const settingsLink = sessioned ? '<a href="/dashboard/settings/masks">Masks</a>' : '';
+  const logoutForm = sessioned
+    ? `<form class="inline" method="post" action="/auth/logout">${hiddenCsrf}<button type="submit">Sign out</button></form>`
+    : '';
   const headerExtra = sessioned
-    ? `${spendChip}${settingsLink}<a href="/auth/github?redirect=/dashboard">Account</a>`
+    ? `${spendChip}${settingsLink}<a href="/auth/github?redirect=/dashboard">Account</a>${logoutForm}`
     : '';
 
   const inner = `<header><h1>🛡 Frontguard Monitoring</h1>${headerExtra}</header>
@@ -365,11 +411,12 @@ ${createForm}
 }
 
 /** Renders the "create monitor" form (incl. alert channel fields). */
-function renderCreateForm(): string {
+function renderCreateForm(csrfToken?: string): string {
   return `
   <h2>Create monitor</h2>
   <div class="card">
     <form method="post" action="/dashboard/monitors">
+      ${csrfInput(csrfToken)}
       <div class="grid2">
         <div><label for="create-name">Name</label><input id="create-name" name="name" required placeholder="Marketing site"/></div>
         <div><label for="create-url">URL</label><input id="create-url" name="url" required type="url" placeholder="https://example.com"/></div>
@@ -435,13 +482,15 @@ export function renderMonitorDetail(
   runs: MonitorRun[],
   now: Date | number = new Date(),
   alertState?: MonitorAlertState | null,
+  security?: RenderSecurityOptions,
 ): string {
   const nowDate = typeof now === 'number' ? new Date(now) : now;
-  const id = escapeHtml(monitor.id);
+  const id = encodePathSegment(monitor.id);
   const slack = escapeHtml(monitor.alerts?.slack ?? '');
   const emails = escapeHtml((monitor.alerts?.email ?? []).join(', '));
   const score = flakeScore(runs);
   const badge = renderFlakeBadge(score);
+  const hiddenCsrf = csrfInput(security?.csrfToken);
 
   const isSnoozed =
     alertState?.snoozedUntil && new Date(alertState.snoozedUntil).getTime() > nowDate.getTime();
@@ -452,8 +501,9 @@ export function renderMonitorDetail(
   const timeline = runs.length
     ? runs
         .map((r) => {
-          const runLink = r.id
-            ? `<a href="/dashboard/runs/${escapeHtml(r.id)}">View screenshots</a>`
+          const targetRunId = r.runId ?? r.id;
+          const runLink = targetRunId
+            ? `<a href="/dashboard/runs/${encodePathSegment(targetRunId)}">View screenshots</a>`
             : '';
           return `<tr>
         <td>${relativeTime(r.createdAt, nowDate)}</td>
@@ -479,6 +529,7 @@ export function renderMonitorDetail(
   <h2>Alert configuration</h2>
   <div class="card">
     <form method="post" action="/dashboard/monitors/${id}/alerts">
+      ${hiddenCsrf}
       <div class="grid2">
         <div><label for="alert-threshold">Alert threshold (0–1)</label><input id="alert-threshold" name="alertThreshold" type="number" min="0" max="1" step="0.01" value="${monitor.alertThreshold}"/></div>
         <div><label for="alert-slack">Slack webhook URL</label><input id="alert-slack" name="slack" type="url" value="${slack}" placeholder="https://hooks.slack.com/…"/></div>
@@ -492,6 +543,7 @@ export function renderMonitorDetail(
   <h2>Snooze alerts</h2>
   <div class="card">
     <form method="post" action="/dashboard/monitors/${id}/snooze" class="actions">
+      ${hiddenCsrf}
       <input id="snooze-hours" name="hours" type="number" value="24" min="0" max="720" aria-label="Snooze hours" style="max-width:120px"/>
       <button type="submit">Snooze (hours)</button>
     </form>
@@ -529,9 +581,12 @@ export function renderScreenshotComparison(
     decisions?: ScreenshotDecision[];
     attachments?: RunAttachment[];
     run?: Run | null;
+    csrfToken?: string;
+    cspNonce?: string;
   } = {},
 ): string {
   const rid = escapeHtml(runId);
+  const ridPath = encodePathSegment(runId);
   const sessioned = !!opts.sessioned;
   const decisions = opts.decisions ?? [];
   const decisionByShot = new Map<string, ScreenshotDecision>();
@@ -568,9 +623,10 @@ export function renderScreenshotComparison(
             .map((type) => {
               const shot = shots.find((s) => s.type === type);
               if (!shot) return `<div class="shot"><div class="cap">${type}</div><div class="murl">— none —</div></div>`;
-              const img = `<img alt="${escapeHtml(type)}" src="/dashboard/screenshots/${rid}/${escapeHtml(shot.id)}/raw"/>`;
+              const sidPath = encodePathSegment(shot.id);
+              const img = `<img alt="${escapeHtml(type)}" src="/dashboard/screenshots/${ridPath}/${sidPath}/raw"/>`;
               if (type === 'diff' && sessioned) {
-                return `<div class="shot"><div class="cap">${type}</div><a href="/dashboard/runs/${rid}/diffs/${escapeHtml(shot.id)}">${img}</a></div>`;
+                return `<div class="shot"><div class="cap">${type}</div><a href="/dashboard/runs/${ridPath}/diffs/${sidPath}">${img}</a></div>`;
               }
               return `<div class="shot"><div class="cap">${type}</div>${img}</div>`;
             })
@@ -581,14 +637,14 @@ export function renderScreenshotComparison(
               ? `<input type="checkbox" class="diff-select" name="diff_ids" value="${escapeHtml(diffShot.id)}" form="bulk-approve-form" aria-label="Select for bulk approve"/>`
               : '';
           const decisionLabel = decision
-            ? `<span class="group-decision ${escapeHtml(decision.decision)}">${decision.decision}</span>`
+            ? `<span class="group-decision ${escapeHtml(decision.decision)}">${escapeHtml(decision.decision)}</span>`
             : '';
           const resultMeta = matchedResult
             ? `<span class="murl">${matchedResult.diffPercentage.toFixed(2)}%</span> <span class="badge ${(matchedResult.classification ?? matchedResult.status) === 'regression' ? 'err' : 'ok'}">${escapeHtml(matchedResult.classification ?? matchedResult.status)}</span>`
             : '';
           const viewerLink =
             sessioned && diffShot
-              ? `<a class="btn" href="/dashboard/runs/${rid}/diffs/${escapeHtml(diffShot.id)}">Open diff viewer</a>`
+              ? `<a class="btn" href="/dashboard/runs/${ridPath}/diffs/${encodePathSegment(diffShot.id)}">Open diff viewer</a>`
               : '';
 
           return `<div class="group" data-key="${escapeHtml(routeSlugged)}-${escapeHtml(viewportStr)}">
@@ -609,7 +665,8 @@ export function renderScreenshotComparison(
   const diffShots = screenshots.filter((s) => s.type === 'diff');
   const bulkBar =
     sessioned && diffShots.length
-      ? `<form id="bulk-approve-form" class="bulk-bar" method="post" action="/dashboard/runs/${rid}/approve" onsubmit="return confirmBulkApprove(event)">
+      ? `<form id="bulk-approve-form" class="bulk-bar" method="post" action="/dashboard/runs/${ridPath}/approve">
+    ${csrfInput(opts.csrfToken)}
     <span class="count" id="bulk-count">0 selected</span>
     <span class="label">Select diffs above and click Accept to promote those baselines.</span>
     <div class="actions">
@@ -621,7 +678,7 @@ export function renderScreenshotComparison(
 
   const attachmentsLink =
     sessioned && opts.attachments?.length
-      ? `<p><a class="btn" href="/dashboard/runs/${rid}/attachments">View ${opts.attachments.length} attachment${opts.attachments.length === 1 ? '' : 's'} →</a></p>`
+      ? `<p><a class="btn" href="/dashboard/runs/${ridPath}/attachments">View ${opts.attachments.length} attachment${opts.attachments.length === 1 ? '' : 's'} →</a></p>`
       : '';
 
   const runSummary = opts.run
@@ -633,7 +690,7 @@ export function renderScreenshotComparison(
     : '';
 
   const bulkScript = sessioned
-    ? `<script>
+    ? `${scriptOpen(opts.cspNonce)}
 (function(){
   function updateCount(){
     var n = document.querySelectorAll('.diff-select:checked').length;
@@ -650,11 +707,12 @@ export function renderScreenshotComparison(
     boxes.forEach(function(b){ b.checked = !allOn; });
     updateCount();
   });
-  window.confirmBulkApprove = function(e){
+  var bulkForm = document.getElementById('bulk-approve-form');
+  if (bulkForm) bulkForm.addEventListener('submit', function(e){
     var n = document.querySelectorAll('.diff-select:checked').length;
-    if (n === 0) { e.preventDefault(); alert('Select at least one diff to accept.'); return false; }
-    return confirm('Accept ' + n + ' baseline' + (n === 1 ? '' : 's') + '?');
-  };
+    if (n === 0) { e.preventDefault(); alert('Select at least one diff to accept.'); return; }
+    if (!confirm('Accept ' + n + ' baseline' + (n === 1 ? '' : 's') + '?')) { e.preventDefault(); }
+  });
 })();
 </script>`
     : '';
@@ -699,7 +757,7 @@ export function renderMonitorHistory(
   const status = filters.status ?? 'all';
   const attempts = filters.attempts ?? 'all';
   const sort = filters.sort ?? 'newest';
-  const id = escapeHtml(monitor.id);
+  const id = encodePathSegment(monitor.id);
 
   let filtered = runs.slice();
   if (status !== 'all') filtered = filtered.filter((r) => r.status === status);
@@ -734,7 +792,8 @@ export function renderMonitorHistory(
   const rowsHtml = filtered.length
     ? filtered
         .map((r) => {
-          const link = `<a href="/dashboard/runs/${escapeHtml(r.id)}">View →</a>`;
+          const targetRunId = r.runId ?? r.id;
+          const link = `<a href="/dashboard/runs/${encodePathSegment(targetRunId)}">View →</a>`;
           return `<tr>
         <td>${relativeTime(r.createdAt, now)}</td>
         <td>${runStatusBadge(r.status)}</td>
@@ -800,6 +859,8 @@ export interface DiffViewerData {
   prev?: DiffNeighbour;
   next?: DiffNeighbour;
   masks: IgnoreMask[];
+  csrfToken?: string;
+  cspNonce?: string;
 }
 
 /**
@@ -809,27 +870,31 @@ export interface DiffViewerData {
  * the page doesn't full-reload between actions.
  */
 export function renderDiffViewer(data: DiffViewerData): string {
-  const rid = escapeHtml(data.runId);
-  const did = escapeHtml(data.diff.id);
+  const ridPath = encodePathSegment(data.runId);
+  const didPath = encodePathSegment(data.diff.id);
   const route = escapeHtml(data.diff.route);
   const viewport = data.diff.viewport;
   const browser = escapeHtml(data.diff.browser);
-  const currentUrl = data.current ? `/dashboard/screenshots/${rid}/${escapeHtml(data.current.id)}/raw` : '';
-  const baselineUrl = data.baseline ? `/dashboard/screenshots/${rid}/${escapeHtml(data.baseline.id)}/raw` : '';
-  const diffUrl = `/dashboard/screenshots/${rid}/${did}/raw`;
+  const currentUrl = data.current
+    ? `/dashboard/screenshots/${ridPath}/${encodePathSegment(data.current.id)}/raw`
+    : '';
+  const baselineUrl = data.baseline
+    ? `/dashboard/screenshots/${ridPath}/${encodePathSegment(data.baseline.id)}/raw`
+    : '';
+  const diffUrl = `/dashboard/screenshots/${ridPath}/${didPath}/raw`;
 
   const prevLink = data.prev
-    ? `<a href="/dashboard/runs/${rid}/diffs/${escapeHtml(data.prev.id)}" title="Previous (←)">← Prev</a>`
+    ? `<a href="/dashboard/runs/${ridPath}/diffs/${encodePathSegment(data.prev.id)}" title="Previous (←)">← Prev</a>`
     : '<span class="disabled" title="No previous diff">← Prev</span>';
   const nextLink = data.next
-    ? `<a href="/dashboard/runs/${rid}/diffs/${escapeHtml(data.next.id)}" title="Next (→)">Next →</a>`
+    ? `<a href="/dashboard/runs/${ridPath}/diffs/${encodePathSegment(data.next.id)}" title="Next (→)">Next →</a>`
     : '<span class="disabled" title="No next diff">Next →</span>';
 
-  const masksJson = JSON.stringify(
+  const masksJson = safeJsonForScript(
     data.masks.map((m) => ({ id: m.id, x: m.x, y: m.y, width: m.width, height: m.height, label: m.label ?? '' })),
   );
 
-  const inner = `<header><h1>🛡 Diff viewer</h1><a href="/dashboard/runs/${rid}">← Run</a></header>
+  const inner = `<header><h1>🛡 Diff viewer</h1><a href="/dashboard/runs/${ridPath}">← Run</a></header>
 <div class="wrap" id="main-content" role="main">
   <div class="viewer-toolbar">
     <strong>${route}</strong>
@@ -882,15 +947,23 @@ export function renderDiffViewer(data: DiffViewerData): string {
   </p>
 </div>
 
-<script>
+${scriptOpen(data.cspNonce)}
 (function(){
-  var runId = ${JSON.stringify(data.runId)};
-  var diffId = ${JSON.stringify(data.diff.id)};
-  var route = ${JSON.stringify(data.diff.route)};
-  var viewport = ${JSON.stringify(data.diff.viewport)};
-  var prevHref = ${data.prev ? JSON.stringify(`/dashboard/runs/${data.runId}/diffs/${data.prev.id}`) : 'null'};
-  var nextHref = ${data.next ? JSON.stringify(`/dashboard/runs/${data.runId}/diffs/${data.next.id}`) : 'null'};
+  var runId = ${safeJsonForScript(data.runId)};
+  var diffId = ${safeJsonForScript(data.diff.id)};
+  var route = ${safeJsonForScript(data.diff.route)};
+  var viewport = ${safeJsonForScript(data.diff.viewport)};
+  var prevHref = ${data.prev ? safeJsonForScript(`/dashboard/runs/${encodeURIComponent(data.runId)}/diffs/${encodeURIComponent(data.prev.id)}`) : 'null'};
+  var nextHref = ${data.next ? safeJsonForScript(`/dashboard/runs/${encodeURIComponent(data.runId)}/diffs/${encodeURIComponent(data.next.id)}`) : 'null'};
   var existingMasks = ${masksJson};
+  var csrfToken = ${safeJsonForScript(data.csrfToken ?? '')};
+  var csrfHeader = ${safeJsonForScript(CSRF_HEADER)};
+
+  function csrfHeaders(){
+    var h = {};
+    if (csrfToken) h[csrfHeader] = csrfToken;
+    return h;
+  }
 
   var stage = document.getElementById('stage');
   var inner = document.getElementById('stage-inner');
@@ -917,7 +990,7 @@ export function renderDiffViewer(data: DiffViewerData): string {
   function renderMasks(){
     if (!maskLayer) return;
     var scale = imgScale();
-    maskLayer.innerHTML = '';
+    while (maskLayer.firstChild) maskLayer.removeChild(maskLayer.firstChild);
     existingMasks.forEach(function(m){
       var d = document.createElement('div');
       d.className = 'mask';
@@ -1020,7 +1093,7 @@ export function renderDiffViewer(data: DiffViewerData): string {
         width: String(Math.round(w / scale)),
         height: String(Math.round(h / scale)),
       });
-      fetch('/dashboard/masks', { method: 'POST', body: body, credentials: 'same-origin' })
+      fetch('/dashboard/masks', { method: 'POST', body: body, headers: csrfHeaders(), credentials: 'same-origin' })
         .then(function(r){ return r.ok ? r.json() : null; })
         .then(function(j){
           if (j && j.mask) {
@@ -1033,7 +1106,7 @@ export function renderDiffViewer(data: DiffViewerData): string {
   }
 
   function post(path){
-    return fetch(path, { method: 'POST', credentials: 'same-origin' });
+    return fetch(path, { method: 'POST', headers: csrfHeaders(), credentials: 'same-origin' });
   }
   function approve(){
     post('/dashboard/runs/' + encodeURIComponent(runId) + '/diffs/' + encodeURIComponent(diffId) + '/accept')
@@ -1070,7 +1143,12 @@ export function renderDiffViewer(data: DiffViewerData): string {
 // ---------------------------------------------------------------------------
 
 /** Renders the saved-masks settings page. */
-export function renderMasksSettings(masks: IgnoreMask[], now = new Date()): string {
+export function renderMasksSettings(
+  masks: IgnoreMask[],
+  now = new Date(),
+  security?: RenderSecurityOptions,
+): string {
+  const hiddenCsrf = csrfInput(security?.csrfToken);
   const rows = masks.length
     ? masks
         .map((m) => {
@@ -1080,7 +1158,8 @@ export function renderMasksSettings(masks: IgnoreMask[], now = new Date()): stri
           <div><strong>${m.width}×${m.height}px</strong> at (${m.x}, ${m.y})${m.label ? ' — ' + escapeHtml(m.label) : ''}</div>
           <div class="where">${escapeHtml(m.route)} @ ${m.viewport}px · added ${relativeTime(m.createdAt, now)}</div>
         </div>
-        <form class="inline" method="post" action="/dashboard/settings/masks/${escapeHtml(m.id)}/delete">
+        <form class="inline" method="post" action="/dashboard/settings/masks/${encodePathSegment(m.id)}/delete">
+          ${hiddenCsrf}
           <button type="submit" class="danger">Delete</button>
         </form>
       </div>`;
@@ -1105,20 +1184,21 @@ export function renderMasksSettings(masks: IgnoreMask[], now = new Date()): stri
 /** Renders a downloadable list of run attachments. */
 export function renderRunAttachments(runId: string, attachments: RunAttachment[]): string {
   const rid = escapeHtml(runId);
+  const ridPath = encodePathSegment(runId);
   const items = attachments.length
     ? attachments
         .map((a) => {
           const sz = a.sizeBytes ? formatBytes(a.sizeBytes) : '';
           return `<li>
         <span class="kind">${escapeHtml(attachmentLabel(a.kind))}</span>
-        <a href="/dashboard/runs/${rid}/attachments/${escapeHtml(a.id)}/download">${escapeHtml(a.name)}</a>
+        <a href="/dashboard/runs/${ridPath}/attachments/${encodePathSegment(a.id)}/download">${escapeHtml(a.name)}</a>
         <span class="size">${sz}</span>
       </li>`;
         })
         .join('\n')
     : '<li class="empty" style="justify-content:center">No attachments for this run.</li>';
 
-  const inner = `<header><h1>🛡 Attachments</h1><a href="/dashboard/runs/${rid}">← Run</a></header>
+  const inner = `<header><h1>🛡 Attachments</h1><a href="/dashboard/runs/${ridPath}">← Run</a></header>
 <div class="wrap" id="main-content" role="main">
   <p class="murl">Run <code>${rid}</code> · traces, DOM snapshots, console logs, and any other artifacts captured during the run.</p>
   <ul class="attachments">${items}</ul>

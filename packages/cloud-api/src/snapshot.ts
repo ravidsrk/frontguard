@@ -1,4 +1,5 @@
 import { Daytona, Image } from '@daytona/sdk';
+import { FRONTGUARD_CLI_VERSION } from './daytona-runner.js';
 
 // ---------------------------------------------------------------------------
 // Snapshot management — pre-bake a sandbox with Playwright + Frontguard
@@ -20,9 +21,9 @@ export async function createFrontguardSnapshot(): Promise<string> {
   console.log('Creating Frontguard snapshot...');
 
   // Build a custom image with Playwright baked in
-  const image = Image.base('node:20-bookworm')
+  const image = Image.base('node:22-bookworm')
     .runCommands(
-      'npm install -g @frontguard/cli@latest',
+      `npm install -g @frontguard/cli@${FRONTGUARD_CLI_VERSION}`,
       'npx playwright install --with-deps chromium',
       'mkdir -p /home/daytona/output',
     );

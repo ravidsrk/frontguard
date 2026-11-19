@@ -5,9 +5,9 @@
  * them — effective throughput is per-isolate, not global. A truly distributed
  * limiter needs Cloudflare Rate Limiting, Durable Objects, or KV (OPS infra).
  *
- * This implementation is bounded and evicting so quiet/expired keys do not leak
- * memory for the isolate lifetime. Keys should be stable hashes (e.g. API key
- * SHA-256), never raw secrets.
+ * Uses ES Map insertion order for O(1) LRU touch and eviction instead of an
+ * O(N) auxiliary array, so quiet/expired keys do not leak memory or cause O(N²)
+ * rollover spikes.
  *
  * @module rate-limit
  */
@@ -35,11 +35,10 @@ export interface BoundedRateLimiterOptions {
 
 /**
  * Bounded, evicting token-bucket-style limiter keyed by a stable identifier.
+ * All operations are amortized O(1) using Map's insertion-order iteration.
  */
 export class BoundedRateLimiter {
   private readonly entries = new Map<string, RateLimitEntry>();
-  /** LRU order — oldest at index 0. */
-  private readonly lru: string[] = [];
 
   constructor(private readonly opts: BoundedRateLimiterOptions) {}
 
@@ -51,23 +50,26 @@ export class BoundedRateLimiter {
   /** Clears all state (test helper). */
   reset(): void {
     this.entries.clear();
-    this.lru.length = 0;
   }
 
   /**
    * Records one request for `key` and returns whether it is within the limit.
    */
   check(key: string, now = Date.now()): RateLimitResult {
-    this.evictExpired(now);
+    this.evictExpiredHead(now);
 
     let entry = this.entries.get(key);
     if (!entry || now > entry.resetAt) {
+      if (entry) {
+        this.entries.delete(key);
+      }
       entry = { count: 0, resetAt: now + this.opts.windowMs };
-      this.ensureCapacity(key, now);
+      this.ensureCapacity();
       this.entries.set(key, entry);
-      this.touchLru(key);
     } else {
-      this.touchLru(key);
+      // Refresh LRU position in O(1) by reinserting at the tail of the Map.
+      this.entries.delete(key);
+      this.entries.set(key, entry);
     }
 
     entry.count++;
@@ -80,53 +82,76 @@ export class BoundedRateLimiter {
     };
   }
 
-  private evictExpired(now: number): void {
-    for (const [key, entry] of this.entries) {
+  /**
+   * Evicts expired entries from the oldest (LRU) front of the Map.
+   * Amortized O(1): every deleted entry was inserted once and never revisited.
+   */
+  private evictExpiredHead(now: number): void {
+    for (const [k, entry] of this.entries) {
       if (now > entry.resetAt) {
-        this.remove(key);
+        this.entries.delete(k);
+      } else {
+        break;
       }
     }
   }
 
-  private ensureCapacity(incomingKey: string, now: number): void {
-    if (this.entries.has(incomingKey)) return;
+  private ensureCapacity(): void {
     while (this.entries.size >= this.opts.maxEntries) {
-      const evicted = this.evictLru(now);
-      if (!evicted) break;
+      const oldestKey = this.entries.keys().next().value;
+      if (oldestKey === undefined) break;
+      this.entries.delete(oldestKey);
     }
-  }
-
-  private evictLru(now: number): boolean {
-    while (this.lru.length > 0) {
-      const key = this.lru.shift()!;
-      if (!this.entries.has(key)) continue;
-      const entry = this.entries.get(key)!;
-      if (now <= entry.resetAt) {
-        this.remove(key);
-        return true;
-      }
-      this.remove(key);
-      return true;
-    }
-    return false;
-  }
-
-  private touchLru(key: string): void {
-    const idx = this.lru.indexOf(key);
-    if (idx >= 0) this.lru.splice(idx, 1);
-    this.lru.push(key);
-  }
-
-  private remove(key: string): void {
-    this.entries.delete(key);
-    const idx = this.lru.indexOf(key);
-    if (idx >= 0) this.lru.splice(idx, 1);
   }
 }
 
-/** Default /v1 API rate limiter — 100 req/min per hashed API key, max 10k keys. */
+/** Default /v1 API rate limiter — 100 req/min per user/client, max 10k keys. */
 export const apiRateLimiter = new BoundedRateLimiter({
   limit: 100,
   windowMs: 60_000,
   maxEntries: 10_000,
 });
+
+/** Stricter rate limiter for test-alert endpoint to prevent Resend relay abuse. */
+export const testAlertRateLimiter = new BoundedRateLimiter({
+  limit: 5,
+  windowMs: 60_000,
+  maxEntries: 10_000,
+});
+
+/** Extracts a best-effort client IP from Cloudflare / proxy headers. */
+export function clientIpFromHeaders(getHeader: (name: string) => string | undefined): string {
+  const cfIp = getHeader('cf-connecting-ip')?.trim();
+  if (cfIp) return cfIp;
+  const xff = getHeader('x-forwarded-for')?.split(',')[0]?.trim();
+  if (xff) return xff;
+  return 'unknown';
+}
+
+/**
+ * Checks a rate limit key, sets standard `X-RateLimit-*` response headers, and
+ * returns a 429 JSON response when exceeded (or `null` when allowed).
+ */
+export function enforceRateLimit(
+  c: {
+    header: (name: string, value: string) => void;
+    json: (body: unknown, status?: 429) => Response;
+  },
+  key: string,
+  limiter: BoundedRateLimiter = apiRateLimiter,
+): Response | null {
+  const rl = limiter.check(key);
+  c.header('X-RateLimit-Limit', String(rl.limit));
+  c.header('X-RateLimit-Remaining', String(rl.remaining));
+  c.header('X-RateLimit-Reset', String(Math.ceil(rl.resetAt / 1000)));
+  if (!rl.allowed) {
+    return c.json(
+      {
+        error: `Rate limit exceeded. Max ${rl.limit} requests per minute.`,
+        retryAfter: Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000)),
+      },
+      429,
+    );
+  }
+  return null;
+}

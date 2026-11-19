@@ -85,11 +85,14 @@ describe('buildOtlpMetricsPayload', () => {
     expect(JSON.stringify(payload)).toContain('1700000000000000000');
   });
 
-  it('includes run id and status as data-point attributes', () => {
-    const json = JSON.stringify(buildOtlpMetricsPayload(sampleMetrics, 1));
-    expect(json).toContain('run.id');
-    expect(json).toContain('run-1');
+  it('includes low-cardinality status attribute and excludes high-cardinality run.id', () => {
+    const payload = buildOtlpMetricsPayload(sampleMetrics, 1_700_000_000_123);
+    const json = JSON.stringify(payload);
     expect(json).toContain('run.status');
+    expect(json).not.toContain('run.id');
+    expect(json).not.toContain('run-1');
+    // BigInt nanosecond timestamp retains full millisecond precision without float rounding.
+    expect(json).toContain('1700000000123000000');
   });
 });
 

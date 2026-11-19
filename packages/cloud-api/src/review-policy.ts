@@ -166,3 +166,55 @@ export function evaluatePromotionGate(input: PromotionGateInput): PromotionGateR
     allowed: true,
   };
 }
+
+/**
+ * Converts persisted `BaselineApproval` records (often ordered newest-first)
+ * into chronological {@link ShotReviewEvent} entries for {@link evaluatePromotionGate}.
+ */
+export function approvalsToReviewEvents(
+  approvals: ReadonlyArray<{
+    reviewerUserId: string;
+    status: 'approved' | 'rejected';
+    createdAt: string;
+    comment?: string;
+  }>,
+): ShotReviewEvent[] {
+  // Store queries return newest-first; reverse so equal-millisecond timestamps
+  // preserve chronological write order.
+  const ordered = approvals.slice().reverse();
+  let lastMs = 0;
+  return ordered.map((a) => {
+    const parsed = Date.parse(a.createdAt);
+    const ts = Number.isFinite(parsed) ? Math.max(parsed, lastMs + 1) : lastMs + 1;
+    lastMs = ts;
+    return {
+      reviewerId: a.reviewerUserId,
+      decision: a.status === 'approved' ? 'approve' : 'reject',
+      timestampMs: ts,
+      comment: a.comment,
+    };
+  });
+}
+
+/**
+ * Derives the pixelmatch comparator status for a run. First-capture runs that
+ * have no prior baseline (`NO_COMPARISON_ERROR`) map to `'new'` so reviewers
+ * can approve initial baselines; real execution failures map to `'error'`.
+ */
+export function deriveRunPixelmatchStatus(
+  run: {
+    status: string;
+    error?: string;
+    results?: ReadonlyArray<{ classification?: string; diffPercentage?: number }> | null;
+  },
+  noComparisonError: string,
+): PromotionGateInput['pixelmatchStatus'] {
+  if (run.status === 'failed') {
+    if (run.error === noComparisonError) return 'new';
+    return 'error';
+  }
+  const results = run.results ?? [];
+  if (results.some((r) => r.classification === 'regression')) return 'regression';
+  if (results.some((r) => (r.diffPercentage ?? 0) > 0)) return 'changed';
+  return 'pass';
+}

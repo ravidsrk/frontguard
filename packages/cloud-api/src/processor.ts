@@ -50,11 +50,21 @@ export interface ProcessorEnv {
  * sandbox can compare against them instead of treating every screenshot as a
  * new baseline (cloud-1).
  */
+export interface ProcessRunOptions {
+  /**
+   * Whether the caller's plan permits platform-hosted AI analysis.
+   * Defaults to `true` when omitted so direct unit callers with explicit `run.ai`
+   * continue to work; HTTP handlers pass the plan's actual entitlement.
+   */
+  allowAi?: boolean;
+}
+
 export async function processRun(
   run: Run,
   env: ProcessorEnv,
   onScreenshots?: ScreenshotSink,
   baselineRestore?: BaselineRestore,
+  options?: ProcessRunOptions,
 ): Promise<void> {
   run.status = 'running';
 
@@ -64,20 +74,32 @@ export async function processRun(
     if (hasDaytona) {
       // Lazy-import to avoid loading @daytona/sdk when not needed
       const { executeInSandbox } = await import('./daytona-runner.js');
-      const openaiKey = env.OPENAI_API_KEY ?? env.FRONTGUARD_OPENAI_KEY;
-      const anthropicKey = env.ANTHROPIC_API_KEY ?? env.FRONTGUARD_ANTHROPIC_KEY;
+      const aiEnabled = run.ai != null && options?.allowAi !== false;
+      const aiProvider = aiEnabled ? run.ai!.provider.toLowerCase() : undefined;
+      const openaiKey =
+        aiEnabled && aiProvider === 'openai'
+          ? (env.OPENAI_API_KEY ?? env.FRONTGUARD_OPENAI_KEY)
+          : undefined;
+      const anthropicKey =
+        aiEnabled && aiProvider === 'anthropic'
+          ? (env.ANTHROPIC_API_KEY ?? env.FRONTGUARD_ANTHROPIC_KEY)
+          : undefined;
       const sandboxResult = await executeInSandbox({
         url: run.url,
         routes: run.routes,
         viewports: run.viewports,
         browsers: run.browsers,
         threshold: run.threshold,
-        ai: run.ai ?? undefined,
+        ai: aiEnabled ? (run.ai ?? undefined) : undefined,
         ...(openaiKey ? { openaiKey } : {}),
         ...(anthropicKey ? { anthropicKey } : {}),
         daytonaApiKey: env.DAYTONA_API_KEY,
         baselineRestore,
       });
+
+      if (typeof sandboxResult.duration === 'number' && Number.isFinite(sandboxResult.duration) && sandboxResult.duration >= 0) {
+        run.duration = sandboxResult.duration;
+      }
 
       run.results = sandboxResult.results.map((r) => ({
         route: r.route,

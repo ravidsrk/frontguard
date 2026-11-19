@@ -61,6 +61,8 @@ export interface MonitorRun {
   id: string;
   monitorId: string;
   userId: string;
+  /** Underlying `runs.id` for screenshot comparison links (`/dashboard/runs/:runId`). */
+  runId?: string;
   status: MonitorRunStatus;
   regressionsCount: number;
   /** How many attempts were made (1 = first try, 2 = one retry). */

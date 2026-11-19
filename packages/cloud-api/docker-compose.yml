@@ -2,6 +2,7 @@
 #
 # Quick start (from packages/cloud-api/):
 #
+#     export DASHBOARD_SESSION_SECRET="$(openssl rand -base64 32)"
 #     docker compose up --build
 #     curl http://localhost:8787/health
 #     # → { "status": "ok", "version": "..." }
@@ -21,6 +22,13 @@ services:
       - "${FRONTGUARD_PORT:-8787}:8787"
     environment:
       # ----------------------------------------------------------------
+      # Runtime mode — defaults to production so fail-closed auth and
+      # secret checks stay active. Override to "development" only for
+      # local non-networked evaluation.
+      # ----------------------------------------------------------------
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+
+      # ----------------------------------------------------------------
       # PUBLIC URLs — set these to whatever clients (browser, CLI, CI)
       # actually use to reach this server. Defaults assume a local-only
       # install on the loopback interface.
@@ -29,12 +37,20 @@ services:
       API_BASE_URL: ${API_BASE_URL:-http://localhost:8787}
 
       # ----------------------------------------------------------------
-      # OAuth — required if you want the dashboard at /dashboard.
-      # Create a GitHub OAuth App and paste the credentials here.
+      # OAuth & Dashboard session signing — REQUIRED.
+      # Generate with: openssl rand -base64 32
+      # Never use a static placeholder secret.
       # ----------------------------------------------------------------
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
-      DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:-change-me-in-production}
+      DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:?DASHBOARD_SESSION_SECRET must be set to a random 32+ character secret}
+
+      # ----------------------------------------------------------------
+      # Service-to-service callbacks (GitHub App / Vercel integration).
+      # ----------------------------------------------------------------
+      GITHUB_APP_URL: ${GITHUB_APP_URL:-}
+      FRONTGUARD_CALLBACK_SECRET: ${FRONTGUARD_CALLBACK_SECRET:-}
+      VERCEL_INTEGRATION_SECRET: ${VERCEL_INTEGRATION_SECRET:-}
 
       # ----------------------------------------------------------------
       # Browser execution — Daytona sandboxes are how the cloud version

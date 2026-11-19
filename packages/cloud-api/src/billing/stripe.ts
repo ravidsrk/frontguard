@@ -10,6 +10,8 @@
 
 import type { PlanId } from './plans.js';
 
+const STRIPE_FETCH_TIMEOUT_MS = 15_000;
+
 /** Stripe config from Worker secrets. */
 export interface StripeConfig {
   secretKey: string;
@@ -56,6 +58,7 @@ export async function createCheckoutSession(
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: form.toString(),
+    signal: AbortSignal.timeout(STRIPE_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Stripe checkout failed: ${res.status}`);
   const data = (await res.json()) as { id: string; url: string };
@@ -65,8 +68,10 @@ export async function createCheckoutSession(
 /**
  * Verifies a Stripe webhook signature (`Stripe-Signature` header).
  *
- * The header is `t=<timestamp>,v1=<hmac>`; the signed payload is
- * `<timestamp>.<rawBody>` using HMAC-SHA256 with the webhook secret.
+ * The header is `t=<timestamp>,v1=<hmac>[,v1=<hmac2>...]`; the signed payload
+ * is `<timestamp>.<rawBody>` using HMAC-SHA256 with the webhook secret.
+ * Supports multiple `v1=` signatures for zero-downtime secret rotation and
+ * rejects malformed/non-finite timestamps.
  *
  * @param toleranceSec - Max allowed clock skew (default 5 minutes).
  */
@@ -78,17 +83,29 @@ export async function verifyStripeSignature(
   toleranceSec = 300,
   subtle: SubtleCrypto = crypto.subtle,
 ): Promise<boolean> {
-  if (!sigHeader) return false;
-  const parts = Object.fromEntries(
-    sigHeader.split(',').map((kv) => {
-      const [k, v] = kv.split('=');
-      return [k.trim(), v];
-    }),
-  );
-  const timestamp = parts.t;
-  const expectedSig = parts.v1;
-  if (!timestamp || !expectedSig) return false;
-  if (Math.abs(nowSec - Number(timestamp)) > toleranceSec) return false;
+  if (!sigHeader || !webhookSecret) return false;
+
+  let timestamp: string | undefined;
+  const signatures: string[] = [];
+
+  for (const part of sigHeader.split(',')) {
+    const eq = part.indexOf('=');
+    if (eq <= 0) continue;
+    const k = part.slice(0, eq).trim();
+    const v = part.slice(eq + 1).trim();
+    if (!v) continue;
+    if (k === 't') {
+      timestamp = v;
+    } else if (k === 'v1') {
+      signatures.push(v);
+    }
+  }
+
+  if (!timestamp || signatures.length === 0) return false;
+  if (!/^\d+$/.test(timestamp)) return false;
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts) || !Number.isFinite(nowSec)) return false;
+  if (Math.abs(nowSec - ts) > toleranceSec) return false;
 
   const key = await subtle.importKey(
     'raw',
@@ -99,7 +116,15 @@ export async function verifyStripeSignature(
   );
   const mac = await subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${rawBody}`));
   const computed = Array.from(new Uint8Array(mac), (b) => b.toString(16).padStart(2, '0')).join('');
-  return timingSafeEqual(computed, expectedSig);
+
+  // Evaluate every candidate signature without early exit on length/value mismatch.
+  let matched = false;
+  for (const candidate of signatures) {
+    if (timingSafeEqual(computed, candidate)) {
+      matched = true;
+    }
+  }
+  return matched;
 }
 
 /** Constant-time string comparison. */
@@ -113,18 +138,30 @@ export function timingSafeEqual(a: string, b: string): boolean {
 /** A normalised billing event derived from a Stripe webhook. */
 export interface BillingEvent {
   type: string;
+  /** Stripe event id (for idempotency deduplication). */
+  eventId?: string;
+  /** Stripe Unix timestamp in seconds (for out-of-order protection). */
+  created?: number;
   /** The team this event applies to (from metadata/client_reference_id). */
   teamId?: string;
   /** New plan (for checkout/subscription updates). */
   plan?: PlanId;
   customerId?: string;
   subscriptionId?: string;
-  /** True for downgrade-to-free events (cancellation). */
+  /** True for downgrade-to-free events (cancellation / terminal non-payment). */
   cancel?: boolean;
+  /** True when the event is an invoice.payment_failed notification. */
+  paymentFailed?: boolean;
+  /** Non-null when payment failed permanently (no further retry scheduled). */
+  terminalFailure?: boolean;
+  /** When set, the event was intentionally ignored (e.g. unpaid checkout). */
+  ignoredReason?: string;
 }
 
 /** Raw Stripe event shape (subset). */
-interface StripeEvent {
+export interface StripeEvent {
+  id?: string;
+  created?: number;
   type: string;
   data: {
     object: {
@@ -132,37 +169,160 @@ interface StripeEvent {
       customer?: string;
       subscription?: string;
       id?: string;
+      status?: string;
+      payment_status?: string;
+      attempt_count?: number;
+      next_payment_attempt?: number | null;
       metadata?: Record<string, string>;
-      items?: { data: Array<{ price: { metadata?: Record<string, string>; id: string } }> };
+      subscription_details?: { metadata?: Record<string, string> };
+      items?: { data: Array<{ price?: { metadata?: Record<string, string>; id?: string } }> };
+      line_items?: { data: Array<{ price?: { id?: string } }> };
     };
   };
 }
 
+function parsePlanId(raw: string | undefined): PlanId | undefined {
+  if (raw === 'free' || raw === 'pro' || raw === 'business') return raw;
+  return undefined;
+}
+
+/** Resolves a PlanId from a Stripe Price ID using the server's configured price map. */
+function planFromPriceId(
+  priceId: string | undefined,
+  priceIds?: Partial<Record<PlanId, string>>,
+): PlanId | undefined {
+  if (!priceId || !priceIds) return undefined;
+  if (priceIds.business && priceId === priceIds.business) return 'business';
+  if (priceIds.pro && priceId === priceIds.pro) return 'pro';
+  return undefined;
+}
+
 /**
  * Interprets a parsed Stripe event into a normalised {@link BillingEvent}.
- * Returns null for events we don't act on.
+ * Validates payment_status, subscription status, and configured price IDs
+ * before authorizing plan upgrades. Returns null for events we don't act on.
  */
-export function interpretStripeEvent(event: StripeEvent): BillingEvent | null {
-  const obj = event.data.object;
+export function interpretStripeEvent(
+  event: StripeEvent,
+  priceIds?: Partial<Record<PlanId, string>>,
+): BillingEvent | null {
+  const obj = event.data?.object;
+  if (!obj) return null;
+
+  const base = {
+    eventId: typeof event.id === 'string' && event.id.length > 0 ? event.id : undefined,
+    created:
+      typeof event.created === 'number' && Number.isFinite(event.created) && event.created > 0
+        ? event.created
+        : undefined,
+  };
+
   switch (event.type) {
-    case 'checkout.session.completed':
+    case 'checkout.session.completed': {
+      // Reject unpaid / incomplete checkout sessions (e.g. async SEPA/boleto pending).
+      if (
+        obj.payment_status !== undefined &&
+        obj.payment_status !== 'paid' &&
+        obj.payment_status !== 'no_payment_required'
+      ) {
+        return {
+          ...base,
+          type: event.type,
+          teamId: obj.metadata?.team_id ?? obj.client_reference_id,
+          customerId: obj.customer,
+          subscriptionId: obj.subscription,
+          ignoredReason: `payment_status:${obj.payment_status}`,
+        };
+      }
+      if (obj.status !== undefined && obj.status !== 'complete') {
+        return {
+          ...base,
+          type: event.type,
+          teamId: obj.metadata?.team_id ?? obj.client_reference_id,
+          customerId: obj.customer,
+          subscriptionId: obj.subscription,
+          ignoredReason: `session_status:${obj.status}`,
+        };
+      }
+      const linePriceId =
+        obj.line_items?.data?.[0]?.price?.id ?? obj.items?.data?.[0]?.price?.id;
+      const fromPrice = planFromPriceId(linePriceId, priceIds);
+      if (linePriceId && priceIds && (priceIds.pro || priceIds.business) && !fromPrice) {
+        return {
+          ...base,
+          type: event.type,
+          teamId: obj.metadata?.team_id ?? obj.client_reference_id,
+          customerId: obj.customer,
+          subscriptionId: obj.subscription,
+          ignoredReason: `unknown_price:${linePriceId}`,
+        };
+      }
+      const metaPlan = parsePlanId(obj.metadata?.plan);
+      const resolvedPlan = fromPrice ?? (metaPlan && metaPlan !== 'free' ? metaPlan : 'pro');
       return {
+        ...base,
         type: event.type,
         teamId: obj.metadata?.team_id ?? obj.client_reference_id,
-        plan: (obj.metadata?.plan as PlanId) ?? 'pro',
+        plan: resolvedPlan,
         customerId: obj.customer,
         subscriptionId: obj.subscription,
       };
-    case 'customer.subscription.updated':
+    }
+
+    case 'customer.subscription.updated': {
+      const subStatus = obj.status;
+      // Terminal non-active statuses must downgrade back to free.
+      if (
+        subStatus === 'canceled' ||
+        subStatus === 'unpaid' ||
+        subStatus === 'incomplete_expired'
+      ) {
+        return {
+          ...base,
+          type: event.type,
+          teamId: obj.metadata?.team_id,
+          plan: 'free',
+          customerId: obj.customer,
+          subscriptionId: obj.id,
+          cancel: true,
+        };
+      }
+      // Do not grant or change paid plans while subscription is incomplete, paused, or past_due.
+      if (subStatus === 'incomplete' || subStatus === 'paused' || subStatus === 'past_due') {
+        return {
+          ...base,
+          type: event.type,
+          teamId: obj.metadata?.team_id,
+          customerId: obj.customer,
+          subscriptionId: obj.id,
+          ignoredReason: `subscription_status:${subStatus}`,
+        };
+      }
+      const itemPriceId = obj.items?.data?.[0]?.price?.id;
+      const fromPrice = planFromPriceId(itemPriceId, priceIds);
+      if (itemPriceId && priceIds && (priceIds.pro || priceIds.business) && !fromPrice) {
+        return {
+          ...base,
+          type: event.type,
+          teamId: obj.metadata?.team_id,
+          customerId: obj.customer,
+          subscriptionId: obj.id,
+          ignoredReason: `unknown_price:${itemPriceId}`,
+        };
+      }
       return {
+        ...base,
         type: event.type,
         teamId: obj.metadata?.team_id,
-        plan: (obj.metadata?.plan as PlanId) ?? undefined,
+        plan: fromPrice ?? parsePlanId(obj.metadata?.plan),
         customerId: obj.customer,
         subscriptionId: obj.id,
       };
+    }
+
     case 'customer.subscription.deleted':
       return {
+        ...base,
         type: event.type,
         teamId: obj.metadata?.team_id,
         plan: 'free',
@@ -170,8 +330,21 @@ export function interpretStripeEvent(event: StripeEvent): BillingEvent | null {
         subscriptionId: obj.id,
         cancel: true,
       };
-    case 'invoice.payment_failed':
-      return { type: event.type, teamId: obj.metadata?.team_id, customerId: obj.customer };
+
+    case 'invoice.payment_failed': {
+      const terminalFailure = obj.next_payment_attempt === null;
+      return {
+        ...base,
+        type: event.type,
+        teamId: obj.metadata?.team_id ?? obj.subscription_details?.metadata?.team_id,
+        customerId: obj.customer,
+        subscriptionId: obj.subscription,
+        paymentFailed: true,
+        terminalFailure,
+        ...(terminalFailure ? { plan: 'free' as PlanId, cancel: true } : {}),
+      };
+    }
+
     default:
       return null;
   }

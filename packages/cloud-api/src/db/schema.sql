@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS usage (
   month TEXT NOT NULL,           -- YYYY-MM
   runs_count INTEGER DEFAULT 0,
   screenshots_count INTEGER DEFAULT 0,
+  sandbox_minutes_used INTEGER NOT NULL DEFAULT 0,
+  ai_calls_used INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, month)
 );
 
@@ -70,6 +72,7 @@ CREATE TABLE IF NOT EXISTS teams (
   plan TEXT NOT NULL DEFAULT 'free',
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,
+  stripe_last_event_created INTEGER NOT NULL DEFAULT 0,
   version INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
@@ -113,6 +116,7 @@ CREATE TABLE IF NOT EXISTS team_usage (
   month TEXT NOT NULL,
   runs_count INTEGER DEFAULT 0,
   screenshots_count INTEGER DEFAULT 0,
+  sandbox_minutes_used INTEGER NOT NULL DEFAULT 0,
   diffs_used INTEGER NOT NULL DEFAULT 0,
   ai_calls_used INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -171,6 +175,7 @@ CREATE TABLE IF NOT EXISTS monitor_runs (
   id TEXT PRIMARY KEY,
   monitor_id TEXT NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id),
+  run_id TEXT,
   status TEXT NOT NULL,           -- passed, regression, error
   regressions_count INTEGER NOT NULL DEFAULT 0,
   attempts INTEGER NOT NULL DEFAULT 1,
@@ -280,4 +285,13 @@ CREATE TABLE IF NOT EXISTS pending_run_updates (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pending_run_updates_user ON pending_run_updates(user_id);
+
+-- Stripe webhook idempotency ledger ---------------------------------------
+CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+  event_id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  created INTEGER NOT NULL DEFAULT 0,
+  team_id TEXT,
+  processed_at TEXT NOT NULL
+);
 

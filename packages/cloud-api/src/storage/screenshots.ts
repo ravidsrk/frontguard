@@ -17,7 +17,11 @@ export interface R2Bucket {
   put(key: string, value: ArrayBuffer | ArrayBufferView | string): Promise<unknown>;
   get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
   delete(key: string | string[]): Promise<void>;
-  list(options?: { prefix?: string }): Promise<{ objects: Array<{ key: string }> }>;
+  list(options?: { prefix?: string; cursor?: string }): Promise<{
+    objects: Array<{ key: string }>;
+    truncated?: boolean;
+    cursor?: string;
+  }>;
 }
 
 /** A stored screenshot reference. */
@@ -31,6 +35,8 @@ export interface ScreenshotStore {
   put(key: string, bytes: Uint8Array): Promise<void>;
   get(key: string): Promise<Uint8Array | null>;
   delete(key: string): Promise<void>;
+  /** Deletes every object under a prefix (paginates past R2's 1,000-object cap). */
+  deletePrefix(prefix: string): Promise<void>;
   /** Deletes every object under a run's prefix (scoped to the owning user). */
   deleteRun(userId: string, runId: string): Promise<void>;
 }
@@ -132,12 +138,20 @@ export class R2ScreenshotStore implements ScreenshotStore {
   async delete(key: string): Promise<void> {
     await this.bucket.delete(key);
   }
+  async deletePrefix(prefix: string): Promise<void> {
+    let cursor: string | undefined;
+    do {
+      const page = await this.bucket.list(cursor ? { prefix, cursor } : { prefix });
+      if (page.objects.length > 0) {
+        for (let i = 0; i < page.objects.length; i += 1000) {
+          await this.bucket.delete(page.objects.slice(i, i + 1000).map((o) => o.key));
+        }
+      }
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+  }
   async deleteRun(userId: string, runId: string): Promise<void> {
-    const prefix = runPrefix(userId, runId);
-    const { objects } = await this.bucket.list({ prefix });
-    if (objects.length > 0) {
-      await this.bucket.delete(objects.map((o) => o.key));
-    }
+    await this.deletePrefix(runPrefix(userId, runId));
   }
 }
 
@@ -158,11 +172,13 @@ export class MemoryScreenshotStore implements ScreenshotStore {
   async delete(key: string): Promise<void> {
     this.blobs.delete(key);
   }
-  async deleteRun(userId: string, runId: string): Promise<void> {
-    const prefix = runPrefix(userId, runId);
+  async deletePrefix(prefix: string): Promise<void> {
     for (const key of [...this.blobs.keys()]) {
       if (key.startsWith(prefix)) this.blobs.delete(key);
     }
+  }
+  async deleteRun(userId: string, runId: string): Promise<void> {
+    await this.deletePrefix(runPrefix(userId, runId));
   }
 
   /** Test helper. */

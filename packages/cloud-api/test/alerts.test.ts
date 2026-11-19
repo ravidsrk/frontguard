@@ -71,14 +71,17 @@ describe('alert payload builders', () => {
 });
 
 describe('sendSlackAlert', () => {
+  const slackUrl = 'https://hooks.slack.com/services/T00/B00/XXX';
+  const publicDns = { resolveHost: async () => ['54.230.1.1'] };
+
   it('returns ok on 200', async () => {
     const fakeFetch = (async () => new Response('ok', { status: 200 })) as unknown as typeof fetch;
-    const res = await sendSlackAlert('https://hook', monitor, alerts, fakeFetch);
+    const res = await sendSlackAlert(slackUrl, monitor, alerts, fakeFetch, publicDns);
     expect(res).toEqual({ channel: 'slack', ok: true, error: undefined });
   });
   it('reports failure on non-2xx without throwing', async () => {
     const fakeFetch = (async () => new Response('no', { status: 500 })) as unknown as typeof fetch;
-    const res = await sendSlackAlert('https://hook', monitor, alerts, fakeFetch);
+    const res = await sendSlackAlert(slackUrl, monitor, alerts, fakeFetch, publicDns);
     expect(res.ok).toBe(false);
     expect(res.error).toContain('500');
   });
@@ -86,9 +89,25 @@ describe('sendSlackAlert', () => {
     const fakeFetch = (async () => {
       throw new Error('network down');
     }) as unknown as typeof fetch;
-    const res = await sendSlackAlert('https://hook', monitor, alerts, fakeFetch);
+    const res = await sendSlackAlert(slackUrl, monitor, alerts, fakeFetch, publicDns);
     expect(res.ok).toBe(false);
     expect(res.error).toContain('network down');
+  });
+  it('rejects non-Slack or private/SSRF webhook URLs before calling fetch', async () => {
+    let called = false;
+    const fakeFetch = (async () => {
+      called = true;
+      return new Response('ok', { status: 200 });
+    }) as unknown as typeof fetch;
+    const nonSlack = await sendSlackAlert('https://169.254.169.254/latest', monitor, alerts, fakeFetch, publicDns);
+    expect(nonSlack.ok).toBe(false);
+    expect(called).toBe(false);
+
+    const privateResolved = await sendSlackAlert(slackUrl, monitor, alerts, fakeFetch, {
+      resolveHost: async () => ['127.0.0.1'],
+    });
+    expect(privateResolved.ok).toBe(false);
+    expect(called).toBe(false);
   });
 });
 

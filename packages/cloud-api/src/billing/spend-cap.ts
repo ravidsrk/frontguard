@@ -9,8 +9,21 @@
  */
 
 import type { Store, User } from '../db/store.js';
-import type { Plan } from './plans.js';
+import { highestPlanId, type Plan, type PlanId } from './plans.js';
 import { sendUsageWarningEmail, type AlertEnv, type AlertDeliveryResult } from '../alerts/index.js';
+
+/**
+ * Recomputes a user's denormalized `users.plan` from all teams they currently
+ * own so cancelling or leaving one team never downgrades an owner who still
+ * has another active paid team.
+ */
+export async function syncUserPlanFromTeams(store: Store, userId: string): Promise<PlanId> {
+  const teams = await store.listTeamsForUser(userId);
+  const ownedPlans = teams.filter((t) => t.role === 'owner').map((t) => t.plan);
+  const effective = highestPlanId(ownedPlans);
+  await store.updateUserPlan(userId, effective);
+  return effective;
+}
 
 /** The thresholds we alert at, in ascending order. */
 export const SPEND_TIERS: Array<{ tier: 80 | 95; ratio: number }> = [
@@ -53,12 +66,16 @@ export async function evaluateSpendCap(
   month: string,
   now: Date = new Date(),
   fetchImpl: typeof fetch = fetch,
+  teamId?: string,
 ): Promise<SpendCapResult> {
   const limit = plan.limits.runsPerMonth;
   if (limit == null) return { reason: 'unlimited', tier: 0 };
 
-  const usage = await store.getUsage(user.id, month);
-  const tier = highestTierCrossed(usage.runsCount, limit);
+  const runsCount =
+    teamId && plan.id !== 'free'
+      ? (await store.getTeamUsage(teamId, month)).runsCount
+      : (await store.getUsage(user.id, month)).runsCount;
+  const tier = highestTierCrossed(runsCount, limit);
   if (tier === 0) return { reason: 'unchanged', tier: 0 };
 
   const state = await store.getUsageAlertState(user.id, month);
@@ -76,7 +93,7 @@ export async function evaluateSpendCap(
   const delivery = await sendUsageWarningEmail(
     env,
     [user.email],
-    { plan: plan.name, tier, used: usage.runsCount, limit },
+    { plan: plan.name, tier, used: runsCount, limit },
     fetchImpl,
   );
   await store.setUsageAlertState({ userId: user.id, month, lastTier: tier, lastAlertAt: now.toISOString() });

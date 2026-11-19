@@ -13,6 +13,8 @@ import {
   getMemoryScreenshotStore,
 } from '../src/storage/screenshots.js';
 import {
+  CSRF_HEADER,
+  createCsrfToken,
   createSessionCookie,
   INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD,
 } from '../src/auth/session.js';
@@ -20,10 +22,18 @@ import type { Monitor, MonitorRun } from '../src/db/monitors.js';
 import type { Run } from '../src/types.js';
 import type { ScreenshotRecord } from '../src/db/store.js';
 
-/** Builds a valid fg_session Cookie header for the given userId. */
-async function sessionHeader(userId: string): Promise<{ Cookie: string }> {
+/** Builds a valid fg_session Cookie + CSRF header and ensures the user row exists. */
+async function sessionHeader(
+  userId: string,
+  plan = 'business',
+): Promise<{ Cookie: string; [CSRF_HEADER]: string }> {
+  const store = getMemoryStore();
+  if (!(await store.getUser(userId))) {
+    await store.createUser({ id: userId, plan, createdAt: '2026-01-01T00:00:00Z' });
+  }
   const value = await createSessionCookie(userId, INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD);
-  return { Cookie: `fg_session=${value}` };
+  const csrf = await createCsrfToken(value, INSECURE_DEV_SESSION_SECRET_DO_NOT_USE_IN_PROD);
+  return { Cookie: `fg_session=${value}`, [CSRF_HEADER]: csrf };
 }
 
 function makeMonitor(over: Partial<Monitor> = {}): Monitor {
@@ -202,7 +212,7 @@ describe('dashboard monitor CRUD via forms', () => {
       const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
       if (url.origin !== 'https://cloudflare-dns.com' ||
           url.pathname !== '/dns-query' ||
-          !['my.site', 'x.com'].includes(url.searchParams.get('name') ?? '')) {
+          !['my.site', 'x.com', 'hooks.slack.com'].includes(url.searchParams.get('name') ?? '')) {
         throw new Error(`Unexpected network request in dashboard test: ${url}`);
       }
       return Response.json({
@@ -328,7 +338,21 @@ describe('per-monitor detail page', () => {
 });
 
 describe('alert config + snooze via dashboard', () => {
-  beforeEach(() => resetMemoryStore());
+  beforeEach(() => {
+    resetMemoryStore();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+      if (url.origin === 'https://cloudflare-dns.com' && url.pathname === '/dns-query') {
+        return Response.json({
+          Answer: url.searchParams.get('type') === '1'
+            ? [{ type: 1, data: '54.230.1.1' }]
+            : [],
+        });
+      }
+      throw new Error(`Unexpected network request in dashboard alert test: ${url}`);
+    });
+  });
+  afterEach(() => vi.restoreAllMocks());
 
   it('updates alert config', async () => {
     const store = getMemoryStore();

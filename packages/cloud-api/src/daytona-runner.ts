@@ -1,9 +1,10 @@
 import { Daytona } from '@daytona/sdk';
 import type { SuggestedFix } from './types.js';
 import { orphanBaselinePath } from './storage/screenshots.js';
+import { assertSafeRoutePaths } from './security/render-target.js';
 
 /** Pinned CLI release — constant so Workers/Docker bundles do not depend on relative fs reads. */
-const FRONTGUARD_CLI_VERSION = '0.2.3'; // allow-version-drift
+export const FRONTGUARD_CLI_VERSION = '0.2.3'; // allow-version-drift
 
 // ---------------------------------------------------------------------------
 // Types
@@ -198,6 +199,10 @@ export function parseSandboxCliOutput(text: string): RunResult['results'] {
 // ---------------------------------------------------------------------------
 
 export async function executeInSandbox(request: RunRequest): Promise<RunResult> {
+  // Defense-in-depth: guarantee every route path is origin-bound relative to request.url
+  // before spinning up or configuring a sandbox.
+  assertSafeRoutePaths(request.url, request.routes);
+
   // The SDK falls back to a DAYTONA_API_KEY shell variable on Node, but
   // Workers has no Node env — the caller must pass the key from the
   // Worker env binding.
@@ -207,14 +212,16 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
   let sandbox;
   let needsInstall = false;
 
-  const envVars: Record<string, string> = {
-    ...(request.openaiKey
-      ? { FRONTGUARD_OPENAI_KEY: request.openaiKey, OPENAI_API_KEY: request.openaiKey }
-      : {}),
-    ...(request.anthropicKey
-      ? { FRONTGUARD_ANTHROPIC_KEY: request.anthropicKey, ANTHROPIC_API_KEY: request.anthropicKey }
-      : {}),
-  };
+  const envVars: Record<string, string> = request.ai
+    ? {
+        ...(request.openaiKey
+          ? { FRONTGUARD_OPENAI_KEY: request.openaiKey, OPENAI_API_KEY: request.openaiKey }
+          : {}),
+        ...(request.anthropicKey
+          ? { FRONTGUARD_ANTHROPIC_KEY: request.anthropicKey, ANTHROPIC_API_KEY: request.anthropicKey }
+          : {}),
+      }
+    : {};
 
   try {
     sandbox = await daytona.create(
@@ -233,7 +240,7 @@ export async function executeInSandbox(request: RunRequest): Promise<RunResult> 
     // Snapshot doesn't exist yet — create from base image
     sandbox = await daytona.create(
       {
-        image: 'node:20-bookworm',
+        image: 'node:22-bookworm',
         resources: {
           cpu: 2,
           memory: 4, // 4 GiB for Chromium
