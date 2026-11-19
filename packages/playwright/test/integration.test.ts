@@ -20,11 +20,14 @@ const isCI = process.env.GITHUB_ACTIONS !== undefined;
 const hasBrowserBinary = (() => {
   try {
     const execPath = chromium.executablePath();
-    const headlessPath = execPath.replace(
-      /\/chromium-(\d+)\/.*$/,
-      '/chromium_headless_shell-$1/chrome-linux/headless_shell',
+    if (!fs.existsSync(execPath)) return false;
+    const headlessDir = execPath.replace(/\/chromium-(\d+)\/.*$/, '/chromium_headless_shell-$1');
+    return (
+      fs.existsSync(join(headlessDir, 'INSTALLATION_COMPLETE')) ||
+      fs.existsSync(join(headlessDir, 'chrome-linux/headless_shell')) ||
+      fs.existsSync(join(headlessDir, 'chrome-headless-shell-linux64/chrome-headless-shell')) ||
+      fs.existsSync(join(headlessDir, 'chrome-headless-shell-linux-arm64/chrome-headless-shell'))
     );
-    return fs.existsSync(execPath) && fs.existsSync(headlessPath);
   } catch {
     return false;
   }
@@ -66,7 +69,7 @@ describe.skipIf(skipBrowserTests)('visualTest real-browser integration', () => {
     try {
       // Baseline: red box.
       await page.goto(redUrl);
-      const first = await visualTest(page, 'integration-regression', { baselineDir });
+      const first = await visualTest(page, 'integration-regression', { baselineDir, update: true });
       expect(first.isNewBaseline).toBe(true);
       expect(first.passed).toBe(true);
 
@@ -86,7 +89,7 @@ describe.skipIf(skipBrowserTests)('visualTest real-browser integration', () => {
     const page = await browser.newPage({ viewport: { width: 300, height: 300 } });
     try {
       await page.goto(url);
-      const first = await visualTest(page, 'integration-stable', { baselineDir });
+      const first = await visualTest(page, 'integration-stable', { baselineDir, update: true });
       expect(first.isNewBaseline).toBe(true);
       expect(first.passed).toBe(true);
 
@@ -108,7 +111,11 @@ describe.skipIf(skipBrowserTests)('visualTest real-browser integration', () => {
       await page.goto(url);
 
       // This triggers the freezeTime path inside visualTest on the live page.
-      const result = await visualTest(page, 'integration-freeze', { baselineDir, freezeTime: fixed });
+      const result = await visualTest(page, 'integration-freeze', {
+        baselineDir,
+        freezeTime: fixed,
+        update: true,
+      });
       expect(result.passed).toBe(true);
 
       const t1 = await page.evaluate(() => Date.now());
@@ -120,6 +127,108 @@ describe.skipIf(skipBrowserTests)('visualTest real-browser integration', () => {
       // new Date() should also reflect the frozen time.
       const fromCtor = await page.evaluate(() => new Date().getTime());
       expect(fromCtor).toBe(fixed);
+    } finally {
+      await page.close();
+    }
+  }, 60_000);
+
+  it('offsets component domBoxes by selector origin so component captures attribute accurately', async () => {
+    const mkComponentHtml = (btnColor: string) => `<!doctype html><html><head><style>
+      body { margin: 0; }
+      .spacer { height: 180px; width: 100%; background: #eee; }
+      .card { margin-left: 160px; width: 160px; height: 120px; position: relative; background: #fff; }
+      .cta { position: absolute; left: 20px; top: 30px; width: 80px; height: 40px; background: ${btnColor}; }
+    </style></head><body>
+      <div class="spacer"></div>
+      <div class="card" data-testid="pricing-card">
+        <button class="cta" data-testid="inner-cta">Buy</button>
+      </div>
+    </body></html>`;
+
+    const beforePath = join(workDir, 'comp-before.html');
+    const afterPath = join(workDir, 'comp-after.html');
+    fs.writeFileSync(beforePath, mkComponentHtml('#2563eb'), 'utf8');
+    fs.writeFileSync(afterPath, mkComponentHtml('#dc2626'), 'utf8');
+
+    const page = await browser.newPage({ viewport: { width: 500, height: 400 } });
+    try {
+      await page.goto(pathToFileURL(beforePath).href);
+      await visualTest(page, 'component-attribution', {
+        baselineDir,
+        selector: '[data-testid="pricing-card"]',
+        update: true,
+      });
+
+      await page.goto(pathToFileURL(afterPath).href);
+      const res = await visualTest(page, 'component-attribution', {
+        baselineDir,
+        selector: '[data-testid="pricing-card"]',
+        threshold: 0.001,
+      });
+
+      expect(res.passed).toBe(false);
+      expect(res.clusters?.length).toBeGreaterThan(0);
+      expect(res.clusters?.[0]?.targetSelector).toBe('[data-testid="inner-cta"]');
+    } finally {
+      await page.close();
+    }
+  }, 60_000);
+
+  it('hardens redactSensitive: handles Shadow DOM, isolates invalid selectors, and scrubs text/ARIA snapshots', async () => {
+    const secretHtml = `<!doctype html><html><body>
+      <div id="app">
+        <input name="cardNumber" value="4111-1111-1111-4242" />
+        <input name="cvv" value="987" />
+        <span data-frontguard-redact id="token-box">SUPER_SECRET_TOKEN_XYZ</span>
+        <div id="shadow-host"></div>
+      </div>
+      <script>
+        const host = document.getElementById('shadow-host');
+        const sr = host.attachShadow({ mode: 'open' });
+        sr.innerHTML = '<input type="password" value="SHADOW_SECRET_PASS" /><span data-sensitive>SHADOW_PII</span>';
+      </script>
+    </body></html>`;
+    const file = join(workDir, 'redact.html');
+    fs.writeFileSync(file, secretHtml, 'utf8');
+
+    const page = await browser.newPage({ viewport: { width: 400, height: 300 } });
+    try {
+      await page.goto(pathToFileURL(file).href);
+      const res = await visualTest(page, 'redact-hardened', {
+        baselineDir,
+        update: true,
+        // Include an intentionally malformed custom selector to prove default redaction still runs
+        redactSensitive: ['input[broken-selector', '[data-custom-secret]'],
+        captureAriaSnapshot: true,
+        textSnapshot: { json: '#app' },
+      });
+
+      expect(res.passed).toBe(true);
+      expect(res.ariaSnapshot).toBeDefined();
+      expect(res.ariaSnapshot).not.toContain('SUPER_SECRET_TOKEN_XYZ');
+      expect(res.ariaSnapshot).not.toContain('4111-1111-1111-4242');
+      expect(res.ariaSnapshot).not.toContain('SHADOW_SECRET_PASS');
+      expect(res.ariaSnapshot).not.toContain('SHADOW_PII');
+
+      const jsonSnap = res.textSnapshots?.find((t) => t.kind === 'json');
+      expect(jsonSnap).toBeDefined();
+      const savedJson = fs.readFileSync(jsonSnap!.path, 'utf8');
+      expect(savedJson).not.toContain('SUPER_SECRET_TOKEN_XYZ');
+      expect(savedJson).toContain('[REDACTED]');
+
+      // Verify DOM values and text were cleanly restored after capture
+      const restored = await page.evaluate(() => {
+        const card = (document.querySelector('input[name="cardNumber"]') as HTMLInputElement).value;
+        const token = document.getElementById('token-box')?.textContent;
+        const shadowHost = document.getElementById('shadow-host')!;
+        const shadowPass = (shadowHost.shadowRoot!.querySelector('input[type="password"]') as HTMLInputElement).value;
+        return { card, token, shadowPass };
+      });
+      expect(restored).toEqual({
+        card: '4111-1111-1111-4242',
+        token: 'SUPER_SECRET_TOKEN_XYZ',
+        shadowPass: 'SHADOW_SECRET_PASS',
+      });
     } finally {
       await page.close();
     }

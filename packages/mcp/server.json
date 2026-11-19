@@ -32,7 +32,7 @@
         },
         {
           "name": "FRONTGUARD_LOCAL_REPORT",
-          "description": "Path to a local Frontguard report directory or results.json for offline mode.",
+          "description": "Explicit path to a local Frontguard report directory (containing report.json or results.json) or JSON report file for read-only offline mode.",
           "isRequired": false,
           "isSecret": false
         }

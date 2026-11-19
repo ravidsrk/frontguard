@@ -8,11 +8,19 @@
 import { z } from 'zod';
 import type { CloudClient, CloudSuggestedFix } from '../client/cloud.js';
 import { diffIdFor, parseDiffId } from '../client/cloud.js';
+import {
+  capSingleLine,
+  MAX_DIFF_ID_LENGTH,
+  MAX_LABEL_LENGTH,
+  MAX_ROUTE_LENGTH,
+  sanitizeSuggestedFix,
+} from './_sanitize.js';
 
 export const getSuggestedFixInputSchema = {
   diff_id: z
     .string()
     .min(3)
+    .max(MAX_DIFF_ID_LENGTH)
     .describe(
       'A diff id from `list_regressions` — encodes the run id, route, and viewport (e.g. `run_abc:/pricing:1280`).',
     ),
@@ -97,22 +105,22 @@ export async function getSuggestedFix(
 
   if (!match.suggestedFix) {
     return {
-      diffId: diffIdFor(runId, match),
-      runId,
-      route,
+      diffId: capSingleLine(diffIdFor(runId, match), MAX_DIFF_ID_LENGTH),
+      runId: capSingleLine(runId, MAX_LABEL_LENGTH),
+      route: capSingleLine(route, MAX_ROUTE_LENGTH),
       viewport,
-      browser: match.browser,
+      ...(match.browser ? { browser: capSingleLine(match.browser, MAX_LABEL_LENGTH) } : {}),
       fix: null,
       reason: NO_FIX_REASON,
     };
   }
 
   return {
-    diffId: diffIdFor(runId, match),
-    runId,
-    route,
+    diffId: capSingleLine(diffIdFor(runId, match), MAX_DIFF_ID_LENGTH),
+    runId: capSingleLine(runId, MAX_LABEL_LENGTH),
+    route: capSingleLine(route, MAX_ROUTE_LENGTH),
     viewport,
-    browser: match.browser,
-    fix: match.suggestedFix,
+    ...(match.browser ? { browser: capSingleLine(match.browser, MAX_LABEL_LENGTH) } : {}),
+    fix: sanitizeSuggestedFix(match.suggestedFix),
   };
 }

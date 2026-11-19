@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
@@ -16,12 +16,15 @@ import {
   httpError,
   parseModelJson,
   parseResponse,
+  parseRetryAfterMs,
+  redactSecrets,
   redactUrl,
   resolveApiKey,
   resolveBaseUrl,
   summarizeErrorBody,
   supportsServerSideFallback,
   toModelImage,
+  validateBaseUrl,
   validateClassification,
   type ModelRequest,
 } from '../../src/diff/ai-provider.js';
@@ -90,33 +93,49 @@ describe('buildRequest', () => {
     expect(buildRequest(req(), env).url).toBe('https://openrouter.ai/api/v1/chat/completions');
   });
 
-  it('Anthropic first party: output_config and the fallback only for Claude 5 models', () => {
-    const sonnet = buildRequest(req({ provider: 'anthropic', model: 'claude-sonnet-5-5' }), NO_ENV);
-    expect(sonnet.url).toBe('https://api.anthropic.com/v1/messages');
-    expect(sonnet.headers['x-api-key']).toBe('secret-key');
-    expect(sonnet.headers['anthropic-version']).toBe('2023-06-01');
-    expect(sonnet.body).toHaveProperty('output_config.format.type', 'json_schema');
-    expect(sonnet.body.fallbacks).toBe('default');
-    expect(sonnet.headers['anthropic-beta']).toBe('server-side-fallback-2026-07-01');
+  it('Anthropic first party: output_config always, server-side fallback opt-in only for Claude 5 models', () => {
+    const sonnetDefault = buildRequest(req({ provider: 'anthropic', model: 'claude-sonnet-5-5' }), NO_ENV);
+    expect(sonnetDefault.url).toBe('https://api.anthropic.com/v1/messages');
+    expect(sonnetDefault.headers['x-api-key']).toBe('secret-key');
+    expect(sonnetDefault.headers['anthropic-version']).toBe('2023-06-01');
+    expect(sonnetDefault.body).toHaveProperty('output_config.format.type', 'json_schema');
+    expect(sonnetDefault.body.fallbacks).toBeUndefined();
+    expect(sonnetDefault.headers['anthropic-beta']).toBeUndefined();
 
-    const haiku = buildRequest(req({ provider: 'anthropic', model: 'claude-haiku-5-5' }), NO_ENV);
+    const sonnetFallback = buildRequest(
+      req({ provider: 'anthropic', model: 'claude-sonnet-5-5', allowFallback: true }),
+      NO_ENV,
+    );
+    expect(sonnetFallback.body.fallbacks).toBe('default');
+    expect(sonnetFallback.headers['anthropic-beta']).toBe('server-side-fallback-2026-07-01');
+
+    const haiku = buildRequest(
+      req({ provider: 'anthropic', model: 'claude-haiku-5-5', allowFallback: true }),
+      NO_ENV,
+    );
     expect(haiku.body.fallbacks).toBeUndefined();
     expect(haiku.headers['anthropic-beta']).toBeUndefined();
     expect(haiku.body.output_config).toBeDefined();
 
     // Images first, then the text block.
-    const content = (sonnet.body.messages as Array<{ content: Array<{ type: string }> }>)[0].content;
+    const content = (sonnetDefault.body.messages as Array<{ content: Array<{ type: string }> }>)[0].content;
     expect(content.map((c) => c.type)).toEqual(['image', 'text']);
   });
 
-  it('Anthropic custom endpoint: no output_config, no beta header', () => {
+  it('Anthropic custom endpoint: no output_config, no beta header even with allowFallback', () => {
     const built = buildRequest(
-      req({ provider: 'anthropic', model: 'claude-sonnet-5-5', baseUrl: 'https://gateway.example/v1/messages' }),
+      req({
+        provider: 'anthropic',
+        model: 'claude-sonnet-5-5',
+        baseUrl: 'https://gateway.example/v1/messages',
+        allowFallback: true,
+      }),
       NO_ENV,
     );
     expect(built.url).toBe('https://gateway.example/v1/messages');
     expect(built.body.output_config).toBeUndefined();
     expect(built.body.fallbacks).toBeUndefined();
+    expect(built.headers['anthropic-beta']).toBeUndefined();
   });
 
   it('Gemini first party: header key, systemInstruction, responseJsonSchema', () => {
@@ -130,17 +149,30 @@ describe('buildRequest', () => {
     expect(built.body).not.toHaveProperty('generationConfig.temperature');
   });
 
-  it('Gemini custom endpoints accept both base-URL conventions and keep the query key', () => {
+  it('Gemini custom endpoints accept both base-URL conventions and never append ?key= in URL', () => {
     const models = buildRequest(req({ provider: 'gemini', baseUrl: 'https://proxy.example/v1beta/models' }), NO_ENV);
-    expect(models.url).toBe('https://proxy.example/v1beta/models/gpt-6-luna:generateContent?key=secret-key');
+    expect(models.url).toBe('https://proxy.example/v1beta/models/gpt-6-luna:generateContent');
+    expect(models.headers['x-goog-api-key']).toBe('secret-key');
     const root = buildRequest(req({ provider: 'gemini', model: 'g', baseUrl: 'https://proxy.example/v1beta' }), NO_ENV);
-    expect(root.url).toBe('https://proxy.example/v1beta/models/g:generateContent?key=secret-key');
+    expect(root.url).toBe('https://proxy.example/v1beta/models/g:generateContent');
+    expect(root.headers['x-goog-api-key']).toBe('secret-key');
     const full = buildRequest(
-      req({ provider: 'gemini', baseUrl: 'https://proxy.example/custom:generateContent?key=abc' }),
+      req({ provider: 'gemini', baseUrl: 'https://proxy.example/custom:generateContent' }),
       NO_ENV,
     );
-    expect(full.url).toBe('https://proxy.example/custom:generateContent?key=abc');
+    expect(full.url).toBe('https://proxy.example/custom:generateContent');
+    expect(full.headers['x-goog-api-key']).toBe('secret-key');
     expect(models.body).not.toHaveProperty('generationConfig.responseJsonSchema');
+  });
+
+  it('rejects non-loopback http:// and non-http(s) base URLs while allowing loopback http://', () => {
+    expect(() => validateBaseUrl('http://api.example.com/v1', 'openai')).toThrow(/Refusing insecure base URL/);
+    expect(() => buildRequest(req({ baseUrl: 'http://evil.example/v1' }), NO_ENV)).toThrow(/Refusing insecure base URL/);
+    expect(() => buildRequest(req({ baseUrl: 'file:///etc/passwd' }), NO_ENV)).toThrow(/Refusing insecure base URL/);
+    expect(() => buildRequest(req({ baseUrl: 'not a url' }), NO_ENV)).toThrow(/Invalid base URL/);
+    expect(validateBaseUrl('http://localhost:11434/v1', 'openai')).toBe('http://localhost:11434/v1');
+    expect(validateBaseUrl('http://127.0.0.1:8080/v1', 'openai')).toBe('http://127.0.0.1:8080/v1');
+    expect(validateBaseUrl('http://[::1]:8080/v1', 'openai')).toBe('http://[::1]:8080/v1');
   });
 
   it('honours per-call output and model overrides', () => {
@@ -363,36 +395,186 @@ describe('callModel', () => {
     ).rejects.toBeInstanceOf(AIAnalysisError);
   });
 
-  it('writes a redacted, image-free dump when FRONTGUARD_DEBUG_AI=1', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'fg-ai-dump-'));
+  it('writes a redacted, image-free dump with 0700/0600 permissions when FRONTGUARD_DEBUG_AI=1', async () => {
+    const parentDir = mkdtempSync(join(tmpdir(), 'fg-ai-dump-'));
+    const dir = join(parentDir, 'ai');
     try {
       const big = new PNG({ width: 64, height: 48 });
       big.data.fill(90);
       const image = toModelImage(PNG.sync.write(big), 'baseline');
+      const secretKey = 'AIzaSyFakeSecretKeyValue1234567890';
       await callModel(
-        req({ provider: 'gemini', model: 'g', baseUrl: 'https://proxy.example/v1beta', images: [image], label: 'analyze /a b' }),
+        req({
+          provider: 'gemini',
+          model: 'g',
+          apiKey: secretKey,
+          baseUrl: 'https://user:superpass@proxy.example/v1beta',
+          images: [image],
+          label: 'analyze /a b',
+        }),
         {
           fetchImpl: (async () =>
-            new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: VALID }] } }] }), {
-              status: 200,
-            })) as unknown as typeof fetch,
+            new Response(
+              JSON.stringify({
+                modelVersion: 'gemini-3.5-flash-lite',
+                candidates: [{ content: { parts: [{ text: VALID }] } }],
+              }),
+              { status: 200 },
+            )) as unknown as typeof fetch,
           env: { FRONTGUARD_DEBUG_AI: '1' } as NodeJS.ProcessEnv,
           debugDir: dir,
         },
       );
       const files = readdirSync(dir);
       expect(files).toHaveLength(1);
-      const text = readFileSync(join(dir, files[0]), 'utf8');
-      expect(text).not.toContain('secret-key');
-      expect(text).toContain('key=REDACTED');
+      const filePath = join(dir, files[0]);
+      if (process.platform !== 'win32') {
+        expect(statSync(dir).mode & 0o777).toBe(0o700);
+        expect(statSync(filePath).mode & 0o777).toBe(0o600);
+      }
+      const text = readFileSync(filePath, 'utf8');
+      expect(text).not.toContain(secretKey);
+      expect(text).not.toContain('superpass');
+      expect(text).toContain('https://REDACTED@proxy.example/v1beta/models/g:generateContent');
       expect(text).not.toContain(image.data.slice(0, 40));
       expect(text).toMatch(/<image 64x48 base64Bytes=\d+ sha256=[0-9a-f]{16}>/);
       const dump = JSON.parse(text);
-      expect(dump).toMatchObject({ label: 'analyze /a b', provider: 'gemini', attempt: 1, structured: false });
+      expect(dump).toMatchObject({
+        label: 'analyze /a b',
+        provider: 'gemini',
+        model: 'gemini-3.5-flash-lite',
+        requestedModel: 'g',
+        attempt: 1,
+        structured: false,
+      });
       expect(dump.headers).toEqual(['Content-Type', 'x-goog-api-key']);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      rmSync(parentDir, { recursive: true, force: true });
     }
+  });
+
+  it('refuses to write debug dumps into a symlink directory', async () => {
+    const parentDir = mkdtempSync(join(tmpdir(), 'fg-ai-sym-'));
+    const realDir = join(parentDir, 'real');
+    const linkDir = join(parentDir, 'link');
+    try {
+      const { mkdirSync } = await import('node:fs');
+      mkdirSync(realDir);
+      symlinkSync(realDir, linkDir);
+      await callModel(req(), {
+        fetchImpl: (async () => ok()) as unknown as typeof fetch,
+        env: { FRONTGUARD_DEBUG_AI: '1' } as NodeJS.ProcessEnv,
+        debugDir: linkDir,
+      });
+      expect(readdirSync(realDir)).toHaveLength(0);
+    } finally {
+      rmSync(parentDir, { recursive: true, force: true });
+    }
+  });
+
+  it('passes redirect: "error" and fails closed without retrying on redirect errors', async () => {
+    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(init?.redirect).toBe('error');
+      const err = new TypeError('fetch failed');
+      (err as { cause?: Error }).cause = new Error('unexpected redirect');
+      throw err;
+    });
+    await expect(
+      callModel(req(), {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        env: NO_ENV,
+        retries: 2,
+        backoffMs: 0,
+      }),
+    ).rejects.toMatchObject({ kind: 'config', retryable: false, message: expect.stringMatching(/redirect/i) });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the abort timer active across body reads and times out stalled streams', async () => {
+    const fetchImpl = (async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: () => new Promise(() => {}),
+    })) as unknown as typeof fetch;
+    await expect(
+      callModel(req({ timeoutMs: 25 }), { fetchImpl, env: NO_ENV, retries: 0 }),
+    ).rejects.toMatchObject({ kind: 'timeout', statusCode: 408 });
+  });
+
+  it('enforces maxResponseBytes on streaming bodies and content-length headers', async () => {
+    const bigBody = JSON.stringify({ choices: [{ message: { content: 'x'.repeat(2048) } }] });
+    await expect(
+      callModel(req({ maxResponseBytes: 256 }), {
+        fetchImpl: (async () => new Response(bigBody, { status: 200 })) as unknown as typeof fetch,
+        env: NO_ENV,
+        retries: 2,
+      }),
+    ).rejects.toMatchObject({ kind: 'invalid_output', retryable: false, message: expect.stringMatching(/size limit/i) });
+  });
+
+  it('honors bounded Retry-After headers on 429 and 503 retries', async () => {
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls++;
+      if (calls === 1) {
+        return new Response('slow down', { status: 429, headers: { 'Retry-After': '3' } });
+      }
+      return ok();
+    });
+    const sleep = vi.fn(async () => {});
+    const res = await callModel(req(), {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      env: NO_ENV,
+      retries: 1,
+      backoffMs: 500,
+      sleep,
+    });
+    expect(res.attempts).toBe(2);
+    expect(sleep).toHaveBeenCalledWith(3000);
+    expect(parseRetryAfterMs(new Headers({ 'Retry-After': '9999' }), 0, 60_000)).toBe(60_000);
+    expect(parseRetryAfterMs(new Headers({ 'Retry-After': 'Wed, 21 Oct 2015 07:28:00 GMT' }), Date.parse('Wed, 21 Oct 2015 07:27:55 GMT'))).toBe(5000);
+  });
+
+  it('records actual returned data.model in ModelResponse and onCall (e.g. Anthropic fallback)', async () => {
+    const records: Array<{ model: string }> = [];
+    const res = await callModel(
+      req({ provider: 'anthropic', model: 'claude-sonnet-5-5', allowFallback: true }),
+      {
+        fetchImpl: (async () =>
+          new Response(
+            JSON.stringify({
+              model: 'claude-opus-5-20260701',
+              stop_reason: 'end_turn',
+              content: [{ type: 'text', text: VALID }],
+              usage: { input_tokens: 10, output_tokens: 5 },
+            }),
+            { status: 200 },
+          )) as unknown as typeof fetch,
+        env: NO_ENV,
+        onCall: (r) => records.push(r),
+      },
+    );
+    expect(res.model).toBe('claude-opus-5-20260701');
+    expect(records[0]?.model).toBe('claude-opus-5-20260701');
+  });
+
+  it('redacts secrets in error bodies, error messages, and URL userinfo', async () => {
+    const geminiKey = 'AIzaSyTestSecretKey1234567890abcd';
+    const err = httpError(400, `{"error":{"message":"bad key ${geminiKey} and Bearer fg_live_secret_token_12345"}}`, {
+      provider: 'gemini',
+      model: 'g',
+      firstParty: true,
+      literalSecret: geminiKey,
+    });
+    expect(err.message).not.toContain(geminiKey);
+    expect(err.message).not.toContain('fg_live_secret_token_12345');
+    expect(redactSecrets('https://alice:hunter2@proxy.example/v1?key=abc&x=1')).toBe(
+      'https://REDACTED@proxy.example/v1?key=REDACTED&x=1',
+    );
+    expect(redactUrl('https://alice:hunter2@proxy.example/v1?key=abc')).toBe(
+      'https://REDACTED@proxy.example/v1?key=REDACTED',
+    );
   });
 });
 

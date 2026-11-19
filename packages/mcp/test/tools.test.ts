@@ -587,7 +587,7 @@ describe('verify_css_patch', () => {
     expect(out.nextStep).toMatch(/^Remove @import, url\(\)/);
   });
 
-  it('fails the static check when target_selector or rule selector does not match recorded diff target', async () => {
+  it('fails the static check when target_selector or rule selector does not match recorded diff target without splicing untrusted selectors into nextStep', async () => {
     const client = buildClient({ approved: [] });
     const out = await verifyCssPatch(client, {
       diff_id: 'run_pr42:/pricing:1280',
@@ -597,8 +597,10 @@ describe('verify_css_patch', () => {
     expect(out.validSyntax).toBe(true);
     expect(out.selectorMatchedTarget).toBe(false);
     expect(out.staticCheck).toBe('fail');
-    expect(out.reason).toContain('".pricing-card"');
-    expect(out.nextStep).toMatch(/Target a recorded selector \(".pricing-card"; see inspect_diff_cluster_dom\)/);
+    expect(out.knownTargets).toEqual(['.pricing-card']);
+    expect(out.nextStep).not.toContain('.unrelated-footer');
+    expect(out.nextStep).not.toContain('.pricing-card');
+    expect(out.nextStep).toMatch(/knownTargets/);
 
     const mismatchedRule = await verifyCssPatch(client, {
       diff_id: 'run_pr42:/pricing:1280',
@@ -608,7 +610,8 @@ describe('verify_css_patch', () => {
     expect(mismatchedRule.validSyntax).toBe(true);
     expect(mismatchedRule.selectorMatchedTarget).toBe(false);
     expect(mismatchedRule.staticCheck).toBe('fail');
-    expect(mismatchedRule.nextStep).toMatch(/Use ".pricing-card" as the rule selector/);
+    expect(mismatchedRule.nextStep).not.toContain('.pricing-card');
+    expect(mismatchedRule.nextStep).toMatch(/Align the rule selector in css_patch with target_selector/);
   });
 });
 
@@ -642,7 +645,7 @@ describe('promote_baseline', () => {
     }
   });
 
-  it('records approval for the changed routes when confirm_reviewed is true, and promotes nothing', async () => {
+  it('records approval and reports truthful screenshotsPromoted when confirm_reviewed is true', async () => {
     const state: StubState = { approved: [] };
     const client = buildClient(state);
     const out = await promoteBaseline(client, {
@@ -651,7 +654,7 @@ describe('promote_baseline', () => {
     });
     expect(out).toEqual({
       approvalRecorded: true,
-      screenshotsPromoted: false,
+      screenshotsPromoted: true,
       runId: 'run_pr42',
       reviewedRoutes: ['/pricing'],
       mode: 'cloud-api',
@@ -659,23 +662,32 @@ describe('promote_baseline', () => {
     expect(state.approved).toEqual(['run_pr42']);
   });
 
-  it('filters to requested routes subset when all changed routes are included and resolves PR numbers', async () => {
+  it('requires an explicit run_id (rejects bare PR numbers) and enforces full changed-route coverage', async () => {
     const state: StubState = { approved: [] };
     const client = buildClient(state);
+
+    await expect(
+      promoteBaseline(client, {
+        run_id: '42',
+        routes: ['/pricing'],
+        confirm_reviewed: true,
+      }),
+    ).rejects.toThrow(/explicit run_id/i);
+
     const out = await promoteBaseline(client, {
-      run_id: '42',
+      run_id: 'run_pr42',
       routes: ['/pricing'],
       confirm_reviewed: true,
     });
     expect(out.approvalRecorded).toBe(true);
-    expect(out.screenshotsPromoted).toBe(false);
+    expect(out.screenshotsPromoted).toBe(true);
     expect(out.runId).toBe('run_pr42');
     expect(out.reviewedRoutes).toEqual(['/pricing']);
     expect(state.approved).toEqual(['run_pr42']);
 
     await expect(
       promoteBaseline(client, {
-        run_id: '42',
+        run_id: 'run_pr42',
         routes: ['/'],
         confirm_reviewed: true,
       }),
@@ -826,9 +838,10 @@ describe('MCP server tools/list + tools/call', () => {
     const instructions = client.getInstructions() ?? '';
     expect(instructions.length).toBeGreaterThan(0);
     expect(instructions.length).toBeLessThan(4096);
-    expect(instructions).toMatch(/`promote_baseline` and `accept_baseline` both record whole-run approval/);
-    expect(instructions).toMatch(/promote no screenshots/);
-    expect(instructions).not.toMatch(/`promote_baseline` promotes/);
+    expect(instructions).toMatch(/UNTRUSTED page or report data/i);
+    expect(instructions).toMatch(/`promote_baseline`.*`accept_baseline`/);
+    expect(instructions).toMatch(/POST \/v1\/baselines\/:runId\/approve/);
+    expect(instructions).toMatch(/refused in local-report mode/);
 
     await client.close();
     await server.close();

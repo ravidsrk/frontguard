@@ -26,14 +26,24 @@ export function createMockTransport(cases: EvalCase[]): MockTransport {
     const evalCase = id ? byId.get(id) : undefined;
     if (!evalCase) return new Response('{"error":{"message":"unknown eval case"}}', { status: 400 });
 
+    const isFixRequest = raw.includes('frontguard_fix') || raw.includes('Fix this regression.');
     const label = evalCase.expected[0] === 'pass' ? 'intentional' : evalCase.expected[0];
-    const answer = JSON.stringify({
-      classification: label,
-      explanation: `Mock answer for ${evalCase.id}`,
-      severity: label === 'regression' ? 'warning' : 'info',
-      confidence: 0.9,
-      suggestedFix: null,
-    });
+    const answer = isFixRequest
+      ? JSON.stringify({
+          fixType: 'css',
+          category: 'overflow-fix',
+          patch: evalCase.mockFixPatch ?? '.mock-restored { display: block; }',
+          confidence: 0.9,
+          explanation: `Mock fix for ${evalCase.id}`,
+          target: '.mock-restored',
+        })
+      : JSON.stringify({
+          classification: label,
+          explanation: `Mock answer for ${evalCase.id}`,
+          severity: label === 'regression' ? 'warning' : 'info',
+          confidence: 0.9,
+          suggestedFix: null,
+        });
     const usage = { in: 1500, out: 80 };
     let payload: unknown;
     if (url.includes('anthropic')) {

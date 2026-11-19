@@ -1,6 +1,13 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { PNG } from 'pngjs';
-import { analyzeWithAI, resetAIWarnings, warnOnce } from '../src/ai.js';
+import {
+  analyzeWithAI,
+  DEFAULT_PLAYWRIGHT_AI_MAX_CALLS,
+  resetAIBudget,
+  resetAIWarnings,
+  resolveAIMaxCalls,
+  warnOnce,
+} from '../src/ai.js';
 import { CLASSIFICATIONS, SEVERITIES, DEFAULT_AI_MODELS } from '../../cli/src/diff/ai-provider.js';
 
 function png(width: number, height: number): Buffer {
@@ -19,6 +26,7 @@ const AI_ENV = [
   'ANTHROPIC_API_KEY',
   'FRONTGUARD_GEMINI_KEY',
   'GEMINI_API_KEY',
+  'FRONTGUARD_AI_MAX_CALLS',
 ];
 
 const saved: Record<string, string | undefined> = {};
@@ -29,6 +37,7 @@ beforeEach(() => {
     delete process.env[k];
   }
   resetAIWarnings();
+  resetAIBudget();
 });
 
 afterEach(() => {
@@ -139,6 +148,36 @@ describe('analyzeWithAI', () => {
   it('uses the same taxonomy as the CLI', () => {
     expect([...CLASSIFICATIONS]).toEqual(['regression', 'intentional', 'content_update']);
     expect([...SEVERITIES]).toEqual(['critical', 'warning', 'info']);
+  });
+
+  it('enforces FRONTGUARD_AI_MAX_CALLS budget with a finite default cap matching CLI', async () => {
+    expect(DEFAULT_PLAYWRIGHT_AI_MAX_CALLS).toBe(50);
+    expect(resolveAIMaxCalls({})).toBe(50);
+    expect(resolveAIMaxCalls({ FRONTGUARD_AI_MAX_CALLS: '0' })).toBe(0);
+    expect(resolveAIMaxCalls({ FRONTGUARD_AI_MAX_CALLS: 'Infinity' })).toBe(Number.POSITIVE_INFINITY);
+
+    process.env.OPENAI_API_KEY = 'sk-test';
+    process.env.FRONTGUARD_AI_MAX_CALLS = '2';
+    const fetchImpl = openAIFetch();
+
+    const r1 = await analyzeWithAI(img, img, { provider: 'openai' }, null, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    const r2 = await analyzeWithAI(img, img, { provider: 'openai' }, null, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    const r3 = await analyzeWithAI(img, img, { provider: 'openai' }, null, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    expect(r1.ai).toBeDefined();
+    expect(r2.ai).toBeDefined();
+    expect(r3.ai).toBeUndefined();
+    expect(r3.aiError).toMatchObject({
+      kind: 'config',
+      message: expect.stringMatching(/FRONTGUARD_AI_MAX_CALLS=2/),
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });
 

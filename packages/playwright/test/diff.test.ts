@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PNG } from 'pngjs';
-import { compareImages, computeSSIM } from '../src/diff.js';
+import { compareImages, computeSSIM, extractDiffClusters } from '../src/diff.js';
 
 /** Create a solid-color PNG buffer */
 function createPNG(
@@ -226,9 +226,81 @@ describe('compareImages', () => {
       rawDiffPixels: 16,
     });
   });
+
+  it('uses byte-identical fast path without decoding PNGs', () => {
+    const identicalRaw = Buffer.from('not-even-a-png-byte-identical');
+    const result = compareImages(identicalRaw, Buffer.from(identicalRaw), 0.01);
+    expect(result).toEqual({
+      passed: true,
+      diffPercentage: 0,
+      windowMax: 0,
+      diffBuffer: null,
+      ssim: 1,
+      clusters: [],
+    });
+  });
+
+  it('applies minPixels filtering, maxClusters capping, and non-cubic merging on dense speck fields', () => {
+    // 200x200 image with 20 separate 3x3 blocks (9px each, spaced 25px apart so they don't merge)
+    const width = 400;
+    const height = 400;
+    const mask = new Uint8Array(width * height);
+    // Add isolated 1px micro-specks (< minPixels=4) that must be filtered out
+    mask[5 * width + 5] = 1;
+    mask[5 * width + 50] = 1;
+
+    // Add 16 separated 3x3 blocks (>= minPixels=4) -> must cap at maxClusters=8
+    let count = 0;
+    for (let gy = 0; gy < 4; gy++) {
+      for (let gx = 0; gx < 4; gx++) {
+        const x0 = 20 + gx * 90;
+        const y0 = 20 + gy * 90;
+        for (let dy = 0; dy < 3; dy++) {
+          for (let dx = 0; dx < 3; dx++) {
+            mask[(y0 + dy) * width + (x0 + dx)] = 1;
+          }
+        }
+        count++;
+      }
+    }
+    expect(count).toBe(16);
+
+    const start = performance.now();
+    const clusters = extractDiffClusters(mask, width, height);
+    const elapsed = performance.now() - start;
+
+    expect(clusters).toHaveLength(8); // capped at default maxClusters=8
+    expect(clusters.every((c) => c.rawDiffPixels === 9)).toBe(true);
+    expect(elapsed).toBeLessThan(500);
+  });
+
+  it('handles float-boundary threshold equality cleanly via compareDiffToThreshold', () => {
+    // 100x100 image with 100 changed pixels = exact 0.01 (1%) -> should pass at threshold 0.01
+    // Spread across 10x10? No, 10x10 has windowMax=100>64, so use a 100x1 line (windowMax=16<=64)
+    const base = createPNG(100, 100, [128, 128, 128, 255]);
+    const current = createPNGWithRegion(100, 100, [128, 128, 128, 255], [255, 0, 0, 255], 0, 0, 100, 1);
+    const result = compareImages(base, current, 0.01);
+    expect(result.diffPercentage).toBe(0.01);
+    expect(result.windowMax).toBeLessThanOrEqual(64);
+    expect(result.passed).toBe(true);
+  });
 });
 
 describe('computeSSIM', () => {
+  it('uses ITU-R BT.709 luminance weights matching @frontguard/cli', () => {
+    const size = 16;
+    // Pure blue (0,0,255): BT.709 luma = 18.411 vs BT.601 luma = 29.07
+    // Gray with luma 18 (18,18,18) matches BT.709 much closer than gray 29
+    const blue = Buffer.alloc(size * size * 4);
+    const gray709 = Buffer.alloc(size * size * 4);
+    const gray601 = Buffer.alloc(size * size * 4);
+    for (let i = 0; i < size * size * 4; i += 4) {
+      blue[i] = 0; blue[i + 1] = 0; blue[i + 2] = 255; blue[i + 3] = 255;
+      gray709[i] = 18; gray709[i + 1] = 18; gray709[i + 2] = 18; gray709[i + 3] = 255;
+      gray601[i] = 29; gray601[i + 1] = 29; gray601[i + 2] = 29; gray601[i + 3] = 255;
+    }
+    expect(computeSSIM(blue, gray709, size, size)).toBeGreaterThan(computeSSIM(blue, gray601, size, size));
+  });
   it('identical data → SSIM ≈ 1', () => {
     const size = 32;
     const data = Buffer.alloc(size * size * 4, 128);

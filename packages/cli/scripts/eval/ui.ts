@@ -59,23 +59,38 @@ interface Mutation {
   ambiguous?: boolean;
   css?: string;
   body?: string;
+  mockFixPatch?: string;
 }
 
 const MUTATIONS: Mutation[] = [
-  { id: 'ui-nav-removed', description: 'Header navigation disappears', expected: ['regression'], css: 'header { display: none; }' },
+  {
+    id: 'ui-nav-removed',
+    description: 'Header navigation disappears',
+    expected: ['regression'],
+    css: 'header { display: none; }',
+    mockFixPatch: 'header { display: flex; }',
+  },
   {
     id: 'ui-cta-clipped',
     description: 'Hero call-to-action is clipped to a sliver',
     expected: ['regression'],
     css: '.hero .primary { width: 64px; overflow: hidden; }',
+    mockFixPatch: '.hero .primary { width: auto; overflow: visible; }',
   },
   {
     id: 'ui-cards-overlap',
     description: 'The Pro card slides over the Starter card and hides its text',
     expected: ['regression'],
     css: '.pricing .card:nth-child(2) { transform: translate(-300px, 56px); box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18); }',
+    mockFixPatch: '.pricing .card:nth-child(2) { transform: none; box-shadow: none; }',
   },
-  { id: 'ui-footer-missing', description: 'Footer is gone', expected: ['regression'], css: 'footer { display: none; }' },
+  {
+    id: 'ui-footer-missing',
+    description: 'Footer is gone',
+    expected: ['regression'],
+    css: 'footer { display: none; }',
+    mockFixPatch: 'footer { display: block; }',
+  },
   {
     id: 'ui-price-change',
     description: 'Pro price changes from $49 to $59',
@@ -162,6 +177,7 @@ export async function uiCases(): Promise<EvalCase[]> {
         before,
         after: await renderHtml(page, afterHtml),
         html: { before: baseHtml, after: afterHtml },
+        ...(m.mockFixPatch ? { mockFixPatch: m.mockFixPatch } : {}),
       });
     }
     return cases;
