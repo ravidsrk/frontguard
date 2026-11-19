@@ -46,7 +46,7 @@ const INTEGRATION_TABS: ReadonlyArray<IntegrationSurface> = [
     label: "Coding agents",
     pkg: "@frontguard/mcp",
     sentence:
-      "Expose 7 local visual cortex tools to Claude Code, Cursor, or Windsurf via MCP stdio—or run frontguard guide --json for structured machine-readable workflows.",
+      "Expose 6 local read tools (plus 2 opt-in write tools) to Claude Code, Cursor, or Windsurf via MCP stdio—or run frontguard guide --json for structured machine-readable workflows.",
     code: MCP_CODE,
     html: MCP_HTML,
   },
@@ -55,7 +55,7 @@ const INTEGRATION_TABS: ReadonlyArray<IntegrationSurface> = [
 export function WorkflowEntryDeck() {
   const [activeTab, setActiveTab] = useState<IntegrationTabId>("cli");
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const [copied, copyCode] = useCopy();
+  const [copied, copyCode, copyStatus] = useCopy();
 
   const currentTab =
     INTEGRATION_TABS.find((t) => t.id === activeTab) ?? INTEGRATION_TABS[0];
@@ -92,7 +92,7 @@ export function WorkflowEntryDeck() {
           </h2>
           <p className="fg-lead">
             The same local pixel and Chroma SSIM engine powers the standalone
-            CLI, the Playwright test helper, and the 7-tool MCP server.
+            CLI, the Playwright test helper, and the 8-tool MCP server.
           </p>
         </div>
 
@@ -205,7 +205,11 @@ export function WorkflowEntryDeck() {
                     ),
                   }}
                 >
-                  {copied ? "Copied ✓" : "Copy"}
+                  {copied
+                    ? "Copied ✓"
+                    : copyStatus === "failed"
+                      ? "Copy failed"
+                      : "Copy"}
                 </button>
               </div>
               <pre

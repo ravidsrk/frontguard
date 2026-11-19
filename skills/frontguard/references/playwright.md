@@ -15,7 +15,7 @@ test('pricing tier card matches baseline', async ({ page }) => {
     selector: '[data-testid="tier-pro"]', // Crop to a specific component
     threshold: 0.01,                      // 1% pixel ratio threshold
     mask: ['.live-currency-ticker'],      // Mask volatile dynamic selectors
-    redactSensitive: true,                // Mask password/CC/[data-frontguard-redact]
+    redactSensitive: true,                // Mask password/CC/OTP/[data-frontguard-redact]/[data-sensitive]
     waitForStable: true,                  // Poll until 2 consecutive frames converge
   });
 
@@ -27,11 +27,12 @@ test('pricing tier card matches baseline', async ({ page }) => {
 
 ## Options Reference (`VisualTestOptions`)
 
-- **`threshold`** (`number`, default `0.1`): Changed-pixel ratio in `[0, 1]` (`0.01` = 1%).
+- **`threshold`** (`number`, default `0.01`): Changed-pixel ratio in `[0, 1]` (`0.01` = 1%).
 - **`selector`** (`string`): Optional CSS selector to capture a single component (`page.locator(selector).first().screenshot()`) instead of the full page.
 - **`fullPage`** (`boolean`, default `true`): Capture full scrollable page when `selector` is not set.
-- **`mask`** (`string[]`): CSS selectors to cover with neutral gray boxes during capture.
-- **`redactSensitive`** (`boolean | string[]`): Mask sensitive inputs (`input[type="password"]`, `autocomplete^="cc-"`, `[data-frontguard-redact]`, `[data-sensitive]`) while preserving layout geometry.
-- **`waitForStable`** (`boolean | { timeoutMs?: number; intervalMs?: number; maxUnstableRatio?: number }`): Wait for consecutive frames to settle before returning the screenshot.
-- **`update`** (`boolean`): Accept current screenshot as the new baseline (also enabled when `FRONTGUARD_UPDATE=1` or `UPDATE_SNAPSHOTS=1`).
-- **`baselineDir`** (`string`, default `'.frontguard/playwright'`): Directory for baseline, current, and diff PNG artifacts.
+- **`mask`** (`string[]`): CSS selectors to hide (`visibility: hidden`) during capture.
+- **`maskRegions`** (`Array<{ x: number; y: number; width: number; height: number }>`): Explicit coordinate rectangles covered with neutral gray boxes during capture.
+- **`redactSensitive`** (`boolean | string[]`): Mask sensitive inputs (`input[type="password"]`, `input[autocomplete="current-password"]`, `input[autocomplete="new-password"]`, `input[autocomplete="one-time-code"]`, `input[autocomplete^="cc-"]`, `[data-frontguard-redact]`, `[data-sensitive]`, plus any custom selectors) while preserving layout geometry.
+- **`waitForStable`** (`boolean | { maxAttempts?: number; intervalMs?: number }`): Wait for consecutive frames to settle before returning the screenshot (defaults: `maxAttempts: 3`, `intervalMs: 80`).
+- **`update`** (`boolean`): Accept current screenshot as the new baseline (also enabled when `FRONTGUARD_UPDATE=1`).
+- **`baselineDir`** (`string`, default `'__visual_baselines__'`): Directory for baseline, current, and diff PNG artifacts.

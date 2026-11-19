@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { copyText } from "../../lib/clipboard";
 import { s } from "../../lib/style";
 import { Shield } from "../Shield";
 import { MONO } from "./home-data";
@@ -45,7 +46,7 @@ const INSTALL_STEPS: ReadonlyArray<InstallStep> = [
   {
     num: "04",
     title: "Promote reviewed baselines",
-    cmd: "npx -p @frontguard/cli frontguard update-baselines",
+    cmd: "npx -p @frontguard/cli frontguard update-baselines --confirm-baselines",
     note: (
       <>
         After inspecting the HTML diff workbench, promote reviewed snapshots to
@@ -60,17 +61,36 @@ const INSTALL_STEPS: ReadonlyArray<InstallStep> = [
 ];
 
 export function ClosingCommandDeck() {
-  const [copiedStep, setCopiedStep] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<{
+    cmd: string;
+    status: "copied" | "failed";
+  } | null>(null);
+  const attemptRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleCopy = (cmd: string) => {
-    try {
-      navigator.clipboard?.writeText(cmd);
-    } catch {
-      /* ignore clipboard errors in headless environments */
+  useEffect(() => {
+    return () => {
+      attemptRef.current += 1;
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopy = async (cmd: string) => {
+    const attempt = ++attemptRef.current;
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
-    setCopiedStep(cmd);
-    setTimeout(() => {
-      setCopiedStep((prev) => (prev === cmd ? null : prev));
+    const ok = await copyText(cmd);
+    if (attempt !== attemptRef.current) return;
+    setCopyFeedback({ cmd, status: ok ? "copied" : "failed" });
+    timerRef.current = setTimeout(() => {
+      if (attempt === attemptRef.current) {
+        setCopyFeedback(null);
+        timerRef.current = null;
+      }
     }, 1800);
   };
 
@@ -87,16 +107,13 @@ export function ClosingCommandDeck() {
               <Shield w={34} h={40} />
             </div>
             <h2 className="fg-h2" style={s("max-width: 22ch;")}>
-              Stop triaging noise. Run your first diff in two minutes.
+              Stop triaging noise. Run your first diff locally.
             </h2>
             <p className="fg-lead">
               Install the CLI, run a local comparison against your dev server,
               and inspect the interactive HTML diff workbench before gating pull
               requests.
             </p>
-          </div>
-          <div className="fg-todo-note">
-            TODO: confirm exact setup timing wording (e.g. "two minutes")
           </div>
         </div>
 
@@ -108,7 +125,10 @@ export function ClosingCommandDeck() {
           className="fg-split-2"
         >
           {INSTALL_STEPS.map((st) => {
-            const isCopied = copiedStep === st.cmd;
+            const isCopied =
+              copyFeedback?.cmd === st.cmd && copyFeedback.status === "copied";
+            const isFailed =
+              copyFeedback?.cmd === st.cmd && copyFeedback.status === "failed";
             return (
               <li
                 key={st.num}
@@ -146,13 +166,15 @@ export function ClosingCommandDeck() {
                         ),
                       }}
                     >
-                      {isCopied ? "Copied ✓" : "Copy"}
+                      {isCopied ? "Copied ✓" : isFailed ? "Copy failed" : "Copy"}
                     </button>
                   </div>
                   <div className="fg-small">{st.note}</div>
                 </div>
 
                 <div
+                  tabIndex={0}
+                  aria-label={`${st.title} command`}
                   style={{
                     fontFamily: MONO,
                     ...s(
@@ -183,7 +205,7 @@ export function ClosingCommandDeck() {
           >
             <Link
               to="/docs/$"
-              params={{ _splat: "getting-started/quickstart" }}
+              params={{ _splat: "quick-start" }}
               className="fg-btn-primary"
               style={s(
                 "padding: 13px 22px; background: var(--accent); color: var(--bg); font-weight: 600; font-size: 15px; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;",

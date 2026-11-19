@@ -564,7 +564,7 @@ $ frontguard monitor --history`,
     // or provider: 'anthropic' (default 'claude-sonnet-5-5')
   },
   ignore: [
-    { selector: '.live- visitor-counter' },
+    { selector: '.live-visitor-counter' },
   ],
   smartRender: true,
   workers: 4,
@@ -586,12 +586,12 @@ $ frontguard monitor --history`,
         ['ssimThreshold', 'number (0-1)', '0.98', 'SSIM fallback cutoff when ssimFallback is enabled.'],
         ['colorScheme', "'light' | 'dark'", 'undefined', 'Emulate prefers-color-scheme during capture. Uses the same baseline file as the default scheme unless named capture modes are configured, and warns when the stored scheme differs. The warning does not change the exit code.'],
         ['modes', 'Record&lt;string, CaptureModeConfig&gt;', 'undefined', 'Named capture mode bundles (colorScheme, reducedMotion, forcedColors, contrast, locale, timezoneId) keyed onto baselines/&lt;route&gt;/&lt;viewport&gt;/&lt;mode&gt;/&lt;browser&gt;.png.'],
-        ['waitForStability', 'boolean', 'false', 'Wait for consecutive animation frames to converge before taking the screenshot.'],
-        ['redactSensitive', 'boolean', 'false', 'Mask password/email/tel inputs and [data-frontguard-redact] nodes and scrub DOM snapshots.'],
+        ['waitForStability', 'boolean | { maxAttempts?, intervalMs?, pixelThreshold?, maxUnstableRatio? }', 'false', 'Wait for consecutive animation frames to converge before taking the screenshot (defaults: maxAttempts 4, intervalMs 120, maxUnstableRatio 0.0005).'],
+        ['redactSensitive', 'boolean | string[]', 'false', 'Mask password, credit-card (autocomplete^="cc-"), one-time-code, and [data-frontguard-redact] / [data-sensitive] elements (plus any custom selectors) and scrub DOM snapshots.'],
         ['freezeTime', 'boolean | number | string', 'undefined', 'Freeze page.clock and Date.now() to a fixed epoch ms or ISO 8601 date string.'],
         ['seedRandom', 'boolean | number', 'undefined', 'Override Math.random() with a seeded Mulberry32 PRNG.'],
         ['blockUrls', 'string[]', '[]', 'Abort third-party URLs matching glob/substring patterns before capture.'],
-        ['ignore', 'Array&lt;{ selector: string }&gt;', '[]', 'Hide or mask volatile DOM elements (e.g., live tickers, video players) during capture.'],
+        ['ignore', 'Array&lt;{ selector?: string, rect?: Rect, description?: string, since?: string }&gt;', '[]', 'Hide or mask volatile DOM elements or pixel rects (e.g., live tickers, video players) during capture.'],
         ['ai', '{ provider, model?, baseUrl?, maxCalls?, maxOutputTokens?, timeoutMs? }', 'undefined', 'Optional BYOK vision triage (openai, anthropic, gemini). maxCalls caps model calls per run; skipped calls are reported in aiUsage and leave pixel results unchanged.'],
         ['plugins', 'FrontguardPlugin[]', '[]', 'Registered 9-hook lifecycle plugins (accessibility, performance budgets, script inventory, custom).'],
         ['outputDir', 'string', "'./frontguard-report'", 'Directory for HTML and images. JSON output is written to stdout; redirect it to save a file.'],
@@ -628,7 +628,7 @@ $ frontguard monitor --history`,
     '*doubleclick.net*',
   ],
   ignore: [
-    { selector: '[data-testid="live- latency-sparkline"]' },
+    { selector: '[data-testid="live-latency-sparkline"]' },
   ],
 }`,
     )}${h2('Optional controls')}${figure(
@@ -778,7 +778,7 @@ test('annual pricing card matches baseline without third-party noise', async ({ 
         ['selector', 'string', 'undefined', 'CSS selector to capture a specific component instead of the full viewport.'],
         ['fullPage', 'boolean', 'true', 'Capture the full scrollable page height (ignored when selector is set).'],
         ['waitForStable', 'boolean | { maxAttempts?: number, intervalMs?: number }', 'false', 'Wait for fonts, then compare consecutive captures using threshold. Defaults: maxAttempts 3, intervalMs 80.'],
-        ['redactSensitive', 'boolean', 'false', 'Mask password/email/tel inputs and [data-frontguard-redact] elements before capture.'],
+        ['redactSensitive', 'boolean | string[]', 'false', 'Mask password, credit-card (autocomplete^="cc-"), one-time-code, and [data-frontguard-redact] / [data-sensitive] elements (plus any custom selectors) before capture.'],
         ['freezeTime', 'boolean | number | string', 'undefined', 'Freeze page.clock and Date.now() via epoch ms or ISO 8601 string (e.g., "2026-01-01T00:00:00Z").'],
         ['seedRandom', 'boolean | number', 'undefined', 'Override Math.random() with a deterministic Mulberry32 PRNG (true uses seed 42).'],
         ['blockUrls', 'string[]', 'undefined', 'Abort matching network requests via page.route() during capture and clean up afterward.'],
@@ -1155,7 +1155,7 @@ export default {
   version: 1,
   baseUrl: 'http://localhost:3000',
   blockUrls: [
-    '*Widget.intercom.io*',
+    '*widget.intercom.io*',
     '*cdn.segment.com*',
     '*optimize.google.com*',
   ],
@@ -1254,12 +1254,16 @@ FRONTGUARD_API_KEY=fg_live_your_token_here`,
       ['Method & Path', 'Auth', 'Purpose'],
       [
         ['GET /health', 'Public', 'Returns service health and D1 SQLite database connectivity status.'],
-        ['POST /v1/runs', 'Bearer API Key', 'Ingests run metadata, route diff metrics, and spatial cluster records.'],
-        ['GET /v1/runs/:id', 'Bearer API Key', 'Retrieves a specific run and its per-route comparison results.'],
-        ['POST /v1/runs/:id/accept', 'Bearer API Key', 'Records run-level approval metadata in D1 (does not promote git screenshots).'],
+        ['POST /v1/run', 'Bearer API Key', 'Submits a visual regression run for asynchronous processing.'],
+        ['GET /v1/runs', 'Bearer API Key', 'Lists recent runs visible to the authenticated caller.'],
+        ['GET /v1/runs/{id}', 'Bearer API Key', 'Retrieves a specific run and its per-route comparison results.'],
+        ['DELETE /v1/runs/{id}', 'Bearer API Key', 'Deletes a run and performs best-effort cleanup of its screenshot blobs.'],
+        ['GET /v1/reports/{id}', 'Bearer API Key', 'Fetches the completed HTML report for a run.'],
+        ['POST /v1/baselines/{runId}/approve', 'Bearer API Key', 'Records whole-run baseline approval metadata in D1 (does not promote git screenshots).'],
+        ['GET /v1/usage', 'Bearer API Key', 'Returns current monthly run and screenshot usage counters.'],
         ['POST /v1/cas/check', 'Bearer API Key', 'Checks a batch of SHA-256 digests against R2 and returns existing vs missing hashes.'],
-        ['PUT /v1/cas/blobs/:sha256', 'Bearer API Key', 'Verifies the SHA-256 digest of a PNG payload and stores it immutably in R2.'],
-        ['GET /v1/cas/blobs/:sha256', 'Bearer API Key', 'Streams an immutable PNG blob from R2 with long-lived Cache-Control headers.'],
+        ['PUT /v1/cas/blobs/{sha256}', 'Bearer API Key', 'Verifies the SHA-256 digest of a PNG payload and stores it immutably in R2.'],
+        ['GET /v1/cas/blobs/{sha256}', 'Bearer API Key', 'Streams an immutable PNG blob from R2 with long-lived Cache-Control headers.'],
       ],
     )}${h2('Production warning')}${p(
       'Do not use the pre-release cloud for production data until deployment, migrations, retention, recovery, and tenant isolation are independently verified.',
@@ -1411,7 +1415,7 @@ export function createStorageStatePlugin(options: StorageStateOptions): Frontgua
       'GitHub Actions Two-Lane Baseline Governance',
       'FIG 01 · TWO-LANE CI/CD GOVERNANCE — COMPARISON-ONLY PR WORKFLOW & EXPLICIT BASELINE PROMOTION',
     )}${h2('Generated workflow')}${p(
-      'frontguard init --ci generates a comparison-only workflow that invokes the CLI directly, uses contents: read, and uploads the HTML artifact. Configure FRONTGUARD_OPENAI_KEY or FRONTGUARD_ANTHROPIC_KEY only if optional analysis is enabled.',
+      'frontguard init --ci generates a comparison-only workflow that invokes the CLI directly, uses contents: read, and uploads the HTML artifact. Configure FRONTGUARD_OPENAI_KEY, FRONTGUARD_ANTHROPIC_KEY, or FRONTGUARD_GEMINI_KEY only if optional analysis is enabled.',
     )}${p(
       'The generated workflow fetches origin/frontguard-baselines explicitly. Default actions/checkout fetch-depth: 1 only retrieves the triggering commit, so a CI user who omits that fetch gets an empty expected set.',
     )}${h2('Complete PR workflow YAML')}${code(
@@ -1544,7 +1548,7 @@ jobs:
     ])}${h2('Configuration mapping')}${table(
       ['BackstopJS (backstop.json)', 'Frontguard (frontguard.config.ts)', 'Migration Notes'],
       [
-        ['viewports: [{ label, width, height }]', 'viewports: [375, 768, 1440]', 'Specify widths in pixels (or { width, height } objects).'],
+        ['viewports: [{ label, width, height }]', 'viewports: [375, 768, 1440]', 'Specify widths as positive integers in CSS pixels (use top-level viewportHeight to override default height).'],
         ['scenarios[].url', 'baseUrl + routes: ["/pricing", ...]', 'Extract shared origin to baseUrl and list relative paths in routes.'],
         ['scenarios[].misMatchThreshold: 1.5', 'threshold: 0.015', 'Divide BackstopJS percentage (0–100) by 100 to get Frontguard ratio (0–1).'],
         ['scenarios[].hideSelectors / removeSelectors', 'ignore: [{ selector: ".ad-banner" }]', 'Masks volatile DOM elements before capture.'],
@@ -1595,7 +1599,7 @@ export default {
     )}${h2('Scope')}${list([
       'Map page and Storybook captures to Frontguard routes.',
       'Configure viewports and thresholds explicitly.',
-      'Review and accept new Frontguard baselines with update-baselines.',
+      'Review and accept new Frontguard baselines with frontguard update-baselines --confirm-baselines.',
       'Run both systems until your team accepts the new evidence and failure semantics.',
     ])}${h2('Configuration mapping')}${table(
       ['Lost Pixel (lostpixel.config.ts)', 'Frontguard (frontguard.config.ts)', 'Migration Notes'],
@@ -1827,7 +1831,7 @@ createServer(async (req, res) =&gt; {
     )}${p(
       'This example listens only on localhost. Use your existing authenticated alert service for remote CI runners; webhook delivery is best-effort.',
     )}${h2('Cloud requirement')}${p(
-      'Interactive Slack buttons and OAuth installation in integrations/slack require a self-operated Cloud API deployment and are not generally available.',
+      'Interactive Slack buttons and OAuth installation in integrations/slack-app require a self-operated Cloud API deployment and are not generally available.',
     )}`,
   ),
 

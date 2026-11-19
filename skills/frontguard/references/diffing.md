@@ -15,11 +15,11 @@ Frontguard combines three complementary diffing stages in `packages/cli/src/diff
 
 ## Frame Stability Convergence & Motion Attribution
 
-When `waitForStability: true` (or `--wait-for-stability`) is enabled:
+When `waitForStability: true` (or `waitForStability: { maxAttempts, intervalMs, pixelThreshold, maxUnstableRatio }` / `--wait-for-stability`) is enabled:
 
-- Frontguard polls consecutive screenshots at `intervalMs` (default `100ms`) up to `timeoutMs` (default `3000ms`).
-- Once two consecutive frames differ by $\le \text{maxUnstableRatio}$ (default `0.0005` = 0.05%), the page is marked `settled: true` and the settled buffer is used directly without an extra screenshot roundtrip.
-- If the page fails to settle within `timeoutMs` (e.g., an infinite JS canvas ticker or unthrottled animation), Frontguard extracts `motionClusters` (`DiffCluster[]`) pinpointing the exact `(x, y, width, height)` regions still in motion.
+- Frontguard polls consecutive screenshots at `intervalMs` (default `120ms`, max `5000ms`) for up to `maxAttempts` frames (default `4`, min `2`, max `10`).
+- Once two consecutive frames differ by $\le \text{maxUnstableRatio}$ (default `0.0005` = 0.05%, using `pixelThreshold` default `0.1`), the page is marked `settled: true` and the settled buffer is used directly without an extra screenshot roundtrip.
+- If the page fails to settle within `maxAttempts` (e.g., an infinite JS canvas ticker or unthrottled animation), Frontguard extracts `motionClusters` (`DiffCluster[]`) pinpointing the exact `(x, y, width, height)` regions still in motion.
 
 ## Sensitive-DOM Pixel & HTML Snapshot Redaction
 
@@ -27,10 +27,11 @@ When `redactSensitive: true` (or `--redact-sensitive`) is enabled:
 
 - Automatically masks:
   - `input[type="password"]`
-  - Credit card inputs (`autocomplete^="cc-"`, `name*="card"`, `name*="cvv"`, `name*="cvc"`)
+  - `input[autocomplete="current-password"]` and `input[autocomplete="new-password"]`
+  - Credit card inputs (`input[autocomplete^="cc-"]`)
   - `input[autocomplete="one-time-code"]`
   - Any element with `[data-frontguard-redact]` or `[data-sensitive]`
   - Any custom CSS selectors provided in `redactSensitive: ['...']`
-- **Layout-Preserving**: Applies an opaque neutral block without altering `width`, `height`, `padding`, or `border`, preventing false layout shifts.
+- **Layout-Preserving**: Applies `color: transparent !important; text-shadow: none !important; caret-color: transparent !important;` without altering `width`, `height`, `padding`, or `border`, preventing false layout shifts.
 - **Shadow DOM Traversal**: Recursively traverses open `shadowRoot` trees.
-- **HTML Snapshot Scrubbing**: Scrubs `value="..."` attributes from sensitive `<input>` tags in `domSnapshot` before sending DOM context to AI vision models.
+- **HTML Snapshot Scrubbing**: Scrubs `value="..."` attributes to `value="[REDACTED]"` on sensitive `<input>` tags in `domSnapshot` before persisting snapshots or transmitting DOM context to AI vision models.

@@ -89,7 +89,7 @@ export function Nav({ active }: { active?: ActivePage }) {
             target="_blank"
             rel="noopener noreferrer"
             className="fg-navlink"
-            title="TODO: wire live GitHub star count"
+            title="Star Frontguard on GitHub"
             style={s(
               "font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-secondary); padding: 5px 10px; border: 1px solid var(--border); border-radius: 4px; text-decoration: none;",
             )}
@@ -100,7 +100,7 @@ export function Nav({ active }: { active?: ActivePage }) {
 
         <Link
           to="/docs/$"
-          params={{ _splat: 'getting-started/quickstart' }}
+          params={{ _splat: 'quick-start' }}
           className="fg-btn-primary fg-nav-cta"
           style={s(
             'padding: 8px 16px; background: var(--accent); color: var(--bg); font-weight: 600; font-size: 13px; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;',

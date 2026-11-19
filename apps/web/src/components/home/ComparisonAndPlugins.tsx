@@ -56,7 +56,7 @@ export function ComparisonAndPlugins() {
               ),
             }}
           >
-            See all 11 capabilities across 6 tools →
+            See all 15 capabilities across 6 tools →
           </Link>
         </div>
 
@@ -88,7 +88,7 @@ export function ComparisonAndPlugins() {
                   Experimental CSS suggestion verification, clearly labeled.
                 </h3>
                 <span className="fg-small">
-                  Candidate CSS patches are opt-in (`◐`) and never auto-applied
+                  Candidate CSS patches are opt-in (◐) and never auto-applied
                   to source files.
                 </span>
               </div>

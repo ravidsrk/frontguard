@@ -222,17 +222,6 @@ a { color: inherit; }
   line-height: 1.55;
 }
 
-.fg-todo-note {
-  font-family: var(--fg-mono);
-  font-size: 11px;
-  color: var(--text-muted);
-  background: var(--surface);
-  border: 1px dashed var(--border);
-  border-radius: 4px;
-  padding: 4px 8px;
-  display: inline-block;
-}
-
 .fg-hero-grid {
   display: grid;
   grid-template-columns: 1fr 1.08fr;

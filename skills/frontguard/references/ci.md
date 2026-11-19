@@ -41,15 +41,15 @@ jobs:
         run: |
           npm run build && npm run start &
           npx wait-on http://localhost:3000
-          npx @frontguard/cli run --url http://localhost:3000 --wait-for-stability --redact-sensitive
+          npx -p @frontguard/cli frontguard run --url http://localhost:3000 --wait-for-stability --redact-sensitive
 ```
 
 ## Cross-OS Deterministic Rendering (`--docker`)
 
-Font hinting and anti-aliasing differ between macOS (CoreText) and Linux (FreeType). If developers record baselines on macOS and CI runs on Ubuntu, run Frontguard inside the deterministic Linux container:
+Font hinting and anti-aliasing differ between macOS (CoreText) and Linux (FreeType). If developers record baselines on macOS and CI runs on Ubuntu, build the repository-source renderer image locally (see `https://frontguard.dev/docs/cross-os-rendering`) and run Frontguard inside the Linux container:
 
 ```bash
-npx @frontguard/cli run --docker --url http://localhost:3000
+npx -p @frontguard/cli frontguard run --docker --url http://localhost:3000
 ```
 
 When `--docker` is passed, Frontguard automatically rewrites `localhost` / `127.0.0.1` URLs to `host.docker.internal` inside the container.

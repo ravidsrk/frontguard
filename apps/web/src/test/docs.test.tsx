@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { RouterProvider } from "@tanstack/react-router";
+import { isNotFound, RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "../router";
+import { Route as DocArticleRoute } from "../routes/docs/$";
 import {
   articles,
   DOC_SLUGS,
@@ -257,10 +258,25 @@ describe("docs routes", () => {
     cleanup();
   });
 
-  it("shows 404 fallback for unknown slug", async () => {
+  it("throws TanStack notFound() and shows 404 fallback for unknown slugs", async () => {
+    const loader = DocArticleRoute.options.loader;
+    expect(typeof loader).toBe("function");
+    let thrown: unknown;
+    try {
+      if (typeof loader === "function") {
+        await loader({
+          params: { _splat: "getting-started/quickstart" },
+        } as never);
+      }
+    } catch (err) {
+      thrown = err;
+    }
+    expect(isNotFound(thrown)).toBe(true);
+
     await renderAt("/docs/this-slug-does-not-exist");
     expect(screen.getByRole("heading", { name: /page not found/i })).toBeInTheDocument();
     expect(screen.getByText(/no docs article matches/i)).toBeInTheDocument();
+    expect(screen.queryByText("ON THIS PAGE")).not.toBeInTheDocument();
   });
 
   it("disables prev at the first article and next at the last", async () => {

@@ -14,33 +14,29 @@ const HERO_STATS = [
     highlight: true,
     label: "Routes verified cleanly",
     qualifier: "route rechecks completed in the published local harness",
-    todo: 'TODO: confirm meaning, e.g. "39 of 43 real regressions caught in [suite name]"',
   },
   {
     value: "2 / 5",
     highlight: false,
     label: "Benchmark repos booted",
     qualifier: "fixture repositories booted successfully",
-    todo: "TODO: confirm meaning of 2 / 5 repository benchmark denominator",
   },
   {
     value: "0 AI calls",
     highlight: false,
     label: "Fully deterministic unless you opt in",
     qualifier: "classifier accuracy was not measured in that run",
-    todo: null,
   },
   {
     value: "1 HOST",
     highlight: false,
     label: "Runs on a single machine",
     qualifier: "macOS only; cross-OS equivalence remains unproven",
-    todo: "TODO: confirm single-host / cross-OS qualification wording",
   },
 ] as const;
 
 export function HeroStage() {
-  const [installCopied, copyInstall] = useCopy();
+  const [installCopied, copyInstall, installCopyStatus] = useCopy();
   const [viewport, setViewport] = useState<ViewportId>("1440");
   const [curtainPct, setCurtainPct] = useState<number>(52);
   const scenario = VIEWPORT_SCENARIOS[viewport];
@@ -96,13 +92,17 @@ export function HeroStage() {
                     ),
                   }}
                 >
-                  {installCopied ? "Copied ✓" : "Copy"}
+                  {installCopied
+                    ? "Copied ✓"
+                    : installCopyStatus === "failed"
+                      ? "Copy failed"
+                      : "Copy"}
                 </button>
               </div>
 
               <Link
                 to="/docs/$"
-                params={{ _splat: "getting-started/quickstart" }}
+                params={{ _splat: "quick-start" }}
                 className="fg-btn-ghost"
                 style={s(
                   "padding: 13px 20px; background: transparent; color: var(--text-primary); border: 1px solid var(--border); font-weight: 500; font-size: 15px; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;",
@@ -550,9 +550,6 @@ export function HeroStage() {
                   {stat.qualifier}
                 </p>
               </div>
-              {stat.todo && (
-                <div className="fg-todo-note">{stat.todo}</div>
-              )}
             </div>
           ))}
         </div>
