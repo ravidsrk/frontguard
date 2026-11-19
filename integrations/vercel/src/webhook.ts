@@ -23,6 +23,8 @@ export interface VercelWebhookPayload {
   /** Unique event/delivery id Vercel assigns to each webhook event. */
   id?: string;
   type: string;
+  /** Epoch timestamp (milliseconds, or seconds) when Vercel created the event. */
+  createdAt?: number;
   configurationId?: string | null;
   payload: {
     deployment?: {
@@ -100,6 +102,25 @@ export async function verifyVercelSignature(
   return timingSafeEqual(expected, signature);
 }
 
+/** Default webhook timestamp replay tolerance (5 minutes). */
+export const WEBHOOK_TIMESTAMP_TOLERANCE_MS = 5 * 60_000;
+
+/**
+ * Checks whether a webhook timestamp (`payload.createdAt` or header value) is
+ * within the allowed freshness window to mitigate replay attacks.
+ */
+export function isFreshWebhookTimestamp(
+  timestamp: number | string | null | undefined,
+  nowMs: number = Date.now(),
+  toleranceMs: number = WEBHOOK_TIMESTAMP_TOLERANCE_MS,
+): boolean {
+  if (timestamp == null || timestamp === '') return false;
+  const num = typeof timestamp === 'number' ? timestamp : Number(timestamp);
+  if (!Number.isFinite(num) || num <= 0) return false;
+  // Normalize seconds vs milliseconds (Vercel sends epoch ms in `createdAt`).
+  const tsMs = num < 1e12 ? num * 1000 : num;
+  return Math.abs(nowMs - tsMs) <= toleranceMs;
+}
 /** Constant-time string comparison to avoid timing attacks. */
 export function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -209,7 +230,7 @@ export function decideFromWebhook(payload: VercelWebhookPayload): WebhookDecisio
     userId,
     git: {
       commitSha: meta.githubCommitSha ?? meta.gitCommitSha,
-      pullRequestId: meta.githubPrId ?? meta.githubCommitRef,
+      pullRequestId: meta.githubPrId,
       repoOwner: meta.githubOrg ?? meta.githubCommitOrg,
       repoSlug: meta.githubRepo ?? meta.githubCommitRepo,
       branch: meta.githubCommitRef ?? meta.gitCommitRef,
@@ -221,18 +242,13 @@ export function decideFromWebhook(payload: VercelWebhookPayload): WebhookDecisio
  * GitHub PR linkage forwarded to the Cloud API so it can post results back as a
  * PR comment (via the existing github-pr reporter).
  *
- * NOTE: The Cloud API `/v1/run` contract (see
- * `packages/cloud-api/src/index.ts`, `runRequestSchema`) does not yet model git
- * metadata, so we forward it under a dedicated `github` object. Fields:
- * - `owner`     — repository owner / org (e.g. "acme").
- * - `repo`      — repository slug (e.g. "web").
- * - `prNumber`  — pull request number (parsed from the Vercel deployment meta).
- * - `commitSha` — the deployed commit SHA.
- * - `branch`    — the git branch / ref the deployment was built from.
+ * Cloud API's `/v1/run` schema requires both `owner` and `repo` strings whenever
+ * `github` is present, so non-GitHub deploys (missing `owner` or `repo`) omit
+ * the `github` field entirely.
  */
 export interface GitHubRunLinkage {
-  owner?: string;
-  repo?: string;
+  owner: string;
+  repo: string;
   prNumber?: number;
   commitSha?: string;
   branch?: string;
@@ -249,47 +265,44 @@ export interface TriggerRunOptions {
   git?: WebhookDecision['git'];
 }
 
+const CLOUD_API_TIMEOUT_MS = 15_000;
+
 /**
  * Builds the `github` linkage object from the webhook-extracted git metadata.
- * Returns `undefined` when no useful linkage can be derived (so we don't send
- * an empty object to the API).
+ * Returns `undefined` for non-GitHub deployments (missing `repoOwner` or
+ * `repoSlug`) so the Cloud API never rejects the run with HTTP 400.
  */
 export function buildGitHubLinkage(git?: WebhookDecision['git']): GitHubRunLinkage | undefined {
   if (!git) return undefined;
-  const prNumber = git.pullRequestId != null ? Number(git.pullRequestId) : undefined;
-  const linkage: GitHubRunLinkage = {
-    owner: git.repoOwner,
-    repo: git.repoSlug,
-    prNumber: Number.isFinite(prNumber) ? prNumber : undefined,
+  const owner = git.repoOwner?.trim();
+  const repo = git.repoSlug?.trim();
+  if (!owner || !repo) return undefined;
+
+  const parsedPr = git.pullRequestId != null ? Number(git.pullRequestId) : undefined;
+  const prNumber =
+    parsedPr !== undefined && Number.isInteger(parsedPr) && parsedPr > 0 ? parsedPr : undefined;
+
+  return {
+    owner,
+    repo,
+    prNumber,
     commitSha: git.commitSha,
     branch: git.branch,
   };
-  // Drop entirely if nothing meaningful is present.
-  if (
-    linkage.owner == null &&
-    linkage.repo == null &&
-    linkage.prNumber == null &&
-    linkage.commitSha == null &&
-    linkage.branch == null
-  ) {
-    return undefined;
-  }
-  return linkage;
 }
 
 /**
  * Triggers a Frontguard run via the Cloud API. Returns the created run id.
  *
  * Forwards git metadata (repo owner/slug, PR number, commit SHA, branch) under
- * a `github` object so the Cloud API can post results back to the linked PR via
- * the github-pr reporter.
+ * a `github` object only when GitHub repo linkage (`owner` and `repo`) is present.
  */
 export async function triggerRun(
   opts: TriggerRunOptions,
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ id: string; statusUrl: string }> {
   const github = buildGitHubLinkage(opts.git);
-  const res = await fetchImpl(`${opts.apiBaseUrl}/v1/run`, {
+  const res = await fetchImpl(`${opts.apiBaseUrl.replace(/\/+$/, '')}/v1/run`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -300,6 +313,7 @@ export async function triggerRun(
       routes: opts.routes?.map((path) => ({ path })),
       ...(github ? { github } : {}),
     }),
+    signal: AbortSignal.timeout(CLOUD_API_TIMEOUT_MS),
   });
   if (!res.ok) {
     throw new Error(`Cloud API run request failed: ${res.status}`);

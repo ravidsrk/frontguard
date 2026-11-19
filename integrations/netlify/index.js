@@ -23,6 +23,7 @@
 
 import {
   decideRun,
+  resolveApiUrl,
   parseGitHubRepo,
   triggerRun,
   pollRun,
@@ -57,8 +58,24 @@ export const onSuccess = async ({ inputs = {}, utils }) => {
     return;
   }
 
-  const apiUrl = inputs.apiUrl || process.env.FRONTGUARD_API_URL;
-  const apiKey = inputs.apiKey || process.env.FRONTGUARD_API_KEY;
+  let apiUrl;
+  try {
+    const resolved = resolveApiUrl(ctx, inputs, process.env);
+    if (resolved.warning) {
+      log(resolved.warning);
+    }
+    apiUrl = resolved.apiUrl;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (inputs.failBuild) {
+      utils.build.failBuild(`Frontguard configuration error: ${message}`);
+    } else {
+      log(`Configuration error (non-blocking): ${message}`);
+    }
+    return;
+  }
+
+  const apiKey = process.env.FRONTGUARD_API_KEY || inputs.apiKey;
   if (!apiUrl || !apiKey) {
     log('FRONTGUARD_API_URL / FRONTGUARD_API_KEY not set — skipping run.');
     return;
@@ -73,7 +90,7 @@ export const onSuccess = async ({ inputs = {}, utils }) => {
       apiKey,
       previewUrl: decision.previewUrl,
       routes: inputs.routes,
-      projectId: inputs.projectId || process.env.FRONTGUARD_PROJECT_ID,
+      projectId: process.env.FRONTGUARD_PROJECT_ID || inputs.projectId,
     });
     log(`Run queued: ${triggered.id}`);
     run = await pollRun({ apiUrl, apiKey, runId: triggered.id });
@@ -89,7 +106,7 @@ export const onSuccess = async ({ inputs = {}, utils }) => {
   }
 
   // Best-effort PR comment.
-  const githubToken = inputs.githubToken || process.env.GITHUB_TOKEN;
+  const githubToken = process.env.GITHUB_TOKEN || inputs.githubToken;
   const repo = parseGitHubRepo(ctx.REPOSITORY_URL);
   if (githubToken && repo && decision.reviewId) {
     const ok = await postPrComment({

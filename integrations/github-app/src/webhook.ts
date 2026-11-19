@@ -16,8 +16,15 @@ export interface PullRequestEvent {
   action: string;
   number: number;
   pull_request: {
-    head: { sha: string; ref: string };
-    base: { ref: string };
+    head: {
+      sha: string;
+      ref: string;
+      repo?: { full_name?: string; fork?: boolean } | null;
+    };
+    base: {
+      ref: string;
+      repo?: { full_name?: string } | null;
+    };
     html_url: string;
   };
   repository: { name: string; owner: { login: string }; full_name: string };
@@ -39,6 +46,7 @@ export interface PrDecision {
   prNumber?: number;
   owner?: string;
   repo?: string;
+  baseRef?: string;
   installationId?: number;
 }
 
@@ -81,16 +89,47 @@ export function timingSafeEqual(a: string, b: string): boolean {
 /** Which PR actions warrant a (re-)run. */
 const TRIGGER_ACTIONS = ['opened', 'synchronize', 'reopened', 'ready_for_review'];
 
+/** Options for pull-request decisioning. */
+export interface DecidePullRequestOptions {
+  /**
+   * Explicitly opt in to running checks on pull requests originating from
+   * forked repositories. Disabled by default (fail closed) so untrusted fork
+   * PRs cannot trigger privileged runs or spend tenant quota.
+   */
+  allowForkPrs?: boolean;
+}
+
+/**
+ * Returns true if the pull request originates from a fork or has missing/null
+ * head repository metadata (e.g. a deleted fork).
+ */
+export function isForkPullRequest(event: PullRequestEvent): boolean {
+  const pr = event.pull_request;
+  const headRepo = pr?.head?.repo;
+  if (!headRepo) return true;
+  if (headRepo.fork === true) return true;
+  const baseFullName = (pr.base?.repo?.full_name ?? event.repository?.full_name ?? '').toLowerCase();
+  const headFullName = (headRepo.full_name ?? '').toLowerCase();
+  if (!baseFullName || !headFullName) return true;
+  return headFullName !== baseFullName;
+}
+
 /**
  * Decides whether a `pull_request` event should trigger a Frontguard run.
  */
-export function decidePullRequest(event: PullRequestEvent): PrDecision {
+export function decidePullRequest(
+  event: PullRequestEvent,
+  options: DecidePullRequestOptions = {},
+): PrDecision {
   if (!TRIGGER_ACTIONS.includes(event.action)) {
     return { trigger: false, reason: `Ignored PR action: ${event.action}` };
   }
   const pr = event.pull_request;
   if (!pr?.head?.sha) {
     return { trigger: false, reason: 'No head SHA in payload' };
+  }
+  if (!options.allowForkPrs && isForkPullRequest(event)) {
+    return { trigger: false, reason: 'Ignored pull request from fork repository' };
   }
   return {
     trigger: true,
@@ -99,6 +138,7 @@ export function decidePullRequest(event: PullRequestEvent): PrDecision {
     prNumber: event.number,
     owner: event.repository.owner.login,
     repo: event.repository.name,
+    baseRef: pr.base.ref,
     installationId: event.installation?.id,
   };
 }

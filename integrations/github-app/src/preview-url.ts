@@ -25,7 +25,55 @@
  * @module preview-url
  */
 
+import {
+  isPrivateOrLoopbackHost,
+  assertSafeRenderTarget,
+  type HostResolver,
+} from '@frontguard/cloud-api/render-target';
 import type { PullRequestEvent } from './webhook.js';
+
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
+
+/**
+ * Validates that a candidate preview URL is a well-formed `https:` URL with no
+ * embedded credentials, whitespace, control characters, or private/loopback host.
+ */
+export function parseSafePreviewUrl(raw: string | null | undefined): URL | null {
+  if (typeof raw !== 'string') return null;
+  if (CONTROL_CHARS.test(raw)) return null;
+  const trimmed = raw.trim();
+  if (!trimmed || /\s/.test(trimmed)) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:') return null;
+  if (parsed.username || parsed.password) return null;
+  if (!parsed.hostname || isPrivateOrLoopbackHost(parsed.hostname)) return null;
+  return parsed;
+}
+
+/**
+ * Async defense-in-depth SSRF verification (HTTPS + host literal + DNS check).
+ */
+export async function assertSafePreviewUrl(
+  url: string,
+  opts?: { resolveHost?: HostResolver },
+): Promise<void> {
+  if (!parseSafePreviewUrl(url)) {
+    throw new Error('Preview URL must be a valid public https: URL');
+  }
+  await assertSafeRenderTarget(url, opts);
+}
+
+/** Returns true when `hostname` is a strict subdomain of `baseDomain`. */
+function isSubdomainOf(hostname: string, baseDomain: string): boolean {
+  const host = hostname.toLowerCase();
+  const suffix = `.${baseDomain.toLowerCase()}`;
+  return host.length > suffix.length && host.endsWith(suffix);
+}
 
 /** A GitHub `commit_status` webhook payload (subset used here). */
 export interface CommitStatusEvent {
@@ -88,23 +136,25 @@ export function classifyCommitStatus(event: CommitStatusEvent): 'vercel' | null 
 /**
  * Identifies the deployment provider for a `deployment_status` payload.
  *
- * Detection is heuristic — GitHub does not stamp the provider on the event,
- * so we look at the environment label and the URL host. Returns `null` when
- * the status is not for a preview deployment we can map.
+ * Matches strictly against the parsed `URL.hostname` of the validated `https:`
+ * deployment URL (never substrings of the path or environment label) so
+ * arbitrary hosts or SSRF targets cannot spoof a recognised provider.
  */
 export function classifyDeploymentStatus(
   event: DeploymentStatusEvent,
 ): 'netlify' | 'cloudflare-pages' | 'vercel' | null {
-  const env = (event.deployment.environment ?? '').toLowerCase();
-  const url = (event.deployment_status.environment_url ?? event.deployment_status.target_url ?? '')
-    .toLowerCase();
-
+  const env = (event.deployment.environment ?? '').trim().toLowerCase();
   // Exclude production deployments outright — they are not PR previews.
   if (env === 'production') return null;
 
-  if (/\.netlify\.app(\/|$)/.test(url) || env.includes('netlify')) return 'netlify';
-  if (/\.pages\.dev(\/|$)/.test(url) || env.includes('cloudflare')) return 'cloudflare-pages';
-  if (/\.vercel\.app(\/|$)/.test(url) || env.includes('vercel')) return 'vercel';
+  const rawUrl = (event.deployment_status.environment_url ?? event.deployment_status.target_url ?? '').trim();
+  const parsed = parseSafePreviewUrl(rawUrl);
+  if (!parsed) return null;
+
+  const host = parsed.hostname.toLowerCase();
+  if (isSubdomainOf(host, 'netlify.app')) return 'netlify';
+  if (isSubdomainOf(host, 'pages.dev')) return 'cloudflare-pages';
+  if (isSubdomainOf(host, 'vercel.app')) return 'vercel';
   return null;
 }
 
@@ -119,23 +169,26 @@ export interface InferredPreviewUrl {
 /**
  * Extracts a preview URL from a `commit_status` event.
  *
- * Only succeeds when the status is `success` and the context maps to a
- * supported provider (currently Vercel).
+ * Only succeeds when the status is `success`, the context maps to a supported
+ * provider (currently Vercel), and `target_url` is a validated `https:` URL
+ * hosted on `*.vercel.app` (not a private/loopback or arbitrary third-party host).
  */
 export function previewUrlFromCommitStatus(event: CommitStatusEvent): InferredPreviewUrl | null {
   if (event.state !== 'success') return null;
   const provider = classifyCommitStatus(event);
   if (!provider) return null;
-  const url = event.target_url?.trim();
-  if (!url || !/^https?:\/\//i.test(url)) return null;
-  return { url, source: 'vercel-status' };
+  const rawUrl = event.target_url?.trim();
+  const parsed = parseSafePreviewUrl(rawUrl);
+  if (!parsed) return null;
+  if (!isSubdomainOf(parsed.hostname, 'vercel.app')) return null;
+  return { url: rawUrl!, source: 'vercel-status' };
 }
 
 /**
  * Extracts a preview URL from a `deployment_status` event.
  *
- * Only succeeds when the status is `success` and points at a preview-style
- * URL we recognise (Netlify / Cloudflare Pages / Vercel preview).
+ * Only succeeds when the status is `success` and points at a validated `https:`
+ * preview host we recognise (`*.netlify.app`, `*.pages.dev`, `*.vercel.app`).
  */
 export function previewUrlFromDeploymentStatus(
   event: DeploymentStatusEvent,
@@ -143,15 +196,15 @@ export function previewUrlFromDeploymentStatus(
   if (event.deployment_status.state !== 'success') return null;
   const provider = classifyDeploymentStatus(event);
   if (!provider) return null;
-  const url = (event.deployment_status.environment_url ?? event.deployment_status.target_url ?? '').trim();
-  if (!url || !/^https?:\/\//i.test(url)) return null;
+  const rawUrl = (event.deployment_status.environment_url ?? event.deployment_status.target_url ?? '').trim();
+  if (!parseSafePreviewUrl(rawUrl)) return null;
   const source =
     provider === 'netlify'
       ? 'netlify-deployment'
       : provider === 'cloudflare-pages'
         ? 'cloudflare-deployment'
         : 'vercel-deployment';
-  return { url, source };
+  return { url: rawUrl, source };
 }
 
 /** Context available when rendering a preview URL template. */
@@ -167,48 +220,102 @@ export interface PreviewTemplateContext {
 
 /** Tokens recognised in a preview URL template. */
 const TEMPLATE_TOKEN = /\{(owner|repo|prNumber|pr|commitSha|sha|commitShortSha|shortSha|branch)\}/g;
+const TEMPLATE_SENTINEL = 'fgplaceholder';
+
+/**
+ * Slugifies a branch name (or label) into a safe RFC-1123 DNS label so branch
+ * names containing `.`, `@`, `/`, `:`, `?`, or `#` cannot redirect URL authority.
+ */
+export function slugifyDnsLabel(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 63)
+    .replace(/-+$/g, '');
+}
+
+function sanitizeTemplateToken(token: string, ctx: PreviewTemplateContext): string {
+  const short = ctx.commitShortSha ?? ctx.commitSha.slice(0, 7);
+  switch (token) {
+    case 'owner':
+      return slugifyDnsLabel(ctx.owner);
+    case 'repo':
+      return slugifyDnsLabel(ctx.repo);
+    case 'pr':
+    case 'prNumber':
+      return Number.isInteger(ctx.prNumber) && ctx.prNumber > 0 ? String(ctx.prNumber) : '';
+    case 'sha':
+    case 'commitSha':
+      return ctx.commitSha.toLowerCase().replace(/[^0-9a-f]/g, '');
+    case 'shortSha':
+    case 'commitShortSha':
+      return short.toLowerCase().replace(/[^0-9a-f]/g, '');
+    case 'branch':
+      return slugifyDnsLabel(ctx.branch);
+    default:
+      return `{${token}}`;
+  }
+}
 
 /**
  * Renders a preview URL template by substituting `{prNumber}`, `{owner}`,
  * `{repo}`, `{commitSha}`, `{commitShortSha}` and `{branch}` placeholders.
  *
- * Unknown tokens are left as-is so misconfigured templates fail loudly when
- * the URL is fetched, rather than silently producing a wrong host.
- *
- * @example
- * ```ts
- * renderPreviewUrlTemplate('https://pr-{prNumber}.preview.example.com', {
- *   owner: 'acme', repo: 'web', prNumber: 42, commitSha: 'deadbeefcafe', branch: 'feat/x',
- * });
- * // → 'https://pr-42.preview.example.com'
- * ```
+ * `{branch}`, `{owner}`, and `{repo}` are slugified into safe DNS labels so
+ * attacker-controlled branch names cannot inject authority delimiters (`@`, `/`,
+ * `.`, `:`, `?`, `#`). Unknown tokens are left as-is so misconfigured templates
+ * fail validation cleanly.
  */
 export function renderPreviewUrlTemplate(
   template: string,
   ctx: PreviewTemplateContext,
 ): string {
-  const short = ctx.commitShortSha ?? ctx.commitSha.slice(0, 7);
-  return template.replace(TEMPLATE_TOKEN, (_, token: string) => {
-    switch (token) {
-      case 'owner':
-        return ctx.owner;
-      case 'repo':
-        return ctx.repo;
-      case 'pr':
-      case 'prNumber':
-        return String(ctx.prNumber);
-      case 'sha':
-      case 'commitSha':
-        return ctx.commitSha;
-      case 'shortSha':
-      case 'commitShortSha':
-        return short;
-      case 'branch':
-        return ctx.branch;
-      default:
-        return `{${token}}`;
+  return template.replace(TEMPLATE_TOKEN, (_, token: string) => sanitizeTemplateToken(token, ctx));
+}
+
+/**
+ * Verifies that a rendered template URL preserves the template's scheme, port,
+ * and static origin/host labels (preventing authority redirection), contains no
+ * unresolved `{...}` placeholders, and passes the `https:` + SSRF host check.
+ */
+export function isValidRenderedTemplateUrl(template: string, rendered: string): boolean {
+  if (/\{[^}]+\}/.test(rendered)) return false;
+  const sentinelStr = template.replace(TEMPLATE_TOKEN, TEMPLATE_SENTINEL);
+  const templateUrl = parseSafePreviewUrl(sentinelStr);
+  const renderedUrl = parseSafePreviewUrl(rendered);
+  if (!templateUrl || !renderedUrl) return false;
+  if (renderedUrl.protocol !== templateUrl.protocol) return false;
+  if (renderedUrl.port !== templateUrl.port) return false;
+
+  const templateHost = templateUrl.hostname.toLowerCase();
+  const renderedHost = renderedUrl.hostname.toLowerCase();
+  if (!templateHost.includes(TEMPLATE_SENTINEL)) {
+    return renderedUrl.origin === templateUrl.origin;
+  }
+
+  const templateLabels = templateHost.split('.');
+  const renderedLabels = renderedHost.split('.');
+  if (templateLabels.length !== renderedLabels.length) return false;
+
+  let hasStaticLabel = false;
+  for (let i = 0; i < templateLabels.length; i++) {
+    const tLabel = templateLabels[i]!;
+    const rLabel = renderedLabels[i]!;
+    if (!rLabel || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(rLabel)) return false;
+    if (tLabel.includes(TEMPLATE_SENTINEL)) {
+      const pattern = new RegExp(
+        `^${tLabel
+          .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          .replaceAll(TEMPLATE_SENTINEL, '[a-z0-9-]+')}$`,
+      );
+      if (!pattern.test(rLabel)) return false;
+    } else {
+      hasStaticLabel = true;
+      if (tLabel !== rLabel) return false;
     }
-  });
+  }
+  return hasStaticLabel;
 }
 
 /** Inputs for inferring a preview URL at PR time. */
@@ -233,12 +340,14 @@ export interface InferPreviewUrlOptions {
  *
  * Order of preference:
  * 1. A provider-observed URL (Vercel / Netlify / Cloudflare).
- * 2. A user-supplied template.
- * 3. `null` — caller can then fall back to its previous default, or skip the
- *    run rather than test the github.com PR page (the original bug).
+ * 2. A user-supplied template (validated against template origin + SSRF rules).
+ * 3. `null` — caller can then wait for a deployment event or skip the run.
  */
 export function inferPreviewUrl(opts: InferPreviewUrlOptions): InferredPreviewUrl | null {
-  if (opts.observed) return opts.observed;
+  if (opts.observed) {
+    if (!parseSafePreviewUrl(opts.observed.url)) return null;
+    return opts.observed;
+  }
   const template = opts.template?.trim();
   if (template) {
     const ctx: PreviewTemplateContext = {
@@ -249,7 +358,7 @@ export function inferPreviewUrl(opts: InferPreviewUrlOptions): InferredPreviewUr
       branch: opts.event.pull_request.head.ref,
     };
     const rendered = renderPreviewUrlTemplate(template, ctx);
-    if (/^https?:\/\//i.test(rendered)) {
+    if (isValidRenderedTemplateUrl(template, rendered)) {
       return { url: rendered, source: 'template' };
     }
   }

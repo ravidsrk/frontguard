@@ -1,4 +1,5 @@
-import { isAllowedRunUrl } from './runs.js';
+import { canonicalizeRunUrl } from './runs.js';
+import { escapeSlackMrkdwn } from './slack-api.js';
 
 /**
  * Pure decisioning for Slack Events API envelopes and slash commands.
@@ -14,13 +15,14 @@ export interface SlackEnvelope {
   type: string;
   challenge?: string;
   team_id?: string;
+  event_id?: string;
   event?: { type: string; text?: string; channel?: string; user?: string };
 }
 
 /** The decision for an incoming events request. */
 export type EnvelopeDecision =
   | { kind: 'url_verification'; challenge: string }
-  | { kind: 'event'; eventType: string; teamId?: string; channel?: string }
+  | { kind: 'event'; eventType: string; eventId?: string; teamId?: string; channel?: string }
   | { kind: 'ignore'; reason: string };
 
 /**
@@ -38,7 +40,13 @@ export function parseSlackEnvelope(body: unknown): EnvelopeDecision {
   }
 
   if (env.type === 'event_callback' && env.event?.type) {
-    return { kind: 'event', eventType: env.event.type, teamId: env.team_id, channel: env.event.channel };
+    return {
+      kind: 'event',
+      eventType: env.event.type,
+      eventId: typeof env.event_id === 'string' ? env.event_id : undefined,
+      teamId: env.team_id,
+      channel: env.event.channel,
+    };
   }
 
   return { kind: 'ignore', reason: `unhandled envelope type: ${env.type}` };
@@ -76,33 +84,53 @@ export type CommandDecision =
   | { kind: 'status_invalid'; reason: string }
   | { kind: 'help' };
 
+const CONTROL_CHARS_RE = /[\u0000-\u001f\u007f]/;
+
 /**
  * Classifies a slash-command body into a structured decision. Pure — no
- * side effects, no network. URL parsing is permissive enough to accept the
- * `<url|url>` form Slack emits when it auto-links a URL in the message text.
+ * side effects, no network. Enforces a single canonical `https:` URL with no
+ * control chars/whitespace and no private/loopback target so trailing Slack
+ * `mrkdwn` or `<!channel>` payloads are rejected before reaching any message.
  */
 export function decideCommand(cmd: SlackCommand): CommandDecision {
-  const [sub, ...rest] = cmd.text.split(/\s+/);
-  const rawArg = rest.join(' ').trim();
+  const trimmed = cmd.text.trim();
+  if (!trimmed) return { kind: 'help' };
+  const [sub, ...rest] = trimmed.split(/\s+/);
 
   if (sub === 'status') {
-    if (!rawArg) return { kind: 'status_invalid', reason: 'Missing URL — try `/frontguard status https://example.com`' };
+    if (rest.length === 0) {
+      return {
+        kind: 'status_invalid',
+        reason: 'Missing URL — try `/frontguard status https://example.com`',
+      };
+    }
+    if (rest.length > 1) {
+      return {
+        kind: 'status_invalid',
+        reason: 'Expected a single https:// URL with no extra text',
+      };
+    }
+    const rawArg = rest[0]!;
+    if (CONTROL_CHARS_RE.test(rawArg)) {
+      return { kind: 'status_invalid', reason: 'That URL contains invalid control characters' };
+    }
     const cleaned = cleanSlackLink(rawArg);
-    if (!/^https?:\/\//i.test(cleaned)) {
-      return { kind: 'status_invalid', reason: 'URL must start with http(s)://' };
+    if (!/^https:\/\//i.test(cleaned)) {
+      return { kind: 'status_invalid', reason: 'URL must start with https://' };
     }
     try {
       new URL(cleaned);
     } catch {
       return { kind: 'status_invalid', reason: 'That URL is not valid' };
     }
-    if (!isAllowedRunUrl(cleaned)) {
+    const canonical = canonicalizeRunUrl(cleaned);
+    if (!canonical) {
       return {
         kind: 'status_invalid',
         reason: 'That URL targets a private or internal address and cannot be checked',
       };
     }
-    return { kind: 'status', url: cleaned };
+    return { kind: 'status', url: canonical };
   }
 
   return { kind: 'help' };
@@ -135,7 +163,7 @@ export function buildCommandResponse(cmd: SlackCommand): unknown {
   if (decision.kind === 'status') {
     return {
       response_type: 'ephemeral',
-      text: `🔍 Queued a visual check for \`${decision.url}\`. I'll post the result here when it's done.`,
+      text: `🔍 Queued a visual check for \`${escapeSlackMrkdwn(decision.url)}\`. I'll post the result here when it's done.`,
     };
   }
   if (decision.kind === 'status_invalid') {

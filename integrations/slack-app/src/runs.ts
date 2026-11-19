@@ -1,10 +1,11 @@
 /**
- * Cloud-API run submission + Slack `response_url` delivery.
+ * Cloud-API run submission + Workers-safe Slack `response_url` delivery.
  *
- * The slash-command handler must reply within 3 seconds. We use that ack to
- * say "queued"; the actual run is submitted to the Frontguard Cloud API in
- * the background, and once it finishes we deliver a follow-up message via
- * Slack's `response_url` (valid for ~30 minutes).
+ * The slash-command handler must reply within Slack's 3-second deadline, and
+ * Cloudflare Workers bound `waitUntil` background execution to ~30 seconds.
+ * Ack-path I/O (DoH + submit) is strictly bounded under 2 seconds, and
+ * background polling is strictly capped within Workers limits (with optional
+ * Queue or webhook callback support for long-running checks).
  *
  * Pure, testable core — the HTTP shell lives in `handler.ts`.
  *
@@ -18,44 +19,113 @@ import {
   SafeRenderTargetError,
   type HostResolver,
 } from '@frontguard/cloud-api/render-target';
-import { buildVisualResultBlocks, postSlackMessage, type RunSummary } from './slack-api.js';
+import {
+  buildVisualResultBlocks,
+  escapeSlackMrkdwn,
+  postSlackMessage,
+  type RunSummary,
+} from './slack-api.js';
+
+const CONTROL_CHARS_RE = /[\u0000-\u001f\u007f]/;
+
+/** Default ack-path timeout for submitting a run (keeps total ack < 2s). */
+export const DEFAULT_SUBMIT_TIMEOUT_MS = 1_500;
+/** Default ack-path timeout for DoH resolution. */
+export const DEFAULT_DNS_TIMEOUT_MS = 800;
+/** Default Workers-safe poll wall-clock budget (20s < 30s Workers limit). */
+export const DEFAULT_POLL_MAX_WAIT_MS = 20_000;
+/** Hard ceiling for waitUntil polling inside a Worker isolate. */
+export const MAX_POLL_WAIT_MS = 25_000;
+const POLL_REQUEST_TIMEOUT_MS = 5_000;
+const SLACK_RESPONSE_TIMEOUT_MS = 10_000;
 
 /**
- * URL validation for slash-command runs: `http(s)` only, and never private /
- * loopback / link-local hosts (SSRF guard — mirrors Vercel + cloud-api).
+ * Validates and canonicalizes a slash-command target URL:
+ * - `https:` scheme only (no `http:`, `javascript:`, `file:`, etc.)
+ * - No control characters, embedded whitespace, or embedded credentials
+ * - Valid public hostname (never private / loopback / link-local hosts)
+ * - Percent-encodes `<`, `>`, and `` ` `` to prevent Slack mrkdwn injection
+ */
+export function canonicalizeRunUrl(value: string): string | null {
+  if (typeof value !== 'string') return null;
+  if (CONTROL_CHARS_RE.test(value)) return null;
+  const trimmed = value.trim();
+  if (!trimmed || /\s/.test(trimmed)) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:') return null;
+  if (parsed.username || parsed.password) return null;
+  const host = parsed.hostname.toLowerCase();
+  if (!host || isPrivateOrLoopbackHost(host)) return null;
+
+  const base =
+    parsed.pathname === '/' && !parsed.search && !parsed.hash && !trimmed.endsWith('/')
+      ? parsed.origin
+      : parsed.href;
+  return base.replace(/[<>\`]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
+}
+
+/**
+ * URL validation for slash-command runs: `https:` only, valid hostname, no
+ * control chars/whitespace, and never private / loopback / link-local hosts.
  */
 export function isAllowedRunUrl(value: string): boolean {
+  return canonicalizeRunUrl(value) !== null;
+}
+
+/**
+ * Validates that a Slack `response_url` is strictly `https:` on
+ * `hooks.slack.com` or `*.slack.com` (no SSRF or credential leakage).
+ */
+export function isAllowedSlackResponseUrl(responseUrl: string): boolean {
+  if (typeof responseUrl !== 'string' || !responseUrl || CONTROL_CHARS_RE.test(responseUrl)) {
+    return false;
+  }
+  let parsed: URL;
   try {
-    const u = new URL(value);
-    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
-    return !isPrivateOrLoopbackHost(u.hostname);
+    parsed = new URL(responseUrl);
   } catch {
     return false;
   }
+  if (parsed.protocol !== 'https:') return false;
+  if (parsed.username || parsed.password) return false;
+  const host = parsed.hostname.toLowerCase();
+  return host === 'hooks.slack.com' || (host.endsWith('.slack.com') && host.length > '.slack.com'.length);
 }
 
 /**
  * Defense-in-depth SSRF check before forwarding a Slack-submitted URL to the
- * Cloud API. Rejects host literals synchronously, then resolves hostnames and
- * re-checks resolved addresses (DNS-rebinding guard).
+ * Cloud API. Rejects non-https and private host literals synchronously, then
+ * resolves hostnames with a tight timeout and re-checks resolved addresses.
  */
 export async function assertSafeRunUrl(
   url: string,
-  opts: { resolveHost?: HostResolver } = {},
+  opts: { resolveHost?: HostResolver; dnsTimeoutMs?: number } = {},
 ): Promise<void> {
+  if (typeof url !== 'string' || CONTROL_CHARS_RE.test(url) || /\s/.test(url.trim())) {
+    throw new SafeRenderTargetError('invalid_url', 'url must be a valid URL');
+  }
   let parsed: URL;
   try {
-    parsed = new URL(url);
+    parsed = new URL(url.trim());
   } catch {
     throw new SafeRenderTargetError('invalid_url', 'url must be a valid URL');
   }
 
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    throw new SafeRenderTargetError('scheme_not_allowed', 'url must use http or https');
+  if (parsed.protocol !== 'https:') {
+    throw new SafeRenderTargetError('scheme_not_allowed', 'url must use https');
+  }
+
+  if (parsed.username || parsed.password) {
+    throw new SafeRenderTargetError('invalid_url', 'url must not contain credentials');
   }
 
   const host = parsed.hostname.toLowerCase();
-  if (isPrivateOrLoopbackHost(host)) {
+  if (!host || isPrivateOrLoopbackHost(host)) {
     throw new SafeRenderTargetError(
       'private_host',
       'url must not target a private, loopback, or link-local host',
@@ -65,11 +135,33 @@ export async function assertSafeRunUrl(
   if (isIpLiteral(host)) return;
 
   const resolveHost = opts.resolveHost ?? resolveHostAddresses;
+  const dnsTimeoutMs = opts.dnsTimeoutMs ?? DEFAULT_DNS_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let addresses: string[];
   try {
-    addresses = await resolveHost(host);
+    addresses = await Promise.race([
+      resolveHost(host),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new SafeRenderTargetError(
+                'dns_resolution_failed',
+                `DNS resolution timed out for host: ${host}`,
+              ),
+            ),
+          dnsTimeoutMs,
+        );
+      }),
+    ]);
   } catch (err) {
     if (err instanceof SafeRenderTargetError) throw err;
+    throw new SafeRenderTargetError('dns_resolution_failed', `could not resolve host: ${host}`);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+
+  if (!Array.isArray(addresses) || addresses.length === 0) {
     throw new SafeRenderTargetError('dns_resolution_failed', `could not resolve host: ${host}`);
   }
 
@@ -98,12 +190,6 @@ export interface CloudRunResponse {
 /**
  * One per-route result inside a completed run. Mirrors the cloud-api wire shape
  * (`RunResult`): each result carries a `status` STRING, not a boolean flag.
- *
- * Per-result `status` ∈ `passed | regression | changed | warning |
- * new_baseline | failed` (`failed` is defensive; the API does not emit it today
- * but the type is widened so we don't ignore it if it appears).
- *
- * @see packages/cloud-api/src/types.ts:30 (RunResult)
  */
 export interface CloudRunResult {
   route?: string;
@@ -128,6 +214,8 @@ export interface SubmitRunOptions {
   apiBaseUrl: string;
   apiKey: string;
   url: string;
+  /** Request timeout in ms. Default 1500ms to stay well inside Slack's 3s ack deadline. */
+  timeoutMs?: number;
 }
 
 /**
@@ -138,13 +226,14 @@ export async function submitCloudRun(
   opts: SubmitRunOptions,
   fetchImpl: typeof fetch = fetch,
 ): Promise<CloudRunResponse> {
-  const res = await fetchImpl(`${opts.apiBaseUrl.replace(/\/$/, '')}/v1/run`, {
+  const res = await fetchImpl(`${opts.apiBaseUrl.replace(/\/+$/, '')}/v1/run`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${opts.apiKey}`,
     },
     body: JSON.stringify({ url: opts.url }),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_SUBMIT_TIMEOUT_MS),
   });
   if (!res.ok) {
     let detail = '';
@@ -161,17 +250,17 @@ export async function submitCloudRun(
 }
 
 /**
- * Polls `GET /v1/runs/:id` until the run reaches a terminal state or the
- * deadline elapses. Returns the latest status seen (which may still be
- * `running` if the deadline hit first).
+ * Polls `GET /v1/runs/:id` for a Workers-safe bounded window (default 20s,
+ * hard-capped at 25s so `waitUntil` never breaches Cloudflare Workers' 30s
+ * wall-clock limit). Fails fast on permanent 4xx errors.
  */
 export async function pollRunUntilTerminal(opts: {
   apiBaseUrl: string;
   apiKey: string;
   runId: string;
-  /** Max wall-clock seconds to wait. Default 25 minutes (Slack response_url is good for 30). */
+  /** Max wall-clock ms to wait. Default 20s, clamped to <= 25s for Workers safety. */
   maxWaitMs?: number;
-  /** Poll interval. Default 5 s. */
+  /** Poll interval. Default 2 s. */
   intervalMs?: number;
   fetchImpl?: typeof fetch;
   /** Injectable timer (tests). */
@@ -182,21 +271,26 @@ export async function pollRunUntilTerminal(opts: {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   const now = opts.now ?? (() => Date.now());
-  const maxWaitMs = opts.maxWaitMs ?? 25 * 60_000;
-  const interval = opts.intervalMs ?? 5_000;
+  const requestedWait = opts.maxWaitMs ?? DEFAULT_POLL_MAX_WAIT_MS;
+  const maxWaitMs = Math.max(0, Math.min(requestedWait, MAX_POLL_WAIT_MS));
+  const interval = opts.intervalMs ?? 2_000;
 
   const deadline = now() + maxWaitMs;
   let last: CloudRunStatus = { id: opts.runId, status: 'queued' };
   while (now() < deadline) {
     const res = await fetchImpl(
-      `${opts.apiBaseUrl.replace(/\/$/, '')}/v1/runs/${encodeURIComponent(opts.runId)}`,
-      { headers: { Authorization: `Bearer ${opts.apiKey}` } },
+      `${opts.apiBaseUrl.replace(/\/+$/, '')}/v1/runs/${encodeURIComponent(opts.runId)}`,
+      {
+        headers: { Authorization: `Bearer ${opts.apiKey}` },
+        signal: AbortSignal.timeout(POLL_REQUEST_TIMEOUT_MS),
+      },
     );
     if (res.ok) {
       last = (await res.json()) as CloudRunStatus;
       if (last.status === 'completed' || last.status === 'failed') return last;
+    } else if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+      throw new Error(`Cloud API poll failed: HTTP ${res.status}`);
     }
-    // Sleep without exceeding the deadline.
     const remaining = deadline - now();
     if (remaining <= 0) break;
     await sleep(Math.min(interval, remaining));
@@ -206,15 +300,6 @@ export async function pollRunUntilTerminal(opts: {
 
 /**
  * Counts regressions and warnings in a polled run.
- *
- * Reads the per-result `status` string from the real cloud-api wire shape —
- * mirroring `isFailingRun()`/`summarizeResults()` in
- * `integrations/netlify/lib/core.js`:
- *   - `regression` / `changed` / `failed` are failure-worthy → counted as
- *     regressions (RunSummary has no separate `failed` bucket, so a per-result
- *     `failed` folds in here);
- *   - `warning` is a soft warning;
- *   - `passed` / `new_baseline` are clean and counted as neither.
  */
 export function summarizeRun(run: CloudRunStatus, fallbackUrl: string): RunSummary {
   const results = run.results ?? [];
@@ -235,20 +320,23 @@ export function summarizeRun(run: CloudRunStatus, fallbackUrl: string): RunSumma
 }
 
 /**
- * Posts a delayed Slack message to a `response_url`. Slack expects a JSON
- * body with `response_type` + `text` (and optional `blocks`). Never throws —
- * returns `{ ok }` so a failed post can't crash the worker.
+ * Posts a delayed Slack message to a validated `response_url` strictly hosted on
+ * `hooks.slack.com` / `*.slack.com`. Never throws — returns `{ ok }`.
  */
 export async function postSlackResponse(
   responseUrl: string,
   body: { response_type: 'in_channel' | 'ephemeral'; text: string; blocks?: unknown[]; replace_original?: boolean },
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (!isAllowedSlackResponseUrl(responseUrl)) {
+    return { ok: false, error: 'Invalid Slack response_url host (must be https://*.slack.com)' };
+  }
   try {
     const res = await fetchImpl(responseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(SLACK_RESPONSE_TIMEOUT_MS),
     });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
     return { ok: true };
@@ -258,24 +346,48 @@ export async function postSlackResponse(
 }
 
 /**
- * Builds the follow-up Slack response body for a completed (or failed) run.
+ * Builds the follow-up Slack response body for a completed, failed, or
+ * still-running run. Escapes all untrusted `mrkdwn` fields to neutralize
+ * `<!channel>`/`<!here>`/`<!everyone>` and formatting injection.
  */
 export function buildFollowUpResponse(run: CloudRunStatus, fallbackUrl: string): {
-  response_type: 'in_channel';
+  response_type: 'in_channel' | 'ephemeral';
   text: string;
   blocks: unknown[];
   replace_original: false;
 } {
+  const safeFallbackUrl = escapeSlackMrkdwn(fallbackUrl);
+
   if (run.status === 'failed') {
+    const safeError = escapeSlackMrkdwn(run.error ?? 'unknown error');
     return {
       response_type: 'in_channel',
-      text: `Frontguard check failed for ${fallbackUrl}: ${run.error ?? 'unknown error'}`,
+      text: `Frontguard check failed for ${safeFallbackUrl}: ${safeError}`,
       blocks: [
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `:warning: Frontguard check *failed* for \`${fallbackUrl}\`\n_${run.error ?? 'unknown error'}_`,
+            text: `:warning: Frontguard check *failed* for \`${safeFallbackUrl}\`\n${safeError}`,
+          },
+        },
+      ],
+      replace_original: false,
+    };
+  }
+
+  if (run.status !== 'completed') {
+    const safeStatus = escapeSlackMrkdwn(run.status || 'running');
+    const safeRunId = escapeSlackMrkdwn(run.id);
+    return {
+      response_type: 'ephemeral',
+      text: `Frontguard check ${safeRunId} for ${safeFallbackUrl} is still ${safeStatus}. Check your Frontguard dashboard for final results.`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `:hourglass_flowing_sand: Frontguard check *${safeRunId}* for \`${safeFallbackUrl}\` is still *${safeStatus}*. Check your Frontguard dashboard once it finishes.`,
           },
         },
       ],
@@ -284,12 +396,13 @@ export function buildFollowUpResponse(run: CloudRunStatus, fallbackUrl: string):
   }
 
   const summary = summarizeRun(run, fallbackUrl);
+  const safeUrl = escapeSlackMrkdwn(summary.url);
   const headline =
     summary.regressions > 0
-      ? `${summary.regressions} visual regression(s) on ${summary.url}`
+      ? `${summary.regressions} visual regression(s) on ${safeUrl}`
       : summary.warnings > 0
-        ? `${summary.warnings} visual change(s) on ${summary.url}`
-        : `No visual regressions on ${summary.url}`;
+        ? `${summary.warnings} visual change(s) on ${safeUrl}`
+        : `No visual regressions on ${safeUrl}`;
 
   return {
     response_type: 'in_channel',
@@ -300,9 +413,9 @@ export function buildFollowUpResponse(run: CloudRunStatus, fallbackUrl: string):
 }
 
 /**
- * End-to-end: poll the run to completion and deliver the follow-up message
- * to Slack's `response_url`. Designed for `ctx.waitUntil(...)` on Workers.
- * Errors are caught and reported back to Slack (never thrown).
+ * End-to-end: runs a bounded Workers-safe status check and delivers the
+ * follow-up message to Slack's `response_url`. Errors are caught and reported
+ * back cleanly with escaped `mrkdwn`.
  */
 export async function deliverRunResult(opts: {
   apiBaseUrl: string;
@@ -343,12 +456,14 @@ export async function deliverRunResult(opts: {
       );
     }
   } catch (err) {
-    const errorText = `Frontguard check errored for ${opts.url}: ${err instanceof Error ? err.message : String(err)}`;
+    const safeUrl = escapeSlackMrkdwn(opts.url);
+    const safeErr = escapeSlackMrkdwn(err instanceof Error ? err.message : String(err));
+    const errorText = `Frontguard check errored for ${safeUrl}: ${safeErr}`;
     const posted = opts.responseUrl
       ? await postSlackResponse(
           opts.responseUrl,
           {
-            response_type: 'in_channel',
+            response_type: 'ephemeral',
             text: errorText,
             replace_original: false,
           },

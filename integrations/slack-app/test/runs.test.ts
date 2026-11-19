@@ -39,14 +39,16 @@ function recordingFetch(plan: Array<(req: Recorded) => Response | Promise<Respon
 }
 
 describe('isAllowedRunUrl', () => {
-  it('accepts http and https URLs', () => {
+  it('accepts https URLs only', () => {
     expect(isAllowedRunUrl('https://example.com')).toBe(true);
-    expect(isAllowedRunUrl('http://example.com')).toBe(true);
+    expect(isAllowedRunUrl('http://example.com')).toBe(false);
   });
-  it('rejects other schemes', () => {
+  it('rejects other schemes, whitespace, and control chars', () => {
     expect(isAllowedRunUrl('javascript:alert(1)')).toBe(false);
     expect(isAllowedRunUrl('file:///etc/passwd')).toBe(false);
     expect(isAllowedRunUrl('not-a-url')).toBe(false);
+    expect(isAllowedRunUrl('https://example.com/ <!channel>')).toBe(false);
+    expect(isAllowedRunUrl('https://example.com/\tfoo')).toBe(false);
   });
   it('blocks private/loopback/link-local hosts (SSRF)', () => {
     for (const url of [
@@ -206,6 +208,44 @@ describe('pollRunUntilTerminal', () => {
     expect(out.status).toBe('completed');
     expect(calls.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('caps maxWaitMs to the Workers-safe ceiling (<= 25s) and fails fast on 4xx', async () => {
+    let t = 0;
+    const alwaysRunning = (async () =>
+      new Response(JSON.stringify({ id: 'r', status: 'running' }), { status: 200 })) as unknown as typeof fetch;
+    const out = await pollRunUntilTerminal({
+      apiBaseUrl: 'https://api.frontguard.dev',
+      apiKey: 'x',
+      runId: 'r',
+      fetchImpl: alwaysRunning,
+      sleep: async (ms) => {
+        t += ms;
+      },
+      now: () => t,
+      intervalMs: 5_000,
+      maxWaitMs: 25 * 60_000,
+    });
+    expect(out.status).toBe('running');
+    expect(t).toBeLessThanOrEqual(25_000);
+
+    let errCalls = 0;
+    const errFetch = (async () => {
+      errCalls += 1;
+      return new Response('unauthorized', { status: 401 });
+    }) as unknown as typeof fetch;
+    await expect(
+      pollRunUntilTerminal({
+        apiBaseUrl: 'https://api.frontguard.dev',
+        apiKey: 'x',
+        runId: 'r',
+        fetchImpl: errFetch,
+        sleep: async () => undefined,
+        now: () => 0,
+        maxWaitMs: 10_000,
+      }),
+    ).rejects.toThrow(/HTTP 401/);
+    expect(errCalls).toBe(1);
+  });
 });
 
 describe('summarizeRun + buildFollowUpResponse', () => {
@@ -303,6 +343,29 @@ describe('summarizeRun + buildFollowUpResponse', () => {
     expect(body.text).toContain('failed');
     expect(body.text).toContain('sandbox crashed');
   });
+
+  it('escapes <!channel>, <!here>, <!everyone>, and mrkdwn chars in follow-up messages', () => {
+    const body = buildFollowUpResponse(
+      {
+        id: 'r',
+        status: 'failed',
+        error: '<!channel> <!here> <!everyone> *bold* _it_ ~strike~ `code` & <https://evil|click>',
+      },
+      'https://example.com/<!channel>',
+    );
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('<!channel>');
+    expect(serialized).not.toContain('<!here>');
+    expect(serialized).not.toContain('<!everyone>');
+    expect(serialized).not.toContain('<https://evil|click>');
+  });
+
+  it('reports an honest in-progress ephemeral response when a run has not finished yet', () => {
+    const body = buildFollowUpResponse({ id: 'r_slow', status: 'running' }, 'https://example.com');
+    expect(body.response_type).toBe('ephemeral');
+    expect(body.text).toContain('still running');
+    expect(body.text).not.toContain('No visual regressions');
+  });
 });
 
 describe('postSlackResponse', () => {
@@ -316,6 +379,26 @@ describe('postSlackResponse', () => {
     expect(out.ok).toBe(true);
     expect(calls[0].url).toBe('https://hooks.slack.com/x');
     expect(JSON.parse(calls[0].body!)).toMatchObject({ response_type: 'in_channel', text: 'hello' });
+  });
+
+  it('rejects non-slack.com and non-https response_urls without issuing fetch', async () => {
+    let called = false;
+    const fakeFetch = (async () => {
+      called = true;
+      return new Response('ok', { status: 200 });
+    }) as unknown as typeof fetch;
+
+    for (const bad of [
+      'https://evil.example/hook',
+      'http://hooks.slack.com/x',
+      'https://slack.com.evil.example/x',
+      'https://user:pass@hooks.slack.com/x',
+      'https://169.254.169.254/latest',
+    ]) {
+      const out = await postSlackResponse(bad, { response_type: 'ephemeral', text: 'hi' }, fakeFetch);
+      expect(out.ok, bad).toBe(false);
+    }
+    expect(called).toBe(false);
   });
 
   it('returns ok:false on a non-2xx (no throw)', async () => {

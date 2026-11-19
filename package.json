@@ -40,7 +40,7 @@
   },
   "overrides": {
     "@opentelemetry/core": "2.9.0",
-    "@opentelemetry/instrumentation-http": "0.220.0",
+    "@opentelemetry/instrumentation-http": "0.222.0",
     "@opentelemetry/resources": "2.9.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "0.220.0",
     "@opentelemetry/exporter-logs-otlp-http": "0.220.0",
@@ -82,8 +82,7 @@
     "ip-address": "^10.7.4",
     "proxy-addr": "^2.0.8",
     "source-map-js": "^1.2.2",
-    "brace-expansion": "^5.0.12",
-    "braces": "npm:picomatch@^4.0.0"
+    "brace-expansion": "^5.0.12"
   },
   "devDependencies": {
     "@playwright/test": "1.65.0",

@@ -74,3 +74,17 @@ export async function getTeamInstall(
     return null;
   }
 }
+
+/**
+ * Deletes a stored Slack install record (e.g. on `app_uninstalled` or
+ * `tokens_revoked` events). No-ops when `teamId` is empty.
+ */
+export async function deleteTeamInstall(kv: KVNamespace, teamId: string): Promise<void> {
+  if (!teamId) return;
+  const key = teamKey(teamId);
+  if (typeof kv.delete === 'function') {
+    await kv.delete(key);
+  } else {
+    await kv.put(key, '', { expirationTtl: 60 });
+  }
+}

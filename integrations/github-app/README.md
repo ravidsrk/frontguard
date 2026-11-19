@@ -73,11 +73,15 @@ you pick must match the webhook URL configured on the GitHub App.
 | ------------------------------ | -------- | ------------------------------------------------------------------------- |
 | `GITHUB_WEBHOOK_SECRET`        | yes      | HMAC secret GitHub signs webhook deliveries with. Fail-closed — without it every webhook is rejected. |
 | `GITHUB_APP_ID`                | yes      | Numeric App id from the App settings page.                                |
-| `GITHUB_APP_PRIVATE_KEY`       | yes      | PEM-encoded private key (the `.pem` GitHub gives you on App creation).    |
+| `GITHUB_APP_PRIVATE_KEY`       | yes      | PEM-encoded private key (PKCS#1 `RSA PRIVATE KEY` from GitHub or PKCS#8 `PRIVATE KEY`). |
 | `FRONTGUARD_API_URL`           | yes      | Base URL of the Cloud API the app forwards runs to.                       |
-| `FRONTGUARD_API_KEY`           | yes      | Bearer token the worker presents to the Cloud API.                        |
-| `FRONTGUARD_CALLBACK_SECRET`   | yes      | Shared secret the Cloud API presents on `/runs/:id/complete` callbacks. Fail-closed. |
-| `FRONTGUARD_PREVIEW_URL_TEMPLATE` | no    | Fallback URL template (e.g. `https://pr-{prNumber}.preview.example.com`) used when no Vercel/Netlify/Cloudflare deployment event has been observed for the PR's head commit. |
+| `FRONTGUARD_API_KEY`           | single-tenant | Bearer token used only when `FRONTGUARD_SINGLE_TENANT_INSTALLATION_ID` matches the installation. |
+| `FRONTGUARD_SINGLE_TENANT_INSTALLATION_ID` | single-tenant | Explicit GitHub installation ID bound to `FRONTGUARD_API_KEY`. |
+| `FRONTGUARD_INSTALLATION_KEYS` | multi-tenant | Optional JSON map `{ "<installationId>": "<apiKey>" }` (or store `installation:<id>:credentials` in KV). |
+| `FRONTGUARD_CALLBACK_SECRET`   | yes      | Shared secret sent on `POST /v1/run` (`X-Frontguard-Callback-Secret`) and required on `/runs/:id/complete` callbacks. Fail-closed. |
+| `FRONTGUARD_PREVIEW_URL_TEMPLATE` | no    | Fallback `https:` URL template (e.g. `https://pr-{prNumber}.preview.example.com`) used when no Vercel/Netlify/Cloudflare deployment event has been observed for the PR's head commit. `{branch}` is slugified to a safe DNS label. |
+| `FRONTGUARD_ALLOW_FORK_PRS`    | no       | Set to `"true"` to opt in to running checks on fork PRs (disabled by default). |
+| `KV`                           | recommended | Cloudflare Workers KV namespace for durable preview caches, pending PRs, Check Run bindings, and per-installation credentials. |
 
 Set secrets with `wrangler secret put <NAME>`. Non-secret vars (the template)
 can live in `[vars]` in `wrangler.toml`.
@@ -90,7 +94,8 @@ Configured in [`manifest.yml`](./manifest.yml):
 | ---------------- | ------ | --------------------------------------------------------- |
 | `pull_requests`  | write  | Read PR metadata + post status; rare write on rebases.    |
 | `checks`         | write  | Create / update the visual-regression Check Run.          |
-| `contents`       | write  | Read `frontguard.config.*`; open the bootstrap PR.        |
+| `contents`       | write  | Read `frontguard.config.*` (from `base.ref`); open the bootstrap PR. |
+| `workflows`      | write  | Plant `.github/workflows/frontguard.yml` in the bootstrap PR. |
 | `metadata`       | read   | Implicit on every GitHub App.                             |
 | `statuses`       | read   | Pick up Vercel preview URLs from `commit_status` events.  |
 | `deployments`    | read   | Pick up Netlify / Cloudflare Pages preview URLs from `deployment_status` events. |

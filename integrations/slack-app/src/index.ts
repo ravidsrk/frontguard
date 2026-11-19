@@ -4,7 +4,7 @@
  * @module slack-app
  */
 
-export { createSlackApp, type SlackAppEnv, type KVNamespace } from './handler.js';
+export { createSlackApp, clearEventDedupCache, type SlackAppEnv, type KVNamespace } from './handler.js';
 export { verifySlackSignature, timingSafeEqual } from './verify.js';
 export {
   parseSlackEnvelope,
@@ -26,6 +26,8 @@ export {
 } from './oauth.js';
 export {
   buildVisualResultBlocks,
+  escapeSlackMrkdwn,
+  escapeSlackCodeSpan,
   postSlackMessage,
   type RunSummary,
   type PostResult,
@@ -33,6 +35,7 @@ export {
 export {
   putTeamInstall,
   getTeamInstall,
+  deleteTeamInstall,
   teamKey,
   type StoredSlackInstall,
 } from './storage.js';
@@ -43,7 +46,9 @@ export {
   postSlackResponse,
   buildFollowUpResponse,
   deliverRunResult,
+  canonicalizeRunUrl,
   isAllowedRunUrl,
+  isAllowedSlackResponseUrl,
   assertSafeRunUrl,
   type CloudRunResponse,
   type CloudRunStatus,

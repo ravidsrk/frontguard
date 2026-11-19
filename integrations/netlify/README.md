@@ -51,7 +51,7 @@ Then add it to `netlify.toml`:
 
 | Input           | Default                      | Description                                                                |
 | --------------- | ---------------------------- | -------------------------------------------------------------------------- |
-| `apiUrl`        | — **required**               | Frontguard Cloud API base URL. Use your self-hosted deployment or set `FRONTGUARD_API_URL`. |
+| `apiUrl`        | —                            | Optional Frontguard Cloud API base URL (`https:`). **Prefer the env var `FRONTGUARD_API_URL`, which takes precedence over `netlify.toml`.** |
 | `apiKey`        | —                            | Frontguard API key. **Prefer the env var `FRONTGUARD_API_KEY`.**           |
 | `routes`        | `["/"]`                      | Routes (paths) to screenshot. Each is appended to the preview URL.         |
 | `failBuild`     | `false`                      | Fail the Netlify deploy when the run reports any regression.               |
@@ -62,8 +62,9 @@ Then add it to `netlify.toml`:
 
 - `FRONTGUARD_API_KEY` — **required**. Create one in your cloud-api dashboard
   or via the API after you deploy `@frontguard/cloud-api`.
-- `FRONTGUARD_API_URL` — optional fallback for `apiUrl` when not set in
-  `netlify.toml`. Point it at your self-hosted cloud-api base URL.
+- `FRONTGUARD_API_URL` — **recommended**. Base URL of your self-hosted cloud-api
+  (`https:`). Takes precedence over `inputs.apiUrl` in `netlify.toml` so
+  untrusted deploy-preview branches cannot redirect API requests.
 - `GITHUB_TOKEN` — optional. Enables PR comments. A fine-grained PAT or
   GitHub App token with `issues:write` / `pull_requests:write` is enough.
 
@@ -83,7 +84,7 @@ the Marketplace.
 name: "@frontguard/netlify-plugin"
 inputs:
   - name: apiUrl
-    required: true
+    required: false
   - name: apiKey
   - name: routes
     default: ["/"]

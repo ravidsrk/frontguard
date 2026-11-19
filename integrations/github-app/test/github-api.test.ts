@@ -58,6 +58,25 @@ describe('createAppJwt', () => {
     const sigBytes = Buffer.from(sig, 'base64url');
     expect(verifier.verify(publicKey, sigBytes)).toBe(true);
   });
+
+  it('mints a verifiable RS256 JWT from GitHub PKCS#1 RSA PRIVATE KEY PEM', async () => {
+    const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const pkcs1Pem = privateKey.export({ type: 'pkcs1', format: 'pem' }) as string;
+    expect(pkcs1Pem).toContain('BEGIN RSA PRIVATE KEY');
+
+    const now = new Date('2026-01-01T00:00:00Z');
+    const jwt = await createAppJwt('98765', pkcs1Pem, now);
+    const [header, payload, sig] = jwt.split('.');
+    expect(header && payload && sig).toBeTruthy();
+
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    expect(claims.iss).toBe('98765');
+
+    const verifier = createVerify('RSA-SHA256');
+    verifier.update(`${header}.${payload}`);
+    verifier.end();
+    expect(verifier.verify(publicKey, Buffer.from(sig, 'base64url'))).toBe(true);
+  });
 });
 
 describe('getInstallationToken', () => {
@@ -158,6 +177,19 @@ describe('getFileContents', () => {
     expect(res).not.toBeNull();
     expect(res!.sha).toBe('abc123');
     expect(res!.content).toBe(original);
+  });
+
+  it('encodes nested Contents API paths segment-by-segment (preserves / in .github/frontguard.yml)', async () => {
+    let requestedUrl = '';
+    const fakeFetch = (async (url: string) => {
+      requestedUrl = url;
+      return new Response('not found', { status: 404 });
+    }) as unknown as typeof fetch;
+    await getFileContents('tok', 'acme', 'web', '.github/frontguard.yml', 'main', fakeFetch);
+    expect(requestedUrl).toBe(
+      'https://api.github.com/repos/acme/web/contents/.github/frontguard.yml?ref=main',
+    );
+    expect(requestedUrl).not.toContain('%2F');
   });
 });
 
