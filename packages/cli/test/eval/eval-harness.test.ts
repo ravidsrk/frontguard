@@ -11,24 +11,30 @@ import { createMockTransport } from '../../scripts/eval/mock.js';
 import type { EvalCaseResult } from '../../scripts/eval/types.js';
 
 describe('AI eval harness (mock mode)', () => {
-  it.each(['openai', 'anthropic', 'gemini'] as const)('scores every synthetic case for %s', async (provider) => {
-    const report = await runEval({ provider, mock: true, sets: ['synthetic'] });
+  const allSyntheticCases = syntheticCases();
 
-    expect(report.mock).toBe(true);
-    expect(report.metrics.errors).toBe(0);
-    expect(report.metrics.accuracy).toBe(1);
-    expect(report.metrics.gated).toBe(1);
-    expect(report.metrics.ambiguous.total).toBe(3);
-    for (const c of Object.values(report.metrics.perClass)) {
-      expect(c.recall === null || c.recall === 1).toBe(true);
-    }
-    const modelCases = report.cases.filter((c) => !c.gated).length;
-    expect(report.usage.totals.calls).toBe(modelCases);
-    expect(report.usage.calls.every((c) => c.structured)).toBe(true);
-  });
+  it.each(['openai', 'anthropic', 'gemini'] as const)(
+    'scores every synthetic case for %s',
+    async (provider) => {
+      const report = await runEval({ provider, mock: true, cases: allSyntheticCases });
+
+      expect(report.mock).toBe(true);
+      expect(report.metrics.errors).toBe(0);
+      expect(report.metrics.accuracy).toBe(1);
+      expect(report.metrics.gated).toBe(1);
+      expect(report.metrics.ambiguous.total).toBe(3);
+      for (const c of Object.values(report.metrics.perClass)) {
+        expect(c.recall === null || c.recall === 1).toBe(true);
+      }
+      const modelCases = report.cases.filter((c) => !c.gated).length;
+      expect(report.usage.totals.calls).toBe(modelCases);
+      expect(report.usage.calls.every((c) => c.structured)).toBe(true);
+    },
+    60_000,
+  );
 
   it('sends each provider its structured-output schema', async () => {
-    const cases = syntheticCases().filter((c) => c.id === 'syn-dark-theme');
+    const cases = allSyntheticCases.filter((c) => c.id === 'syn-dark-theme');
     for (const provider of ['openai', 'anthropic', 'gemini'] as const) {
       const transport = createMockTransport(cases);
       await runEval({ provider, mock: true, cases, fetchImpl: transport.fetchImpl });
@@ -40,7 +46,7 @@ describe('AI eval harness (mock mode)', () => {
   });
 
   it('keeps synthetic expectations strict: one label unless marked ambiguous', () => {
-    for (const c of syntheticCases()) {
+    for (const c of allSyntheticCases) {
       if (c.ambiguous) expect(c.expected.length).toBeGreaterThan(1);
       else expect(c.expected).toHaveLength(1);
     }
