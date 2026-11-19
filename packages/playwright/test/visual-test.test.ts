@@ -4,6 +4,11 @@ import * as path from 'node:path';
 import { test as playwrightTest, type TestInfo } from '@playwright/test';
 import { PNG } from 'pngjs';
 import { visualTest, expectVisual } from '../src/index.js';
+import {
+  DEFAULT_FREEZE_TIMESTAMP,
+  DEFAULT_SENSITIVE_SELECTORS,
+  matchesBlockedUrl,
+} from '../src/visual-test.js';
 
 const TEST_BASELINE_DIR = '__test_visual_baselines__';
 
@@ -71,14 +76,20 @@ function createTestInfo(testId: string, projectName = 'desktop'): TestInfo {
 }
 
 describe('visualTest', () => {
+  const origCI = process.env.CI;
+
   beforeEach(() => {
     rmDir(TEST_BASELINE_DIR);
-    // Clear env vars
+    // Clear env vars so local baseline creation tests stay deterministic even in CI
     delete process.env.FRONTGUARD_UPDATE;
+    delete process.env.CI;
   });
 
   afterEach(() => {
     rmDir(TEST_BASELINE_DIR);
+    if (origCI === undefined) delete process.env.CI;
+    else process.env.CI = origCI;
+    delete process.env.FRONTGUARD_UPDATE;
     vi.restoreAllMocks();
   });
 
@@ -705,5 +716,86 @@ describe('visualTest', () => {
       rawDiffPixels: 100,
       targetSelector: '[data-testid="buy-button"]',
     });
+  });
+
+  it('fails closed in CI when baseline is missing unless update: true or FRONTGUARD_UPDATE=1', async () => {
+    process.env.CI = 'true';
+    const img = createPNG(40, 40, [100, 150, 200, 255]);
+
+    const res = await visualTest(createMockPage(img), 'ci-missing', {
+      baselineDir: TEST_BASELINE_DIR,
+    });
+    expect(res.passed).toBe(false);
+    expect(res.isNewBaseline).toBe(false);
+    expect(res.missingBaseline).toBe(true);
+    expect(fs.existsSync(res.baselinePath)).toBe(false);
+    expect(fs.existsSync(res.currentPath)).toBe(true);
+
+    await expect(
+      expectVisual(createMockPage(img), 'ci-missing', { baselineDir: TEST_BASELINE_DIR }),
+    ).rejects.toThrow(/Missing visual baseline for "ci-missing" in CI/);
+
+    // Explicit update: true creates baseline even in CI
+    const updated = await visualTest(createMockPage(img), 'ci-missing', {
+      baselineDir: TEST_BASELINE_DIR,
+      update: true,
+    });
+    expect(updated.passed).toBe(true);
+    expect(updated.isNewBaseline).toBe(true);
+    expect(fs.existsSync(updated.baselinePath)).toBe(true);
+
+    // FRONTGUARD_UPDATE=1 also allows creating a missing baseline in CI
+    process.env.FRONTGUARD_UPDATE = '1';
+    const envUpdated = await visualTest(createMockPage(img), 'ci-missing-env', {
+      baselineDir: TEST_BASELINE_DIR,
+    });
+    expect(envUpdated.passed).toBe(true);
+    expect(envUpdated.isNewBaseline).toBe(true);
+  });
+
+  it('aligns freezeTime: true with CLI default (2024-01-01T00:00:00.000Z)', async () => {
+    const img = createPNG(30, 30, [128, 128, 128, 255]);
+    const page = createMockPage(img);
+
+    await visualTest(page, 'freeze-true-default', {
+      baselineDir: TEST_BASELINE_DIR,
+      freezeTime: true,
+    });
+
+    expect(DEFAULT_FREEZE_TIMESTAMP).toBe(Date.parse('2024-01-01T00:00:00.000Z'));
+    expect(page.clock.setFixedTime).toHaveBeenCalledWith(DEFAULT_FREEZE_TIMESTAMP);
+  });
+
+  it('escapes ? and regex metacharacters cleanly in blockUrls without ReDoS', () => {
+    expect(matchesBlockedUrl('https://api.example.com/v1?key=abc', ['https://api.example.com/v1?key=*'])).toBe(true);
+    // If `?` were treated as regex optional, `v1key=abc` would falsely match `v1?key=*`.
+    expect(matchesBlockedUrl('https://api.example.com/v1key=abc', ['https://api.example.com/v1?key=*'])).toBe(false);
+    expect(matchesBlockedUrl('https://a.example.com/foo+bar(1)$[x]', ['foo+bar(1)$[x]'])).toBe(true);
+    // Pathological wildcard pattern must finish immediately (no ReDoS)
+    const start = performance.now();
+    expect(matchesBlockedUrl('a'.repeat(5000), ['a*a*a*a*a*a*a*a*a*a*a*a*b'])).toBe(false);
+    expect(performance.now() - start).toBeLessThan(100);
+  });
+
+  it('swallows cleanup page.evaluate failures in finally so real errors are never masked', async () => {
+    const page = createMockPage(createPNG(20, 20));
+    page.evaluate = vi
+      .fn()
+      .mockResolvedValueOnce(undefined) // mask apply succeeds
+      .mockRejectedValueOnce(new Error('Target page, context or browser has been closed')); // finally cleanup fails
+    page.screenshot = vi.fn().mockRejectedValueOnce(new Error('real screenshot failure'));
+
+    await expect(
+      visualTest(page, 'cleanup-error', {
+        baselineDir: TEST_BASELINE_DIR,
+        mask: ['.dynamic'],
+      }),
+    ).rejects.toThrow('real screenshot failure');
+  });
+
+  it('covers card/cvv/cvc selectors by default in redactSensitive', () => {
+    expect(DEFAULT_SENSITIVE_SELECTORS).toContain('input[name*="card" i]');
+    expect(DEFAULT_SENSITIVE_SELECTORS).toContain('input[name*="cvv" i]');
+    expect(DEFAULT_SENSITIVE_SELECTORS).toContain('input[name*="cvc" i]');
   });
 });

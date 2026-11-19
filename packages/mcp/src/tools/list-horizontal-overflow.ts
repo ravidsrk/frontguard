@@ -15,11 +15,19 @@ import { z } from 'zod';
 import type { CloudClient, CloudHorizontalOverflow } from '../client/cloud.js';
 import { pageCursorInput, pageLimitInput, paginate } from './_paging.js';
 import { newestRun } from './_runs.js';
+import {
+  capSingleLine,
+  MAX_LABEL_LENGTH,
+  MAX_OVERFLOW_ELEMENTS_PER_ROW,
+  MAX_ROUTE_LENGTH,
+  MAX_SELECTOR_LENGTH,
+} from './_sanitize.js';
 
 export const listHorizontalOverflowInputSchema = {
   run_id: z
     .string()
     .min(1)
+    .max(128)
     .optional()
     .describe('Run id. Omit it to read the newest run, including the local report.'),
   flagged_only: z
@@ -113,7 +121,18 @@ export async function listHorizontalOverflow(
       notFound: { reason: 'No run found' },
     };
   }
-  const all = run.horizontalOverflow ?? [];
+  const all = (run.horizontalOverflow ?? []).map((row) => ({
+    route: capSingleLine(row.route, MAX_ROUTE_LENGTH),
+    viewport: row.viewport,
+    ...(row.browser ? { browser: capSingleLine(row.browser, MAX_LABEL_LENGTH) } : {}),
+    innerWidth: row.innerWidth,
+    scrollWidth: row.scrollWidth,
+    flagged: row.flagged,
+    elements: (row.elements ?? []).slice(0, MAX_OVERFLOW_ELEMENTS_PER_ROW).map((el) => ({
+      selector: capSingleLine(el.selector, MAX_SELECTOR_LENGTH),
+      overflowPx: el.overflowPx,
+    })),
+  }));
   // Array#sort is stable, so rows with equal overflow keep report order.
   const rows = (flaggedOnly ? all.filter((row) => row.flagged) : [...all]).sort(
     (a, b) => largestOverflowPx(b) - largestOverflowPx(a),

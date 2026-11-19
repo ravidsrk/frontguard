@@ -28,6 +28,8 @@ export interface VisualTestOptions {
         maxOutputTokens?: number;
         /** Wall-clock limit per HTTP attempt in milliseconds. */
         timeoutMs?: number;
+        /** Opt in to Anthropic server-side refusal fallback (`anthropic-beta` + `fallbacks: "default"`). Default false. */
+        allowFallback?: boolean;
       };
   /** Freeze Date.now() during screenshot (boolean, epoch ms, or ISO date string) */
   freezeTime?: boolean | number | string;
@@ -67,7 +69,11 @@ export interface VisualTestResult {
   /** Why `ai` is missing when AI analysis was requested. */
   aiError?: AIErrorInfo;
   ssim?: number;
+  /** True when a borderline pixel diff passed via the CLI-parity SSIM override. */
+  ssimOverride?: boolean;
   isNewBaseline: boolean;
+  /** True when CI failed closed because no baseline existed and update mode was off. */
+  missingBaseline?: boolean;
   settled?: boolean;
   clusters?: PlaywrightDiffCluster[];
   blockedRequestsCount?: number;
@@ -93,6 +99,7 @@ export interface CompareResult {
   windowMax: number;
   diffBuffer: Buffer | null;
   ssim: number;
+  ssimOverride?: boolean;
   clusters?: PlaywrightDiffCluster[];
 }
 

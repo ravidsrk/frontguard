@@ -13,8 +13,8 @@ describe('MCP publish surface — no false hosted API default', () => {
     expect(readme).toMatch(/no hosted default|FRONTGUARD_API_URL.*required/i);
   });
 
-  it('describes accept_baseline as approval rather than screenshot promotion', () => {
-    expect(readme).toMatch(/records(?: cloud)? approval.*screenshot promotion is not implemented/i);
+  it('documents accept_baseline as Cloud API whole-run approval and refuses local-report writes', () => {
+    expect(readme).toMatch(/records whole-run cloud approval.*refuses local-report mode/i);
     expect(readme).not.toMatch(/promotes the.*run.*baseline/i);
   });
 

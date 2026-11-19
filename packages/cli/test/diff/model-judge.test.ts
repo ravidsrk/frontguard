@@ -117,6 +117,19 @@ describe('parseJudgeResponse', () => {
   it('throws JudgeError on unparseable text', () => {
     expect(() => parseJudgeResponse('not json at all')).toThrow(JudgeError);
   });
+
+  it('skips null and non-object entries in issues without throwing', () => {
+    const r = parseJudgeResponse(
+      JSON.stringify({
+        pass: false,
+        confidence: 0.75,
+        issues: [null, 'str', 42, [], { category: 'contrast', severity: 'warning', description: 'Low contrast' }],
+      }),
+    );
+    expect(r.pass).toBe(false);
+    expect(r.issues).toHaveLength(1);
+    expect(r.issues[0]).toMatchObject({ category: 'contrast', severity: 'warning', description: 'Low contrast' });
+  });
 });
 
 describe('buildJudgeContext', () => {

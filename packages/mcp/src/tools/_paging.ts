@@ -11,6 +11,7 @@
  */
 
 import { z } from 'zod';
+import { MAX_CURSOR_LENGTH } from './_sanitize.js';
 
 export const DEFAULT_PAGE_LIMIT = 25;
 export const MAX_PAGE_LIMIT = 200;
@@ -28,6 +29,7 @@ export const pageLimitInput = z
 export const pageCursorInput = z
   .string()
   .min(1)
+  .max(MAX_CURSOR_LENGTH)
   .optional()
   .describe('The `nextCursor` from the previous page. Omit it for the first page.');
 
@@ -57,6 +59,9 @@ function encodeCursor(state: CursorState): string {
 }
 
 function decodeCursor(cursor: string): CursorState {
+  if (typeof cursor !== 'string' || cursor.length === 0 || cursor.length > MAX_CURSOR_LENGTH) {
+    throw new Error('Invalid cursor. Pass the nextCursor from the previous page, or omit cursor to start over.');
+  }
   let state: unknown;
   try {
     state = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));

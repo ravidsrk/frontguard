@@ -147,6 +147,7 @@ describe('tool semantics (#383)', () => {
           validSyntax: true,
           selectorMatchedTarget: true,
           dangerousProperties: [],
+          knownTargets: ['.cards > div:nth-child(1)'],
           normalizedPatch: '.cards > div:nth-child(1) { width: 100%; }',
           reason: expect.stringMatching(/Nothing was rendered, so the pixels are unconfirmed/),
           nextStep: VERIFY_CSS_PASS_NEXT_STEP,
@@ -202,17 +203,24 @@ describe('tool semantics (#383)', () => {
       }
     });
 
-    it('returns approvalRecorded/screenshotsPromoted and hits the same endpoint as accept_baseline', async () => {
+    it('returns truthful approvalRecorded/screenshotsPromoted, requires explicit run_id, and hits the same endpoint as accept_baseline', async () => {
       const { client, close } = await connect();
       try {
-        const promoted = (await client.callTool({
+        const barePr = (await client.callTool({
           name: 'promote_baseline',
           arguments: { run_id: '12', routes: ['/', '/pricing'], confirm_reviewed: true },
+        })) as CallToolResult;
+        expect(barePr.isError).toBe(true);
+        expect(textOf(barePr)).toMatch(/explicit run_id/i);
+
+        const promoted = (await client.callTool({
+          name: 'promote_baseline',
+          arguments: { run_id: 'run_cards', routes: ['/', '/pricing'], confirm_reviewed: true },
         })) as CallToolResult;
         expect(promoted.isError).toBeFalsy();
         expect(promoteBaselineOutputSchema.parse(promoted.structuredContent)).toEqual({
           approvalRecorded: true,
-          screenshotsPromoted: false,
+          screenshotsPromoted: true,
           runId: 'run_cards',
           reviewedRoutes: ['/', '/pricing'],
           mode: 'cloud-api',

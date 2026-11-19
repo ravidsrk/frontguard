@@ -13,20 +13,28 @@
 
 import { z } from 'zod';
 import type { CloudClient, CloudRun, CloudRunResult } from '../client/cloud.js';
-import { diffIdFor } from '../client/cloud.js';
+import { diffIdFor, isValidRunId } from '../client/cloud.js';
 import { pageCursorInput, pageLimitInput, paginate } from './_paging.js';
 import { isRegressionResult } from './_regression.js';
 import { LATEST_RUN, matchesRepo, newestRun } from './_runs.js';
+import {
+  capSingleLine,
+  MAX_DIFF_ID_LENGTH,
+  MAX_LABEL_LENGTH,
+  MAX_ROUTE_LENGTH,
+  MAX_URL_LENGTH,
+} from './_sanitize.js';
 
 export const listRegressionsInputSchema = {
   pr_id: z
-    .union([z.number().int(), z.string().min(1)])
+    .union([z.number().int(), z.string().min(1).max(256)])
     .describe(
       'GitHub PR number, a Frontguard run id (e.g. "run_abc123"; a local report is "run_local" unless it sets an id), or "latest" for the newest run (in local-report mode, the report\'s run). Required.',
     ),
   repo: z
     .string()
     .min(1)
+    .max(256)
     .optional()
     .describe(
       'Optional `owner/name` filter — disambiguates when the same PR number exists across multiple repos.',
@@ -165,6 +173,7 @@ export async function listRegressions(
     run = newestRun(repo ? runs.filter((r) => matchesRepo(r, repo)) : runs);
   } else if (
     typeof input.pr_id === 'string' &&
+    isValidRunId(input.pr_id) &&
     /^(?:run[_-]|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$)/i.test(input.pr_id)
   ) {
     try {
@@ -191,16 +200,16 @@ export async function listRegressions(
     };
   }
 
-  const runId = run.id;
+  const runId = capSingleLine(run.id, MAX_LABEL_LENGTH);
   const rows: RegressionRow[] = (run.results ?? [])
     .filter(isRegression)
     .map((r) => ({
-      diffId: r.diffId ?? diffIdFor(runId, r),
-      route: r.route,
+      diffId: capSingleLine(r.diffId ?? diffIdFor(runId, r), MAX_DIFF_ID_LENGTH),
+      route: capSingleLine(r.route, MAX_ROUTE_LENGTH),
       viewport: r.viewport,
-      status: r.status,
+      status: capSingleLine(r.status, MAX_LABEL_LENGTH),
       diffPercentage: r.diffPercentage,
-      classification: r.classification,
+      ...(r.classification ? { classification: capSingleLine(r.classification, MAX_LABEL_LENGTH) } : {}),
       hasSuggestedFix: Boolean(r.suggestedFix),
       clusterCount: r.clusters?.length ?? 0,
     }))
@@ -209,10 +218,10 @@ export async function listRegressions(
 
   return {
     runId,
-    reportUrl: run.reportUrl ?? null,
+    reportUrl: run.reportUrl ? capSingleLine(run.reportUrl, MAX_URL_LENGTH) : null,
     prNumber: run.github?.prNumber,
-    repo: run.github ? `${run.github.owner}/${run.github.repo}` : undefined,
-    commitSha: run.github?.commitSha,
+    repo: run.github ? capSingleLine(`${run.github.owner}/${run.github.repo}`, MAX_LABEL_LENGTH) : undefined,
+    commitSha: run.github?.commitSha ? capSingleLine(run.github.commitSha, MAX_LABEL_LENGTH) : undefined,
     total: page.total,
     count: page.count,
     nextCursor: page.nextCursor,

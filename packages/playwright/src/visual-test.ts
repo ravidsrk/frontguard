@@ -7,6 +7,78 @@ import { BaselineStorage } from './storage.js';
 import { recordTextSnapshots } from './text-snapshot.js';
 import type { TextSnapshotKind } from './types.js';
 
+/** Default frozen timestamp when `freezeTime: true` (`2024-01-01T00:00:00.000Z`, matching CLI). */
+export const DEFAULT_FREEZE_TIMESTAMP = 1704067200000;
+
+/** Default CSS selectors redacted when `redactSensitive` is enabled (parity with CLI + card/cvv/cvc). */
+export const DEFAULT_SENSITIVE_SELECTORS: readonly string[] = [
+  'input[type="password"]',
+  'input[autocomplete="current-password"]',
+  'input[autocomplete="new-password"]',
+  'input[autocomplete="one-time-code"]',
+  'input[autocomplete^="cc-"]',
+  'input[name*="card" i]',
+  'input[name*="cvv" i]',
+  'input[name*="cvc" i]',
+  '[data-frontguard-redact]',
+  '[data-sensitive]',
+] as const;
+
+/** True when running in a CI environment (`CI` env var set and not `'0'` / `'false'`). */
+export function isCIEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+  const raw = env.CI?.trim().toLowerCase();
+  return Boolean(raw && raw !== '0' && raw !== 'false');
+}
+
+/**
+ * Resolve `freezeTime` option (`true`, epoch ms number, or ISO 8601 string) to
+ * a numeric epoch millisecond timestamp, or `null` when disabled/invalid.
+ */
+export function resolveFreezeTimestamp(
+  freezeTime: boolean | number | string | undefined,
+): number | null {
+  if (freezeTime === undefined || freezeTime === false) return null;
+  if (freezeTime === true) return DEFAULT_FREEZE_TIMESTAMP;
+  if (typeof freezeTime === 'number') return Number.isFinite(freezeTime) ? freezeTime : null;
+  if (typeof freezeTime === 'string') {
+    const parsed = Date.parse(freezeTime);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+/**
+ * Linear-time, ReDoS-safe URL matcher supporting `*` wildcards and
+ * case-insensitive substring matching. All regex metacharacters (including `?`)
+ * are matched literally.
+ */
+export function matchesBlockedUrl(url: string, patterns: readonly string[]): boolean {
+  const lowerUrl = url.toLowerCase();
+  for (const rawPattern of patterns) {
+    const pattern = rawPattern.trim();
+    if (!pattern) continue;
+    const lowerPattern = pattern.toLowerCase();
+    if (!lowerPattern.includes('*')) {
+      if (lowerUrl.includes(lowerPattern)) return true;
+      continue;
+    }
+    const segments = lowerPattern.split('*').filter((s) => s.length > 0);
+    if (segments.length === 0) return true; // Pattern was only `*`
+    let searchFrom = 0;
+    let matched = true;
+    for (const seg of segments) {
+      const idx = lowerUrl.indexOf(seg, searchFrom);
+      if (idx === -1) {
+        matched = false;
+        break;
+      }
+      searchFrom = idx + seg.length;
+    }
+    if (matched) return true;
+  }
+  return false;
+}
+
 function currentTestInfo(): TestInfo | undefined {
   try {
     return playwrightTest.info();
@@ -68,20 +140,14 @@ export async function visualTest(
   const storage = new BaselineStorage(opts.baselineDir);
 
   // Freeze time if requested.
-  if (opts.freezeTime !== false && opts.freezeTime !== undefined) {
-    const rawTs =
-      typeof opts.freezeTime === 'string'
-        ? Date.parse(opts.freezeTime)
-        : opts.freezeTime === true
-          ? 0
-          : (opts.freezeTime ?? 0);
-    const ts = Number.isFinite(rawTs) ? rawTs : 0;
+  const frozenTs = resolveFreezeTimestamp(opts.freezeTime);
+  if (frozenTs !== null) {
     const clock = (page as { clock?: { setFixedTime?: (t: number) => Promise<void> } }).clock;
     if (clock?.setFixedTime) {
-      await clock.setFixedTime(ts).catch(() => {});
+      await clock.setFixedTime(frozenTs).catch(() => {});
     } else {
       await page.addInitScript(`{
-        const __ts = ${ts};
+        const __ts = ${frozenTs};
         const __D = Date;
         const __FrozenDate = class extends __D {
           constructor(...a) { super(...(a.length ? a : [__ts])); }
@@ -108,7 +174,7 @@ export async function visualTest(
           }
         };
         window.Date = FrozenDate as DateConstructor;
-      }, ts)
+      }, frozenTs)
       .catch(() => {});
   }
 
@@ -139,21 +205,13 @@ export async function visualTest(
   if (opts.blockUrls && opts.blockUrls.length > 0 && typeof pageWithRoutes.route === 'function') {
     blockedRequestsCount = 0;
     const patterns = opts.blockUrls;
-    const matchesBlockedPattern = (url: string): boolean => {
-      for (const pat of patterns) {
-        if (url.includes(pat)) return true;
-        const regexStr = pat.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*+/g, '.*');
-        if (new RegExp(regexStr, 'i').test(url)) return true;
-      }
-      return false;
-    };
 
     routeInterceptor = async (route: any) => {
       const reqUrl =
         typeof route?.request === 'function'
           ? (route.request()?.url?.() ?? '')
           : (route?.url ?? '');
-      if (!reqUrl || matchesBlockedPattern(reqUrl)) {
+      if (!reqUrl || matchesBlockedUrl(reqUrl, patterns)) {
         blockedRequestsCount = (blockedRequestsCount ?? 0) + 1;
         await route?.abort?.();
       } else {
@@ -163,23 +221,22 @@ export async function visualTest(
     await pageWithRoutes.route('**/*', routeInterceptor);
   }
 
-  const defaultSensitiveSelectors = [
-    'input[type="password"]',
-    'input[autocomplete="current-password"]',
-    'input[autocomplete="new-password"]',
-    'input[autocomplete="one-time-code"]',
-    'input[autocomplete^="cc-"]',
-    '[data-frontguard-redact]',
-    '[data-sensitive]',
-  ];
   const redactSelectors = !opts.redactSensitive
     ? []
     : opts.redactSensitive === true
-      ? defaultSensitiveSelectors
-      : [...new Set([...defaultSensitiveSelectors, ...opts.redactSensitive])];
+      ? [...DEFAULT_SENSITIVE_SELECTORS]
+      : [
+          ...new Set([
+            ...DEFAULT_SENSITIVE_SELECTORS,
+            ...opts.redactSensitive.map((s) => s.trim()).filter(Boolean),
+          ]),
+        ];
 
   const hasMasks = Boolean(
     opts.mask?.length || opts.maskRegions?.length || redactSelectors.length,
+  );
+  const wantsTextSnapshot = Boolean(
+    opts.captureAriaSnapshot || opts.textSnapshot?.json || opts.textSnapshot?.markdown,
   );
   let currentBuffer: Buffer;
   let settled: boolean | undefined;
@@ -192,29 +249,74 @@ export async function visualTest(
     if (opts.mask?.length) {
       await page.evaluate((selectors: string[]) => {
         for (const sel of selectors) {
-          document.querySelectorAll(sel).forEach((el) => {
-            const htmlEl = el as HTMLElement;
-            if (!htmlEl.hasAttribute('data-frontguard-prev-style')) {
-              htmlEl.setAttribute('data-frontguard-prev-style', htmlEl.getAttribute('style') ?? '');
-            }
-            htmlEl.style.cssText += 'visibility:hidden!important;';
-          });
+          try {
+            document.querySelectorAll(sel).forEach((el) => {
+              const htmlEl = el as HTMLElement;
+              if (!htmlEl.hasAttribute('data-frontguard-prev-style')) {
+                htmlEl.setAttribute('data-frontguard-prev-style', htmlEl.getAttribute('style') ?? '');
+              }
+              htmlEl.style.cssText += 'visibility:hidden!important;';
+            });
+          } catch {
+            // Ignore malformed individual mask selector
+          }
         }
       }, opts.mask);
     }
 
-    // Redact sensitive inputs while keeping their box geometry intact
+    // Redact sensitive elements across Document, open Shadow DOM, and same-origin iframes.
+    // Selectors are evaluated individually so one invalid custom selector never disables defaults.
     if (redactSelectors.length > 0) {
       await page.evaluate((selectors: string[]) => {
-        const combined = selectors.join(', ');
-        document.querySelectorAll(combined).forEach((el) => {
+        const mediaTags = new Set(['img', 'svg', 'canvas', 'video', 'picture']);
+        const seenRoots = new Set<Document | ShadowRoot>();
+
+        const applyVisualRedaction = (el: Element) => {
           const htmlEl = el as HTMLElement;
           if (!htmlEl.hasAttribute('data-frontguard-prev-style')) {
             htmlEl.setAttribute('data-frontguard-prev-style', htmlEl.getAttribute('style') ?? '');
           }
-          htmlEl.style.cssText +=
-            'color:transparent!important;text-shadow:none!important;caret-color:transparent!important;';
-        });
+          htmlEl.style.setProperty('color', 'transparent', 'important');
+          htmlEl.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
+          htmlEl.style.setProperty('text-shadow', 'none', 'important');
+          htmlEl.style.setProperty('caret-color', 'transparent', 'important');
+          if (mediaTags.has(el.tagName.toLowerCase())) {
+            htmlEl.style.setProperty('opacity', '0', 'important');
+          }
+        };
+
+        const visitRoot = (root: Document | ShadowRoot) => {
+          if (seenRoots.has(root)) return;
+          seenRoots.add(root);
+
+          for (const sel of selectors) {
+            try {
+              const matches = root.querySelectorAll(sel);
+              matches.forEach((matchEl) => {
+                applyVisualRedaction(matchEl);
+                matchEl.querySelectorAll('*').forEach((desc) => applyVisualRedaction(desc));
+              });
+            } catch {
+              // Isolate malformed selector so remaining selectors still redact
+            }
+          }
+
+          root.querySelectorAll('*').forEach((el) => {
+            if (el.shadowRoot) {
+              visitRoot(el.shadowRoot);
+            }
+            if (el.tagName.toLowerCase() === 'iframe') {
+              try {
+                const doc = (el as HTMLIFrameElement).contentDocument;
+                if (doc) visitRoot(doc);
+              } catch {
+                // Cross-origin iframe
+              }
+            }
+          });
+        };
+
+        visitRoot(document);
       }, redactSelectors);
     }
 
@@ -267,6 +369,101 @@ export async function visualTest(
       currentBuffer = prev;
     } else {
       currentBuffer = await takeCapture();
+    }
+
+    // Scrub redacted DOM values/text before capturing ARIA / JSON / Markdown text snapshots
+    // so plaintext secrets never leak into saved text baselines or diffs.
+    if (redactSelectors.length > 0 && wantsTextSnapshot) {
+      await page
+        .evaluate((selectors: string[]) => {
+          const restoreKey = Symbol.for('frontguard.redactRestore');
+          const win = window as unknown as Record<symbol, Array<() => void>>;
+          const restores: Array<() => void> = win[restoreKey] ?? [];
+          win[restoreKey] = restores;
+          const seenRoots = new Set<Document | ShadowRoot>();
+          const scrubbedElements = new Set<Element>();
+
+          const scrubElement = (el: Element) => {
+            if (scrubbedElements.has(el)) return;
+            scrubbedElements.add(el);
+
+            const tag = el.tagName.toLowerCase();
+            if (tag === 'input' || tag === 'textarea') {
+              const field = el as HTMLInputElement | HTMLTextAreaElement;
+              const origVal = field.value;
+              const hadValueAttr = field.hasAttribute('value');
+              const origValueAttr = field.getAttribute('value');
+              const hadPlaceholder = field.hasAttribute('placeholder');
+              const origPlaceholder = field.getAttribute('placeholder');
+
+              field.value = '';
+              if (hadValueAttr) field.setAttribute('value', '[REDACTED]');
+              if (hadPlaceholder) field.setAttribute('placeholder', '[REDACTED]');
+
+              restores.push(() => {
+                field.value = origVal;
+                if (hadValueAttr && origValueAttr !== null) field.setAttribute('value', origValueAttr);
+                else if (hadValueAttr) field.removeAttribute('value');
+                if (hadPlaceholder && origPlaceholder !== null) field.setAttribute('placeholder', origPlaceholder);
+              });
+            }
+
+            if (el.hasAttribute('aria-label')) {
+              const origAria = el.getAttribute('aria-label');
+              el.setAttribute('aria-label', '[REDACTED]');
+              restores.push(() => {
+                if (origAria !== null) el.setAttribute('aria-label', origAria);
+              });
+            }
+
+            if (tag !== 'input' && tag !== 'textarea') {
+              const ownerDoc = el.ownerDocument || document;
+              const walker = ownerDoc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+              const textNodes: Text[] = [];
+              let node: Node | null;
+              while ((node = walker.nextNode())) {
+                if (node.nodeValue && node.nodeValue.trim().length > 0) {
+                  textNodes.push(node as Text);
+                }
+              }
+              for (const tn of textNodes) {
+                const origText = tn.nodeValue;
+                tn.nodeValue = '[REDACTED]';
+                restores.push(() => {
+                  tn.nodeValue = origText;
+                });
+              }
+            }
+          };
+
+          const visitRoot = (root: Document | ShadowRoot) => {
+            if (seenRoots.has(root)) return;
+            seenRoots.add(root);
+
+            for (const sel of selectors) {
+              try {
+                root.querySelectorAll(sel).forEach((el) => scrubElement(el));
+              } catch {
+                // Ignore malformed selector
+              }
+            }
+
+            root.querySelectorAll('*').forEach((el) => {
+              if (el.shadowRoot) visitRoot(el.shadowRoot);
+              if (el.tagName.toLowerCase() === 'iframe') {
+                try {
+                  const doc = (el as HTMLIFrameElement).contentDocument;
+                  if (doc) visitRoot(doc);
+                } catch {
+                  // Cross-origin iframe
+                }
+              }
+            });
+          };
+
+          visitRoot(document);
+        }, redactSelectors)
+        .catch(() => {});
     }
 
     if (opts.captureAriaSnapshot) {
@@ -331,20 +528,56 @@ export async function visualTest(
     }
   } finally {
     if (hasMasks) {
-      await page.evaluate(() => {
-        document.querySelectorAll('[data-frontguard-prev-style]').forEach((el) => {
-          const prev = el.getAttribute('data-frontguard-prev-style');
-          el.removeAttribute('data-frontguard-prev-style');
-          if (prev) {
-            el.setAttribute('style', prev);
-          } else {
-            el.removeAttribute('style');
+      await page
+        .evaluate(() => {
+          const restoreKey = Symbol.for('frontguard.redactRestore');
+          const win = window as unknown as Record<symbol, Array<() => void> | undefined>;
+          const restores = win[restoreKey];
+          if (Array.isArray(restores)) {
+            for (let i = restores.length - 1; i >= 0; i--) {
+              try {
+                restores[i]();
+              } catch {
+                // ignore individual restore failure
+              }
+            }
+            delete win[restoreKey];
           }
-        });
-        document.querySelectorAll('[data-frontguard-mask-region]').forEach((el) => {
-          el.remove();
-        });
-      });
+
+          const seenRoots = new Set<Document | ShadowRoot>();
+          const restoreRoot = (root: Document | ShadowRoot) => {
+            if (seenRoots.has(root)) return;
+            seenRoots.add(root);
+
+            root.querySelectorAll('[data-frontguard-prev-style]').forEach((el) => {
+              const prev = el.getAttribute('data-frontguard-prev-style');
+              el.removeAttribute('data-frontguard-prev-style');
+              if (prev) {
+                el.setAttribute('style', prev);
+              } else {
+                el.removeAttribute('style');
+              }
+            });
+            root.querySelectorAll('[data-frontguard-mask-region]').forEach((el) => {
+              el.remove();
+            });
+
+            root.querySelectorAll('*').forEach((el) => {
+              if (el.shadowRoot) restoreRoot(el.shadowRoot);
+              if (el.tagName.toLowerCase() === 'iframe') {
+                try {
+                  const doc = (el as HTMLIFrameElement).contentDocument;
+                  if (doc) restoreRoot(doc);
+                } catch {
+                  // Cross-origin iframe
+                }
+              }
+            });
+          };
+
+          restoreRoot(document);
+        })
+        .catch(() => {});
     }
     if (routeInterceptor && typeof pageWithRoutes.unroute === 'function') {
       await pageWithRoutes.unroute('**/*', routeInterceptor).catch(() => {});
@@ -358,9 +591,10 @@ export async function visualTest(
   if (jsonText !== undefined) textItems.push({ kind: 'json', ext: '.json', body: jsonText });
   if (markdownText !== undefined) textItems.push({ kind: 'markdown', ext: '.md', body: markdownText });
 
-  // Load or create baseline
+  // Load or create baseline (fail closed in CI when baseline is missing and update is off)
   const baseline = storage.readBaseline(baselineKey);
-  const writing = baseline === null || opts.update === true;
+  const missingInCI = baseline === null && opts.update !== true && isCIEnv();
+  const writing = !missingInCI && (baseline === null || opts.update === true);
   const textFailure = textErrors[0];
   if (writing && textFailure) throw new Error(textFailure.message);
   const recorded = textItems.length
@@ -372,6 +606,22 @@ export async function visualTest(
     path: storage.textPath(baselineKey, item.ext),
   }));
   const textSnapshots = recorded.length + failed.length > 0 ? [...recorded, ...failed] : undefined;
+
+  if (missingInCI) {
+    storage.writeFile(baselineKey, 'current', current);
+    return {
+      passed: false,
+      diffPercentage: 1,
+      baselinePath: storage.getPath(baselineKey),
+      currentPath: storage.getPath(baselineKey, 'current'),
+      isNewBaseline: false,
+      missingBaseline: true,
+      ...(settled !== undefined ? { settled } : {}),
+      ...(blockedRequestsCount !== undefined ? { blockedRequestsCount } : {}),
+      ...(ariaSnapshot !== undefined ? { ariaSnapshot } : {}),
+      ...(textSnapshots ? { textSnapshots } : {}),
+    };
+  }
 
   if (writing) {
     storage.writeBaseline(baselineKey, current);
@@ -390,13 +640,37 @@ export async function visualTest(
   }
 
   // Compare
-  const diff = compareImages(baseline, current, opts.threshold);
+  const diff = compareImages(baseline!, current, opts.threshold);
 
-  // Attribute clusters to specific DOM selectors when clusters exist
+  // Attribute clusters to specific DOM selectors when clusters exist.
+  // When `opts.selector` scopes the screenshot to a component, subtract that
+  // component's document-space origin so DOM boxes match component-local clusters.
   if (diff.clusters && diff.clusters.length > 0) {
     try {
-      const domBoxes = await page.evaluate(() => {
-        const elements = Array.from(document.querySelectorAll('*'));
+      const domBoxes = await page.evaluate((componentSelector: string | null) => {
+        let originX = 0;
+        let originY = 0;
+        let rootElements: Element[];
+
+        if (componentSelector) {
+          let compEl: Element | null = null;
+          try {
+            compEl = document.querySelector(componentSelector);
+          } catch {
+            compEl = null;
+          }
+          if (compEl) {
+            const compRect = compEl.getBoundingClientRect();
+            originX = compRect.left + window.scrollX;
+            originY = compRect.top + window.scrollY;
+            rootElements = [compEl, ...Array.from(compEl.querySelectorAll('*'))];
+          } else {
+            rootElements = Array.from(document.querySelectorAll('*'));
+          }
+        } else {
+          rootElements = Array.from(document.querySelectorAll('*'));
+        }
+
         const results: Array<{
           selector: string;
           x: number;
@@ -404,7 +678,7 @@ export async function visualTest(
           width: number;
           height: number;
         }> = [];
-        for (const el of elements) {
+        for (const el of rootElements) {
           const tag = el.tagName.toLowerCase();
           if (tag === 'html' || tag === 'body' || tag === 'head' || tag === 'script' || tag === 'style') {
             continue;
@@ -423,14 +697,14 @@ export async function visualTest(
           }
           results.push({
             selector,
-            x: rect.left + window.scrollX,
-            y: rect.top + window.scrollY,
+            x: rect.left + window.scrollX - originX,
+            y: rect.top + window.scrollY - originY,
             width: rect.width,
             height: rect.height,
           });
         }
         return results;
-      });
+      }, opts.selector ?? null);
 
       if (Array.isArray(domBoxes) && domBoxes.length > 0) {
         for (const cluster of diff.clusters) {
@@ -499,6 +773,7 @@ export async function visualTest(
     currentPath: storage.getPath(baselineKey, 'current'),
     diffPath: diff.diffBuffer ? storage.getPath(baselineKey, 'diff') : undefined,
     ssim: diff.ssim,
+    ...(diff.ssimOverride ? { ssimOverride: true } : {}),
     isNewBaseline: false,
     ...(settled !== undefined ? { settled } : {}),
     ...(diff.clusters && diff.clusters.length > 0 ? { clusters: diff.clusters } : {}),
@@ -510,7 +785,7 @@ export async function visualTest(
   // AI analysis if enabled and diff detected
   if (opts.ai && !diff.passed) {
     const aiOpts = typeof opts.ai === 'object' ? opts.ai : { provider: 'openai' as const };
-    const outcome = await analyzeWithAI(baseline, current, aiOpts, diff.diffBuffer);
+    const outcome = await analyzeWithAI(baseline!, current, aiOpts, diff.diffBuffer);
     if (outcome.ai) result.ai = outcome.ai;
     if (outcome.aiError) {
       result.aiError = outcome.aiError;
@@ -553,6 +828,11 @@ export async function expectVisual(
 ): Promise<VisualTestResult> {
   const result = await visualTest(page, name, options);
   if (!result.passed) {
+    if (result.missingBaseline) {
+      throw new Error(
+        `Missing visual baseline for "${name}" in CI (${result.baselinePath}). Generate and commit baselines locally or run with update: true / FRONTGUARD_UPDATE=1.`,
+      );
+    }
     const pct = (result.diffPercentage * 100).toFixed(2);
     const windowNote =
       result.windowMax !== undefined && result.windowMax > 64

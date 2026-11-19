@@ -175,28 +175,33 @@ export function normalizeJudgement(obj: Record<string, unknown>): {
   confidence: number;
   issues: JudgeIssue[];
 } {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+    return { pass: false, confidence: 0.5, issues: [] };
+  }
   const rawIssues = Array.isArray(obj.issues) ? obj.issues : [];
-  const issues: JudgeIssue[] = rawIssues.map((raw) => {
+  const issues: JudgeIssue[] = [];
+  for (const raw of rawIssues) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
     const i = raw as Record<string, unknown>;
     const category = VALID_CATEGORIES.has(i.category as JudgeIssueCategory)
       ? (i.category as JudgeIssueCategory)
       : 'other';
     const severity = VALID_SEVERITIES.has(i.severity as Severity) ? (i.severity as Severity) : 'info';
-    return {
+    issues.push({
       category,
       severity,
       description: typeof i.description === 'string' ? i.description : 'Unspecified issue',
       location: typeof i.location === 'string' ? i.location : undefined,
       suggestion: typeof i.suggestion === 'string' ? i.suggestion : undefined,
-    };
-  });
+    });
+  }
 
   // Derive pass: explicit boolean wins; otherwise pass iff no critical/warning issues.
   const hasBlocking = issues.some((i) => i.severity === 'critical' || i.severity === 'warning');
   const pass = typeof obj.pass === 'boolean' ? obj.pass : !hasBlocking;
 
   const confidence =
-    typeof obj.confidence === 'number' && obj.confidence >= 0 && obj.confidence <= 1
+    typeof obj.confidence === 'number' && Number.isFinite(obj.confidence) && obj.confidence >= 0 && obj.confidence <= 1
       ? obj.confidence
       : 0.5;
 
@@ -281,6 +286,7 @@ export async function judgeScreenshot(
         baseUrl: ai.baseUrl,
         maxOutputTokens: ai.maxOutputTokens,
         timeoutMs: ai.timeoutMs,
+        allowFallback: (ai as { allowFallback?: boolean }).allowFallback,
         label: `judge ${screenshot.route.path} @${screenshot.viewport}`,
       },
       transport,

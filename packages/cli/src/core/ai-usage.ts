@@ -12,6 +12,9 @@
 import type { AICallRecord } from '../diff/ai-provider.js';
 import type { AIUsageSummary } from './types.js';
 
+/** Default per-run model-call cap when `ai.maxCalls` is not explicitly configured. */
+export const DEFAULT_AI_MAX_CALLS = 50;
+
 /** OTel attribute names for model-call spans (numbers only; no URLs or content). */
 export const AI_SPAN_ATTRIBUTES = {
   calls: 'frontguard.ai.calls',
@@ -23,17 +26,28 @@ export const AI_SPAN_ATTRIBUTES = {
 
 export class AIUsageTracker {
   private readonly records: AICallRecord[] = [];
+  private readonly maxCalls: number;
   private reserved = 0;
   private skippedBudget = 0;
 
-  constructor(private readonly maxCalls?: number) {}
+  constructor(maxCalls?: number) {
+    if (maxCalls === undefined) {
+      this.maxCalls = DEFAULT_AI_MAX_CALLS;
+    } else if (maxCalls === Number.POSITIVE_INFINITY) {
+      this.maxCalls = Number.POSITIVE_INFINITY;
+    } else if (typeof maxCalls === 'number' && Number.isFinite(maxCalls)) {
+      this.maxCalls = Math.max(0, Math.floor(maxCalls));
+    } else {
+      this.maxCalls = DEFAULT_AI_MAX_CALLS;
+    }
+  }
 
   /**
    * Reserves one model call. Returns false (and counts a skip) once the
    * configured `ai.maxCalls` has been used up.
    */
   tryReserve(): boolean {
-    if (this.maxCalls !== undefined && this.reserved >= this.maxCalls) {
+    if (Number.isFinite(this.maxCalls) && this.reserved >= this.maxCalls) {
       this.skippedBudget += 1;
       return false;
     }
@@ -83,7 +97,7 @@ export class AIUsageTracker {
       calls: [...this.records],
       totals,
       skipped: { budget: this.skippedBudget },
-      ...(this.maxCalls !== undefined ? { maxCalls: this.maxCalls } : {}),
+      ...(Number.isFinite(this.maxCalls) ? { maxCalls: this.maxCalls } : {}),
     };
   }
 
