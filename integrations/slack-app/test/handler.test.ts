@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { createSlackApp } from '../src/handler.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createSlackApp, clearEventDedupCache } from '../src/handler.js';
 import type { KVNamespace } from '../src/storage.js';
 import { signSlack, stubPublicDnsFetch } from './helpers.js';
+
+beforeEach(() => clearEventDedupCache());
 
 const SECRET = 'shhh-signing-secret';
 const env = { SLACK_SIGNING_SECRET: SECRET };
@@ -157,7 +159,7 @@ describe('/slack/commands — status subcommand', () => {
     }) as unknown as typeof fetch;
 
     const res = await postStatus({
-      url: 'http://169.254.169.254/',
+      url: 'https://169.254.169.254/',
       apiUrl: 'https://api.frontguard.dev',
       apiKey: 'fg_x',
       fetchSpy: fakeFetch as unknown as typeof fetch & ((...a: unknown[]) => unknown),
@@ -384,5 +386,159 @@ describe('/slack/oauth/callback — install persistence', () => {
     } finally {
       globalThis.fetch = orig;
     }
+  });
+
+  it('handles ?error=access_denied cleanly with HTTP 400 (no OAuth redirect loop)', async () => {
+    const res = await app.request('/slack/oauth/callback?error=access_denied', {}, envWith({}));
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { ok: boolean; error: string };
+    expect(json.ok).toBe(false);
+    expect(json.error).toContain('access_denied');
+  });
+
+  it('deletes KV bot token on app_uninstalled and tokens_revoked events', async () => {
+    const kv = memoryKV();
+    await kv.put(
+      'team:T_REVOKE',
+      JSON.stringify({
+        teamId: 'T_REVOKE',
+        accessToken: 'xoxb-revoked',
+        installedAt: '2026-06-15T00:00:00.000Z',
+      }),
+    );
+
+    const body = JSON.stringify({
+      type: 'event_callback',
+      event_id: 'Ev_uninst_1',
+      team_id: 'T_REVOKE',
+      event: { type: 'app_uninstalled' },
+    });
+    const ts = String(Math.floor(Date.now() / 1000));
+    const sig = await signSlack(body, ts, SECRET);
+    const res = await app.request(
+      '/slack/events',
+      { method: 'POST', headers: signedHeaders(body, ts, sig), body },
+      { SLACK_SIGNING_SECRET: SECRET, SLACK_TEAMS: kv },
+    );
+    expect(res.status).toBe(200);
+    expect(kv.store.has('team:T_REVOKE')).toBe(false);
+
+    // Re-insert and verify tokens_revoked also purges KV.
+    await kv.put(
+      'team:T_REVOKE',
+      JSON.stringify({
+        teamId: 'T_REVOKE',
+        accessToken: 'xoxb-revoked-2',
+        installedAt: '2026-06-15T00:00:00.000Z',
+      }),
+    );
+    const revokeBody = JSON.stringify({
+      type: 'event_callback',
+      event_id: 'Ev_revoke_1',
+      team_id: 'T_REVOKE',
+      event: { type: 'tokens_revoked' },
+    });
+    const revokeSig = await signSlack(revokeBody, ts, SECRET);
+    const revokeRes = await app.request(
+      '/slack/events',
+      { method: 'POST', headers: signedHeaders(revokeBody, ts, revokeSig), body: revokeBody },
+      { SLACK_SIGNING_SECRET: SECRET, SLACK_TEAMS: kv },
+    );
+    expect(revokeRes.status).toBe(200);
+    expect(kv.store.has('team:T_REVOKE')).toBe(false);
+  });
+
+  it('deduplicates Slack retries and repeated event_ids', async () => {
+    const kv = memoryKV();
+    await kv.put(
+      'team:T_DEDUP',
+      JSON.stringify({
+        teamId: 'T_DEDUP',
+        accessToken: 'xoxb-dedup',
+        installedAt: '2026-06-15T00:00:00.000Z',
+      }),
+    );
+    let postCount = 0;
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      postCount += 1;
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }) as typeof fetch;
+    try {
+      const body = JSON.stringify({
+        type: 'event_callback',
+        event_id: 'Ev_dup_99',
+        team_id: 'T_DEDUP',
+        event: { type: 'app_mention', channel: 'C1', text: 'hi' },
+      });
+      const ts = String(Math.floor(Date.now() / 1000));
+      const sig = await signSlack(body, ts, SECRET);
+      const first = await app.request(
+        '/slack/events',
+        { method: 'POST', headers: signedHeaders(body, ts, sig), body },
+        { SLACK_SIGNING_SECRET: SECRET, SLACK_TEAMS: kv },
+      );
+      expect(first.status).toBe(200);
+
+      const second = await app.request(
+        '/slack/events',
+        {
+          method: 'POST',
+          headers: { ...signedHeaders(body, ts, sig), 'x-slack-retry-num': '1' },
+          body,
+        },
+        { SLACK_SIGNING_SECRET: SECRET, SLACK_TEAMS: kv },
+      );
+      expect(second.status).toBe(200);
+      expect((await second.json()).deduplicated).toBe(true);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(postCount).toBe(1);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  it('rejects slash commands from uninstalled teams when SLACK_TEAMS KV is bound', async () => {
+    const kv = memoryKV();
+    const body = new URLSearchParams({
+      command: '/frontguard',
+      text: 'status https://example.com',
+      user_id: 'U1',
+      channel_id: 'C1',
+      team_id: 'T_UNINSTALLED',
+      response_url: 'https://hooks.slack.com/r/X',
+    }).toString();
+    const ts = String(Math.floor(Date.now() / 1000));
+    const sig = await signSlack(body, ts, SECRET);
+    const res = await app.request(
+      '/slack/commands',
+      {
+        method: 'POST',
+        headers: {
+          'x-slack-request-timestamp': ts,
+          'x-slack-signature': sig,
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body,
+      },
+      {
+        SLACK_SIGNING_SECRET: SECRET,
+        SLACK_TEAMS: kv,
+        FRONTGUARD_API_URL: 'https://api.frontguard.dev',
+        FRONTGUARD_API_KEY: 'fg_x',
+      },
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()).text).toMatch(/not installed/i);
+  });
+
+  it('rejects oversized Slack webhook payloads with 413', async () => {
+    const huge = 'x'.repeat(1_048_577);
+    const res = await app.request(
+      '/slack/events',
+      { method: 'POST', body: huge },
+      { SLACK_SIGNING_SECRET: SECRET },
+    );
+    expect(res.status).toBe(413);
   });
 });

@@ -36,18 +36,23 @@ vercel.json     Deployment config when hosted on Vercel itself
 
 `GET /api/install` is dual-mode:
 
-1. **No `code` param** → 302 to Vercel's authorize URL
-   (`https://vercel.com/integrations/oauth/authorize?client_id=…&redirect_uri=…`).
-2. **`?code=…&configurationId=…&next=…`** → exchange the code for an access
-   token at `POST https://api.vercel.com/v2/oauth/access_token`, persist the
-   resulting integration record in KV, optionally hit
+1. **No `code` param** → sets an `HttpOnly; Secure; SameSite=Lax` CSRF `state`
+   cookie and 302s to Vercel's authorize URL
+   (`https://vercel.com/integrations/oauth/authorize?client_id=…&redirect_uri=…&state=…`).
+2. **`?code=…&state=…&next=…`** → verifies the CSRF `state` cookie in constant
+   time, exchanges the code for an access token at
+   `POST https://api.vercel.com/v2/oauth/access_token`, derives
+   `configurationId` strictly from Vercel's token response (`installation_id`),
+   persists the resulting integration record in KV, optionally hits
    `${FRONTGUARD_API_URL}/v1/integrations/vercel/install` to create the matching
-   Frontguard team, then 302 to a validated `next` URL.
+   Frontguard team, then 302s to a validated `next` URL.
+3. **`?error=…`** → clears the state cookie and returns HTTP 400 cleanly.
 
 The token is **never** logged or returned in the response body. The `next` URL
-is validated by `safeNextRedirect` — only same-origin relative paths and
-allowlisted `vercel.com` / `*.vercel.com` hosts pass; everything else falls back
-to `/` to prevent open-redirect abuse.
+is validated by `safeNextRedirect` — control characters, backslashes, and
+protocol-relative URLs are rejected, and only same-origin relative paths and
+allowlisted `vercel.com` / `*.vercel.com` `https:` hosts pass; everything else
+falls back to `/` to prevent open-redirect abuse.
 
 ## Webhook trust model
 
@@ -79,7 +84,7 @@ subsequent custom-domain webhooks to be rejected with HTTP 400.
 | ----------------------- | ----------------- | ----------------------------------------------------------------- |
 | `VERCEL_CLIENT_ID`      | install flow      | Vercel OAuth client id                                            |
 | `VERCEL_CLIENT_SECRET`  | always            | OAuth token exchange + webhook signature verification             |
-| `VERCEL_REDIRECT_URI`   | install flow      | Public URL of `/api/install` (defaults to `req.url + /api/install`) |
+| `VERCEL_REDIRECT_URI`   | install flow (required) | Public `https:` URL of `/api/install` (required; never derived from request Host) |
 | `FRONTGUARD_API_URL`    | running tests     | Base URL of the Frontguard Cloud API                              |
 | `FRONTGUARD_API_KEY`    | running tests     | API key (`Authorization: Bearer …`) for submitting runs           |
 | `FRONTGUARD_ROUTES`     | optional          | Comma-separated routes to test (default `/`)                      |
@@ -147,5 +152,5 @@ the system over HTTP only:
 - The Cloud API for install registration (`POST /v1/integrations/vercel/install`,
   best-effort — install still completes if the Cloud API is unreachable)
 
-It never imports from `packages/cloud-api/`, `apps/web/`, or any sibling
-workspace.
+It only imports the pure SSRF helper from `@frontguard/cloud-api/render-target`,
+never runtime code from `apps/web/` or other sibling workspaces.

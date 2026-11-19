@@ -17,9 +17,9 @@ const DEAD_MARKETPLACE_URLS = [
 ];
 
 describe('Netlify publish surface — no false hosted API default', () => {
-  it('manifest.yml does not default apiUrl to api.frontguard.dev', () => {
+  it('manifest.yml does not default apiUrl to api.frontguard.dev and marks it optional', () => {
     expect(manifest).not.toMatch(HOSTED_DEFAULT);
-    expect(manifest).toMatch(/required:\s*true/);
+    expect(manifest).toMatch(/name:\s*apiUrl[\s\S]*?required:\s*false/);
   });
 
   it('README.md does not advertise api.frontguard.dev as the default apiUrl', () => {

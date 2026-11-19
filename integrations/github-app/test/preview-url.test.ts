@@ -26,17 +26,33 @@ const APP_PEM = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.e
 }) as string;
 const APP_ENV = { GITHUB_APP_ID: APP_ID, GITHUB_APP_PRIVATE_KEY: APP_PEM };
 
+const VALID_SHA = 'deadbeef0123456789abcdef0123456789abcdef';
+
 function sign(body: string): string {
   return 'sha256=' + createHmac('sha256', SECRET).update(body).digest('hex');
 }
 
-function prEvent(commitSha = 'deadbeef'): PullRequestEvent {
+function stubPublicDnsFetch(
+  inner: (url: string, init?: RequestInit) => Promise<Response>,
+): typeof fetch {
+  return (async (url: string, init?: RequestInit) => {
+    if (String(url).includes('cloudflare-dns.com/dns-query')) {
+      return new Response(JSON.stringify({ Answer: [{ data: '93.184.216.34.' }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/dns-json' },
+      });
+    }
+    return inner(String(url), init);
+  }) as typeof fetch;
+}
+
+function prEvent(commitSha = VALID_SHA, branch = 'feature'): PullRequestEvent {
   return {
     action: 'opened',
     number: 7,
     pull_request: {
-      head: { sha: commitSha, ref: 'feature' },
-      base: { ref: 'main' },
+      head: { sha: commitSha, ref: branch, repo: { full_name: 'acme/web', fork: false } },
+      base: { ref: 'main', repo: { full_name: 'acme/web' } },
       html_url: 'https://github.com/acme/web/pull/7',
     },
     repository: { name: 'web', owner: { login: 'acme' }, full_name: 'acme/web' },
@@ -92,14 +108,22 @@ describe('previewUrlFromCommitStatus', () => {
     expect(previewUrlFromCommitStatus(event)).toBeNull();
   });
 
-  it('ignores non-http target_urls', () => {
-    const event: CommitStatusEvent = {
-      context: 'Vercel',
-      state: 'success',
-      target_url: 'ftp://nope.vercel.app',
-      sha: 'a',
-    };
-    expect(previewUrlFromCommitStatus(event)).toBeNull();
+  it('ignores non-https and arbitrary/SSRF target_urls on Vercel commit_status', () => {
+    for (const target_url of [
+      'ftp://nope.vercel.app',
+      'http://my-app.vercel.app',
+      'https://evil.example/vercel.app',
+      'https://169.254.169.254/latest/meta-data/',
+      'https://vercel.app.evil.example',
+    ]) {
+      const event: CommitStatusEvent = {
+        context: 'Vercel',
+        state: 'success',
+        target_url,
+        sha: 'a',
+      };
+      expect(previewUrlFromCommitStatus(event), target_url).toBeNull();
+    }
   });
 });
 
@@ -134,6 +158,30 @@ describe('classifyDeploymentStatus', () => {
       deployment_status: { state: 'success', environment_url: 'https://example.com' },
     };
     expect(classifyDeploymentStatus(ev)).toBeNull();
+  });
+
+  it('rejects path-spoofed hosts, env-label spoofing, non-https, and private hosts', () => {
+    for (const ev of [
+      {
+        deployment: { sha: 'a', environment: 'netlify preview' },
+        deployment_status: { state: 'success' as const, environment_url: 'https://evil.example/' },
+      },
+      {
+        deployment: { sha: 'a', environment: 'preview' },
+        deployment_status: { state: 'success' as const, environment_url: 'https://evil.example/.netlify.app/' },
+      },
+      {
+        deployment: { sha: 'a', environment: 'cloudflare preview' },
+        deployment_status: { state: 'success' as const, environment_url: 'https://169.254.169.254/latest' },
+      },
+      {
+        deployment: { sha: 'a', environment: 'preview' },
+        deployment_status: { state: 'success' as const, environment_url: 'http://app.netlify.app' },
+      },
+    ]) {
+      expect(classifyDeploymentStatus(ev)).toBeNull();
+      expect(previewUrlFromDeploymentStatus(ev)).toBeNull();
+    }
   });
 });
 
@@ -200,10 +248,17 @@ describe('renderPreviewUrlTemplate', () => {
     ).toBe('https://pr-42.acme-web.preview.example.com/deadbee');
   });
 
-  it('accepts aliases (pr, sha, shortSha)', () => {
+  it('accepts aliases (pr, sha, shortSha) and slugifies branch to a safe DNS label', () => {
     expect(renderPreviewUrlTemplate('https://{owner}.dev/pr/{pr}/{sha}/{shortSha}/{branch}', ctx)).toBe(
-      'https://acme.dev/pr/42/deadbeefcafe1234/deadbee/feat/x',
+      'https://acme.dev/pr/42/deadbeefcafe1234/deadbee/feat-x',
     );
+  });
+
+  it('prevents authority redirection via malicious branch names', () => {
+    const evilCtx = { ...ctx, branch: 'evil.example@ignored' };
+    const rendered = renderPreviewUrlTemplate('https://{branch}.preview.example.com', evilCtx);
+    expect(rendered).toBe('https://evil-example-ignored.preview.example.com');
+    expect(new URL(rendered).hostname).toBe('evil-example-ignored.preview.example.com');
   });
 
   it('leaves unknown tokens unsubstituted', () => {
@@ -236,10 +291,30 @@ describe('inferPreviewUrl', () => {
     expect(inferPreviewUrl({ event: prEvent() })).toBeNull();
   });
 
-  it('rejects a template that renders to a non-http URL', () => {
+  it('rejects a template that renders to a non-https URL, unknown token, or private host', () => {
     expect(
       inferPreviewUrl({ event: prEvent(), template: 'not-a-url-{prNumber}' }),
     ).toBeNull();
+    expect(
+      inferPreviewUrl({ event: prEvent(), template: 'http://pr-{prNumber}.example.com' }),
+    ).toBeNull();
+    expect(
+      inferPreviewUrl({ event: prEvent(), template: 'https://example.com/{unknown}' }),
+    ).toBeNull();
+    expect(
+      inferPreviewUrl({ event: prEvent(), template: 'https://127.0.0.1/pr-{prNumber}' }),
+    ).toBeNull();
+  });
+
+  it('preserves template origin when branch contains URL authority characters', () => {
+    const out = inferPreviewUrl({
+      event: prEvent(VALID_SHA, 'attacker.com#@x'),
+      template: 'https://{branch}.preview.example.com',
+    });
+    expect(out).toEqual({
+      url: 'https://attacker-com-x.preview.example.com',
+      source: 'template',
+    });
   });
 });
 
@@ -306,25 +381,26 @@ describe('handler — preview URL caching + run trigger', () => {
   });
 
   it('uses the cached preview URL when a PR event arrives next', async () => {
-    rememberPreviewUrl('acme', 'web', 'cached-sha', {
+    rememberPreviewUrl('acme', 'web', VALID_SHA, {
       url: 'https://cached.vercel.app',
       source: 'vercel-status',
     });
     const app = createGitHubApp();
     const orig = globalThis.fetch;
     let sentBody: Record<string, unknown> | null = null;
-    globalThis.fetch = (async (url: string, init: RequestInit) => {
+    globalThis.fetch = stubPublicDnsFetch(async (url: string, init?: RequestInit) => {
       if (String(url).includes('/v1/run')) {
-        sentBody = JSON.parse(init.body as string);
+        sentBody = JSON.parse(init!.body as string);
         return new Response(JSON.stringify({ id: 'run_x' }), { status: 202 });
       }
       throw new Error(`Unhandled fetch: ${url}`);
-    }) as typeof fetch;
+    });
     try {
-      const body = JSON.stringify(prEvent('cached-sha'));
+      const body = JSON.stringify(prEvent(VALID_SHA));
       const res = await postWebhook(app, 'pull_request', body, {
         FRONTGUARD_API_URL: 'https://api.frontguard.dev',
         FRONTGUARD_API_KEY: 'fg_x',
+        FRONTGUARD_SINGLE_TENANT_INSTALLATION_ID: '123',
       });
       const json = await res.json();
       expect(json.triggered).toBe(true);
@@ -343,18 +419,19 @@ describe('handler — preview URL caching + run trigger', () => {
     const app = createGitHubApp();
     const orig = globalThis.fetch;
     let sentBody: Record<string, unknown> | null = null;
-    globalThis.fetch = (async (url: string, init: RequestInit) => {
+    globalThis.fetch = stubPublicDnsFetch(async (url: string, init?: RequestInit) => {
       if (String(url).includes('/v1/run')) {
-        sentBody = JSON.parse(init.body as string);
+        sentBody = JSON.parse(init!.body as string);
         return new Response(JSON.stringify({ id: 'run_y' }), { status: 202 });
       }
       throw new Error(`Unhandled fetch: ${url}`);
-    }) as typeof fetch;
+    });
     try {
-      const body = JSON.stringify(prEvent('uncached-sha'));
+      const body = JSON.stringify(prEvent('1111111111111111111111111111111111111111'));
       const res = await postWebhook(app, 'pull_request', body, {
         FRONTGUARD_API_URL: 'https://api.frontguard.dev',
         FRONTGUARD_API_KEY: 'fg_x',
+        FRONTGUARD_SINGLE_TENANT_INSTALLATION_ID: '123',
         FRONTGUARD_PREVIEW_URL_TEMPLATE: 'https://pr-{prNumber}.preview.example.com',
       });
       const json = await res.json();
@@ -371,15 +448,16 @@ describe('handler — preview URL caching + run trigger', () => {
     const app = createGitHubApp();
     const orig = globalThis.fetch;
     let runCalled = false;
-    globalThis.fetch = (async (url: string) => {
+    globalThis.fetch = stubPublicDnsFetch(async (url: string) => {
       if (String(url).includes('/v1/run')) runCalled = true;
       return new Response('{}', { status: 200 });
-    }) as typeof fetch;
+    });
     try {
-      const body = JSON.stringify(prEvent('no-url-sha'));
+      const body = JSON.stringify(prEvent('2222222222222222222222222222222222222222'));
       const res = await postWebhook(app, 'pull_request', body, {
         FRONTGUARD_API_URL: 'https://api.frontguard.dev',
         FRONTGUARD_API_KEY: 'fg_x',
+        FRONTGUARD_SINGLE_TENANT_INSTALLATION_ID: '123',
       });
       const json = await res.json();
       expect(json.triggered).toBe(false);
@@ -396,7 +474,7 @@ describe('handler — preview URL caching + run trigger', () => {
     const app = createGitHubApp();
     const orig = globalThis.fetch;
     let runUrl: string | null = null;
-    globalThis.fetch = (async (url: string, init: RequestInit) => {
+    globalThis.fetch = stubPublicDnsFetch(async (url: string, init?: RequestInit) => {
       const u = String(url);
       if (u.includes('/access_tokens')) {
         return new Response(JSON.stringify({ token: 'ghs_test' }), { status: 201 });
@@ -410,13 +488,14 @@ describe('handler — preview URL caching + run trigger', () => {
         return new Response(JSON.stringify({ id: 'r' }), { status: 202 });
       }
       throw new Error(`Unhandled fetch: ${u}`);
-    }) as typeof fetch;
+    });
     try {
-      const body = JSON.stringify(prEvent('unobserved'));
+      const body = JSON.stringify(prEvent('3333333333333333333333333333333333333333'));
       const res = await postWebhook(app, 'pull_request', body, {
         ...APP_ENV,
         FRONTGUARD_API_URL: 'https://api.frontguard.dev',
         FRONTGUARD_API_KEY: 'fg_x',
+        FRONTGUARD_SINGLE_TENANT_INSTALLATION_ID: '123',
       });
       const json = await res.json();
       expect(json.triggered).toBe(false);
@@ -430,7 +509,8 @@ describe('handler — preview URL caching + run trigger', () => {
     const app = createGitHubApp();
     const orig = globalThis.fetch;
     let sentBody: Record<string, unknown> | null = null;
-    globalThis.fetch = (async (url: string, init: RequestInit) => {
+    const deferredSha = '4444444444444444444444444444444444444444';
+    globalThis.fetch = stubPublicDnsFetch(async (url: string, init?: RequestInit) => {
       const u = String(url);
       if (u.includes('/access_tokens')) {
         return new Response(JSON.stringify({ token: 'ghs_test' }), { status: 201 });
@@ -440,26 +520,27 @@ describe('handler — preview URL caching + run trigger', () => {
       }
       if (u.includes('/contents/')) return new Response('no', { status: 404 });
       if (u.includes('/v1/run')) {
-        sentBody = JSON.parse(init.body as string);
+        sentBody = JSON.parse(init!.body as string);
         return new Response(JSON.stringify({ id: 'run_deferred' }), { status: 202 });
       }
       throw new Error(`Unhandled fetch: ${u}`);
-    }) as typeof fetch;
+    });
     try {
       const env = {
         ...APP_ENV,
         FRONTGUARD_API_URL: 'https://api.frontguard.dev',
         FRONTGUARD_API_KEY: 'fg_x',
+        FRONTGUARD_SINGLE_TENANT_INSTALLATION_ID: '123',
       };
       // 1. pull_request arrives first — no preview URL yet
-      const prRes = await postWebhook(app, 'pull_request', JSON.stringify(prEvent('sha-deferred')), env);
+      const prRes = await postWebhook(app, 'pull_request', JSON.stringify(prEvent(deferredSha)), env);
       const prJson = await prRes.json();
       expect(prJson.triggered).toBe(false);
       expect(prJson.checkRunId).toBe(888);
 
       // 2. deployment_status arrives later for the same commit (or branch)
       const depBody = JSON.stringify({
-        deployment: { sha: 'sha-deferred', ref: 'feature', environment: 'Deploy Preview' },
+        deployment: { sha: deferredSha, ref: 'feature', environment: 'Deploy Preview' },
         deployment_status: {
           state: 'success',
           environment_url: 'https://deploy-preview-7--app.netlify.app',
@@ -480,7 +561,7 @@ describe('handler — preview URL caching + run trigger', () => {
         github: {
           owner: 'acme',
           repo: 'web',
-          commitSha: 'sha-deferred',
+          commitSha: deferredSha,
           prNumber: 7,
         },
       });

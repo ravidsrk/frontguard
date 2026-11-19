@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { putTeamInstall, getTeamInstall, teamKey, type KVNamespace } from '../src/storage.js';
+import {
+  putTeamInstall,
+  getTeamInstall,
+  deleteTeamInstall,
+  teamKey,
+  type KVNamespace,
+} from '../src/storage.js';
 
 function memoryKV(): KVNamespace & { store: Map<string, string> } {
   const store = new Map<string, string>();
@@ -74,5 +80,17 @@ describe('storage', () => {
         installedAt: '2026-06-15T00:00:00.000Z',
       }),
     ).rejects.toThrow(/teamId/);
+  });
+
+  it('deletes a stored install cleanly', async () => {
+    const kv = memoryKV();
+    await putTeamInstall(kv, {
+      teamId: 'T_DEL',
+      accessToken: 'xoxb-del',
+      installedAt: '2026-06-15T00:00:00.000Z',
+    });
+    expect(await getTeamInstall(kv, 'T_DEL')).not.toBeNull();
+    await deleteTeamInstall(kv, 'T_DEL');
+    expect(await getTeamInstall(kv, 'T_DEL')).toBeNull();
   });
 });

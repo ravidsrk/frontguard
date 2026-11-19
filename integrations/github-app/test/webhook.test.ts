@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { createHmac } from 'node:crypto';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createHmac, generateKeyPairSync } from 'node:crypto';
 import {
   verifyGitHubSignature,
   timingSafeEqual,
@@ -9,11 +9,16 @@ import {
   type PullRequestEvent,
   type InstallationEvent,
 } from '../src/webhook.js';
-import { createGitHubApp } from '../src/handler.js';
-import { generateKeyPairSync } from 'node:crypto';
+import {
+  createGitHubApp,
+  clearPreviewUrlCache,
+  recallCheckRunBinding,
+  type KVNamespace,
+} from '../src/handler.js';
 
 const SECRET = 'webhook-secret';
 const CALLBACK_SECRET = 'callback-secret';
+const VALID_SHA = 'deadbeef0123456789abcdef0123456789abcdef';
 
 // App credentials for handler tests that exercise the GitHub API code paths.
 const APP_ID = '424242';
@@ -22,6 +27,36 @@ const APP_PEM = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.e
   format: 'pem',
 }) as string;
 const APP_ENV = { GITHUB_APP_ID: APP_ID, GITHUB_APP_PRIVATE_KEY: APP_PEM };
+
+function memoryKV(): KVNamespace & { store: Map<string, string> } {
+  const store = new Map<string, string>();
+  return {
+    store,
+    async get(key: string) {
+      return store.has(key) ? store.get(key)! : null;
+    },
+    async put(key: string, value: string) {
+      store.set(key, value);
+    },
+    async delete(key: string) {
+      store.delete(key);
+    },
+  };
+}
+
+function stubPublicDnsFetch(
+  inner: (url: string, init?: RequestInit) => Promise<Response>,
+): typeof fetch {
+  return (async (url: string, init?: RequestInit) => {
+    if (String(url).includes('cloudflare-dns.com/dns-query')) {
+      return new Response(JSON.stringify({ Answer: [{ data: '93.184.216.34.' }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/dns-json' },
+      });
+    }
+    return inner(String(url), init);
+  }) as typeof fetch;
+}
 
 function installEvent(action = 'created'): InstallationEvent {
   return {
@@ -39,14 +74,16 @@ function prEvent(action = 'opened'): PullRequestEvent {
     action,
     number: 7,
     pull_request: {
-      head: { sha: 'deadbeef', ref: 'feature' },
-      base: { ref: 'main' },
+      head: { sha: VALID_SHA, ref: 'feature', repo: { full_name: 'acme/web', fork: false } },
+      base: { ref: 'main', repo: { full_name: 'acme/web' } },
       html_url: 'https://github.com/acme/web/pull/7',
     },
     repository: { name: 'web', owner: { login: 'acme' }, full_name: 'acme/web' },
     installation: { id: 123 },
   };
 }
+
+beforeEach(() => clearPreviewUrlCache());
 
 describe('timingSafeEqual', () => {
   it('compares correctly', () => {
@@ -75,14 +112,30 @@ describe('decidePullRequest', () => {
     for (const action of ['opened', 'synchronize', 'reopened', 'ready_for_review']) {
       const d = decidePullRequest(prEvent(action));
       expect(d.trigger).toBe(true);
-      expect(d.commitSha).toBe('deadbeef');
+      expect(d.commitSha).toBe(VALID_SHA);
       expect(d.owner).toBe('acme');
+      expect(d.baseRef).toBe('main');
       expect(d.installationId).toBe(123);
     }
   });
   it('ignores closed/labeled', () => {
     expect(decidePullRequest(prEvent('closed')).trigger).toBe(false);
     expect(decidePullRequest(prEvent('labeled')).trigger).toBe(false);
+  });
+  it('rejects fork PRs and deleted/missing head repos by default', () => {
+    const fork = prEvent('opened');
+    fork.pull_request.head.repo = { full_name: 'attacker/web', fork: true };
+    expect(decidePullRequest(fork).trigger).toBe(false);
+
+    const diffName = prEvent('opened');
+    diffName.pull_request.head.repo = { full_name: 'other/web', fork: false };
+    expect(decidePullRequest(diffName).trigger).toBe(false);
+
+    const deletedFork = prEvent('opened');
+    deletedFork.pull_request.head.repo = null;
+    expect(decidePullRequest(deletedFork).trigger).toBe(false);
+
+    expect(decidePullRequest(fork, { allowForkPrs: true }).trigger).toBe(true);
   });
 });
 
@@ -173,14 +226,18 @@ describe('GitHub App handler', () => {
     const body = JSON.stringify(prEvent('opened'));
     const orig = globalThis.fetch;
     let sentBody: Record<string, unknown> | null = null;
-    globalThis.fetch = (async (_url: string, init: RequestInit) => {
-      sentBody = JSON.parse(init.body as string);
+    let sentHeaders: Record<string, string> | null = null;
+    globalThis.fetch = stubPublicDnsFetch(async (_url: string, init?: RequestInit) => {
+      sentBody = JSON.parse(init!.body as string);
+      sentHeaders = (init!.headers as Record<string, string>) ?? {};
       return new Response(JSON.stringify({ id: 'run_x' }), { status: 202 });
-    }) as typeof fetch;
+    });
     try {
       const res = await postWebhook(app, 'pull_request', body, {
         FRONTGUARD_API_URL: 'https://api.frontguard.dev',
         FRONTGUARD_API_KEY: 'fg_x',
+        FRONTGUARD_SINGLE_TENANT_INSTALLATION_ID: '123',
+        FRONTGUARD_CALLBACK_SECRET: CALLBACK_SECRET,
         // Template fallback so the run can be triggered without a deployment
         // event having fired first. Without this we'd correctly skip.
         FRONTGUARD_PREVIEW_URL_TEMPLATE: 'https://pr-{prNumber}.preview.example.com',
@@ -188,6 +245,8 @@ describe('GitHub App handler', () => {
       const json = await res.json();
       expect(json.triggered).toBe(true);
       expect(json.runId).toBe('run_x');
+      // Service-to-service callback secret header is forwarded to cloud-api.
+      expect(sentHeaders?.['X-Frontguard-Callback-Secret']).toBe(CALLBACK_SECRET);
       // The github linkage is forwarded as a nested object the Cloud API accepts.
       expect((sentBody as { github?: { owner?: string } } | null)?.github?.owner).toBe('acme');
       // Preview URL must NOT be the github.com PR URL.
@@ -197,6 +256,62 @@ describe('GitHub App handler', () => {
     } finally {
       globalThis.fetch = orig;
     }
+  });
+
+  it('refuses to share a global FRONTGUARD_API_KEY without single-tenant binding or per-installation credentials', async () => {
+    const app = createGitHubApp();
+    const body = JSON.stringify(prEvent('opened'));
+    const orig = globalThis.fetch;
+    let runCalled = false;
+    globalThis.fetch = stubPublicDnsFetch(async () => {
+      runCalled = true;
+      return new Response(JSON.stringify({ id: 'run_x' }), { status: 202 });
+    });
+    try {
+      const res = await postWebhook(app, 'pull_request', body, {
+        FRONTGUARD_API_URL: 'https://api.frontguard.dev',
+        FRONTGUARD_API_KEY: 'fg_global_secret',
+        FRONTGUARD_PREVIEW_URL_TEMPLATE: 'https://pr-{prNumber}.preview.example.com',
+      });
+      const json = await res.json();
+      expect(json.triggered).toBe(false);
+      expect(json.reason).toMatch(/tenant API credential/i);
+      expect(runCalled).toBe(false);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  it('returns 502 instead of triggered:true when cloud-api /v1/run returns non-ok', async () => {
+    const app = createGitHubApp();
+    const body = JSON.stringify(prEvent('opened'));
+    const orig = globalThis.fetch;
+    globalThis.fetch = stubPublicDnsFetch(async () => new Response(JSON.stringify({ error: 'boom' }), { status: 500 }));
+    try {
+      const res = await postWebhook(app, 'pull_request', body, {
+        FRONTGUARD_API_URL: 'https://api.frontguard.dev',
+        FRONTGUARD_API_KEY: 'fg_x',
+        FRONTGUARD_SINGLE_TENANT_INSTALLATION_ID: '123',
+        FRONTGUARD_PREVIEW_URL_TEMPLATE: 'https://pr-{prNumber}.preview.example.com',
+      });
+      expect(res.status).toBe(502);
+      const json = await res.json();
+      expect(json.triggered).toBe(false);
+      expect(json.error).toContain('boom');
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  it('rejects oversized webhook payloads with 413', async () => {
+    const app = createGitHubApp();
+    const huge = 'x'.repeat(1_048_577);
+    const res = await app.request(
+      '/webhook',
+      { method: 'POST', body: huge, headers: { 'x-github-event': 'ping', 'x-hub-signature-256': 'sha256=abc' } },
+      { GITHUB_WEBHOOK_SECRET: SECRET },
+    );
+    expect(res.status).toBe(413);
   });
 });
 
@@ -221,14 +336,14 @@ describe('decideInstallation', () => {
 
 /** Routes a GitHub API path to a Response for handler integration tests. */
 function ghRouter(handlers: Array<{ test: (url: string, init?: RequestInit) => boolean; res: (url: string, init?: RequestInit) => Response }>) {
-  return (async (url: string, init?: RequestInit) => {
+  return stubPublicDnsFetch(async (url: string, init?: RequestInit) => {
     const u = String(url);
     // Installation token exchange is common to all app-cred flows.
     if (u.includes('/access_tokens')) return new Response(JSON.stringify({ token: 'ghs_test' }), { status: 201 });
     const h = handlers.find((x) => x.test(u, init));
     if (!h) throw new Error(`Unhandled fetch in test: ${(init?.method ?? 'GET')} ${u}`);
     return h.res(u, init);
-  }) as typeof fetch;
+  });
 }
 
 describe('GitHub App handler — installation bootstrap', () => {
@@ -312,44 +427,76 @@ describe('GitHub App handler — installation bootstrap', () => {
 });
 
 describe('GitHub App handler — per-repo config in run trigger', () => {
-  it('reads repo config and passes it to the Cloud API', async () => {
+  it('reads repo config strictly from base.ref (not head.ref) and binds checkRunId on trigger', async () => {
     const app = createGitHubApp();
+    const kv = memoryKV();
+    await kv.put('installation:123:credentials', JSON.stringify({ apiKey: 'fg_tenant_123' }));
     const body = JSON.stringify(prEvent('opened'));
     const orig = globalThis.fetch;
     const yml = Buffer.from('threshold: 0.05\n').toString('base64');
+    const contentUrls: string[] = [];
     let runRequestBody: Record<string, unknown> | null = null;
+    let runAuthHeader: string | undefined;
     globalThis.fetch = ghRouter([
       { test: (u, i) => u.includes('/check-runs') && i?.method === 'POST', res: () => new Response(JSON.stringify({ id: 777 }), { status: 201 }) },
-      { test: (u) => u.includes('/contents/frontguard.config.ts'), res: () => new Response('no', { status: 404 }) },
-      { test: (u) => u.includes('/contents/') && u.includes('frontguard.yml'), res: () => new Response(JSON.stringify({ sha: 's', content: yml, encoding: 'base64' }), { status: 200 }) },
+      {
+        test: (u) => u.includes('/contents/frontguard.config.ts'),
+        res: (u) => {
+          contentUrls.push(u);
+          return new Response('no', { status: 404 });
+        },
+      },
+      {
+        test: (u) => u.includes('/contents/.github/frontguard.yml'),
+        res: (u) => {
+          contentUrls.push(u);
+          return new Response(JSON.stringify({ sha: 's', content: yml, encoding: 'base64' }), { status: 200 });
+        },
+      },
       {
         test: (u) => u.includes('/v1/run'),
         res: (_u, i) => {
           runRequestBody = JSON.parse((i!.body as string) ?? '{}');
+          runAuthHeader = (i!.headers as Record<string, string>)?.Authorization;
           return new Response(JSON.stringify({ id: 'run_cfg' }), { status: 202 });
         },
       },
     ]);
     try {
+      const env = {
+        GITHUB_WEBHOOK_SECRET: SECRET,
+        ...APP_ENV,
+        FRONTGUARD_API_URL: 'https://api.frontguard.dev',
+        FRONTGUARD_CALLBACK_SECRET: CALLBACK_SECRET,
+        FRONTGUARD_PREVIEW_URL_TEMPLATE: 'https://pr-{prNumber}.preview.example.com',
+        KV: kv,
+      };
       const res = await app.request(
         '/webhook',
         { method: 'POST', body, headers: { 'x-github-event': 'pull_request', 'x-hub-signature-256': sign(body) } },
-        {
-          GITHUB_WEBHOOK_SECRET: SECRET,
-          ...APP_ENV,
-          FRONTGUARD_API_URL: 'https://api.frontguard.dev',
-          FRONTGUARD_API_KEY: 'fg_x',
-          FRONTGUARD_PREVIEW_URL_TEMPLATE: 'https://pr-{prNumber}.preview.example.com',
-        },
+        env,
       );
       const json = await res.json();
       expect(json.triggered).toBe(true);
       expect(json.checkRunId).toBe(777);
       expect(json.config).toBe('.github/frontguard.yml');
+      expect(runAuthHeader).toBe('Bearer fg_tenant_123');
       expect((runRequestBody!.config as { path: string }).path).toBe('.github/frontguard.yml');
       expect(runRequestBody!.checkRunId).toBe(777);
+      // Config MUST be read from base.ref (`main`), never head.ref (`feature`).
+      expect(contentUrls.length).toBe(2);
+      expect(contentUrls.every((u) => u.endsWith('?ref=main'))).toBe(true);
       // Preview URL was forwarded from the template, not the PR html_url.
       expect(runRequestBody!.url).toBe('https://pr-7.preview.example.com');
+      // Server-side Check Run binding recorded in memory & KV.
+      const binding = await recallCheckRunBinding(777, env);
+      expect(binding).toMatchObject({
+        runId: 'run_cfg',
+        owner: 'acme',
+        repo: 'web',
+        commitSha: VALID_SHA,
+        installationId: 123,
+      });
     } finally {
       globalThis.fetch = orig;
     }
@@ -358,7 +505,7 @@ describe('GitHub App handler — per-repo config in run trigger', () => {
 
 describe('GitHub App handler — check run completion callback', () => {
   function completeBody(extra: Record<string, unknown> = {}) {
-    return JSON.stringify({ owner: 'acme', repo: 'web', commitSha: 'deadbeef', installationId: 123, ...extra });
+    return JSON.stringify({ owner: 'acme', repo: 'web', commitSha: VALID_SHA, installationId: 123, ...extra });
   }
 
   it('completes with success conclusion', async () => {
@@ -449,5 +596,93 @@ describe('GitHub App handler — check run completion callback', () => {
       env,
     );
     expect(wrong.status).toBe(401);
+  });
+
+  it('rejects invalid owner/repo/commitSha/installationId/detailsUrl with 400', async () => {
+    const app = createGitHubApp();
+    const env = { ...APP_ENV, FRONTGUARD_CALLBACK_SECRET: CALLBACK_SECRET };
+    const authHeaders = { authorization: `Bearer ${CALLBACK_SECRET}` };
+
+    for (const bad of [
+      completeBody({ owner: '../evil' }),
+      completeBody({ repo: 'a/b' }),
+      completeBody({ commitSha: 'shortsha' }),
+      completeBody({ installationId: -1 }),
+      completeBody({ detailsUrl: 'http://insecure.example/report' }),
+      completeBody({ detailsUrl: 'javascript:alert(1)' }),
+    ]) {
+      const res = await app.request('/runs/555/complete', { method: 'POST', body: bad, headers: authHeaders }, env);
+      expect(res.status, bad).toBe(400);
+    }
+  });
+
+  it('enforces server-side checkRunId binding and rejects mismatches with 403', async () => {
+    const app = createGitHubApp();
+    const kv = memoryKV();
+    await kv.put('installation:123:credentials', JSON.stringify({ apiKey: 'fg_tenant_123' }));
+    const orig = globalThis.fetch;
+    globalThis.fetch = ghRouter([
+      { test: (u, i) => u.includes('/check-runs') && i?.method === 'POST', res: () => new Response(JSON.stringify({ id: 901 }), { status: 201 }) },
+      { test: (u) => u.includes('/contents/'), res: () => new Response('no', { status: 404 }) },
+      { test: (u) => u.includes('/v1/run'), res: () => new Response(JSON.stringify({ id: 'run_bound' }), { status: 202 }) },
+      { test: (u, i) => u.includes('/check-runs/901') && i?.method === 'PATCH', res: () => new Response(JSON.stringify({ id: 901 }), { status: 200 }) },
+    ]);
+    try {
+      const env = {
+        GITHUB_WEBHOOK_SECRET: SECRET,
+        ...APP_ENV,
+        FRONTGUARD_API_URL: 'https://api.frontguard.dev',
+        FRONTGUARD_CALLBACK_SECRET: CALLBACK_SECRET,
+        FRONTGUARD_PREVIEW_URL_TEMPLATE: 'https://pr-{prNumber}.preview.example.com',
+        KV: kv,
+      };
+      // Trigger PR so checkRunId 901 is bound to acme/web @ VALID_SHA / install 123 / run_bound.
+      const trig = await postWebhook(app, 'pull_request', JSON.stringify(prEvent('opened')), env);
+      expect((await trig.json()).triggered).toBe(true);
+
+      const authHeaders = { authorization: `Bearer ${CALLBACK_SECRET}` };
+      // Wrong repo -> 403
+      const wrongRepo = await app.request(
+        '/runs/901/complete',
+        { method: 'POST', body: completeBody({ repo: 'other-repo' }), headers: authHeaders },
+        env,
+      );
+      expect(wrongRepo.status).toBe(403);
+
+      // Wrong installationId -> 403
+      const wrongInst = await app.request(
+        '/runs/901/complete',
+        { method: 'POST', body: completeBody({ installationId: 999 }), headers: authHeaders },
+        env,
+      );
+      expect(wrongInst.status).toBe(403);
+
+      // Wrong runId -> 403
+      const wrongRun = await app.request(
+        '/runs/901/complete',
+        { method: 'POST', body: completeBody({ runId: 'run_forged' }), headers: authHeaders },
+        env,
+      );
+      expect(wrongRun.status).toBe(403);
+
+      // Unknown checkRunId when durable KV is active -> 403
+      const unknownCheck = await app.request(
+        '/runs/9999/complete',
+        { method: 'POST', body: completeBody(), headers: authHeaders },
+        env,
+      );
+      expect(unknownCheck.status).toBe(403);
+
+      // Matching binding -> 200
+      const ok = await app.request(
+        '/runs/901/complete',
+        { method: 'POST', body: completeBody({ runId: 'run_bound', conclusion: 'success', detailsUrl: 'https://reports.example.com/r/1' }), headers: authHeaders },
+        env,
+      );
+      expect(ok.status).toBe(200);
+      expect((await ok.json()).completed).toBe(true);
+    } finally {
+      globalThis.fetch = orig;
+    }
   });
 });

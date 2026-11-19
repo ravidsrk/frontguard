@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   decideRun,
+  normalizeApiUrl,
+  resolveApiUrl,
   parseGitHubRepo,
   triggerRun,
   pollRun,
@@ -95,9 +97,52 @@ describe('parseGitHubRepo', () => {
   it('parses ssh URLs', () => {
     expect(parseGitHubRepo('git@github.com:acme/web.git')).toEqual({ owner: 'acme', repo: 'web' });
   });
-  it('returns null for non-GitHub and empty', () => {
+  it('parses dotted repository names with and without .git', () => {
+    expect(parseGitHubRepo('https://github.com/org/my.repo.git')).toEqual({ owner: 'org', repo: 'my.repo' });
+    expect(parseGitHubRepo('https://github.com/org/frontguard.dev')).toEqual({ owner: 'org', repo: 'frontguard.dev' });
+    expect(parseGitHubRepo('git@github.com:org/my.repo.git')).toEqual({ owner: 'org', repo: 'my.repo' });
+  });
+  it('returns null for non-GitHub, spoofed host, traversal, and empty', () => {
     expect(parseGitHubRepo('https://gitlab.com/a/b')).toBeNull();
+    expect(parseGitHubRepo('https://evil.com/github.com/acme/web')).toBeNull();
+    expect(parseGitHubRepo('https://github.com/acme/..')).toBeNull();
     expect(parseGitHubRepo(undefined)).toBeNull();
+  });
+});
+
+describe('normalizeApiUrl & resolveApiUrl', () => {
+  it('strips trailing slashes and accepts https or loopback http', () => {
+    expect(normalizeApiUrl('https://api.example.com///')).toBe('https://api.example.com');
+    expect(normalizeApiUrl('https://api.example.com/prefix/')).toBe('https://api.example.com/prefix');
+    expect(normalizeApiUrl('http://localhost:8787/')).toBe('http://localhost:8787');
+    expect(normalizeApiUrl('http://127.0.0.1:8787')).toBe('http://127.0.0.1:8787');
+  });
+
+  it('rejects non-https non-loopback URLs, credentials, query strings, and control chars', () => {
+    expect(() => normalizeApiUrl('http://api.example.com')).toThrow(/https/i);
+    expect(() => normalizeApiUrl('https://user:pass@api.example.com')).toThrow(/credentials/i);
+    expect(() => normalizeApiUrl('https://api.example.com?foo=bar')).toThrow(/query/i);
+    expect(() => normalizeApiUrl('https://api.example.com\n')).toThrow(/https|valid|control/i);
+  });
+
+  it('prefers FRONTGUARD_API_URL over netlify.toml inputs.apiUrl and warns on deploy-preview override', () => {
+    const res = resolveApiUrl(
+      { CONTEXT: 'deploy-preview' },
+      { apiUrl: 'https://attacker.example' },
+      { FRONTGUARD_API_URL: 'https://trusted.example/' },
+    );
+    expect(res.apiUrl).toBe('https://trusted.example');
+    expect(res.warning).toMatch(/Refusing.*deploy-preview/i);
+  });
+
+  it('falls back to inputs.apiUrl when FRONTGUARD_API_URL is unset', () => {
+    const res = resolveApiUrl(
+      { CONTEXT: 'deploy-preview' },
+      { apiUrl: 'https://self-hosted.example/' },
+      {},
+    );
+    expect(res.apiUrl).toBe('https://self-hosted.example');
+    expect(res.warning).toBeUndefined();
   });
 });
 
@@ -165,6 +210,31 @@ describe('pollRun', () => {
     const fakeFetch = async () => new Response(JSON.stringify({ status: 'running' }), { status: 200 });
     const r = await pollRun({ apiUrl: 'https://api', apiKey: 'k', runId: 'r', timeoutMs: 0 }, fakeFetch, noSleep);
     expect(r.status).toBe('timeout');
+  });
+
+  it('fails fast on permanent 4xx responses instead of polling until timeout', async () => {
+    let calls = 0;
+    const fakeFetch = async () => {
+      calls += 1;
+      return new Response('unauthorized', { status: 401 });
+    };
+    await expect(
+      pollRun({ apiUrl: 'https://api/', apiKey: 'k', runId: 'run/1', timeoutMs: 60000 }, fakeFetch, noSleep),
+    ).rejects.toThrow(/401/);
+    expect(calls).toBe(1);
+  });
+
+  it('encodes runId and strips trailing slash on apiUrl and sets timeout signal', async () => {
+    let capturedUrl;
+    let capturedSignal;
+    const fakeFetch = async (url, init) => {
+      capturedUrl = url;
+      capturedSignal = init.signal;
+      return new Response(JSON.stringify({ status: 'completed', results: [] }), { status: 200 });
+    };
+    await pollRun({ apiUrl: 'https://api/', apiKey: 'k', runId: '../secret' }, fakeFetch, noSleep);
+    expect(capturedUrl).toBe('https://api/v1/runs/..%2Fsecret');
+    expect(capturedSignal).toBeInstanceOf(AbortSignal);
   });
 });
 
@@ -241,6 +311,29 @@ describe('renderSummary', () => {
   it('shows ❌ for a timeout status', () => {
     const s = renderSummary({ status: 'timeout', results: null }, 'https://p');
     expect(s).toContain('❌');
+  });
+
+  it('neutralizes Markdown/HTML injection in status, previewUrl, and reportUrl', () => {
+    const s = renderSummary(
+      {
+        status: 'completed`\n<script>alert(1)</script>[pwn](https://evil.example)',
+        reportUrl: 'javascript:alert(1)',
+        results: null,
+      },
+      'https://preview.example/a)<img src=x onerror=alert(1)>',
+    );
+    expect(s).not.toContain('<script>');
+    expect(s).not.toContain('javascript:');
+    expect(s).not.toContain('View full report');
+    expect(s).not.toContain('<img');
+  });
+
+  it('percent-encodes Markdown link delimiters inside https reportUrl', () => {
+    const s = renderSummary(
+      { status: 'completed', reportUrl: 'https://report.example/r?a=1)b[c]', results: null },
+      'https://preview.example',
+    );
+    expect(s).toContain('[View full report](https://report.example/r?a=1%29b%5Bc%5D)');
   });
 });
 

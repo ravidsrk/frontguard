@@ -68,9 +68,15 @@ describe('safeNextRedirect', () => {
     expect(safeNextRedirect('https://vercel.com/dashboard')).toBe('https://vercel.com/dashboard');
     expect(safeNextRedirect('https://app.vercel.com/x')).toBe('https://app.vercel.com/x');
   });
-  it('rejects protocol-relative and backslash-trick URLs', () => {
+  it('rejects protocol-relative, backslash, and ASCII control-char redirect tricks', () => {
     expect(safeNextRedirect('//evil.com')).toBe('/');
     expect(safeNextRedirect('/\\evil.com')).toBe('/');
+    expect(safeNextRedirect('/\t/evil.example')).toBe('/');
+    expect(safeNextRedirect('/%09/evil.example')).toBe('/');
+    expect(safeNextRedirect('/\n/evil.example')).toBe('/');
+    expect(safeNextRedirect('/%0a/evil.example')).toBe('/');
+    expect(safeNextRedirect('/%5cevil.example')).toBe('/');
+    expect(safeNextRedirect('https://vercel.com@evil.example/')).toBe('/');
   });
   it('rejects off-allowlist absolute URLs and non-https', () => {
     expect(safeNextRedirect('https://evil.com')).toBe('/');
@@ -141,25 +147,76 @@ describe('exchangeCodeForToken', () => {
 });
 
 describe('install HTTP handler', () => {
-  it('redirects to Vercel authorize URL when no code present', async () => {
-    const app = createVercelApp();
-    const res = await app.request(
-      '/api/install',
-      {},
-      { VERCEL_CLIENT_ID: 'oac_test', VERCEL_CLIENT_SECRET: 'sec_test', VERCEL_REDIRECT_URI: 'https://fg.example.com/api/install' },
-    );
+  const OAUTH_ENV = {
+    VERCEL_CLIENT_ID: 'oac_test',
+    VERCEL_CLIENT_SECRET: 'sec_test',
+    VERCEL_REDIRECT_URI: 'https://fg.example.com/api/install',
+  };
+
+  async function startVercelOAuth(
+    app: ReturnType<typeof createVercelApp>,
+    extraEnv: Record<string, unknown> = {},
+  ): Promise<{ state: string; cookie: string; setCookie: string; location: string }> {
+    const res = await app.request('/api/install', {}, { ...OAUTH_ENV, ...extraEnv });
     expect(res.status).toBe(302);
     const location = res.headers.get('location')!;
+    const state = new URL(location).searchParams.get('state')!;
+    const setCookie = res.headers.get('set-cookie') ?? '';
+    const match = setCookie.match(/fg_vercel_oauth_state=([^;]+)/);
+    return {
+      state,
+      cookie: `fg_vercel_oauth_state=${match ? match[1] : state}`,
+      setCookie,
+      location,
+    };
+  }
+
+  it('redirects to Vercel authorize URL with CSRF state cookie when no code present', async () => {
+    const app = createVercelApp();
+    const { location, setCookie, state } = await startVercelOAuth(app);
     expect(location).toContain('https://vercel.com/integrations/oauth/authorize');
     expect(location).toContain('client_id=oac_test');
+    expect(state).toBeTruthy();
+    expect(setCookie).toMatch(/fg_vercel_oauth_state=/);
+    expect(setCookie).toMatch(/HttpOnly/i);
+    expect(setCookie).toMatch(/Secure/i);
+    expect(setCookie).toMatch(/SameSite=Lax/i);
   });
 
-  it('returns 500 when OAuth env is not configured', async () => {
+  it('returns 500 when OAuth env or VERCEL_REDIRECT_URI is not configured', async () => {
     const app = createVercelApp();
     const res = await app.request('/api/install', {}, {});
     expect(res.status).toBe(500);
+    expect((await res.json()).error).toMatch(/not configured/);
+
+    const missingRedirect = await app.request(
+      '/api/install',
+      {},
+      { VERCEL_CLIENT_ID: 'oac_test', VERCEL_CLIENT_SECRET: 'sec_test' },
+    );
+    expect(missingRedirect.status).toBe(500);
+  });
+
+  it('returns 400 cleanly when Vercel sends an OAuth ?error= param (no redirect loop)', async () => {
+    const app = createVercelApp();
+    const res = await app.request('/api/install?error=access_denied', {}, OAUTH_ENV);
+    expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toMatch(/not configured/);
+    expect(json.installed).toBe(false);
+    expect(json.error).toContain('access_denied');
+  });
+
+  it('rejects callback with missing or mismatched OAuth state (403)', async () => {
+    const app = createVercelApp();
+    const noState = await app.request('/api/install?code=code_abc', {}, OAUTH_ENV);
+    expect(noState.status).toBe(403);
+
+    const wrongState = await app.request(
+      '/api/install?code=code_abc&state=forged',
+      { headers: { Cookie: 'fg_vercel_oauth_state=expected' } },
+      OAUTH_ENV,
+    );
+    expect(wrongState.status).toBe(403);
   });
 
   it('exchanges the code and reports installed (no next URL)', async () => {
@@ -171,10 +228,11 @@ describe('install HTTP handler', () => {
         { status: 200 },
       )) as typeof fetch;
     try {
+      const { state, cookie } = await startVercelOAuth(app);
       const res = await app.request(
-        '/api/install?code=code_abc&configurationId=icfg_9',
-        {},
-        { VERCEL_CLIENT_ID: 'oac_test', VERCEL_CLIENT_SECRET: 'sec_test', VERCEL_REDIRECT_URI: 'https://fg.example.com/api/install' },
+        `/api/install?code=code_abc&state=${state}&configurationId=icfg_9`,
+        { headers: { Cookie: cookie } },
+        OAUTH_ENV,
       );
       expect(res.status).toBe(200);
       const json = await res.json();
@@ -194,10 +252,11 @@ describe('install HTTP handler', () => {
     globalThis.fetch = (async () =>
       new Response(JSON.stringify({ access_token: 'tok_123', user_id: 'u1' }), { status: 200 })) as typeof fetch;
     try {
+      const { state, cookie } = await startVercelOAuth(app);
       const res = await app.request(
-        '/api/install?code=code_abc&next=' + encodeURIComponent('https://vercel.com/dashboard'),
-        {},
-        { VERCEL_CLIENT_ID: 'oac_test', VERCEL_CLIENT_SECRET: 'sec_test', VERCEL_REDIRECT_URI: 'https://fg.example.com/api/install' },
+        `/api/install?code=code_abc&state=${state}&next=${encodeURIComponent('https://vercel.com/dashboard')}`,
+        { headers: { Cookie: cookie } },
+        OAUTH_ENV,
       );
       expect(res.status).toBe(302);
       expect(res.headers.get('location')).toBe('https://vercel.com/dashboard');
@@ -211,10 +270,11 @@ describe('install HTTP handler', () => {
     const origFetch = globalThis.fetch;
     globalThis.fetch = (async () => new Response('bad', { status: 400 })) as typeof fetch;
     try {
+      const { state, cookie } = await startVercelOAuth(app);
       const res = await app.request(
-        '/api/install?code=bad_code',
-        {},
-        { VERCEL_CLIENT_ID: 'oac_test', VERCEL_CLIENT_SECRET: 'sec_test', VERCEL_REDIRECT_URI: 'https://fg.example.com/api/install' },
+        `/api/install?code=bad_code&state=${state}`,
+        { headers: { Cookie: cookie } },
+        OAUTH_ENV,
       );
       expect(res.status).toBe(502);
     } finally {
@@ -222,29 +282,37 @@ describe('install HTTP handler', () => {
     }
   });
 
-  // FIX V2: open-redirect rejection — an off-allowlist `next` falls back to '/'.
-  it('falls back to "/" for an open-redirect next URL', async () => {
+  // FIX V2: open-redirect rejection — an off-allowlist or control-char `next` falls back to '/'.
+  it('falls back to "/" for open-redirect and ASCII-tab next URLs', async () => {
     const app = createVercelApp();
     const origFetch = globalThis.fetch;
     globalThis.fetch = (async () =>
       new Response(JSON.stringify({ access_token: 'tok_123', user_id: 'u1' }), { status: 200 })) as typeof fetch;
     try {
-      const res = await app.request(
-        '/api/install?code=code_abc&next=' + encodeURIComponent('https://evil.com/phish'),
-        {},
-        { VERCEL_CLIENT_ID: 'oac_test', VERCEL_CLIENT_SECRET: 'sec_test', VERCEL_REDIRECT_URI: 'https://fg.example.com/api/install' },
-      );
-      expect(res.status).toBe(302);
-      expect(res.headers.get('location')).toBe('/');
+      for (const badNext of ['https://evil.com/phish', '/\t/evil.example', '/%09/evil.example']) {
+        const { state, cookie } = await startVercelOAuth(app);
+        const res = await app.request(
+          `/api/install?code=code_abc&state=${state}&next=${encodeURIComponent(badNext)}`,
+          { headers: { Cookie: cookie } },
+          OAUTH_ENV,
+        );
+        expect(res.status).toBe(302);
+        expect(res.headers.get('location')).toBe('/');
+      }
     } finally {
       globalThis.fetch = origFetch;
     }
   });
 
-  // FIX V3: persists the integration (token, teamId, configurationId) to KV.
-  it('persists the integration to KV keyed by configurationId', async () => {
+  // FIX V3 + #414: persists to KV strictly under Vercel token response installation_id,
+  // ignoring untrusted query-string configurationId so one tenant cannot overwrite another.
+  it('derives configurationId strictly from token exchange response (ignores spoofed query param)', async () => {
     const app = createVercelApp();
     const kv = memoryKV();
+    kv.store.set(
+      'integration:icfg_victim',
+      JSON.stringify({ accessToken: 'tok_victim', configurationId: 'icfg_victim', installedAt: 'orig' }),
+    );
     const origFetch = globalThis.fetch;
     globalThis.fetch = (async () =>
       new Response(
@@ -252,17 +320,16 @@ describe('install HTTP handler', () => {
         { status: 200 },
       )) as typeof fetch;
     try {
+      const { state, cookie } = await startVercelOAuth(app, { KV: kv });
       const res = await app.request(
-        '/api/install?code=code_abc&configurationId=icfg_9',
-        {},
-        {
-          VERCEL_CLIENT_ID: 'oac_test',
-          VERCEL_CLIENT_SECRET: 'sec_test',
-          VERCEL_REDIRECT_URI: 'https://fg.example.com/api/install',
-          KV: kv,
-        },
+        `/api/install?code=code_abc&state=${state}&configurationId=icfg_victim`,
+        { headers: { Cookie: cookie } },
+        { ...OAUTH_ENV, KV: kv },
       );
       expect(res.status).toBe(200);
+      // Victim record untouched!
+      expect(JSON.parse(kv.store.get('integration:icfg_victim')!).accessToken).toBe('tok_victim');
+      // Authoritative installation_id written instead!
       const stored = kv.store.get('integration:icfg_9');
       expect(stored).toBeTruthy();
       const parsed = JSON.parse(stored!);
@@ -281,10 +348,11 @@ describe('install HTTP handler', () => {
     globalThis.fetch = (async () =>
       new Response(JSON.stringify({ access_token: 'tok_123', installation_id: 'icfg_1' }), { status: 200 })) as typeof fetch;
     try {
+      const { state, cookie } = await startVercelOAuth(app);
       const res = await app.request(
-        '/api/install?code=code_abc&configurationId=icfg_1',
-        {},
-        { VERCEL_CLIENT_ID: 'oac_test', VERCEL_CLIENT_SECRET: 'sec_test', VERCEL_REDIRECT_URI: 'https://fg.example.com/api/install' },
+        `/api/install?code=code_abc&state=${state}`,
+        { headers: { Cookie: cookie } },
+        OAUTH_ENV,
       );
       expect(res.status).toBe(200);
       expect((await res.json()).installed).toBe(true);

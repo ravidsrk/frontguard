@@ -13,6 +13,8 @@
  * @module github-api
  */
 
+const DEFAULT_GITHUB_TIMEOUT_MS = 15_000;
+
 /** base64url-encodes a string or bytes (no padding). */
 export function base64url(input: string | Uint8Array): string {
   const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : input;
@@ -21,18 +23,81 @@ export function base64url(input: string | Uint8Array): string {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/** Encodes a DER length field (ASN.1 definite form). */
+function derLength(length: number): Uint8Array {
+  if (length < 0x80) return new Uint8Array([length]);
+  const octets: number[] = [];
+  let n = length;
+  while (n > 0) {
+    octets.unshift(n & 0xff);
+    n >>>= 8;
+  }
+  return new Uint8Array([0x80 | octets.length, ...octets]);
+}
+
+/** Concatenates multiple Uint8Arrays. */
+function concatBytes(...chunks: Uint8Array[]): Uint8Array {
+  const total = chunks.reduce((sum, c) => sum + c.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.length;
+  }
+  return out;
+}
+
 /**
- * Imports a PKCS#8 PEM private key for RS256 signing.
+ * Wraps a PKCS#1 `RSAPrivateKey` DER blob inside a PKCS#8 `PrivateKeyInfo`
+ * envelope so Web Crypto's `subtle.importKey('pkcs8', ...)` can import GitHub's
+ * native `-----BEGIN RSA PRIVATE KEY-----` PEM files.
+ */
+export function wrapPkcs1InPkcs8(pkcs1Der: Uint8Array): Uint8Array {
+  // INTEGER 0 (PKCS#8 version)
+  const version = new Uint8Array([0x02, 0x01, 0x00]);
+  // SEQUENCE { OID 1.2.840.113549.1.1.1 (rsaEncryption), NULL }
+  const rsaAlgId = new Uint8Array([
+    0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00,
+  ]);
+  // OCTET STRING <pkcs1Der>
+  const privateKeyOctet = concatBytes(new Uint8Array([0x04]), derLength(pkcs1Der.length), pkcs1Der);
+  const inner = concatBytes(version, rsaAlgId, privateKeyOctet);
+  // SEQUENCE <inner>
+  return concatBytes(new Uint8Array([0x30]), derLength(inner.length), inner);
+}
+
+/**
+ * Encodes a repository path segment-by-segment for GitHub's Contents API so
+ * nested paths like `.github/frontguard.yml` preserve `/` separators while
+ * percent-encoding special characters inside each segment.
+ */
+export function encodeContentsPath(filePath: string): string {
+  const segments = filePath.split('/').filter((seg) => seg.length > 0);
+  if (segments.length === 0 || segments.some((seg) => seg === '.' || seg === '..')) {
+    throw new Error(`Invalid repository file path: ${filePath}`);
+  }
+  return segments.map((seg) => encodeURIComponent(seg)).join('/');
+}
+
+/**
+ * Imports a PKCS#8 (`BEGIN PRIVATE KEY`) or GitHub-native PKCS#1
+ * (`BEGIN RSA PRIVATE KEY`) PEM private key for RS256 signing.
  */
 export async function importPrivateKey(pem: string, subtle: SubtleCrypto = crypto.subtle): Promise<CryptoKey> {
+  const isPkcs1 = /-----BEGIN RSA PRIVATE KEY-----/.test(pem);
+  const isPkcs8 = /-----BEGIN PRIVATE KEY-----/.test(pem);
+  if (!isPkcs1 && !isPkcs8) {
+    throw new Error('Unsupported private key PEM format (expected PKCS#1 or PKCS#8)');
+  }
   const body = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/, '')
-    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/-----BEGIN (?:RSA )?PRIVATE KEY-----/g, '')
+    .replace(/-----END (?:RSA )?PRIVATE KEY-----/g, '')
     .replace(/\s+/g, '');
-  const der = Uint8Array.from(atob(body), (c) => c.charCodeAt(0));
+  const rawDer = Uint8Array.from(atob(body), (c) => c.charCodeAt(0));
+  const pkcs8Der = isPkcs1 ? wrapPkcs1InPkcs8(rawDer) : rawDer;
   return subtle.importKey(
     'pkcs8',
-    der.buffer as ArrayBuffer,
+    pkcs8Der.buffer.slice(pkcs8Der.byteOffset, pkcs8Der.byteOffset + pkcs8Der.byteLength) as ArrayBuffer,
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
     false,
     ['sign'],
@@ -71,7 +136,7 @@ export async function getInstallationToken(
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
   const res = await fetchImpl(
-    `https://api.github.com/app/installations/${installationId}/access_tokens`,
+    `https://api.github.com/app/installations/${encodeURIComponent(String(installationId))}/access_tokens`,
     {
       method: 'POST',
       headers: {
@@ -79,6 +144,7 @@ export async function getInstallationToken(
         Accept: 'application/vnd.github+json',
         'User-Agent': 'frontguard-github-app',
       },
+      signal: AbortSignal.timeout(DEFAULT_GITHUB_TIMEOUT_MS),
     },
   );
   if (!res.ok) throw new Error(`Failed to get installation token: ${res.status}`);
@@ -107,11 +173,15 @@ export async function createCheckRun(
   payload: Record<string, unknown>,
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ id: number }> {
-  const res = await fetchImpl(`https://api.github.com/repos/${owner}/${repo}/check-runs`, {
-    method: 'POST',
-    headers: ghHeaders(token, true),
-    body: JSON.stringify(payload),
-  });
+  const res = await fetchImpl(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/check-runs`,
+    {
+      method: 'POST',
+      headers: ghHeaders(token, true),
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(DEFAULT_GITHUB_TIMEOUT_MS),
+    },
+  );
   if (!res.ok) throw new Error(`Failed to create check run: ${res.status}`);
   return (await res.json()) as { id: number };
 }
@@ -131,11 +201,12 @@ export async function updateCheckRun(
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ id: number }> {
   const res = await fetchImpl(
-    `https://api.github.com/repos/${owner}/${repo}/check-runs/${checkRunId}`,
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/check-runs/${encodeURIComponent(String(checkRunId))}`,
     {
       method: 'PATCH',
       headers: ghHeaders(token, true),
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(DEFAULT_GITHUB_TIMEOUT_MS),
     },
   );
   if (!res.ok) throw new Error(`Failed to update check run: ${res.status}`);
@@ -161,6 +232,7 @@ export async function getInstallationRepos(
 ): Promise<InstallationRepo[]> {
   const res = await fetchImpl('https://api.github.com/installation/repositories?per_page=100', {
     headers: ghHeaders(token),
+    signal: AbortSignal.timeout(DEFAULT_GITHUB_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Failed to list installation repos: ${res.status}`);
   const data = (await res.json()) as {
@@ -198,9 +270,13 @@ export async function getFileContents(
   fetchImpl: typeof fetch = fetch,
 ): Promise<FileContents | null> {
   const query = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+  const encodedPath = encodeContentsPath(path);
   const res = await fetchImpl(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}${query}`,
-    { headers: ghHeaders(token) },
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}${query}`,
+    {
+      headers: ghHeaders(token),
+      signal: AbortSignal.timeout(DEFAULT_GITHUB_TIMEOUT_MS),
+    },
   );
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Failed to get file contents (${path}): ${res.status}`);
@@ -222,9 +298,13 @@ export async function getBranchSha(
   branch: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
+  const encodedBranch = encodeContentsPath(branch);
   const res = await fetchImpl(
-    `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`,
-    { headers: ghHeaders(token) },
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/ref/heads/${encodedBranch}`,
+    {
+      headers: ghHeaders(token),
+      signal: AbortSignal.timeout(DEFAULT_GITHUB_TIMEOUT_MS),
+    },
   );
   if (!res.ok) throw new Error(`Failed to resolve branch ${branch}: ${res.status}`);
   const data = (await res.json()) as { object: { sha: string } };
@@ -242,11 +322,15 @@ export async function createBranch(
   fromSha: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
-  const res = await fetchImpl(`https://api.github.com/repos/${owner}/${repo}/git/refs`, {
-    method: 'POST',
-    headers: ghHeaders(token, true),
-    body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: fromSha }),
-  });
+  const res = await fetchImpl(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs`,
+    {
+      method: 'POST',
+      headers: ghHeaders(token, true),
+      body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: fromSha }),
+      signal: AbortSignal.timeout(DEFAULT_GITHUB_TIMEOUT_MS),
+    },
+  );
   if (!res.ok) throw new Error(`Failed to create branch ${branch}: ${res.status}`);
 }
 
@@ -266,15 +350,20 @@ export async function createOrUpdateFile(
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
   // Contents API expects standard base64 (with padding), not base64url.
-  const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(content)));
+  const bytes = new TextEncoder().encode(content);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  const encoded = btoa(bin);
   const body: Record<string, unknown> = { message, content: encoded, branch };
   if (sha) body.sha = sha;
+  const encodedPath = encodeContentsPath(path);
   const res = await fetchImpl(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}`,
     {
       method: 'PUT',
       headers: ghHeaders(token, true),
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(DEFAULT_GITHUB_TIMEOUT_MS),
     },
   );
   if (!res.ok) throw new Error(`Failed to write file ${path}: ${res.status}`);
@@ -290,11 +379,15 @@ export async function createPullRequest(
   params: { title: string; head: string; base: string; body?: string },
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ number: number; html_url: string }> {
-  const res = await fetchImpl(`https://api.github.com/repos/${owner}/${repo}/pulls`, {
-    method: 'POST',
-    headers: ghHeaders(token, true),
-    body: JSON.stringify(params),
-  });
+  const res = await fetchImpl(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`,
+    {
+      method: 'POST',
+      headers: ghHeaders(token, true),
+      body: JSON.stringify(params),
+      signal: AbortSignal.timeout(DEFAULT_GITHUB_TIMEOUT_MS),
+    },
+  );
   if (!res.ok) throw new Error(`Failed to open PR on ${owner}/${repo}: ${res.status}`);
   return (await res.json()) as { number: number; html_url: string };
 }

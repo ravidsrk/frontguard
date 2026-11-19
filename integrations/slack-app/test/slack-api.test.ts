@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { buildVisualResultBlocks, postSlackMessage, type RunSummary } from '../src/slack-api.js';
+import {
+  buildVisualResultBlocks,
+  escapeSlackMrkdwn,
+  postSlackMessage,
+  type RunSummary,
+} from '../src/slack-api.js';
+
+describe('escapeSlackMrkdwn', () => {
+  it('escapes all mrkdwn special chars and neutralizes broadcast mentions', () => {
+    const out = escapeSlackMrkdwn('<!channel> <!here> <!everyone> *b* _i_ ~s~ `c` & <x>');
+    expect(out).not.toContain('<!channel>');
+    expect(out).not.toContain('<!here>');
+    expect(out).not.toContain('<!everyone>');
+    expect(out).not.toContain('*');
+    expect(out).not.toContain('_');
+    expect(out).not.toContain('~');
+    expect(out).not.toContain('`');
+    expect(out).toContain('&amp;');
+    expect(out).toContain('&lt;!channel&gt;');
+  });
+});
 
 describe('buildVisualResultBlocks', () => {
   it('renders a red header and a report button when regressions exist', () => {
@@ -13,6 +33,18 @@ describe('buildVisualResultBlocks', () => {
   it('renders a green header and no button when clean', () => {
     const blocks = buildVisualResultBlocks({ url: 'https://x.com', total: 5, regressions: 0, warnings: 0 });
     expect(JSON.stringify(blocks)).toContain('🟢');
+    expect((blocks as Array<{ type: string }>).some((b) => b.type === 'actions')).toBe(false);
+  });
+
+  it('omits non-https reportUrl buttons and escapes mrkdwn in URL field', () => {
+    const blocks = buildVisualResultBlocks({
+      url: 'https://x.com/<!channel>',
+      total: 1,
+      regressions: 0,
+      warnings: 0,
+      reportUrl: 'javascript:alert(1)',
+    });
+    expect(JSON.stringify(blocks)).not.toContain('<!channel>');
     expect((blocks as Array<{ type: string }>).some((b) => b.type === 'actions')).toBe(false);
   });
 });
