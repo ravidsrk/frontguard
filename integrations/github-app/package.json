@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@frontguard/cloud-api": "*",
-    "hono": "^4.13.17"
+    "hono": "^4.13.18"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
