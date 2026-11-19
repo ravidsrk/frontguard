@@ -5,7 +5,9 @@ export function stubPublicDnsFetch(
   return (async (input: string, init?: RequestInit) => {
     const url = String(input);
     if (url.includes('cloudflare-dns.com/dns-query')) {
-      return new Response(JSON.stringify({ Answer: [{ data: '93.184.216.34.' }] }), {
+      const isAaaa = /[?&]type=(28|AAAA)(?:&|$)/i.test(url);
+      const body = isAaaa ? { Answer: [] } : { Answer: [{ type: 1, data: '93.184.216.34' }] };
+      return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'Content-Type': 'application/dns-json' },
       });

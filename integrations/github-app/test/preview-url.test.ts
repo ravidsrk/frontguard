@@ -36,8 +36,11 @@ function stubPublicDnsFetch(
   inner: (url: string, init?: RequestInit) => Promise<Response>,
 ): typeof fetch {
   return (async (url: string, init?: RequestInit) => {
-    if (String(url).includes('cloudflare-dns.com/dns-query')) {
-      return new Response(JSON.stringify({ Answer: [{ data: '93.184.216.34.' }] }), {
+    const urlStr = String(url);
+    if (urlStr.includes('cloudflare-dns.com/dns-query')) {
+      const isAaaa = /[?&]type=(28|AAAA)(?:&|$)/i.test(urlStr);
+      const body = isAaaa ? { Answer: [] } : { Answer: [{ type: 1, data: '93.184.216.34' }] };
+      return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'Content-Type': 'application/dns-json' },
       });

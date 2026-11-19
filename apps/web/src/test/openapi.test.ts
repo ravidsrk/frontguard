@@ -31,6 +31,7 @@ const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head',
 
 const EXPECTED_PATHS = [
   '/health',
+  '/v1/account',
   '/v1/baselines/{runId}/approve',
   '/v1/cas/blobs/{sha256}',
   '/v1/cas/check',
@@ -51,6 +52,7 @@ const EXPECTED_PATHS = [
   '/v1/teams/{id}',
   '/v1/teams/{id}/activity',
   '/v1/teams/{id}/invitations',
+  '/v1/teams/{id}/invitations/{invitationId}',
   '/v1/teams/{id}/members/{userId}',
   '/v1/teams/{id}/members/{userId}/reviewer',
   '/v1/teams/{id}/projects',
@@ -65,6 +67,7 @@ const EXPECTED_PATHS = [
 
 const EXPECTED_METHODS: Record<string, string[]> = {
   '/health': ['get'],
+  '/v1/account': ['delete'],
   '/v1/baselines/{runId}/approve': ['post'],
   '/v1/cas/blobs/{sha256}': ['get', 'put'],
   '/v1/cas/check': ['post'],
@@ -84,7 +87,8 @@ const EXPECTED_METHODS: Record<string, string[]> = {
   '/v1/teams/invitations/accept': ['post'],
   '/v1/teams/{id}': ['delete', 'get', 'patch'],
   '/v1/teams/{id}/activity': ['get'],
-  '/v1/teams/{id}/invitations': ['post'],
+  '/v1/teams/{id}/invitations': ['get', 'post'],
+  '/v1/teams/{id}/invitations/{invitationId}': ['delete'],
   '/v1/teams/{id}/members/{userId}': ['delete', 'patch'],
   '/v1/teams/{id}/members/{userId}/reviewer': ['patch'],
   '/v1/teams/{id}/projects': ['get', 'post'],
