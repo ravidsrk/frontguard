@@ -3,6 +3,16 @@ import { Readable } from 'node:stream';
 import { resolve } from 'node:path';
 import ts from 'typescript';
 import { articles } from '../lib/docs-content';
+
+// core/config.ts statically imports tsx/esm/api (which loads esbuild, incompatible
+// with jsdom's cross-realm Uint8Array). configSchema itself never invokes tsImport.
+vi.mock('tsx/esm/api', () => ({
+  tsImport: () => {
+    throw new Error('tsImport is unused during configSchema validation');
+  },
+}));
+
+import { configSchema } from '../../../../packages/cli/src/core/config';
 import {
   acceptBaselineInputSchema,
   getSuggestedFixInputSchema,
@@ -31,9 +41,12 @@ function snippets(id: string) {
 describe('copyable documentation contracts', () => {
   it('typechecks the plugin and configuration recipes against the built public packages', () => {
     const examples = [
-      ...['guides/accessibility', 'guides/performance-budgets', 'guides/ai-fixes',
+      ...['cli/configuration', 'guides/accessibility', 'guides/performance-budgets', 'guides/ai-fixes',
         'guides/custom-plugins', 'guides/create-plugin', 'integrations/storybook']
         .flatMap((id) => snippets(id).filter((text) => /export default|export function/.test(text))),
+      ...['skills/frontguard/SKILL.md', 'skills/frontguard/references/setup.md'].flatMap((file) =>
+        [...readFileSync(`${repoRoot}/${file}`, 'utf8').matchAll(/```(?:typescript|ts)\n([\s\S]*?)```/g)]
+          .map((match) => match[1]).filter((text) => text.includes('defineConfig'))),
       ...['README.md', 'packages/cli/README.md'].flatMap((file) =>
         [...readFileSync(`${repoRoot}/${file}`, 'utf8').matchAll(/```(?:typescript|ts)\n([\s\S]*?)```/g)]
           .map((match) => match[1]).filter((text) => text.includes('createAccessibilityPlugin'))),
@@ -134,5 +147,64 @@ describe('copyable documentation contracts', () => {
       text: 'Frontguard: 1 of 3 checks alerted',
     });
     expect(response.writeHead).toHaveBeenCalledWith(status === 200 ? 200 : 502);
+  });
+
+  it('validates config snippets in docs and skills against the live Zod configSchema', () => {
+    const configBlocks = [
+      ...snippets('cli/configuration').filter((text) => text.includes('export default {')),
+      ...['skills/frontguard/SKILL.md', 'skills/frontguard/references/setup.md'].flatMap((file) =>
+        [...readFileSync(`${repoRoot}/${file}`, 'utf8').matchAll(/```(?:typescript|ts)\n([\s\S]*?)```/g)]
+          .map((match) => match[1])
+          .filter((text) => text.includes('defineConfig(')),
+      ),
+    ];
+    expect(configBlocks.length).toBeGreaterThanOrEqual(4);
+
+    for (const block of configBlocks) {
+      const transpiled = ts.transpileModule(block, {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+      });
+      const exportsObj: { default?: unknown } = {};
+      new Function('require', 'exports', transpiled.outputText)(
+        (mod: string) => {
+          if (mod === '@frontguard/cli') return { defineConfig: (cfg: unknown) => cfg };
+          throw new Error(`Unexpected import: ${mod}`);
+        },
+        exportsObj,
+      );
+      const parsed = configSchema.safeParse(exportsObj.default);
+      expect(parsed.success, parsed.success ? '' : JSON.stringify(parsed.error.issues)).toBe(true);
+    }
+  });
+
+  it('aligns guides/cloud-api endpoint rows with public/openapi.json', () => {
+    const openapi = JSON.parse(
+      readFileSync(`${repoRoot}/apps/web/public/openapi.json`, 'utf8'),
+    ) as { paths: Record<string, Record<string, unknown>> };
+    const rows = [...articleElement('guides/cloud-api').querySelectorAll('tbody tr')];
+    expect(rows.length).toBeGreaterThanOrEqual(7);
+
+    for (const row of rows) {
+      const methodAndPath = (row.querySelector('td')?.textContent ?? '').trim();
+      const [method, path] = methodAndPath.split(/\s+/);
+      expect(openapi.paths[path], `Unknown OpenAPI path: ${methodAndPath}`).toBeDefined();
+      expect(
+        openapi.paths[path]?.[method.toLowerCase()],
+        `Unknown OpenAPI method: ${methodAndPath}`,
+      ).toBeDefined();
+    }
+  });
+
+  it('keeps skills/frontguard Playwright reference and apps/demo free of stale options and CDN scripts', () => {
+    const pwRef = readFileSync(`${repoRoot}/skills/frontguard/references/playwright.md`, 'utf8');
+    expect(pwRef).toContain('FRONTGUARD_UPDATE=1');
+    expect(pwRef).toContain("'__visual_baselines__'");
+    expect(pwRef).toContain('default `0.01`');
+    expect(pwRef).not.toContain('UPDATE_SNAPSHOTS=1');
+    expect(pwRef).not.toContain('.frontguard/playwright');
+    expect(pwRef).not.toContain('timeoutMs');
+
+    const demoLayout = readFileSync(`${repoRoot}/apps/demo/app/layout.tsx`, 'utf8');
+    expect(demoLayout).not.toContain('cdn.tailwindcss.com');
   });
 });

@@ -5,23 +5,17 @@ import {
   Scripts,
 } from '@tanstack/react-router'
 import { NotFound } from '../components/NotFound'
+import { buildSecurityHeaders } from '../lib/security-headers'
 import appCss from '../styles.css?url'
 
 // Workers SSR handles routing — no Cloudflare Pages _redirects SPA fallback needed.
+// Per-request security headers and CSP nonces are applied globally in src/start.ts
+// so SSR pages, redirects (/docs/), 404s, and errors all receive them.
 
-export const SECURITY_HEADERS: Record<string, string> = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
-  'Content-Security-Policy':
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://frontguard.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
-}
+export const SECURITY_HEADERS: Record<string, string> = buildSecurityHeaders()
 
 export const Route = createRootRoute({
   notFoundComponent: NotFound,
-  headers: () => SECURITY_HEADERS,
   head: () => ({
     meta: [
       { charSet: 'utf-8' },

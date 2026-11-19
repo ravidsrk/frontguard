@@ -37,6 +37,7 @@ function sign(body: string): string {
 function previewPayload(over: Partial<VercelWebhookPayload['payload']['deployment']> = {}): VercelWebhookPayload {
   return {
     type: 'deployment.succeeded',
+    createdAt: Date.now(),
     payload: {
       deployment: {
         id: 'dpl_1',
@@ -175,9 +176,14 @@ describe('buildGitHubLinkage', () => {
     expect(buildGitHubLinkage({})).toBeUndefined();
   });
   it('omits prNumber when not numeric', () => {
-    const linkage = buildGitHubLinkage({ pullRequestId: 'main', repoOwner: 'acme' });
+    const linkage = buildGitHubLinkage({ pullRequestId: 'main', repoOwner: 'acme', repoSlug: 'web' });
     expect(linkage?.prNumber).toBeUndefined();
     expect(linkage?.owner).toBe('acme');
+    expect(linkage?.repo).toBe('web');
+  });
+  it('returns undefined for non-GitHub deploys missing owner or repo', () => {
+    expect(buildGitHubLinkage({ commitSha: 'abc123', branch: 'main' })).toBeUndefined();
+    expect(buildGitHubLinkage({ repoOwner: 'acme', commitSha: 'abc123' })).toBeUndefined();
   });
 });
 
@@ -406,6 +412,7 @@ describe('webhook HTTP handler', () => {
 
     const payload: VercelWebhookPayload = {
       type: 'deployment.succeeded',
+      createdAt: Date.now(),
       payload: {
         deployment: {
           id: 'dpl_acme',
@@ -455,6 +462,7 @@ describe('webhook HTTP handler', () => {
     kv.store.set('team:team_acme', JSON.stringify({ configurationId: 'icfg_x', installedAt: 'x' }));
     const payload: VercelWebhookPayload = {
       type: 'deployment.succeeded',
+      createdAt: Date.now(),
       payload: {
         deployment: { id: 'dpl_bad', url: 'http://169.254.169.254/latest/meta-data/', target: null },
         project: { id: 'prj_acme' },
@@ -528,6 +536,7 @@ describe('webhook HTTP handler', () => {
 
     const payload: VercelWebhookPayload = {
       type: 'deployment.succeeded',
+      createdAt: Date.now(),
       payload: {
         deployment: {
           id: 'dpl_personal',
@@ -586,6 +595,7 @@ describe('webhook HTTP handler', () => {
 
     const removeBody = JSON.stringify({
       type: 'integration-configuration.removed',
+      createdAt: Date.now(),
       payload: {
         configuration: { id: 'icfg_revoke' },
         team: { id: 'team_revoke' },
@@ -605,6 +615,7 @@ describe('webhook HTTP handler', () => {
     // Subsequent custom-domain deployment for that team/project must now be rejected.
     const deployBody = JSON.stringify({
       type: 'deployment.succeeded',
+      createdAt: Date.now(),
       payload: {
         deployment: { id: 'dpl_after_revoke', url: 'preview.revoked-acme.com', target: null },
         project: { id: 'prj_revoke' },
@@ -622,5 +633,102 @@ describe('webhook HTTP handler', () => {
       },
     );
     expect(deployRes.status).toBe(400);
+  });
+
+  it('does not record delivery idempotency key when triggerRun fails (502), allowing retries to succeed', async () => {
+    const app = createVercelApp();
+    const kv = memoryKV();
+    const payload = previewPayload();
+    payload.id = 'evt_retry_1';
+    const body = JSON.stringify(payload);
+    const env = {
+      VERCEL_CLIENT_SECRET: SECRET,
+      FRONTGUARD_API_URL: 'https://api.frontguard.dev',
+      FRONTGUARD_API_KEY: 'fg_x',
+      KV: kv,
+    };
+    let attempt = 0;
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      attempt += 1;
+      if (attempt === 1) return new Response('upstream error', { status: 500 });
+      return new Response(JSON.stringify({ id: 'run_retry_ok', statusUrl: '/v1/runs/run_retry_ok' }), {
+        status: 202,
+      });
+    }) as typeof fetch;
+    try {
+      const first = await app.request(
+        '/api/webhook',
+        { method: 'POST', body, headers: { 'x-vercel-signature': sign(body) } },
+        env,
+      );
+      expect(first.status).toBe(502);
+      expect(kv.store.has('delivery:evt_retry_1')).toBe(false);
+
+      const second = await app.request(
+        '/api/webhook',
+        { method: 'POST', body, headers: { 'x-vercel-signature': sign(body) } },
+        env,
+      );
+      expect(second.status).toBe(200);
+      expect((await second.json()).triggered).toBe(true);
+      expect(kv.store.has('delivery:evt_retry_1')).toBe(true);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('fails closed on corrupt JSON in KV project authorization record', async () => {
+    const app = createVercelApp();
+    const kv = memoryKV();
+    kv.store.set('project:prj_corrupt', '{not-valid-json');
+    const body = JSON.stringify({
+      type: 'deployment.succeeded',
+      createdAt: Date.now(),
+      payload: {
+        deployment: { id: 'dpl_c', url: 'preview.corrupt-acme.com', target: null },
+        project: { id: 'prj_corrupt' },
+      },
+    });
+    const res = await app.request(
+      '/api/webhook',
+      { method: 'POST', body, headers: { 'x-vercel-signature': sign(body) } },
+      { VERCEL_CLIENT_SECRET: SECRET, FRONTGUARD_API_URL: 'https://api.frontguard.dev', FRONTGUARD_API_KEY: 'fg_x', KV: kv },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects stale or missing webhook timestamps with 401', async () => {
+    const app = createVercelApp();
+    const stale = previewPayload();
+    stale.createdAt = Date.now() - 10 * 60_000;
+    const staleBody = JSON.stringify(stale);
+    const staleRes = await app.request(
+      '/api/webhook',
+      { method: 'POST', body: staleBody, headers: { 'x-vercel-signature': sign(staleBody) } },
+      { VERCEL_CLIENT_SECRET: SECRET },
+    );
+    expect(staleRes.status).toBe(401);
+
+    const missing = previewPayload();
+    delete missing.createdAt;
+    const missingBody = JSON.stringify(missing);
+    const missingRes = await app.request(
+      '/api/webhook',
+      { method: 'POST', body: missingBody, headers: { 'x-vercel-signature': sign(missingBody) } },
+      { VERCEL_CLIENT_SECRET: SECRET },
+    );
+    expect(missingRes.status).toBe(401);
+  });
+
+  it('rejects oversized webhook bodies with 413', async () => {
+    const app = createVercelApp();
+    const huge = 'x'.repeat(1_048_577);
+    const res = await app.request(
+      '/api/webhook',
+      { method: 'POST', body: huge, headers: { 'x-vercel-signature': 'abc' } },
+      { VERCEL_CLIENT_SECRET: SECRET },
+    );
+    expect(res.status).toBe(413);
   });
 });

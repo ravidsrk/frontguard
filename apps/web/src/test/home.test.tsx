@@ -107,9 +107,54 @@ describe('home route — real product content', () => {
 
   it('shows explicit baseline acceptance in the CLI install flow', () => {
     expect(screen.getByText(/Start your app in another terminal/)).toBeInTheDocument()
-    expect(screen.getByText(/frontguard update-baselines/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/frontguard update-baselines --confirm-baselines/),
+    ).toBeInTheDocument()
     expect(screen.getByText(/generated config/)).toHaveTextContent('baseUrl')
     expect(screen.queryByText(/frontguard run --url/)).not.toBeInTheDocument()
+  })
+
+  it('routes all primary onboarding CTAs to /docs/quick-start with zero TODO placeholders', () => {
+    const navCta = screen.getByRole('link', { name: /Get started →/i })
+    const heroCta = screen.getByRole('link', { name: /Read the docs →/i })
+    const closingCta = screen.getByRole('link', { name: /Get started in Docs →/i })
+
+    expect(navCta).toHaveAttribute('href', '/docs/quick-start')
+    expect(heroCta).toHaveAttribute('href', '/docs/quick-start')
+    expect(closingCta).toHaveAttribute('href', '/docs/quick-start')
+
+    expect(document.querySelectorAll('.fg-todo-note')).toHaveLength(0)
+    expect(document.body.textContent).not.toMatch(/\bTODO:/)
+    for (const el of document.querySelectorAll('[title]')) {
+      expect(el.getAttribute('title')).not.toMatch(/\bTODO:/)
+    }
+  })
+
+  it('keeps home page counts and paths consistent with the product', () => {
+    expect(screen.getByText(/8-tool MCP server/i)).toBeInTheDocument()
+    expect(screen.queryByText(/7-tool MCP server/i)).not.toBeInTheDocument()
+    expect(screen.getByText('./frontguard-report/report.json')).toBeInTheDocument()
+    expect(screen.getByText(/"classification": "regression"/)).toBeInTheDocument()
+  })
+
+  it('reports clipboard failure honestly on home copy buttons', async () => {
+    const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: () => Promise.reject(new Error('denied')) },
+      })
+      const btn = screen.getByRole('button', {
+        name: 'Copy command: npm install @frontguard/cli',
+      })
+      await act(async () => {
+        fireEvent.click(btn)
+      })
+      expect(btn.textContent).toBe('Copy failed')
+    } finally {
+      if (originalClipboard) Object.defineProperty(navigator, 'clipboard', originalClipboard)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+    }
   })
 
   it('gates the unvalidated Action and describes AI as optional assistance', () => {
@@ -138,7 +183,7 @@ describe('home route — real product content', () => {
       }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: /See all 11 capabilities across 6 tools/i }),
+      screen.getByRole('link', { name: /See all 15 capabilities across 6 tools/i }),
     ).toHaveAttribute('href', '/comparisons')
   })
 

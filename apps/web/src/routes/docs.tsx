@@ -75,8 +75,8 @@ function DocsLayout() {
   const params = useParams({ strict: false }) as { _splat?: string }
   const slug = params._splat ?? ''
   const known = !!slug && articles.some((a) => a.id === slug)
-  const active = known ? slug : articles[0]?.id ?? 'index'
-  const cur = byId(active)
+  const active = known ? slug : ''
+  const cur = known ? byId(active) : undefined
   const [filterQuery, setFilterQuery] = useState('')
   const normalizedFilter = filterQuery.trim().toLowerCase()
   const filteredGroups = navGroups
@@ -231,18 +231,22 @@ function DocsLayout() {
           style={s('padding: 44px 24px; border-left: 1px solid #211e1b;')}
         >
           <div style={s('position: sticky; top: 84px;')}>
-            <div style={s(`font-family: ${MONO}; font-size: 12px; font-weight: 600; color: #a89f94; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;`)}>ON THIS PAGE</div>
-            {cur.toc.map((t) => (
-              <a
-                key={t}
-                href={`#${slugifyHeading(t)}`}
-                className="fg-toc"
-                style={s('display: block; text-decoration: none; font-size: 13px; color: #b8b0a6; padding: 5px 0; line-height: 1.4;')}
-              >
-                {t}
-              </a>
-            ))}
-            <div style={s('margin-top: 26px; border-top: 1px solid #211e1b; padding-top: 20px;')}>
+            {cur && (
+              <>
+                <div style={s(`font-family: ${MONO}; font-size: 12px; font-weight: 600; color: #a89f94; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;`)}>ON THIS PAGE</div>
+                {cur.toc.map((t) => (
+                  <a
+                    key={t}
+                    href={`#${slugifyHeading(t)}`}
+                    className="fg-toc"
+                    style={s('display: block; text-decoration: none; font-size: 13px; color: #b8b0a6; padding: 5px 0; line-height: 1.4;')}
+                  >
+                    {t}
+                  </a>
+                ))}
+              </>
+            )}
+            <div style={s(`${cur ? 'margin-top: 26px; border-top: 1px solid #211e1b; padding-top: 20px;' : ''}`)}>
               <a href="https://github.com/ravidsrk/frontguard" className="fg-btn-primary" style={s(`display: block; text-align: center; background: #e8862e; color: #0d0c0b; font-family: ${MONO}; font-weight: 700; font-size: 12px; padding: 10px; text-decoration: none;`)}>★ Star on GitHub</a>
               <a href="https://github.com/ravidsrk/frontguard" className="fg-navlink" style={s(`display: block; text-align: center; font-family: ${MONO}; font-size: 12px; color: #a89f94; text-decoration: none; margin-top: 12px;`)}>Edit this page ↗</a>
             </div>

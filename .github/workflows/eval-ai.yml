@@ -41,31 +41,36 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: [openai, anthropic, gemini]
+        include:
+          - provider: openai
+            secret_var: FRONTGUARD_OPENAI_KEY
+          - provider: anthropic
+            secret_var: FRONTGUARD_ANTHROPIC_KEY
+          - provider: gemini
+            secret_var: FRONTGUARD_GEMINI_KEY
     env:
       PROVIDER: ${{ matrix.provider }}
+      SECRET_VAR: ${{ matrix.secret_var }}
       SELECTED: ${{ github.event.inputs.provider || 'all' }}
       MODEL: ${{ github.event.inputs.model || '' }}
-      FRONTGUARD_OPENAI_KEY: ${{ secrets.FRONTGUARD_OPENAI_KEY }}
-      FRONTGUARD_ANTHROPIC_KEY: ${{ secrets.FRONTGUARD_ANTHROPIC_KEY }}
-      FRONTGUARD_GEMINI_KEY: ${{ secrets.FRONTGUARD_GEMINI_KEY }}
     steps:
       - name: Check provider key
         id: key
+        env:
+          PROVIDER_KEY: ${{ secrets[matrix.secret_var] }}
         run: |
           if [ "$SELECTED" != "all" ] && [ "$SELECTED" != "$PROVIDER" ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          var="FRONTGUARD_$(echo "$PROVIDER" | tr '[:lower:]' '[:upper:]')_KEY"
-          if [ -z "${!var}" ]; then
-            echo "::notice title=AI eval skipped::$var is not set as a repository secret; skipping $PROVIDER."
+          if [ -z "$PROVIDER_KEY" ]; then
+            echo "::notice title=AI eval skipped::$SECRET_VAR is not set as a repository secret; skipping $PROVIDER."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         if: steps.key.outputs.run == 'true'
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: steps.key.outputs.run == 'true'
         with:
           node-version: 22
@@ -77,7 +82,11 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run eval
         if: steps.key.outputs.run == 'true'
+        env:
+          PROVIDER_KEY: ${{ secrets[matrix.secret_var] }}
         run: |
+          export "${SECRET_VAR}=${PROVIDER_KEY}"
+          unset PROVIDER_KEY
           args=(--provider "$PROVIDER" --fixes --out "$RUNNER_TEMP/eval-$PROVIDER.json")
           if [ -n "$MODEL" ]; then args+=(--model "$MODEL"); fi
           npm run eval:ai --workspace=packages/cli -- "${args[@]}" | tee "$RUNNER_TEMP/eval-$PROVIDER.txt"
@@ -90,7 +99,7 @@ jobs:
             cat "$RUNNER_TEMP/eval-$PROVIDER.txt" 2>/dev/null || echo "no output"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always() && steps.key.outputs.run == 'true'
         with:
           name: eval-ai-${{ matrix.provider }}

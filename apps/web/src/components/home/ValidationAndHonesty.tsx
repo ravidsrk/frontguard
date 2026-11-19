@@ -29,7 +29,7 @@ export function ValidationAndHonesty() {
         </div>
 
         {/* 2-Column Split: 3-Point Harness Methodology Summary + Transparent Skipped Repos */}
-        <div className="fg-split-2" style={s("margin-bottom: 40px;")}>
+        <div className="fg-split-2">
           {/* Left Card: 3-Point Harness Methodology Summary */}
           <div
             className="fg-surface-card"
@@ -217,32 +217,6 @@ export function ValidationAndHonesty() {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-
-        {/* External Social Proof Placeholders (Unfabricated TODOs per spec) */}
-        <div
-          style={s(
-            "padding: 20px 24px; background: var(--surface); border: 1px dashed var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;",
-          )}
-        >
-          <div className="fg-small">
-            <strong style={s("color: var(--text-primary);")}>
-              External adoption &amp; community proof:
-            </strong>{" "}
-            Insert verified community metrics and adopter feedback here once
-            approved.
-          </div>
-          <div style={s("display: flex; gap: 10px; flex-wrap: wrap;")}>
-            <span className="fg-todo-note">
-              TODO: insert verified GitHub star count
-            </span>
-            <span className="fg-todo-note">
-              TODO: insert approved user / team logos
-            </span>
-            <span className="fg-todo-note">
-              TODO: insert verified engineer quote
-            </span>
           </div>
         </div>
       </div>

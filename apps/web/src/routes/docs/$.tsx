@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, notFound, type NotFoundRouteProps } from '@tanstack/react-router'
 import { articles, FIRST_DOC_SLUG, type Article } from '../../lib/docs-content'
 import { buildSeoHead, canonicalUrl } from '../../lib/seo'
 import {
@@ -53,6 +53,14 @@ function docArticleBreadcrumbJsonLd(article: Article) {
 }
 
 export const Route = createFileRoute('/docs/$')({
+  loader: ({ params }) => {
+    const slug = params._splat ?? ''
+    const idx = articles.findIndex((a) => a.id === slug)
+    if (idx === -1) {
+      throw notFound({ data: { slug } })
+    }
+    return { idx }
+  },
   head: ({ params }) => {
     const slug = params._splat
     const article = articles.find((a) => a.id === slug)
@@ -75,22 +83,46 @@ export const Route = createFileRoute('/docs/$')({
       ],
     })
   },
+  notFoundComponent: DocNotFound,
   component: DocArticle,
 })
 
 const MONO = "'JetBrains Mono', monospace"
 
+function DocNotFound({ data }: NotFoundRouteProps) {
+  const slug =
+    typeof data === 'object' && data !== null && 'slug' in data && typeof data.slug === 'string'
+      ? data.slug
+      : ''
+  return (
+    <div style={s('padding: 40px 0;')}>
+      <h1 style={s('font-size: 32px; font-weight: 700; color: #f5f1ea; margin: 0 0 12px;')}>Page not found</h1>
+      <p style={s('font-size: 15px; color: #c8c0b6; margin: 0 0 20px;')}>No docs article matches “{slug}”.</p>
+      <Link
+        to="/docs/$"
+        params={{ _splat: FIRST_DOC_SLUG }}
+        className="fg-btn-primary"
+        style={s(`display: inline-block; background: #e8862e; color: #0d0c0b; font-family: ${MONO}; font-weight: 700; font-size: 13px; padding: 12px 18px; text-decoration: none;`)}
+      >
+        ← Back to Getting Started
+      </Link>
+    </div>
+  )
+}
+
 function DocArticle() {
-  const { _splat: slug } = Route.useParams()
-  const idx = articles.findIndex((a) => a.id === slug)
+  const { idx } = Route.useLoaderData()
+  const cur = articles[idx]
+  const prev = articles[idx - 1]
+  const next = articles[idx + 1]
   const articleRef = useRef<HTMLDivElement>(null)
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
   const [copyErrorSlug, setCopyErrorSlug] = useState<string | null>(null)
   const pageCopyAttempt = useRef({ value: 0 })
   const pageCopyTimer = useRef<number | undefined>(undefined)
-  const activeId = idx !== -1 ? articles[idx]?.id : undefined
-  const copiedPage = Boolean(activeId && copiedSlug === activeId)
-  const copyFailed = Boolean(activeId && copyErrorSlug === activeId)
+  const activeId = cur.id
+  const copiedPage = copiedSlug === activeId
+  const copyFailed = copyErrorSlug === activeId
 
   useEffect(() => () => {
     window.clearTimeout(pageCopyTimer.current)
@@ -153,27 +185,6 @@ function DocArticle() {
       createdButtons.forEach((b) => b.remove())
     }
   }, [activeId])
-
-  if (idx === -1) {
-    return (
-      <div style={s('padding: 40px 0;')}>
-        <h1 style={s('font-size: 32px; font-weight: 700; color: #f5f1ea; margin: 0 0 12px;')}>Page not found</h1>
-        <p style={s('font-size: 15px; color: #c8c0b6; margin: 0 0 20px;')}>No docs article matches “{slug}”.</p>
-        <Link
-          to="/docs/$"
-          params={{ _splat: FIRST_DOC_SLUG }}
-          className="fg-btn-primary"
-          style={s(`display: inline-block; background: #e8862e; color: #0d0c0b; font-family: ${MONO}; font-weight: 700; font-size: 13px; padding: 12px 18px; text-decoration: none;`)}
-        >
-          ← Back to Getting Started
-        </Link>
-      </div>
-    )
-  }
-
-  const cur = articles[idx]
-  const prev = articles[idx - 1]
-  const next = articles[idx + 1]
 
   const handleCopyArticle = async () => {
     const request = ++pageCopyAttempt.current.value

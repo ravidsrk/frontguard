@@ -45,6 +45,8 @@ export function buildSlackAuthorizeUrl(config: SlackOAuthConfig, state?: string)
   return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
 }
 
+const OAUTH_TIMEOUT_MS = 15_000;
+
 /**
  * Exchanges an OAuth `code` for a bot token via `oauth.v2.access`. Throws on a
  * non-ok Slack response.
@@ -63,6 +65,7 @@ export async function exchangeSlackCode(
       redirect_uri: config.redirectUri,
       code,
     }).toString(),
+    signal: AbortSignal.timeout(OAUTH_TIMEOUT_MS),
   });
   const data = (await res.json()) as SlackOAuthResponse;
   if (!data.ok || !data.access_token) {

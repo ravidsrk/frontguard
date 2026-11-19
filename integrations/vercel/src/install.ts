@@ -87,11 +87,18 @@ export function parseInstallCallback(query: Record<string, string | undefined>):
   };
 }
 
+const OAUTH_TIMEOUT_MS = 15_000;
+const CONTROL_CHARS_RE = /[\u0000-\u001f\u007f]/;
+const ENCODED_CONTROL_OR_BACKSLASH_RE = /%(?:0[0-9a-f]|1[0-9a-f]|7f|5c)/i;
+
 /**
  * Validates the `next` redirect target supplied by Vercel to prevent
  * open-redirect attacks. A target is considered safe when it is either:
- * - a same-origin relative path (starts with a single `/`, not `//` or `/\`), or
- * - an absolute URL on an allowlisted host (`vercel.com` / `*.vercel.com`).
+ * - a same-origin relative path (starts with a single `/`, no control chars,
+ *   whitespace, backslashes, or encoded control/backslash tricks, and resolves
+ *   strictly to the same origin under WHATWG URL parsing), or
+ * - an absolute `https:` URL on an allowlisted host (`vercel.com` / `*.vercel.com`)
+ *   with no embedded credentials.
  *
  * Anything else falls back to the provided default (`/` by default).
  *
@@ -99,22 +106,40 @@ export function parseInstallCallback(query: Record<string, string | undefined>):
  * @param fallback - Safe default to return for invalid input.
  */
 export function safeNextRedirect(next: string | undefined, fallback = '/'): string {
-  if (!next) return fallback;
-
-  // Relative path: must start with a single '/' and not be a protocol-relative
-  // ('//host') or backslash-trick ('/\\host') URL.
-  if (next.startsWith('/')) {
-    if (next.startsWith('//') || next.startsWith('/\\')) return fallback;
-    return next;
+  if (!next || typeof next !== 'string') return fallback;
+  if (
+    CONTROL_CHARS_RE.test(next) ||
+    /\s/.test(next) ||
+    next.includes('\\') ||
+    ENCODED_CONTROL_OR_BACKSLASH_RE.test(next)
+  ) {
+    return fallback;
   }
 
-  // Absolute URL: only allow https on an allowlisted Vercel host.
+  // Relative path: must start with a single '/' and resolve strictly to the
+  // sentinel origin so browser/WHATWG URL parsing cannot reinterpret it as an
+  // external host (e.g. via tab/newline stripping or backslash tricks).
+  if (next.startsWith('/')) {
+    if (next.startsWith('//') || next.startsWith('/\\')) return fallback;
+    try {
+      const sentinel = 'https://frontguard.invalid';
+      const resolved = new URL(next, sentinel);
+      if (resolved.origin !== sentinel) return fallback;
+      if (!resolved.pathname.startsWith('/') || resolved.pathname.startsWith('//')) return fallback;
+      return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+    } catch {
+      return fallback;
+    }
+  }
+
+  // Absolute URL: only allow https on an allowlisted Vercel host without creds.
   try {
     const url = new URL(next);
     if (url.protocol !== 'https:') return fallback;
+    if (url.username || url.password) return fallback;
     const host = url.hostname.toLowerCase();
     if (host === 'vercel.com' || host.endsWith('.vercel.com')) {
-      return next;
+      return url.href;
     }
   } catch {
     // Not a valid absolute URL.
@@ -147,6 +172,7 @@ export async function exchangeCodeForToken(
       code,
       redirect_uri: config.redirectUri,
     }).toString(),
+    signal: AbortSignal.timeout(OAUTH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Vercel token exchange failed: ${res.status}`);
   const data = (await res.json()) as VercelTokenResponse;
@@ -158,6 +184,7 @@ export async function exchangeCodeForToken(
     installationType: data.team_id ? 'team' : 'user',
     userId: data.user_id,
     teamId: data.team_id ?? undefined,
+    configurationId: data.installation_id,
     installationId: data.installation_id,
   };
 }

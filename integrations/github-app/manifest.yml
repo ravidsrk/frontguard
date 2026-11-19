@@ -12,7 +12,10 @@ url: https://frontguard.dev
 hook_attributes:
   url: https://github-app.frontguard.dev/webhook
 redirect_url: https://frontguard.dev/github/setup
-public: true
+# Default to private (single-tenant) for self-hosted deployments. Enable public
+# installs only when per-installation credentials are configured in KV
+# (`installation:<id>:credentials`) or `FRONTGUARD_INSTALLATION_KEYS`.
+public: false
 default_events:
   - pull_request
   - check_run
@@ -30,6 +33,8 @@ default_permissions:
   checks: write
   # Read repo contents (config detection) + open bootstrap PRs.
   contents: write
+  # Plant `.github/workflows/frontguard.yml` during installation bootstrap PRs.
+  workflows: write
   metadata: read
   # Subscribe to commit statuses (Vercel preview URLs).
   statuses: read

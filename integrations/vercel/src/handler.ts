@@ -12,8 +12,11 @@
  */
 
 import { Hono } from 'hono';
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import {
   verifyVercelSignature,
+  timingSafeEqual,
+  isFreshWebhookTimestamp,
   decideFromWebhook,
   triggerRun,
   isAllowedPreviewUrl,
@@ -46,6 +49,10 @@ async function deleteKvKey(kv: KVNamespace, key: string): Promise<void> {
 
 /** TTL (seconds) for recorded webhook delivery ids used for idempotency. */
 const DELIVERY_ID_TTL_SECONDS = 60 * 60 * 24; // 24h
+/** Short-lived cookie holding the OAuth `state` for CSRF protection. */
+const STATE_COOKIE = 'fg_vercel_oauth_state';
+const MAX_WEBHOOK_BODY_BYTES = 1_048_576; // 1 MiB
+const INSTALL_CALLBACK_TIMEOUT_MS = 15_000;
 
 /** Key used in KV to mark a Vercel project as authorized for custom-domain previews. */
 function projectAuthorizationKey(projectId: string): string {
@@ -57,7 +64,7 @@ export interface HandlerEnv {
   VERCEL_CLIENT_SECRET?: string;
   /** Vercel integration client id (for OAuth install flow). */
   VERCEL_CLIENT_ID?: string;
-  /** Public URL Vercel redirects back to (the /api/install endpoint). */
+  /** Public HTTPS URL Vercel redirects back to (the /api/install endpoint). Required for OAuth. */
   VERCEL_REDIRECT_URI?: string;
   /** Frontguard Cloud API base URL. */
   FRONTGUARD_API_URL?: string;
@@ -86,6 +93,55 @@ export function parseRoutesEnv(value?: string): string[] | undefined {
   return routes.length > 0 ? routes : undefined;
 }
 
+function isValidHttpsUri(value: string | undefined): value is string {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && !parsed.username && !parsed.password;
+  } catch {
+    return false;
+  }
+}
+
+/** Reads a request body up to `maxBytes`; returns `null` if the limit is exceeded. */
+async function readBodyWithLimit(req: Request, maxBytes: number): Promise<string | null> {
+  const contentLength = req.headers.get('content-length');
+  if (contentLength) {
+    const declared = Number(contentLength);
+    if (Number.isFinite(declared) && declared > maxBytes) return null;
+  }
+  if (!req.body) {
+    const text = await req.text();
+    return new TextEncoder().encode(text).byteLength <= maxBytes ? text : null;
+  }
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel().catch(() => undefined);
+          return null;
+        }
+        chunks.push(value);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(merged);
+}
+
 export function createVercelApp() {
   const app = new Hono<{ Bindings: HandlerEnv }>();
 
@@ -93,35 +149,68 @@ export function createVercelApp() {
 
   // GET /api/install — Vercel integration install / OAuth callback.
   //
-  // Two modes:
-  // 1. No `code`  → kick off the flow by redirecting to Vercel's authorize URL.
-  // 2. With `code` → exchange it for an access token, persist the config, then
-  //    redirect the user on to the `next` URL Vercel provided.
+  // Three modes:
+  // 1. With `error` → user denied or Vercel returned an OAuth error; stop cleanly.
+  // 2. No `code`    → set CSRF state cookie and redirect to Vercel's authorize URL.
+  // 3. With `code`  → validate CSRF state cookie, exchange the code for an access
+  //    token, derive `configurationId` strictly from Vercel's token response,
+  //    persist to KV, and redirect to a validated `next` URL.
   app.get('/api/install', async (c) => {
     const clientId = c.env?.VERCEL_CLIENT_ID;
     const clientSecret = c.env?.VERCEL_CLIENT_SECRET;
-    const redirectUri =
-      c.env?.VERCEL_REDIRECT_URI ?? new URL('/api/install', c.req.url).toString();
+    const redirectUri = c.env?.VERCEL_REDIRECT_URI;
 
-    if (!clientId || !clientSecret) {
-      return c.json({ error: 'Vercel OAuth not configured (VERCEL_CLIENT_ID / VERCEL_CLIENT_SECRET)' }, 500);
+    if (!clientId || !clientSecret || !isValidHttpsUri(redirectUri)) {
+      return c.json(
+        {
+          error:
+            'Vercel OAuth not configured (VERCEL_CLIENT_ID / VERCEL_CLIENT_SECRET / https VERCEL_REDIRECT_URI)',
+        },
+        500,
+      );
+    }
+
+    const oauthError = c.req.query('error');
+    if (oauthError) {
+      deleteCookie(c, STATE_COOKIE, { path: '/' });
+      return c.json(
+        {
+          installed: false,
+          error: `Vercel OAuth authorization error: ${oauthError}`,
+        },
+        400,
+      );
     }
 
     const config = { clientId, clientSecret, redirectUri };
     const code = c.req.query('code');
 
-    // No code → start the OAuth flow.
+    // No code → start the OAuth flow with a random CSRF state cookie.
     if (!code) {
-      return c.redirect(buildAuthorizeUrl(config));
+      const state = crypto.randomUUID();
+      setCookie(c, STATE_COOKIE, state, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'Lax',
+        path: '/',
+        maxAge: 600,
+      });
+      return c.redirect(buildAuthorizeUrl(config, state));
     }
 
-    // Callback → exchange the code for an access token.
+    // CSRF validation: state query param must match the HttpOnly cookie.
+    const returnedState = c.req.query('state');
+    const expectedState = getCookie(c, STATE_COOKIE);
+    deleteCookie(c, STATE_COOKIE, { path: '/' });
+    if (!expectedState || !returnedState || !timingSafeEqual(returnedState, expectedState)) {
+      return c.json({ error: 'Invalid OAuth state' }, 403);
+    }
+
+    // Callback → parse query params (ignoring untrusted configurationId/teamId).
     let callback;
     try {
       callback = parseInstallCallback({
         code,
-        configurationId: c.req.query('configurationId'),
-        teamId: c.req.query('teamId'),
         next: c.req.query('next'),
       });
     } catch (err) {
@@ -136,20 +225,22 @@ export function createVercelApp() {
       return c.json({ error: err instanceof Error ? err.message : 'Token exchange failed' }, 502);
     }
 
-    integration.configurationId = callback.configurationId;
+    // Derive configurationId strictly from Vercel's token exchange response
+    // (`installation_id`), NEVER from the untrusted query string.
+    const configurationId = integration.installationId;
+    integration.configurationId = configurationId;
 
     // Persist the integration (access token, configurationId, team/user) to
-    // durable storage keyed by configurationId. The token is never logged or
-    // returned in the response body. No-ops gracefully when no KV is bound.
+    // durable storage keyed by the authoritative configurationId.
     const installedAt = new Date().toISOString();
-    if (c.env?.KV && callback.configurationId) {
+    if (c.env?.KV && configurationId) {
       await c.env.KV.put(
-        `integration:${callback.configurationId}`,
+        `integration:${configurationId}`,
         JSON.stringify({
           accessToken: integration.accessToken,
           teamId: integration.teamId,
           userId: integration.userId,
-          configurationId: callback.configurationId,
+          configurationId,
           installedAt,
         }),
       );
@@ -158,35 +249,34 @@ export function createVercelApp() {
       if (integration.teamId) {
         await c.env.KV.put(
           `team:${integration.teamId}`,
-          JSON.stringify({ configurationId: callback.configurationId, installedAt }),
+          JSON.stringify({ configurationId, installedAt }),
         );
       }
       if (integration.userId) {
         await c.env.KV.put(
           `user:${integration.userId}`,
-          JSON.stringify({ configurationId: callback.configurationId, installedAt }),
+          JSON.stringify({ configurationId, installedAt }),
         );
       }
     }
 
     // Best-effort: create a corresponding Frontguard team in the Cloud API so
     // runs triggered by this integration are billed to the right workspace.
-    // Failure does NOT block install — the user can still attach the
-    // integration to an existing Frontguard team via env vars.
     if (c.env?.FRONTGUARD_API_URL && c.env?.FRONTGUARD_API_KEY) {
       try {
-        await fetch(`${c.env.FRONTGUARD_API_URL}/v1/integrations/vercel/install`, {
+        await fetch(`${c.env.FRONTGUARD_API_URL.replace(/\/+$/, '')}/v1/integrations/vercel/install`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${c.env.FRONTGUARD_API_KEY}`,
           },
           body: JSON.stringify({
-            configurationId: callback.configurationId,
+            configurationId,
             vercelTeamId: integration.teamId,
             vercelUserId: integration.userId,
             installationType: integration.installationType,
           }),
+          signal: AbortSignal.timeout(INSTALL_CALLBACK_TIMEOUT_MS),
         });
       } catch {
         // Swallow — install still succeeds locally.
@@ -202,7 +292,7 @@ export function createVercelApp() {
     return c.json({
       installed: true,
       installationType: integration.installationType,
-      configurationId: integration.configurationId,
+      configurationId,
       message: 'Frontguard for Vercel installed. Add FRONTGUARD_API_KEY to your project env.',
     });
   });
@@ -212,15 +302,17 @@ export function createVercelApp() {
     const apiUrl = c.env?.FRONTGUARD_API_URL;
     const apiKey = c.env?.FRONTGUARD_API_KEY;
 
-    const raw = await c.req.text();
-    const signature = c.req.header('x-vercel-signature') ?? null;
-
-    // Fail CLOSED: refuse to process unverified webhooks. If no secret is
-    // configured we cannot verify the signature, so reject the request rather
-    // than silently trusting it.
+    // Fail CLOSED: refuse to process unverified webhooks.
     if (!secret) {
       return c.json({ error: 'Webhook secret not configured' }, 500);
     }
+
+    const raw = await readBodyWithLimit(c.req.raw, MAX_WEBHOOK_BODY_BYTES);
+    if (raw === null) {
+      return c.json({ error: 'Payload too large' }, 413);
+    }
+
+    const signature = c.req.header('x-vercel-signature') ?? null;
     const valid = await verifyVercelSignature(raw, signature, secret);
     if (!valid) return c.json({ error: 'Invalid signature' }, 401);
 
@@ -231,15 +323,21 @@ export function createVercelApp() {
       return c.json({ error: 'Invalid JSON' }, 400);
     }
 
-    // Idempotency: short-circuit duplicate deliveries when a delivery/event id
-    // is present and a KV binding is available to record processed ids.
+    // Replay guard: enforce a 5-minute freshness window on Vercel's signed
+    // `createdAt` timestamp (or `x-vercel-timestamp` header).
+    const timestamp = payload.createdAt ?? c.req.header('x-vercel-timestamp');
+    if (!isFreshWebhookTimestamp(timestamp)) {
+      return c.json({ error: 'Stale or missing webhook timestamp' }, 401);
+    }
+
+    // Idempotency check (read-only here — write ONLY after side effects succeed
+    // so transient 502 retries are never dropped).
     const deliveryId = payload.id;
     if (deliveryId && c.env?.KV) {
       const seen = await c.env.KV.get(`delivery:${deliveryId}`);
       if (seen) {
         return c.json({ triggered: false, reason: 'Duplicate delivery (already processed)' });
       }
-      await c.env.KV.put(`delivery:${deliveryId}`, '1', { expirationTtl: DELIVERY_ID_TTL_SECONDS });
     }
 
     // Handle integration uninstallation / revocation events by purging KV records.
@@ -285,6 +383,11 @@ export function createVercelApp() {
         for (const pid of projectIds) {
           if (pid) await deleteKvKey(c.env.KV, projectAuthorizationKey(pid));
         }
+        if (deliveryId) {
+          await c.env.KV.put(`delivery:${deliveryId}`, '1', {
+            expirationTtl: DELIVERY_ID_TTL_SECONDS,
+          });
+        }
       }
       return c.json({
         triggered: false,
@@ -327,10 +430,7 @@ export function createVercelApp() {
               configurationId?: string | null;
               userId?: string | null;
             };
-            const hasOwnerRef = Boolean(parsed.teamId || parsed.configurationId || parsed.userId);
-            if (!hasOwnerRef) {
-              authorizedProject = true;
-            } else {
+            if (parsed && typeof parsed === 'object') {
               if (parsed.teamId && (await c.env.KV.get(`team:${parsed.teamId}`))) {
                 authorizedProject = true;
               } else if (
@@ -343,7 +443,8 @@ export function createVercelApp() {
               }
             }
           } catch {
-            authorizedProject = true;
+            // Fail closed on corrupt KV JSON.
+            authorizedProject = false;
           }
         }
       }
@@ -385,6 +486,11 @@ export function createVercelApp() {
         routes: parseRoutesEnv(c.env?.FRONTGUARD_ROUTES),
         git: decision.git,
       });
+      if (deliveryId && c.env?.KV) {
+        await c.env.KV.put(`delivery:${deliveryId}`, '1', {
+          expirationTtl: DELIVERY_ID_TTL_SECONDS,
+        });
+      }
       return c.json({ triggered: true, runId: run.id, previewUrl: decision.previewUrl });
     } catch (err) {
       return c.json({ triggered: false, error: err instanceof Error ? err.message : String(err) }, 502);

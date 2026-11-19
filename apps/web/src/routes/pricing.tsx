@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Footer } from '../components/Footer'
 import { Nav } from '../components/Nav'
+import { copyText } from '../lib/clipboard'
 import { s } from '../lib/style'
 import { buildSeoHead } from '../lib/seo'
 
@@ -129,7 +130,7 @@ const matrix = [
 const faqs = [
   {
     q: 'How do I install Frontguard?',
-    a: 'Run npm install @frontguard/cli, initialize the config, start your app, and review it before running frontguard update-baselines. Push the frontguard-baselines branch before CI comparisons. The Playwright adapter installs with npm install -D @frontguard/cli @frontguard/playwright.',
+    a: 'Run npm install @frontguard/cli, initialize the config, start your app, and review it before running frontguard update-baselines --confirm-baselines. Push the frontguard-baselines branch before CI comparisons. The Playwright adapter installs with npm install -D @frontguard/cli @frontguard/playwright.',
   },
   {
     q: 'How does Frontguard handle cross-OS rendering differences?',
@@ -200,14 +201,25 @@ function TierCta({ tier }: { tier: Tier }) {
 
 function Pricing() {
   const [copyLabel, setCopyLabel] = useState('copy')
-  const copyInstall = () => {
-    try {
-      navigator.clipboard?.writeText('npm install @frontguard/cli')
-    } catch {
-      /* noop */
-    }
-    setCopyLabel('copied ✓')
-    window.setTimeout(() => setCopyLabel('copy'), 1600)
+  const copyAttemptRef = useRef(0)
+  const copyTimerRef = useRef<number | undefined>(undefined)
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(copyTimerRef.current)
+    },
+    [],
+  )
+
+  const copyInstall = async () => {
+    const attempt = ++copyAttemptRef.current
+    window.clearTimeout(copyTimerRef.current)
+    const copied = await copyText('npm install @frontguard/cli')
+    if (attempt !== copyAttemptRef.current) return
+    setCopyLabel(copied ? 'copied ✓' : 'copy failed')
+    copyTimerRef.current = window.setTimeout(() => {
+      if (attempt === copyAttemptRef.current) setCopyLabel('copy')
+    }, 1600)
   }
 
   return (

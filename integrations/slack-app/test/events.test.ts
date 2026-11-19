@@ -82,18 +82,34 @@ describe('decideCommand', () => {
     expect(d.kind).toBe('status_invalid');
   });
 
-  it('rejects non-http(s) URLs', () => {
+  it('rejects non-https URLs', () => {
     const d = decideCommand({ ...base, text: 'status javascript:alert(1)' });
+    expect(d.kind).toBe('status_invalid');
+    const http = decideCommand({ ...base, text: 'status http://example.com' });
+    expect(http.kind).toBe('status_invalid');
+  });
+
+  it('rejects trailing mrkdwn / <!channel> payloads after URL', () => {
+    const d = decideCommand({ ...base, text: 'status https://example.com <!channel> *pwn*' });
     expect(d.kind).toBe('status_invalid');
   });
 
+  it('canonicalizes uppercase hostnames and encodes angle brackets', () => {
+    const d = decideCommand({ ...base, text: 'status https://EXAMPLE.COM/path?q=<!channel>' });
+    expect(d.kind).toBe('status');
+    if (d.kind === 'status') {
+      expect(d.url).toBe('https://example.com/path?q=%3C!channel%3E');
+      expect(d.url).not.toContain('<!channel>');
+    }
+  });
+
   it('rejects garbage URLs', () => {
-    const d = decideCommand({ ...base, text: 'status http://' });
+    const d = decideCommand({ ...base, text: 'status https://' });
     expect(d.kind).toBe('status_invalid');
   });
 
   it('rejects private/internal hosts before forwarding (SSRF)', () => {
-    const d = decideCommand({ ...base, text: 'status http://169.254.169.254/' });
+    const d = decideCommand({ ...base, text: 'status https://169.254.169.254/' });
     expect(d).toEqual({
       kind: 'status_invalid',
       reason: 'That URL targets a private or internal address and cannot be checked',
@@ -117,7 +133,7 @@ describe('buildCommandResponse', () => {
 
   it('surfaces an error for invalid status input', () => {
     const res = buildCommandResponse({ ...base, text: 'status javascript:alert(1)' }) as { text: string };
-    expect(res.text).toContain('http(s)');
+    expect(res.text).toContain('https://');
   });
 
   it('shows help by default', () => {

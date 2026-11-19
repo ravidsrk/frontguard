@@ -42,7 +42,8 @@ review the target, then explicitly create baselines:
 ```bash
 npm exec --yes --package="@frontguard/cli@0.2.2" -- frontguard run \
   --config apps/demo/frontguard.config.ts \
-  --update-baselines
+  --update-baselines \
+  --confirm-baselines
 git push origin frontguard-baselines
 ```
 
@@ -81,4 +82,4 @@ See [`frontguard.config.ts`](./frontguard.config.ts) for the full config. Key se
 
 - [Frontguard GitHub](https://github.com/ravidsrk/frontguard)
 - [Frontguard Docs](https://frontguard.dev)
-- [How it works](https://frontguard.dev/docs/how-it-works)
+- [How it works](https://frontguard.dev/docs/cli/index)

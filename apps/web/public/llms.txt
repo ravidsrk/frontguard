@@ -50,7 +50,7 @@ Frontguard terminal (uses the generated config; commands include `init`, `doctor
 ```bash
 npx -p @frontguard/cli frontguard doctor
 npx -p @frontguard/cli frontguard guide [topic] --json
-npx -p @frontguard/cli frontguard update-baselines
+npx -p @frontguard/cli frontguard update-baselines --confirm-baselines
 git push origin frontguard-baselines # before CI comparisons
 npx -p @frontguard/cli frontguard run
 ```

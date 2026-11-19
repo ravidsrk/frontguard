@@ -21,7 +21,7 @@ jobs:
       tag: ${{ steps.context.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}
@@ -73,7 +73,7 @@ jobs:
       - name: Require successful CI on the release commit
         if: github.event_name == 'push'
         id: ci-approval
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           RELEASE_SHA: ${{ steps.context.outputs.release_sha }}
@@ -102,7 +102,7 @@ jobs:
             core.info(`CI-approved commit: ${approved.html_url}`);
             core.setOutput('run_url', approved.html_url);
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
@@ -142,7 +142,7 @@ jobs:
           ./scripts/release.sh "${args[@]}"
 
       - name: Upload validation evidence
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.context.outputs.artifact_name }}
           path: ${{ runner.temp }}/release-evidence
@@ -164,7 +164,7 @@ jobs:
       immutable: ${{ steps.release.outputs.immutable }}
       release_url: ${{ steps.release.outputs.release_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           ref: ${{ needs.validate.outputs.release_sha }}
@@ -180,7 +180,7 @@ jobs:
           [ "$(git rev-parse "refs/release-guard/$TAG^{commit}")" = "$RELEASE_SHA" ]
 
       - name: Download release evidence
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ needs.validate.outputs.artifact_name }}
           path: ${{ runner.temp }}/release-evidence
@@ -262,12 +262,12 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           ref: ${{ needs.validate.outputs.release_sha }}
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
@@ -355,11 +355,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.validate.outputs.release_sha }}
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: 'npm'
@@ -374,7 +374,7 @@ jobs:
           mv packages/cli/docker/frontguard-cli-*.tgz packages/cli/docker/frontguard-cli.tgz
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Check Docker Hub credentials
         id: dockerhub
@@ -393,13 +393,13 @@ jobs:
 
       - name: Log in to Docker Hub
         if: steps.dockerhub.outputs.enabled == 'true'
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push render image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: packages/cli/docker
           file: packages/cli/docker/Dockerfile
