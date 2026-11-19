@@ -8,11 +8,23 @@
 import { z } from 'zod';
 import type { CloudClient, CloudRunResult } from '../client/cloud.js';
 import { diffIdFor, parseDiffId } from '../client/cloud.js';
+import {
+  capMultiLine,
+  capSingleLine,
+  MAX_CLUSTERS_PER_DIFF,
+  MAX_DIFF_ID_LENGTH,
+  MAX_EXPLANATION_LENGTH,
+  MAX_LABEL_LENGTH,
+  MAX_ROUTE_LENGTH,
+  MAX_SELECTOR_LENGTH,
+  sanitizeSuggestedFix,
+} from './_sanitize.js';
 
 export const inspectDiffClusterDomInputSchema = {
   diff_id: z
     .string()
     .min(1)
+    .max(MAX_DIFF_ID_LENGTH)
     .describe(
       'Diff identifier from list_regressions (`<runId>:<route>@<viewport>` or `@<viewport>@<browser>`).',
     ),
@@ -110,48 +122,52 @@ export function normalizeClusters(
   rawClusters: RawCluster[] | undefined,
   fallbackTarget: string,
 ): DiffClusterInspectionItem[] {
-  if (!rawClusters || rawClusters.length === 0) return [];
-  return rawClusters
-    .map((raw, idx) => {
-      const bbox =
-        raw.bbox &&
-        typeof raw.bbox.x === 'number' &&
-        typeof raw.bbox.y === 'number' &&
-        typeof raw.bbox.width === 'number' &&
-        typeof raw.bbox.height === 'number'
-          ? {
-              x: raw.bbox.x,
-              y: raw.bbox.y,
-              width: raw.bbox.width,
-              height: raw.bbox.height,
-            }
-          : typeof raw.x === 'number' &&
-              typeof raw.y === 'number' &&
-              typeof raw.width === 'number' &&
-              typeof raw.height === 'number'
-            ? { x: raw.x, y: raw.y, width: raw.width, height: raw.height }
-            : null;
-      if (!bbox) return null;
-      return {
-        id: typeof raw.id === 'number' ? raw.id : idx + 1,
-        bbox,
-        targetSelector:
-          typeof raw.targetSelector === 'string' && raw.targetSelector.trim().length > 0
-            ? raw.targetSelector.trim()
-            : fallbackTarget,
-      };
-    })
-    .filter((c): c is DiffClusterInspectionItem => c !== null);
+  if (!Array.isArray(rawClusters) || rawClusters.length === 0) return [];
+  const safeFallback = capSingleLine(fallbackTarget, MAX_SELECTOR_LENGTH) || 'main';
+  const items: DiffClusterInspectionItem[] = [];
+  for (let idx = 0; idx < rawClusters.length && items.length < MAX_CLUSTERS_PER_DIFF; idx++) {
+    const raw = rawClusters[idx];
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const bbox =
+      raw.bbox &&
+      typeof raw.bbox === 'object' &&
+      typeof raw.bbox.x === 'number' &&
+      typeof raw.bbox.y === 'number' &&
+      typeof raw.bbox.width === 'number' &&
+      typeof raw.bbox.height === 'number'
+        ? {
+            x: raw.bbox.x,
+            y: raw.bbox.y,
+            width: raw.bbox.width,
+            height: raw.bbox.height,
+          }
+        : typeof raw.x === 'number' &&
+            typeof raw.y === 'number' &&
+            typeof raw.width === 'number' &&
+            typeof raw.height === 'number'
+          ? { x: raw.x, y: raw.y, width: raw.width, height: raw.height }
+          : null;
+    if (!bbox) continue;
+    items.push({
+      id: typeof raw.id === 'number' && Number.isFinite(raw.id) ? raw.id : idx + 1,
+      bbox,
+      targetSelector:
+        typeof raw.targetSelector === 'string' && raw.targetSelector.trim().length > 0
+          ? capSingleLine(raw.targetSelector, MAX_SELECTOR_LENGTH)
+          : safeFallback,
+    });
+  }
+  return items;
 }
 
 function inferTargetSelector(result: CloudRunResult): string {
   if (result.suggestedFix?.target && result.suggestedFix.target.trim()) {
-    return result.suggestedFix.target.trim();
+    return capSingleLine(result.suggestedFix.target, MAX_SELECTOR_LENGTH);
   }
   if (result.suggestedFix?.patch) {
     const braceIdx = result.suggestedFix.patch.indexOf('{');
     if (braceIdx > 0) {
-      const candidate = result.suggestedFix.patch.slice(0, braceIdx).trim();
+      const candidate = capSingleLine(result.suggestedFix.patch.slice(0, braceIdx), MAX_SELECTOR_LENGTH);
       if (candidate) return candidate;
     }
   }
@@ -197,27 +213,30 @@ export async function inspectDiffClusterDom(
     clusters = filtered;
   }
 
-  const explanation = match.explanation ?? match.suggestedFix?.explanation ?? null;
-  const suggestedFix = match.suggestedFix
+  const rawExplanation = match.explanation ?? match.suggestedFix?.explanation ?? null;
+  const explanation =
+    typeof rawExplanation === 'string'
+      ? capMultiLine(rawExplanation, MAX_EXPLANATION_LENGTH)
+      : null;
+  const cleanFix = match.suggestedFix ? sanitizeSuggestedFix(match.suggestedFix) : null;
+  const suggestedFix = cleanFix
     ? {
-        fixType: match.suggestedFix.fixType,
-        category: match.suggestedFix.category,
-        patch: match.suggestedFix.patch,
-        target: match.suggestedFix.target ?? defaultTarget,
-        confidence: match.suggestedFix.confidence,
-        ...(typeof match.suggestedFix.verified === 'boolean'
-          ? { verified: match.suggestedFix.verified }
-          : {}),
+        fixType: cleanFix.fixType,
+        category: cleanFix.category,
+        patch: cleanFix.patch,
+        target: cleanFix.target ?? defaultTarget,
+        confidence: cleanFix.confidence,
+        ...(typeof cleanFix.verified === 'boolean' ? { verified: cleanFix.verified } : {}),
       }
     : null;
 
   return {
-    diffId: match.diffId ?? diffIdFor(runId, match),
-    route: match.route,
+    diffId: capSingleLine(match.diffId ?? diffIdFor(runId, match), MAX_DIFF_ID_LENGTH),
+    route: capSingleLine(match.route, MAX_ROUTE_LENGTH),
     viewport: match.viewport,
-    ...(match.browser ? { browser: match.browser } : {}),
+    ...(match.browser ? { browser: capSingleLine(match.browser, MAX_LABEL_LENGTH) } : {}),
     diffPercentage: match.diffPercentage,
-    classification: match.classification ?? null,
+    classification: match.classification ? capSingleLine(match.classification, MAX_LABEL_LENGTH) : null,
     explanation,
     suggestedFix,
     clusters,

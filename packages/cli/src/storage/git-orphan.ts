@@ -9,13 +9,16 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { BaselineStorage, BaselineManifest, BrowserEngine } from '../core/types.js';
 import { emptyBaselineManifest, isNamedMode, parseBaselineManifest } from '../core/fingerprint.js';
 export { isNamedMode };
 import { logger } from '../utils/logger.js';
+
+const VALID_BROWSERS = new Set<string>(['chromium', 'firefox', 'webkit']);
+const NULL_OID = '0000000000000000000000000000000000000000';
 
 /**
  * Buffer ceiling for every git child process (install-2).
@@ -104,9 +107,15 @@ export function baselineStoragePath(
   browser: BrowserEngine,
   mode?: string,
 ): string {
+  if (!VALID_BROWSERS.has(browser)) {
+    throw new Error(`Invalid browser engine "${String(browser)}"`);
+  }
+  if (!Number.isInteger(viewport) || viewport <= 0) {
+    throw new Error(`Invalid viewport "${String(viewport)}"`);
+  }
   const trimmed = typeof mode === 'string' ? mode.trim() : '';
   if (trimmed.length > 0 && trimmed !== 'default') {
-    const safeMode = trimmed.replace(/[^a-zA-Z0-9_\-]/g, '_') || 'default';
+    const safeMode = trimmed.replace(/\.\./g, '_').replace(/[^a-zA-Z0-9_\-]/g, '_') || 'default';
     return `baselines/${sanitizeRoutePath(route)}/${viewport}/${safeMode}/${browser}.png`;
   }
   return `baselines/${sanitizeRoutePath(route)}/${viewport}/${browser}.png`;
@@ -264,7 +273,7 @@ export class GitOrphanStorage implements BaselineStorage {
     const hasLocalBranch = this.branchExists();
     const ciValue = process.env.CI?.trim().toLowerCase();
     const isCI = ciValue !== undefined && !['', '0', 'false', 'no', 'off'].includes(ciValue);
-    const strictCIComparison = isCI && this.mode === 'compare';
+    const strictCIComparison = isCI && this.mode === 'compare' && !this.offline;
     const hasOrigin = this.gitCheck('remote', 'get-url', 'origin');
     if (strictCIComparison && !hasOrigin) {
       throw new Error(
@@ -420,8 +429,8 @@ export class GitOrphanStorage implements BaselineStorage {
   }
 
   /**
-   * Write multiple baseline images and an optional manifest in a single
-   * worktree transaction and single commit.
+   * Write multiple baseline images, optional sibling text snapshots, and an
+   * optional manifest in a single worktree transaction and single commit.
    */
   async writeBaselines(
     entries: Array<{
@@ -432,10 +441,24 @@ export class GitOrphanStorage implements BaselineStorage {
       buffer: Buffer;
     }>,
     manifest?: BaselineManifest,
+    textFiles?: Array<{
+      route: string;
+      viewport: number;
+      browser?: BrowserEngine;
+      mode?: string;
+      suffix: string;
+      body: string;
+    }>,
   ): Promise<void> {
     this.ensureInitialized();
     this.ensureWritable();
-    if (entries.length === 0 && !manifest) return;
+    const texts = textFiles ?? [];
+    for (const item of texts) {
+      if (!/^\.(aria\.txt|json|md)$/.test(item.suffix)) {
+        throw new Error('Unknown text snapshot');
+      }
+    }
+    if (entries.length === 0 && texts.length === 0 && !manifest) return;
 
     await this.writeToOrphanBranch(
       (wt) => {
@@ -454,6 +477,13 @@ export class GitOrphanStorage implements BaselineStorage {
           }
           mkdirSync(dirname(fullPath), { recursive: true });
           writeFileSync(fullPath, entry.buffer);
+        }
+        for (const item of texts) {
+          const browser = item.browser ?? 'chromium';
+          const path = baselinePath(item.route, item.viewport, browser, item.mode).replace(/\.png$/, item.suffix);
+          const fullPath = join(wt, path);
+          mkdirSync(dirname(fullPath), { recursive: true });
+          writeFileSync(fullPath, item.body);
         }
         if (manifest) {
           const manifestPath = join(wt, 'manifest.json');
@@ -690,57 +720,71 @@ export class GitOrphanStorage implements BaselineStorage {
     }
   }
 
+  private cleanupWorktree(scratch: string, wt: string): void {
+    try {
+      this.git('worktree', 'remove', wt, '--force');
+    } catch {
+      if (existsSync(wt)) {
+        try {
+          rmSync(wt, { recursive: true, force: true });
+        } catch {
+          // Best-effort cleanup
+        }
+      }
+      try {
+        this.git('worktree', 'prune');
+      } catch {
+        // Non-fatal
+      }
+    }
+    try {
+      rmSync(scratch, { recursive: true, force: true });
+    } catch {
+      // Best-effort cleanup
+    }
+  }
+
   /**
-   * Create orphan branch using git worktree (preferred, non-destructive).
-   *
-   * All destructive operations (checkout --orphan, rm -rf) happen inside
-   * a temporary worktree directory — the main working tree is never touched.
+   * Create orphan branch using a detached worktree + atomic ref creation so
+   * `this.branch` is never checked out or locked out across crashes.
    */
   private async createOrphanViaWorktree(): Promise<void> {
-    const tmpDir = mkdtempSync(join(tmpdir(), 'frontguard-init-'));
+    const scratch = mkdtempSync(join(tmpdir(), 'frontguard-init-'));
+    chmodSync(scratch, 0o700);
+    const wt = join(scratch, 'wt');
 
     try {
-      // Add a detached worktree in the temp directory without checking out files
-      this.git('worktree', 'add', '--detach', '--no-checkout', tmpDir);
+      this.git('worktree', 'add', '--detach', '--no-checkout', wt);
+      this.gitIn(wt, 'read-tree', '--empty');
 
-      // Inside the worktree, create the orphan branch and clear the index
-      this.gitIn(tmpDir, 'checkout', '--orphan', this.branch);
-      this.gitIn(tmpDir, 'rm', '-rf', '--ignore-unmatch', '.');
-
-      // Write initial manifest into the temp worktree
       const manifest: BaselineManifest = emptyBaselineManifest();
       writeFileSync(
-        join(tmpDir, 'manifest.json'),
-        JSON.stringify(manifest, null, 2) + '\n'
+        join(wt, 'manifest.json'),
+        JSON.stringify(manifest, null, 2) + '\n',
       );
 
-      this.gitIn(tmpDir, 'add', 'manifest.json');
-      this.gitIn(
-        tmpDir,
+      this.gitIn(wt, 'add', 'manifest.json');
+      const tree = this.gitIn(wt, 'write-tree');
+      const commit = this.gitIn(
+        wt,
         '-c',
         'user.name=Frontguard',
         '-c',
         'user.email=frontguard@local',
         '-c',
         'commit.gpgsign=false',
-        'commit',
+        'commit-tree',
+        tree,
         '-m',
         'Initialize frontguard baselines',
       );
-    } finally {
-      // Always clean up the worktree
       try {
-        this.git('worktree', 'remove', tmpDir, '--force');
-      } catch {
-        if (existsSync(tmpDir)) {
-          rmSync(tmpDir, { recursive: true, force: true });
-        }
-        try {
-          this.git('worktree', 'prune');
-        } catch {
-          // Non-fatal
-        }
+        this.git('update-ref', `refs/heads/${this.branch}`, commit, NULL_OID);
+      } catch (err) {
+        if (!this.branchExists()) throw err;
       }
+    } finally {
+      this.cleanupWorktree(scratch, wt);
     }
   }
 
@@ -798,17 +842,30 @@ export class GitOrphanStorage implements BaselineStorage {
     writeFn: (wt: string) => void,
     commitMessage: string
   ): Promise<void> {
-    const ma = 2;
+    const maxAttempts = 3;
 
-    for (let attempt = 1; attempt <= ma; attempt++) {
-      const wt = mkdtempSync(join(tmpdir(), 'frontguard-wt-'));
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const scratch = mkdtempSync(join(tmpdir(), 'frontguard-wt-'));
+      chmodSync(scratch, 0o700);
+      const wt = join(scratch, 'wt');
+      let cleaned = false;
+      const cleanup = (): void => {
+        if (cleaned) return;
+        cleaned = true;
+        this.cleanupWorktree(scratch, wt);
+      };
+      const onSignal = (sig: NodeJS.Signals): void => {
+        cleanup();
+        process.kill(process.pid, sig);
+      };
+      process.once('SIGINT', onSignal);
+      process.once('SIGTERM', onSignal);
 
       try {
-        // Remove the empty temp dir so git worktree can create it
-        rmSync(wt, { recursive: true, force: true });
+        const expectedTip = this.git('rev-parse', `refs/heads/${this.branch}`);
 
-        // Add a temporary worktree for the orphan branch
-        this.git('worktree', 'add', wt, this.branch);
+        // Detached worktree inside private 0700 dir: no /tmp TOCTOU and never locks the branch ref
+        this.git('worktree', 'add', '--detach', wt, expectedTip);
 
         // Apply the write operation
         writeFn(wt);
@@ -834,19 +891,27 @@ export class GitOrphanStorage implements BaselineStorage {
           '-m',
           commitMessage,
         );
+        const nextTip = this.gitIn(wt, 'rev-parse', 'HEAD');
+
+        // Atomic compare-and-swap update so concurrent writes retry instead of colliding
+        this.git('update-ref', `refs/heads/${this.branch}`, nextTip, expectedTip);
         logger.debug(`Committed to ${this.branch}: ${commitMessage}`);
         return;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
 
-        // Detect concurrent update conflicts
-        if (msg.includes('lock') || msg.includes('index.lock') || msg.includes('cannot lock')) {
-          if (attempt < ma) {
+        // Detect concurrent update / CAS conflicts
+        if (
+          msg.includes('lock') ||
+          msg.includes('index.lock') ||
+          msg.includes('cannot lock') ||
+          msg.includes('but expected')
+        ) {
+          if (attempt < maxAttempts) {
             logger.warn(
-              `Concurrent update detected on "${this.branch}", retrying (attempt ${attempt}/${ma})...`
+              `Concurrent update detected on "${this.branch}", retrying (attempt ${attempt}/${maxAttempts})...`
             );
-            // Brief wait before retry
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
             continue;
           }
         }
@@ -861,21 +926,9 @@ export class GitOrphanStorage implements BaselineStorage {
 
         throw new Error(`Failed to write baseline: ${msg}`);
       } finally {
-        // Always clean up the worktree
-        try {
-          this.git('worktree', 'remove', wt, '--force');
-        } catch {
-          // Manual cleanup if worktree remove fails
-          if (existsSync(wt)) {
-            rmSync(wt, { recursive: true, force: true });
-          }
-          // Prune stale worktree references
-          try {
-            this.git('worktree', 'prune');
-          } catch {
-            // Non-fatal
-          }
-        }
+        process.removeListener('SIGINT', onSignal);
+        process.removeListener('SIGTERM', onSignal);
+        cleanup();
       }
     }
   }

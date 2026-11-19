@@ -68,7 +68,7 @@ export function pixelDiff(before: Buffer, after: Buffer): { overlay: Buffer; rat
 
 function toDiff(c: EvalCase, overlay: Buffer, ratio: number): DiffResult {
   return {
-    route: { path: `/eval/${c.id}` },
+    route: { path: c.routePath ?? `/eval/${c.id}` },
     viewport: c.viewport,
     browser: 'chromium',
     status: 'changed',
@@ -76,6 +76,7 @@ function toDiff(c: EvalCase, overlay: Buffer, ratio: number): DiffResult {
     baselineImage: c.before,
     currentImage: c.after,
     diffImage: overlay,
+    ...(c.clusters ? { clusters: c.clusters } : {}),
   };
 }
 
@@ -102,7 +103,7 @@ export async function runEval(opts: EvalOptions): Promise<EvalReport> {
   const mock = opts.mock ? createMockTransport(loaded.cases) : undefined;
   const fetchImpl = opts.fetchImpl ?? mock?.fetchImpl;
   const env = opts.mock ? { ...process.env, [`FRONTGUARD_${opts.provider.toUpperCase()}_KEY`]: 'mock-key' } : process.env;
-  const usage = new AIUsageTracker();
+  const usage = new AIUsageTracker(Number.POSITIVE_INFINITY);
   const transport = { fetchImpl, env, retries: opts.retries, onCall: usage.record };
 
   const results: EvalCaseResult[] = [];

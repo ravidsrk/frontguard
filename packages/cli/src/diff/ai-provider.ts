@@ -14,7 +14,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, lstatSync, mkdirSync, openSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 
@@ -54,6 +54,10 @@ export const AI_REQUEST_DEFAULTS = {
   maxImageWidth: 800,
   /** Screenshots taller than this are cropped (top kept) before downscaling. */
   maxImageHeight: 5_000,
+  /** Maximum HTTP response body size accepted from a provider (4 MiB). */
+  maxResponseBytes: 4 * 1024 * 1024,
+  /** Maximum Retry-After delay honoured on 429/503 responses. */
+  maxRetryAfterMs: 60_000,
 } as const;
 
 /** Environment variables read per provider. */
@@ -109,19 +113,67 @@ export class AIAnalysisError extends Error {
   readonly kind: AIErrorKind;
   readonly model?: string;
   readonly retryable: boolean;
+  readonly retryAfterMs?: number;
 
   constructor(
     message: string,
     public readonly statusCode?: number,
     public readonly provider?: string,
-    details: { kind?: AIErrorKind; model?: string; retryable?: boolean } = {},
+    details: { kind?: AIErrorKind; model?: string; retryable?: boolean; retryAfterMs?: number } = {},
   ) {
     super(message);
     this.name = 'AIAnalysisError';
     this.kind = details.kind ?? kindForStatus(statusCode);
     this.model = details.model;
     this.retryable = details.retryable ?? RETRYABLE_KINDS.has(this.kind);
+    this.retryAfterMs = details.retryAfterMs;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Secret & URL redaction
+// ---------------------------------------------------------------------------
+
+const SECRET_TOKEN_RE =
+  /\b(?:(?:Bearer|Basic)\s+[a-zA-Z0-9_\-/.+=]{12,}|(?:sk-proj-|sk-ant-|sk-|anthropic-|glpat-|xai-)[a-zA-Z0-9_-]{20,}|sk_(?:live|test)_[a-zA-Z0-9]{20,}|AIza[0-9A-Za-z_-]{20,}|fg_[a-zA-Z0-9_-]{8,}|figd_[a-zA-Z0-9_-]{16,}|github_pat_[a-zA-Z0-9_]{22,}|gh[psou]_[a-zA-Z0-9]{36,}|AKIA[0-9A-Z]{16}|xox[bpors]-[a-zA-Z0-9-]{10,}|vercel_[a-zA-Z0-9_-]{24,})/gi;
+const KV_SECRET_RE =
+  /((?:x-api-key|x-goog-api-key|authorization|api[_-]?key|token|secret|password)["']?\s*[:=]\s*["']?)[a-zA-Z0-9_\-/.+=]{12,}(["']?)/gi;
+const URL_USERINFO_RE = /(https?:\/\/)([^/\s@]+@)/gi;
+const URL_QUERY_SECRET_RE = /([?&](?:key|api_key|apikey|token|access_token|secret)=)[^&\s"'<>]+/gi;
+
+/** Redacts API keys, tokens, credentials in URLs, and an optional literal secret. */
+export function redactSecrets(text: string, literalSecret?: string): string {
+  if (!text) return text;
+  const out = literalSecret && literalSecret.length >= 4 ? text.replaceAll(literalSecret, '[REDACTED]') : text;
+  return out
+    .replace(URL_USERINFO_RE, '$1REDACTED@')
+    .replace(URL_QUERY_SECRET_RE, '$1REDACTED')
+    .replace(KV_SECRET_RE, '$1[REDACTED]$2')
+    .replace(SECRET_TOKEN_RE, '[REDACTED]');
+}
+
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+/** Enforces `https:` for provider base URLs, permitting `http:` only for loopback hosts. */
+export function validateBaseUrl(url: string, provider: AIProviderName): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new AIAnalysisError(`Invalid base URL for ${provider}: "${redactUrl(url)}"`, undefined, provider, {
+      kind: 'config',
+      retryable: false,
+    });
+  }
+  if (parsed.protocol === 'https:' || (parsed.protocol === 'http:' && LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase()))) {
+    return url;
+  }
+  throw new AIAnalysisError(
+    `Refusing insecure base URL for ${provider} (${parsed.protocol}//${parsed.host}): use https:// (http:// is allowed only for localhost/loopback).`,
+    undefined,
+    provider,
+    { kind: 'config', retryable: false },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +337,7 @@ export function parseModelJson(
     const end = candidate.lastIndexOf('}');
     if (start === -1 || end <= start) {
       throw new AIAnalysisError(
-        `${provider} response did not contain a JSON object. Raw response: ${text.slice(0, 300)}`,
+        `${provider} response did not contain a JSON object. Raw response: ${redactSecrets(text.slice(0, 300))}`,
         undefined,
         provider,
         { kind: 'invalid_output' },
@@ -299,16 +351,21 @@ export function parseModelJson(
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     throw new AIAnalysisError(
-      `Failed to parse ${provider} response as JSON${opts.structured ? ' despite the response schema' : ''} (${reason}). Raw response: ${text.slice(0, 300)}`,
+      `Failed to parse ${provider} response as JSON${opts.structured ? ' despite the response schema' : ''} (${reason}). Raw response: ${redactSecrets(text.slice(0, 300))}`,
       undefined,
       provider,
       { kind: 'invalid_output' },
     );
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new AIAnalysisError(`${provider} response JSON is not an object. Raw response: ${text.slice(0, 300)}`, undefined, provider, {
-      kind: 'invalid_output',
-    });
+    throw new AIAnalysisError(
+      `${provider} response JSON is not an object. Raw response: ${redactSecrets(text.slice(0, 300))}`,
+      undefined,
+      provider,
+      {
+        kind: 'invalid_output',
+      },
+    );
   }
   return parsed as Record<string, unknown>;
 }
@@ -406,6 +463,10 @@ export interface ModelRequest {
   baseUrl?: string;
   maxOutputTokens?: number;
   timeoutMs?: number;
+  /** Opt in to Anthropic's server-side refusal fallback (`anthropic-beta` + `fallbacks: "default"`). Default false. */
+  allowFallback?: boolean;
+  /** Maximum response body size in bytes. Defaults to {@link AI_REQUEST_DEFAULTS.maxResponseBytes}. */
+  maxResponseBytes?: number;
   /** Short description used in call records and debug dumps, e.g. `analyze /pricing @1440`. */
   label?: string;
 }
@@ -429,7 +490,7 @@ export function resolveBaseUrl(
 ): string | undefined {
   const raw = baseUrl || env[PROVIDER_ENV[provider].baseUrl];
   const trimmed = raw?.trim().replace(/\/+$/, '');
-  return trimmed ? trimmed : undefined;
+  return trimmed ? validateBaseUrl(trimmed, provider) : undefined;
 }
 
 /**
@@ -519,19 +580,15 @@ export function buildRequest(req: ModelRequest, env: NodeJS.ProcessEnv = process
     if (structured && req.schema) {
       body.output_config = { format: { type: 'json_schema', schema: req.schema.schema } };
     }
-    if (firstParty && supportsServerSideFallback(req.model)) {
+    if (firstParty && req.allowFallback === true && supportsServerSideFallback(req.model)) {
       headers['anthropic-beta'] = ANTHROPIC_FALLBACK_BETA;
       body.fallbacks = 'default';
     }
     return { url, headers, body, firstParty, structured };
   }
 
-  // Gemini
-  let url = geminiUrl(custom, req.model);
-  if (custom && !/[?&]key=/.test(url)) {
-    // Custom Gemini proxies historically read the key from the query string.
-    url += `${url.includes('?') ? '&' : '?'}key=${encodeURIComponent(req.apiKey)}`;
-  }
+  // Gemini — send the API key strictly in the `x-goog-api-key` header, never in the URL query string.
+  const url = geminiUrl(custom, req.model);
   const generationConfig: Record<string, unknown> = {
     responseMimeType: 'application/json',
     maxOutputTokens,
@@ -573,18 +630,22 @@ export interface ParsedResponse {
   text: string;
   usage: ModelUsage;
   stopReason?: string;
+  /** Actual model ID reported by the provider response, when present (e.g. Anthropic fallback). */
+  model?: string;
 }
 
 type ProviderErrorField = { message?: string } | string | undefined;
 
 interface OpenAIChatResponse {
   error?: ProviderErrorField;
+  model?: unknown;
   choices?: Array<{ finish_reason?: string; message?: { content?: unknown; refusal?: unknown } }>;
   usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
 }
 
 interface AnthropicMessageResponse {
   error?: ProviderErrorField;
+  model?: unknown;
   stop_reason?: string;
   stop_details?: { category?: string | null } | null;
   content?: Array<{ type?: string; text?: string }>;
@@ -598,12 +659,17 @@ interface AnthropicMessageResponse {
 
 interface GeminiResponse {
   error?: ProviderErrorField;
+  modelVersion?: unknown;
   promptFeedback?: { blockReason?: string };
   candidates?: Array<{
     finishReason?: string;
     content?: { parts?: Array<{ text?: string; thought?: boolean }> };
   }>;
   usageMetadata?: { promptTokenCount?: unknown; candidatesTokenCount?: unknown; thoughtsTokenCount?: unknown };
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 }
 
 function num(value: unknown): number | undefined {
@@ -648,7 +714,8 @@ export function parseResponse(
   const errorField = ((json ?? {}) as { error?: ProviderErrorField }).error;
 
   if (errorField) {
-    const message = typeof errorField === 'string' ? errorField : (errorField.message ?? 'Unknown error');
+    const rawMessage = typeof errorField === 'string' ? errorField : (errorField.message ?? 'Unknown error');
+    const message = redactSecrets(String(rawMessage));
     throw new AIAnalysisError(`${label} API error: ${message}`, undefined, provider, {
       kind: 'bad_request',
       model: ctx.model,
@@ -657,45 +724,52 @@ export function parseResponse(
 
   if (provider === 'openai') {
     const data = (json ?? {}) as OpenAIChatResponse;
+    const responseModel = nonEmptyString(data.model);
     const choice = data.choices?.[0];
     const message = choice?.message ?? {};
     if (typeof message.refusal === 'string' && message.refusal) {
-      throw refusalError(label, ctx.model, message.refusal.slice(0, 160));
+      throw refusalError(label, responseModel ?? ctx.model, redactSecrets(message.refusal.slice(0, 160)));
     }
-    if (choice?.finish_reason === 'content_filter') throw refusalError(label, ctx.model, 'content_filter');
-    if (choice?.finish_reason === 'length') throw truncatedError(label, ctx.model, maxOut);
+    if (choice?.finish_reason === 'content_filter') throw refusalError(label, responseModel ?? ctx.model, 'content_filter');
+    if (choice?.finish_reason === 'length') throw truncatedError(label, responseModel ?? ctx.model, maxOut);
     const content = typeof message.content === 'string' ? message.content : '';
     if (!content.trim()) {
       throw new AIAnalysisError(
         `${label} returned an empty response — no content in choices[0].message.content`,
         undefined,
         provider,
-        { kind: 'empty', model: ctx.model },
+        { kind: 'empty', model: responseModel ?? ctx.model },
       );
     }
     return {
       text: content,
       stopReason: choice?.finish_reason,
       usage: { inputTokens: num(data.usage?.prompt_tokens), outputTokens: num(data.usage?.completion_tokens) },
+      ...(responseModel ? { model: responseModel } : {}),
     };
   }
 
   if (provider === 'anthropic') {
     const data = (json ?? {}) as AnthropicMessageResponse;
+    const responseModel = nonEmptyString(data.model);
     const stop = data.stop_reason;
     if (stop === 'refusal') {
-      throw refusalError(label, ctx.model, `refusal${data.stop_details?.category ? `: ${data.stop_details.category}` : ''}`);
+      throw refusalError(
+        label,
+        responseModel ?? ctx.model,
+        `refusal${data.stop_details?.category ? `: ${data.stop_details.category}` : ''}`,
+      );
     }
     const blocks = Array.isArray(data.content) ? data.content : [];
     const text = blocks
       .filter((b) => b.type === 'text' && typeof b.text === 'string')
       .map((b) => b.text)
       .join('');
-    if (stop === 'max_tokens') throw truncatedError(label, ctx.model, maxOut);
+    if (stop === 'max_tokens') throw truncatedError(label, responseModel ?? ctx.model, maxOut);
     if (!text.trim()) {
       throw new AIAnalysisError(`${label} returned an empty response — no text block in content`, undefined, provider, {
         kind: 'empty',
-        model: ctx.model,
+        model: responseModel ?? ctx.model,
       });
     }
     const u = data.usage ?? {};
@@ -706,20 +780,22 @@ export function parseResponse(
         inputTokens: sum(num(u.input_tokens), num(u.cache_read_input_tokens), num(u.cache_creation_input_tokens)),
         outputTokens: num(u.output_tokens),
       },
+      ...(responseModel ? { model: responseModel } : {}),
     };
   }
 
   // Gemini
   const data = (json ?? {}) as GeminiResponse;
+  const responseModel = nonEmptyString(data.modelVersion);
   if (data.promptFeedback?.blockReason) {
-    throw refusalError(label, ctx.model, `blocked: ${data.promptFeedback.blockReason}`);
+    throw refusalError(label, responseModel ?? ctx.model, `blocked: ${data.promptFeedback.blockReason}`);
   }
   const candidate = data.candidates?.[0];
   const finish = candidate?.finishReason;
   if (finish && ['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'RECITATION', 'IMAGE_SAFETY'].includes(finish)) {
-    throw refusalError(label, ctx.model, `finishReason ${finish}`);
+    throw refusalError(label, responseModel ?? ctx.model, `finishReason ${finish}`);
   }
-  if (finish === 'MAX_TOKENS') throw truncatedError(label, ctx.model, maxOut);
+  if (finish === 'MAX_TOKENS') throw truncatedError(label, responseModel ?? ctx.model, maxOut);
   const parts = candidate?.content?.parts ?? [];
   const text = parts
     .filter((p) => !p.thought && typeof p.text === 'string')
@@ -731,7 +807,7 @@ export function parseResponse(
       `${label} returned an empty response — no text in candidates[0].content.parts`,
       undefined,
       provider,
-      { kind: 'empty', model: ctx.model },
+      { kind: 'empty', model: responseModel ?? ctx.model },
     );
   }
   const u = data.usageMetadata ?? {};
@@ -742,11 +818,12 @@ export function parseResponse(
       inputTokens: num(u.promptTokenCount),
       outputTokens: sum(num(u.candidatesTokenCount), num(u.thoughtsTokenCount)),
     },
+    ...(responseModel ? { model: responseModel } : {}),
   };
 }
 
-/** Strips HTML, collapses whitespace and caps a provider error body. */
-export function summarizeErrorBody(body: string, max = 300): string {
+/** Strips HTML, redacts secrets, collapses whitespace and caps a provider error body. */
+export function summarizeErrorBody(body: string, max = 300, literalSecret?: string): string {
   let detail = body;
   try {
     const parsed = JSON.parse(body) as { error?: { message?: string }; message?: string } | null;
@@ -754,22 +831,48 @@ export function summarizeErrorBody(body: string, max = 300): string {
   } catch {
     // not JSON
   }
-  const flat = String(detail)
+  const flat = redactSecrets(String(detail), literalSecret)
     .replace(/<[^>]*>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 }
 
+/** Parses an HTTP `Retry-After` header (seconds or HTTP-date) into bounded milliseconds. */
+export function parseRetryAfterMs(
+  headers: Headers | undefined,
+  now: number = Date.now(),
+  maxMs: number = AI_REQUEST_DEFAULTS.maxRetryAfterMs,
+): number | undefined {
+  if (!headers || typeof headers.get !== 'function') return undefined;
+  const raw = headers.get('retry-after')?.trim();
+  if (!raw) return undefined;
+  if (/^\d+(?:\.\d+)?$/.test(raw)) {
+    const ms = Math.round(Number(raw) * 1000);
+    return Number.isFinite(ms) ? Math.min(Math.max(0, ms), maxMs) : undefined;
+  }
+  const parsedDate = Date.parse(raw);
+  if (Number.isFinite(parsedDate)) {
+    return Math.min(Math.max(0, parsedDate - now), maxMs);
+  }
+  return undefined;
+}
+
 /** Maps a non-2xx response to an actionable {@link AIAnalysisError}. */
 export function httpError(
   status: number,
   body: string,
-  ctx: { provider: AIProviderName; model: string; firstParty: boolean },
+  ctx: {
+    provider: AIProviderName;
+    model: string;
+    firstParty: boolean;
+    retryAfterMs?: number;
+    literalSecret?: string;
+  },
 ): AIAnalysisError {
-  const { provider, model } = ctx;
+  const { provider, model, retryAfterMs, literalSecret } = ctx;
   const envVar = PROVIDER_ENV[provider].key;
-  const details = { model };
+  const details = { model, ...(retryAfterMs !== undefined ? { retryAfterMs } : {}) };
   if (status === 401 || status === 403) {
     return new AIAnalysisError(
       `Authentication failed for ${provider} (${status}). Check your ${envVar} environment variable — the key may be invalid, expired, or lack access to model "${model}".`,
@@ -794,7 +897,7 @@ export function httpError(
   if (status >= 500) {
     return new AIAnalysisError(`${provider} server error (${status}).`, status, provider, details);
   }
-  const detail = summarizeErrorBody(body);
+  const detail = summarizeErrorBody(body, 300, literalSecret);
   const hint =
     !ctx.firstParty && /response_format|json_schema|max_completion_tokens|output_config/i.test(detail)
       ? ' This custom endpoint may not support the request shape; check the base URL.'
@@ -862,7 +965,73 @@ export function resolveApiKey(provider: AIProviderName, env: NodeJS.ProcessEnv =
   return key.trim();
 }
 
-const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+const MAX_ERR_BYTES = 65_536;
+
+const isAbort = (e: unknown, s?: AbortSignal): boolean =>
+  Boolean(s?.aborted || (e as { name?: string } | null)?.name === 'AbortError');
+const isRedirect = (e: unknown): boolean =>
+  /redirect/i.test(`${(e as { message?: string } | null)?.message ?? ''} ${(e as { cause?: { message?: string } } | null)?.cause?.message ?? ''}`);
+
+function withAbort<T>(p: Promise<T>, s: AbortSignal): Promise<T> {
+  if (s.aborted) return Promise.reject(new DOMException('aborted', 'AbortError'));
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(new DOMException('aborted', 'AbortError'));
+    s.addEventListener('abort', abort, { once: true });
+    p.then(
+      (v) => (s.removeEventListener('abort', abort), resolve(v)),
+      (e) => (s.removeEventListener('abort', abort), reject(e)),
+    );
+  });
+}
+
+async function readBoundedText(
+  res: Response,
+  max: number,
+  sig: AbortSignal,
+  truncate: boolean,
+  sizeErr: () => AIAnalysisError,
+): Promise<string> {
+  if (!truncate && Number(res.headers?.get?.('content-length')) > max) {
+    await res.body?.cancel?.().catch(() => {});
+    throw sizeErr();
+  }
+  if (!res.body?.getReader) {
+    const t = await withAbort(res.text(), sig);
+    if (Buffer.byteLength(t, 'utf8') > max) {
+      if (truncate) return Buffer.from(t, 'utf8').subarray(0, max).toString('utf8');
+      throw sizeErr();
+    }
+    return t;
+  }
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const cancel = () => void reader.cancel().catch(() => {});
+  sig.addEventListener('abort', cancel, { once: true });
+  try {
+    for (;;) {
+      const { done, value } = await withAbort(reader.read(), sig);
+      if (done) break;
+      if (!value?.byteLength) continue;
+      if (total + value.byteLength > max) {
+        if (truncate) {
+          if (max > total) chunks.push(value.subarray(0, max - total));
+          await reader.cancel().catch(() => {});
+          break;
+        }
+        await reader.cancel().catch(() => {});
+        throw sizeErr();
+      }
+      chunks.push(value);
+      total += value.byteLength;
+    }
+  } finally {
+    sig.removeEventListener('abort', cancel);
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
 
 /**
  * Sends one model request, retrying only retryable failures, and reports a
@@ -876,8 +1045,16 @@ export async function callModel(req: ModelRequest, opts: CallModelOptions = {}):
   const backoffMs = opts.backoffMs ?? AI_REQUEST_DEFAULTS.backoffMs;
   const sleep = opts.sleep ?? defaultSleep;
   const timeoutMs = req.timeoutMs ?? AI_REQUEST_DEFAULTS.timeoutMs;
+  const maxBytes = req.maxResponseBytes ?? AI_REQUEST_DEFAULTS.maxResponseBytes;
   const label = req.label ?? `${req.provider} call`;
   const started = Date.now();
+  const timeoutErr = () =>
+    new AIAnalysisError(
+      `${req.provider} request timed out after ${Math.round(timeoutMs / 1000)}s. Raise ai.timeoutMs if the model needs longer.`,
+      408,
+      req.provider,
+      { kind: 'timeout', model: req.model },
+    );
   let attempt = 0;
 
   for (;;) {
@@ -887,56 +1064,83 @@ export async function callModel(req: ModelRequest, opts: CallModelOptions = {}):
     try {
       const ct = new AbortController();
       const timer = setTimeout(() => ct.abort(), timeoutMs);
-      let res: Response;
+      let json: unknown;
       try {
-        res = await fetchImpl(built.url, {
-          method: 'POST',
-          headers: built.headers,
-          body: JSON.stringify(built.body),
-          signal: ct.signal,
-        });
-      } catch (err) {
-        if ((err as Error)?.name === 'AbortError') {
+        let res: Response;
+        try {
+          res = await fetchImpl(built.url, {
+            method: 'POST',
+            headers: built.headers,
+            body: JSON.stringify(built.body),
+            signal: ct.signal,
+            redirect: 'error',
+          });
+        } catch (err) {
+          if (isAbort(err, ct.signal)) throw timeoutErr();
+          if (isRedirect(err)) {
+            throw new AIAnalysisError(`${req.provider} request refused a redirect to protect API credentials.`, undefined, req.provider, {
+              kind: 'config',
+              model: req.model,
+              retryable: false,
+            });
+          }
           throw new AIAnalysisError(
-            `${req.provider} request timed out after ${Math.round(timeoutMs / 1000)}s. Raise ai.timeoutMs if the model needs longer.`,
-            408,
+            `${req.provider} request failed: ${redactSecrets(err instanceof Error ? err.message : String(err), req.apiKey)}`,
+            undefined,
             req.provider,
-            { kind: 'timeout', model: req.model },
+            { kind: 'network', model: req.model },
           );
         }
-        throw new AIAnalysisError(
-          `${req.provider} request failed: ${err instanceof Error ? err.message : String(err)}`,
-          undefined,
-          req.provider,
-          { kind: 'network', model: req.model },
-        );
+        status = res.status;
+        const sizeErr = () =>
+          new AIAnalysisError(`${req.provider} response exceeded the ${maxBytes}-byte size limit (${status}).`, status, req.provider, {
+            kind: 'invalid_output',
+            model: req.model,
+            retryable: false,
+          });
+        if (!res.ok) {
+          const body = await readBoundedText(res, Math.min(maxBytes, MAX_ERR_BYTES), ct.signal, true, sizeErr).catch((e) => {
+            if (isAbort(e, ct.signal)) throw e;
+            return '';
+          });
+          responseForDump = redactSecrets(body.slice(0, 4000), req.apiKey);
+          throw httpError(status, body, {
+            provider: req.provider,
+            model: req.model,
+            firstParty: built.firstParty,
+            retryAfterMs: status === 429 || status === 503 ? parseRetryAfterMs(res.headers) : undefined,
+            literalSecret: req.apiKey,
+          });
+        }
+        try {
+          json =
+            !res.body?.getReader && typeof res.json === 'function'
+              ? await withAbort(res.json(), ct.signal)
+              : JSON.parse(await readBoundedText(res, maxBytes, ct.signal, false, sizeErr));
+        } catch (e) {
+          if (isAbort(e, ct.signal) || e instanceof AIAnalysisError) throw e;
+          throw new AIAnalysisError(`${req.provider} returned a non-JSON response (${status}).`, status, req.provider, {
+            kind: 'invalid_output',
+            model: req.model,
+            retryable: false,
+          });
+        }
+      } catch (err) {
+        if (err instanceof AIAnalysisError) throw err;
+        if (isAbort(err, ct.signal)) throw timeoutErr();
+        throw err;
       } finally {
         clearTimeout(timer);
       }
-      status = res.status;
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        responseForDump = body.slice(0, 4000);
-        throw httpError(res.status, body, { provider: req.provider, model: req.model, firstParty: built.firstParty });
-      }
-      let json: unknown;
-      try {
-        json = await res.json();
-      } catch {
-        throw new AIAnalysisError(`${req.provider} returned a non-JSON response (${res.status}).`, res.status, req.provider, {
-          kind: 'invalid_output',
-          model: req.model,
-          retryable: false,
-        });
-      }
       responseForDump = json;
       const parsed = parseResponse(req.provider, json, { model: req.model, maxOutputTokens: req.maxOutputTokens });
+      const actualModel = parsed.model ?? req.model;
       const latencyMs = Date.now() - started;
-      dumpCall(env, opts.debugDir, { label, req, built, attempt, status, response: responseForDump, latencyMs });
+      dumpCall(env, opts.debugDir, { label, req, actualModel, built, attempt, status, response: responseForDump, latencyMs });
       opts.onCall?.({
         label,
         provider: req.provider,
-        model: req.model,
+        model: actualModel,
         outcome: 'ok',
         attempts: attempt,
         latencyMs,
@@ -950,7 +1154,7 @@ export async function callModel(req: ModelRequest, opts: CallModelOptions = {}):
         usage: parsed.usage,
         stopReason: parsed.stopReason,
         provider: req.provider,
-        model: req.model,
+        model: actualModel,
         latencyMs,
         attempts: attempt,
       };
@@ -958,12 +1162,13 @@ export async function callModel(req: ModelRequest, opts: CallModelOptions = {}):
       const error =
         err instanceof AIAnalysisError
           ? err
-          : new AIAnalysisError(err instanceof Error ? err.message : String(err), status, req.provider, {
+          : new AIAnalysisError(redactSecrets(err instanceof Error ? err.message : String(err), req.apiKey), status, req.provider, {
               model: req.model,
             });
       dumpCall(env, opts.debugDir, {
         label,
         req,
+        actualModel: error.model ?? req.model,
         built,
         attempt,
         status,
@@ -974,13 +1179,17 @@ export async function callModel(req: ModelRequest, opts: CallModelOptions = {}):
       if (error.retryable && attempt <= retries) {
         opts.onRetry?.(error, attempt);
         const base = backoffMs * 2 ** (attempt - 1);
-        await sleep(Math.min(base + Math.random() * base * 0.1, 30_000));
+        await sleep(
+          error.retryAfterMs !== undefined
+            ? Math.min(Math.max(0, error.retryAfterMs), AI_REQUEST_DEFAULTS.maxRetryAfterMs)
+            : Math.min(base + Math.random() * base * 0.1, 30_000),
+        );
         continue;
       }
       opts.onCall?.({
         label,
         provider: req.provider,
-        model: req.model,
+        model: error.model ?? req.model,
         outcome: 'error',
         attempts: attempt,
         latencyMs: Date.now() - started,
@@ -1030,9 +1239,11 @@ export function elideImages(value: unknown): unknown {
   );
 }
 
-/** Masks credentials in a URL (Gemini proxies carry `key=` in the query). */
+/** Masks credentials in a URL (embedded userinfo and sensitive query params). */
 export function redactUrl(url: string): string {
-  return url.replace(/([?&]key=)[^&]+/g, '$1REDACTED');
+  return url
+    .replace(URL_USERINFO_RE, '$1REDACTED@')
+    .replace(URL_QUERY_SECRET_RE, '$1REDACTED');
 }
 
 function dumpCall(
@@ -1041,6 +1252,7 @@ function dumpCall(
   entry: {
     label: string;
     req: ModelRequest;
+    actualModel: string;
     built: BuiltRequest;
     attempt: number;
     status?: number;
@@ -1052,35 +1264,47 @@ function dumpCall(
   if (env.FRONTGUARD_DEBUG_AI !== '1') return;
   try {
     const target = dir ?? join(process.cwd(), '.frontguard-debug', 'ai');
-    mkdirSync(target, { recursive: true });
+    mkdirSync(target, { recursive: true, mode: 0o700 });
+    const dirStat = lstatSync(target);
+    if (dirStat.isSymbolicLink() || !dirStat.isDirectory()) return;
     dumpSeq += 1;
     const safeLabel = entry.label.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 60);
     const file = join(
       target,
       `${new Date().toISOString().replace(/[:.]/g, '-')}-${String(dumpSeq).padStart(4, '0')}-${safeLabel}.json`,
     );
-    writeFileSync(
-      file,
-      JSON.stringify(
-        {
-          label: entry.label,
-          provider: entry.req.provider,
-          model: entry.req.model,
-          attempt: entry.attempt,
-          firstParty: entry.built.firstParty,
-          structured: entry.built.structured,
-          url: redactUrl(entry.built.url),
-          headers: Object.keys(entry.built.headers),
-          request: elideImages(entry.built.body),
-          status: entry.status,
-          latencyMs: entry.latencyMs,
-          ...(entry.error ? { error: entry.error } : {}),
-          response: entry.response,
-        },
-        null,
-        2,
-      ),
+    const serialized = JSON.stringify(
+      {
+        label: entry.label,
+        provider: entry.req.provider,
+        model: entry.actualModel,
+        ...(entry.actualModel !== entry.req.model ? { requestedModel: entry.req.model } : {}),
+        attempt: entry.attempt,
+        firstParty: entry.built.firstParty,
+        structured: entry.built.structured,
+        url: redactUrl(entry.built.url),
+        headers: Object.keys(entry.built.headers),
+        request: elideImages(entry.built.body),
+        status: entry.status,
+        latencyMs: entry.latencyMs,
+        ...(entry.error ? { error: entry.error } : {}),
+        response: entry.response,
+      },
+      null,
+      2,
     );
+    const redacted = redactSecrets(serialized, entry.req.apiKey);
+    const flags =
+      constants.O_WRONLY |
+      constants.O_CREAT |
+      constants.O_EXCL |
+      (constants.O_NOFOLLOW ?? 0);
+    const fd = openSync(file, flags, 0o600);
+    try {
+      writeFileSync(fd, redacted, 'utf8');
+    } finally {
+      closeSync(fd);
+    }
   } catch {
     // A debug dump must never fail the model call.
   }

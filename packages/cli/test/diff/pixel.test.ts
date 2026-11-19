@@ -54,7 +54,8 @@ describe('compareScreenshot', () => {
 
     // 50×50 inside 100×100 leaves most of the canvas as padding, over the 10% budget.
     expect(result.status).toBe('regression');
-    expect(result.error).toContain('Dimension mismatch');
+    expect(result.dimensionNote).toContain('Dimension mismatch');
+    expect(result.error).toBeUndefined();
     expect(result.diffPercentage).toBeGreaterThan(10);
   });
 
@@ -383,7 +384,8 @@ describe('pixelmatch 8 color metric and window gate', () => {
     const current = fillPng(100, 101, 255, 0, 0);
     const result = compareScreenshot(makeScreenshot(PNG.sync.write(current)), PNG.sync.write(baseline), 0.1);
 
-    expect(result.error).toContain('Dimension mismatch');
+    expect(result.dimensionNote).toContain('Dimension mismatch');
+    expect(result.error).toBeUndefined();
     expect(result.diffPercentage).toBeLessThan(10);
     expect(result.status).not.toBe('regression');
   });

@@ -10,8 +10,9 @@
  * @module render/stability
  */
 
-import { PNG } from 'pngjs';
+import type { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
+import { readPngSafe } from '../diff/png-safe.js';
 import { extractDiffClusters, type DiffCluster } from '../diff/regions.js';
 
 export interface StabilityOptions {
@@ -69,8 +70,8 @@ export function compareConsecutiveFrames(
   let prevPng: PNG;
   let currPng: PNG;
   try {
-    prevPng = PNG.sync.read(previousBuffer);
-    currPng = PNG.sync.read(currentBuffer);
+    prevPng = readPngSafe(previousBuffer);
+    currPng = readPngSafe(currentBuffer);
   } catch {
     // Non-PNG buffers (e.g., synthetic mock buffers in unit tests) fall back to byte comparison
     return {

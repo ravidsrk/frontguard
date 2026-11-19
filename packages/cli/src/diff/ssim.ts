@@ -12,7 +12,8 @@
  * @module diff/ssim
  */
 
-import { PNG } from 'pngjs';
+import type { PNG } from 'pngjs';
+import { readPngSafe } from './png-safe.js';
 import type { BoundingBox } from './regions.js';
 
 // ---------------------------------------------------------------------------
@@ -39,8 +40,8 @@ export interface RegionSimilarityMetrics {
  * @returns A value between 0 (completely different) and 1 (identical)
  */
 export function computeSSIM(img1: Buffer, img2: Buffer): number {
-  const png1 = PNG.sync.read(img1);
-  const png2 = PNG.sync.read(img2);
+  const png1 = readPngSafe(img1);
+  const png2 = readPngSafe(img2);
 
   if (png1.width !== png2.width || png1.height !== png2.height) {
     return 0; // Different dimensions = completely different
@@ -94,8 +95,8 @@ export function computeSSIM(img1: Buffer, img2: Buffer): number {
  * @returns A value between 0 (completely different) and 1 (identical)
  */
 export function computeChromaSSIM(img1: Buffer, img2: Buffer): number {
-  const png1 = PNG.sync.read(img1);
-  const png2 = PNG.sync.read(img2);
+  const png1 = readPngSafe(img1);
+  const png2 = readPngSafe(img2);
 
   if (png1.width !== png2.width || png1.height !== png2.height) {
     return 0;

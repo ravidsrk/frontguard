@@ -1,5 +1,5 @@
 /**
- * Reads Frontguard cloud credentials from the process environment.
+ * Reads and validates Frontguard cloud credentials from the process environment.
  *
  * The MCP server starts cleanly on stdio even without an API key — the SDK
  * is supposed to advertise its tools first and only fail when a tool is
@@ -13,6 +13,8 @@ export interface FrontguardAuth {
   apiKey: string;
   apiUrl: string;
 }
+
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
 /**
  * Thrown by tool handlers when {@link FRONTGUARD_API_KEY} is missing.
@@ -43,6 +45,45 @@ export class MissingApiUrlError extends Error {
   }
 }
 
+/** Thrown when {@link FRONTGUARD_API_URL} uses an unsafe scheme or malformed syntax. */
+export class InvalidApiUrlError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidApiUrlError';
+  }
+}
+
+/**
+ * Validate a Cloud API base URL: require `https:` (permitting `http:` only for
+ * loopback hosts `localhost`, `127.0.0.1`, `::1`), reject embedded credentials,
+ * and strip trailing slashes.
+ */
+export function validateCloudApiUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new InvalidApiUrlError(
+      'FRONTGUARD_API_URL is not a valid URL. Use an https:// URL (or http://localhost:<port> for local dev).',
+    );
+  }
+  if (parsed.username || parsed.password) {
+    throw new InvalidApiUrlError(
+      'FRONTGUARD_API_URL must not contain embedded userinfo credentials. Pass credentials via FRONTGUARD_API_KEY instead.',
+    );
+  }
+  const isHttps = parsed.protocol === 'https:';
+  const isLoopbackHttp =
+    parsed.protocol === 'http:' && LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase());
+  if (!isHttps && !isLoopbackHttp) {
+    throw new InvalidApiUrlError(
+      `Refusing insecure FRONTGUARD_API_URL (${parsed.protocol}//${parsed.host}): use https:// (http:// is allowed only for localhost/loopback).`,
+    );
+  }
+  return trimmed.replace(/\/+$/, '');
+}
+
 /**
  * Resolve auth from `process.env`. Throws {@link MissingApiKeyError} when
  * `FRONTGUARD_API_KEY` is empty/unset. Tool handlers call this lazily so
@@ -57,5 +98,5 @@ export function requireAuth(env: NodeJS.ProcessEnv = process.env): FrontguardAut
   if (!apiUrl) {
     throw new MissingApiUrlError();
   }
-  return { apiKey, apiUrl: apiUrl.replace(/\/+$/, '') };
+  return { apiKey, apiUrl: validateCloudApiUrl(apiUrl) };
 }

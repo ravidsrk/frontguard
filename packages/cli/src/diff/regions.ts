@@ -289,33 +289,58 @@ export function extractDiffClusters(
     (c) => c.rawDiffPixels >= minPixels,
   );
 
-  // --- Step 4: Iterative AABB proximity merging ----------------------------
-  let merged = true;
-  while (merged && list.length > 1) {
-    merged = false;
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const a = list[i];
+  // --- Step 4: Sweep-line + Union-Find AABB proximity merging --------------
+  while (list.length > 1) {
+    list.sort((a, b) => a.minX - b.minX);
+    const n = list.length;
+    const uf = new Int32Array(n);
+    for (let i = 0; i < n; i++) uf[i] = i;
+    const findRoot = (x: number): number => {
+      let r = x;
+      while (uf[r] !== r) r = uf[r];
+      let c = x;
+      while (c !== r) {
+        const nxt = uf[c];
+        uf[c] = r;
+        c = nxt;
+      }
+      return r;
+    };
+    let anyMerged = false;
+    for (let i = 0; i < n; i++) {
+      const a = list[i];
+      const maxReachX = a.maxX + mergeMargin;
+      for (let j = i + 1; j < n; j++) {
         const b = list[j];
-        const overlapsX =
-          a.minX - mergeMargin <= b.maxX && a.maxX + mergeMargin >= b.minX;
-        const overlapsY =
-          a.minY - mergeMargin <= b.maxY && a.maxY + mergeMargin >= b.minY;
-
-        if (overlapsX && overlapsY) {
-          a.minX = Math.min(a.minX, b.minX);
-          a.minY = Math.min(a.minY, b.minY);
-          a.maxX = Math.max(a.maxX, b.maxX);
-          a.maxY = Math.max(a.maxY, b.maxY);
-          a.rawDiffPixels += b.rawDiffPixels;
-          a.perimeterPixels += b.perimeterPixels;
-          list.splice(j, 1);
-          merged = true;
-          break;
+        if (b.minX > maxReachX) break;
+        if (a.minY - mergeMargin <= b.maxY && a.maxY + mergeMargin >= b.minY) {
+          const ra = findRoot(i);
+          const rb = findRoot(j);
+          if (ra !== rb) {
+            uf[rb] = ra;
+            anyMerged = true;
+          }
         }
       }
-      if (merged) break;
     }
+    if (!anyMerged) break;
+    const grouped = new Map<number, RawClusterAccum>();
+    for (let i = 0; i < n; i++) {
+      const r = findRoot(i);
+      const cur = list[i];
+      const acc = grouped.get(r);
+      if (!acc) {
+        grouped.set(r, { ...cur });
+      } else {
+        if (cur.minX < acc.minX) acc.minX = cur.minX;
+        if (cur.minY < acc.minY) acc.minY = cur.minY;
+        if (cur.maxX > acc.maxX) acc.maxX = cur.maxX;
+        if (cur.maxY > acc.maxY) acc.maxY = cur.maxY;
+        acc.rawDiffPixels += cur.rawDiffPixels;
+        acc.perimeterPixels += cur.perimeterPixels;
+      }
+    }
+    list = Array.from(grouped.values());
   }
 
   // Sort by rawDiffPixels descending (deterministic tie-breaker by minY, minX)

@@ -549,7 +549,7 @@ export function incompleteAnalysisReason(input: {
     sources.add(resolve(file));
   }
   for (const file of sources) {
-    const missing = unresolvedRelativeImports(file);
+    const missing = unresolvedRelativeImports(file, input.projectDir);
     if (missing.length === 0) continue;
     return `unresolved import ${missing[0]} in ${toProjectRelative(file, input.projectDir)} — rendering all routes`;
   }

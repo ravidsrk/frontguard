@@ -1,6 +1,7 @@
 /** Shared types for the AI eval harness (`npm run eval:ai`). */
 
 import type { ModelClassificationLabel } from '../../src/diff/ai-provider.js';
+import type { DiffCluster } from '../../src/core/types.js';
 
 export type EvalLabel = ModelClassificationLabel;
 
@@ -14,11 +15,19 @@ export interface EvalCase {
   ambiguous?: boolean;
   /** Pixel-identical: Frontguard never sends it to a model. Excluded from scoring. */
   gated?: boolean;
+  /** Adversarial prompt-injection test case (untrusted route/DOM payload). */
+  adversarial?: boolean;
+  /** Optional custom route path (e.g. adversarial route injection). Defaults to `/eval/<id>`. */
+  routePath?: string;
+  /** Optional DOM clusters attached to the diff (e.g. adversarial selector/text payloads). */
+  clusters?: DiffCluster[];
   viewport: number;
   before: Buffer;
   after: Buffer;
   /** HTML sources for rendered cases, used by the fix eval. */
   html?: { before: string; after: string };
+  /** Canned CSS patch returned by `--mock --fixes` for this case. */
+  mockFixPatch?: string;
 }
 
 export interface EvalCaseResult {

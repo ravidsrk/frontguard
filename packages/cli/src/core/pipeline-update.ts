@@ -19,9 +19,11 @@ import { renderPages } from '../render/playwright.js';
 import { overflowReports } from '../render/horizontal-overflow.js';
 import { createNewPageResult } from '../diff/pixel.js';
 import { GitOrphanStorage } from '../storage/git-orphan.js';
+import type { PendingTextSnapshot } from '../plugins/text-snapshot.js';
 import { logger } from '../utils/logger.js';
 import { timed } from './pipeline-batch.js';
 import { discoverAllRoutes } from './pipeline-discover.js';
+import { UnreachableBaseUrlError, isUnreachableHostError } from './pipeline-errors.js';
 import { buildResult } from './pipeline-result.js';
 
 /**
@@ -57,7 +59,11 @@ async function writeUpdatedBaselines(
   let routes: Route[];
   try {
     routes = await discoverAllRoutes(config);
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (isUnreachableHostError(msg)) {
+      throw new UnreachableBaseUrlError(config.baseUrl, err);
+    }
     routes = [{ path: '/', label: 'Home', discoveredVia: 'config' }];
   }
 
@@ -115,154 +121,174 @@ async function writeUpdatedBaselines(
     if (Array.isArray(stored) && stored.length > 0) baselineA11y = stored as AccessibilityResult[];
   }
 
-  if (!baselineBlock) {
-    const textPlugin = config.plugins?.find((p) => p.name === 'text-snapshot');
-    if (textPlugin) {
-      const mgr = new PluginManager();
-      mgr.register(textPlugin);
-      const md = new Map<string, unknown>();
-      md.set('tw', true);
-      const textCtx = { config, logger, metadata: md };
-      try {
+  try {
+    if (!baselineBlock) {
+      const textPlugin = config.plugins?.find((p) => p.name === 'text-snapshot');
+      if (textPlugin) {
+        const mgr = new PluginManager();
+        mgr.register(textPlugin);
+        const md = new Map<string, unknown>();
+        md.set('tw', true);
+        md.set('text-snapshot:batch-writes', true);
+        const textCtx = { config, logger, metadata: md };
+        textDone = { manager: mgr, ctx: textCtx };
         await mgr.setup(textCtx);
         await mgr.runHook('afterRender', shots, textCtx);
-        textDone = { manager: mgr, ctx: textCtx };
-      } finally {
-        await mgr.teardown();
       }
-    }
+      const pendingTextFiles =
+        (textDone?.ctx.metadata.get('text-snapshot:pending') as
+          | PendingTextSnapshot[]
+          | undefined) ?? [];
 
-    // Init storage and write all baselines
-    const writeSpan = trace.start('frontguard.baseline_write');
-    rp.onStageStart('compare', 'Writing baselines…');
-    const writeStart = performance.now();
-    const storage = new GitOrphanStorage(process.cwd(), { mode: 'update' });
-    await storage.init();
+      // Init storage and write all baselines
+      const writeSpan = trace.start('frontguard.baseline_write');
+      rp.onStageStart('compare', 'Writing baselines…');
+      const writeStart = performance.now();
+      const storage = new GitOrphanStorage(process.cwd(), { mode: 'update' });
+      await storage.init();
 
-    let written = 0;
-    let writeFailures = 0;
-    const writtenScreenshots: ScreenshotResult[] = [];
+      let written = 0;
+      let writeFailures = 0;
+      const writtenScreenshots: ScreenshotResult[] = [];
 
-    const isMockFn = (fn: unknown): boolean =>
-      typeof fn === 'function' && ('mock' in fn || '_isMockFunction' in fn);
-    const useBatchWrite =
-      typeof storage.writeBaselines === 'function' &&
-      (isMockFn(storage.writeBaselines) || !isMockFn(storage.writeBaseline));
+      const isMockFn = (fn: unknown): boolean =>
+        typeof fn === 'function' && ('mock' in fn || '_isMockFunction' in fn);
+      const useBatchWrite =
+        typeof storage.writeBaselines === 'function' &&
+        (isMockFn(storage.writeBaselines) || !isMockFn(storage.writeBaseline));
 
-    if (useBatchWrite) {
-      const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
-      const manifest = stampBaselineManifest(existing, shots, config.colorScheme);
-
-      try {
-        await storage.writeBaselines(
-          shots.map((shot) => {
-            const rawShotMode = shot.mode ?? shot.route.mode;
-            const shotMode = typeof rawShotMode === 'string' ? rawShotMode.trim() : '';
-            const hasNamedShotMode = shotMode.length > 0 && shotMode !== 'default';
-            return {
-              route: shot.route.path,
-              viewport: shot.viewport,
-              browser: shot.browser,
-              ...(hasNamedShotMode ? { mode: shotMode } : {}),
-              buffer: shot.buffer,
-            };
-          }),
-          manifest,
-        );
-        for (const shot of shots) {
-          written++;
-          writtenScreenshots.push(shot);
-          rp.onStageProgress(
-            'compare',
-            written,
-            shots.length,
-            `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
-          );
-        }
-      } catch (err) {
-        writeFailures = shots.length;
-        logger.error(
-          `Failed to write baselines: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-    } else {
-      for (const shot of shots) {
-        try {
+      if (useBatchWrite) {
+        const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
+        const manifest = stampBaselineManifest(existing, shots, config.colorScheme);
+        const entries = shots.map((shot) => {
           const rawShotMode = shot.mode ?? shot.route.mode;
           const shotMode = typeof rawShotMode === 'string' ? rawShotMode.trim() : '';
-          if (shotMode.length > 0 && shotMode !== 'default') {
-            await storage.writeBaseline(
-              shot.route.path,
-              shot.viewport,
-              shot.browser,
-              shot.buffer,
-              shotMode,
-            );
+          const hasNamedShotMode = shotMode.length > 0 && shotMode !== 'default';
+          return {
+            route: shot.route.path,
+            viewport: shot.viewport,
+            browser: shot.browser,
+            ...(hasNamedShotMode ? { mode: shotMode } : {}),
+            buffer: shot.buffer,
+          };
+        });
+
+        try {
+          if (pendingTextFiles.length > 0) {
+            await storage.writeBaselines(entries, manifest, pendingTextFiles);
           } else {
-            await storage.writeBaseline(
-              shot.route.path,
-              shot.viewport,
-              shot.browser,
-              shot.buffer,
+            await storage.writeBaselines(entries, manifest);
+          }
+          for (const shot of shots) {
+            written++;
+            writtenScreenshots.push(shot);
+            rp.onStageProgress(
+              'compare',
+              written,
+              shots.length,
+              `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
             );
           }
-          written++;
-          writtenScreenshots.push(shot);
-
-          rp.onStageProgress(
-            'compare',
-            written,
-            shots.length,
-            `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
-          );
         } catch (err) {
-          writeFailures++;
+          writeFailures = shots.length;
           logger.error(
-            `Failed to write baseline for ${shot.route.path}: ${err instanceof Error ? err.message : String(err)}`,
+            `Failed to write baselines: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
+      } else {
+        for (const shot of shots) {
+          try {
+            const rawShotMode = shot.mode ?? shot.route.mode;
+            const shotMode = typeof rawShotMode === 'string' ? rawShotMode.trim() : '';
+            if (shotMode.length > 0 && shotMode !== 'default') {
+              await storage.writeBaseline(
+                shot.route.path,
+                shot.viewport,
+                shot.browser,
+                shot.buffer,
+                shotMode,
+              );
+            } else {
+              await storage.writeBaseline(
+                shot.route.path,
+                shot.viewport,
+                shot.browser,
+                shot.buffer,
+              );
+            }
+            written++;
+            writtenScreenshots.push(shot);
+
+            rp.onStageProgress(
+              'compare',
+              written,
+              shots.length,
+              `${shot.route.path} @ ${shot.viewport}px [${shot.browser}]`,
+            );
+          } catch (err) {
+            writeFailures++;
+            logger.error(
+              `Failed to write baseline for ${shot.route.path}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        }
+
+        const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
+        const manifest = stampBaselineManifest(existing, writtenScreenshots, config.colorScheme);
+        await storage.writeManifest(manifest);
+
+        if (writeFailures === 0) {
+          for (const item of pendingTextFiles) {
+            await storage.textFile(
+              item.route,
+              item.viewport,
+              item.browser,
+              item.suffix,
+              item.body,
+              item.mode,
+            );
+          }
+        }
+      }
+      timing.compare = Math.round(performance.now() - writeStart);
+
+      if (writeFailures > 0) {
+        writeSpan.end('error', { 'frontguard.shots': written });
+        rp.onStageComplete(
+          'compare',
+          `Failed to write ${writeFailures} of ${shots.length} baseline${shots.length === 1 ? '' : 's'}`,
+        );
+        throw new Error(
+          `Failed to write ${writeFailures} of ${shots.length} baseline${shots.length === 1 ? '' : 's'}`,
+        );
       }
 
-      const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
-      const manifest = stampBaselineManifest(existing, writtenScreenshots, config.colorScheme);
-      await storage.writeManifest(manifest);
-    }
-    timing.compare = Math.round(performance.now() - writeStart);
-
-    if (writeFailures > 0) {
-      writeSpan.end('error', { 'frontguard.shots': written });
-      rp.onStageComplete(
-        'compare',
-        `Failed to write ${writeFailures} of ${shots.length} baseline${shots.length === 1 ? '' : 's'}`,
-      );
-      throw new Error(
-        `Failed to write ${writeFailures} of ${shots.length} baseline${shots.length === 1 ? '' : 's'}`,
-      );
+      writeSpan.end('ok', { 'frontguard.shots': written });
+      rp.onStageComplete('compare', `Wrote ${written} baseline(s)`);
+      logger.info(`✅ Updated ${written} baseline(s) successfully`);
+      logger.info('To share these baselines with CI, run: git push origin frontguard-baselines');
     }
 
-    writeSpan.end('ok', { 'frontguard.shots': written });
-    rp.onStageComplete('compare', `Wrote ${written} baseline(s)`);
-    logger.info(`✅ Updated ${written} baseline(s) successfully`);
-    logger.info('To share these baselines with CI, run: git push origin frontguard-baselines');
+    timing.total = Math.round(performance.now() - totalStart);
+    const hx = await overflowReports(shots);
+    const result = {
+      ...buildResult(
+        shots.map((shot) => createNewPageResult(shot)),
+        timing,
+        totalStart,
+        config,
+      ),
+      ...(baselineBlock ? { baselineRefusal: baselineBlock } : { baselineUpdate: true }),
+      ...(baselineA11y ? { accessibility: baselineA11y } : {}),
+      ...(hx.length > 0 ? { horizontalOverflow: hx } : {}),
+    };
+    if (textDone) await textDone.manager.runHook('afterRun', result, textDone.ctx);
+    rp.onStageStart('report', 'Generating baseline update report…');
+    await rp.onComplete(result);
+    rp.onStageComplete('report', 'Done');
+    if (baselineBlock) throw new Error(baselineBlock);
+    return result;
+  } finally {
+    if (textDone) await textDone.manager.teardown();
   }
-
-  timing.total = Math.round(performance.now() - totalStart);
-  const hx = await overflowReports(shots);
-  const result = {
-    ...buildResult(
-      shots.map((shot) => createNewPageResult(shot)),
-      timing,
-      totalStart,
-      config,
-    ),
-    ...(baselineBlock ? { baselineRefusal: baselineBlock } : { baselineUpdate: true }),
-    ...(baselineA11y ? { accessibility: baselineA11y } : {}),
-    ...(hx.length > 0 ? { horizontalOverflow: hx } : {}),
-  };
-  if (textDone) await textDone.manager.runHook('afterRun', result, textDone.ctx);
-  rp.onStageStart('report', 'Generating baseline update report…');
-  await rp.onComplete(result);
-  rp.onStageComplete('report', 'Done');
-  if (baselineBlock) throw new Error(baselineBlock);
-  return result;
 }

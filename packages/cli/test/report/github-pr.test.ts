@@ -387,9 +387,16 @@ describe('GitHubPRReporter', () => {
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(firstPage), { status: 200 }))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify([{ id: 101, body: '<!-- frontguard-report -->' }]), {
-          status: 200,
-        }),
+        new Response(
+          JSON.stringify([
+            {
+              id: 101,
+              body: '<!-- frontguard-report -->',
+              user: { login: 'github-actions[bot]', type: 'Bot' },
+            },
+          ]),
+          { status: 200 },
+        ),
       )
       .mockResolvedValueOnce(new Response('', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);

@@ -8,21 +8,25 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { parseBaselineManifest } from '../core/fingerprint.js';
-import type { BaselineManifest, RouteEntry } from '../core/types.js';
+import { resolveRouteModes } from '../core/config.js';
+import { isNamedMode, parseBaselineManifest } from '../core/fingerprint.js';
+import type { BaselineManifest, CaptureModeConfig, RouteEntry } from '../core/types.js';
 import { baselineStoragePath } from './git-orphan.js';
 
 const GIT_MAX_BUFFER = 64 * 1024 * 1024;
 const BRANCH = 'frontguard-baselines';
+const VALID_BROWSERS = new Set(['chromium', 'firefox', 'webkit']);
+const SAFE_MODE_RE = /^[a-zA-Z0-9_-]+$/;
 
 export interface PruneShot {
   route: string;
   viewport: number;
   browser: string;
+  mode?: string;
   sha256: string;
 }
 
@@ -53,53 +57,61 @@ export interface PrunePlan {
   unreachableApprovalHashes: string[];
 }
 
-export function targetKey(shot: Pick<PruneShot, 'route' | 'viewport' | 'browser'>): string {
-  return `${shot.route}\0${shot.viewport}\0${shot.browser}`;
+export function targetKey(shot: Pick<PruneShot, 'route' | 'viewport' | 'browser' | 'mode'>): string {
+  const mode = isNamedMode(shot.mode) ? shot.mode.trim() : '';
+  return mode
+    ? `${shot.route}\0${shot.viewport}\0${mode}\0${shot.browser}`
+    : `${shot.route}\0${shot.viewport}\0${shot.browser}`;
+}
+
+export function parseSnapshotKey(
+  key: string,
+): { viewport: number; browser: string; mode?: string } | null {
+  const parts = key.split('/');
+  if (parts.length !== 2 && parts.length !== 3) return null;
+  const viewport = Number(parts[0]);
+  if (!Number.isInteger(viewport) || viewport <= 0) return null;
+  if (parts.length === 2) {
+    const browser = parts[1]!;
+    return VALID_BROWSERS.has(browser) ? { viewport, browser } : null;
+  }
+  const mode = parts[1]!;
+  const browser = parts[2]!;
+  if (!SAFE_MODE_RE.test(mode) || !VALID_BROWSERS.has(browser)) return null;
+  return { viewport, browser, ...(isNamedMode(mode) ? { mode } : {}) };
 }
 
 /**
- * Declared shots are the config's routes crossed with effective viewports and
- * browsers. A path selected twice unions explicit widths. An entry with no
- * override also keeps the global widths. An empty global list with no
+ * Declared shots are the config's routes crossed with effective viewports,
+ * modes, and browsers. A path selected twice unions explicit widths. An entry
+ * with no override also keeps the global widths. An empty global list with no
  * explicit widths is incomplete, so nothing is declared.
  */
 export function declaredTargetKeys(config: {
   routes?: readonly RouteEntry[];
   viewports: readonly number[];
   browsers: readonly string[];
+  modes?: Record<string, CaptureModeConfig>;
 }): { keys: Set<string>; complete: boolean } {
   const entries = config.routes ?? [];
   if (entries.length === 0 || config.browsers.length === 0) {
     return { keys: new Set(), complete: false };
   }
 
-  const groups = new Map<string, RouteEntry[]>();
+  const keys = new Set<string>();
   for (const entry of entries) {
     const path = typeof entry === 'string' ? entry : entry.path;
-    const list = groups.get(path) ?? [];
-    list.push(entry);
-    groups.set(path, list);
-  }
-
-  const keys = new Set<string>();
-  for (const [path, group] of groups) {
-    let usesGlobal = false;
-    const explicit = new Set<number>();
-    for (const entry of group) {
-      if (typeof entry === 'string' || !entry.viewport || entry.viewport.length === 0) {
-        usesGlobal = true;
-      } else {
-        for (const width of entry.viewport) explicit.add(width);
-      }
-    }
-    if (usesGlobal) {
-      if (config.viewports.length === 0) return { keys: new Set(), complete: false };
-      for (const width of config.viewports) explicit.add(width);
-    }
-    if (explicit.size === 0) return { keys: new Set(), complete: false };
-    for (const width of explicit) {
-      for (const browser of config.browsers) {
-        keys.add(targetKey({ route: path, viewport: width, browser }));
+    const widths =
+      typeof entry === 'string' || !entry.viewport || entry.viewport.length === 0
+        ? config.viewports
+        : entry.viewport;
+    if (widths.length === 0) return { keys: new Set(), complete: false };
+    const modes = resolveRouteModes(entry, config.modes);
+    for (const width of widths) {
+      for (const mode of modes) {
+        for (const browser of config.browsers) {
+          keys.add(targetKey({ route: path, viewport: width, browser, mode: mode.name }));
+        }
       }
     }
   }
@@ -138,17 +150,23 @@ export function shotsFromManifest(manifest: BaselineManifest | null): PruneShot[
     const snapshots = info?.snapshots;
     if (snapshots && Object.keys(snapshots).length > 0) {
       for (const [key, snapshot] of Object.entries(snapshots)) {
-        const slash = key.indexOf('/');
-        if (slash <= 0) continue;
-        const viewport = Number(key.slice(0, slash));
-        const browser = key.slice(slash + 1);
-        if (!Number.isInteger(viewport) || browser.length === 0 || !snapshot?.sha256) continue;
-        shots.push({ route, viewport, browser, sha256: snapshot.sha256 });
+        const parsed = parseSnapshotKey(key);
+        if (!parsed || !snapshot?.sha256) continue;
+        shots.push({
+          route,
+          viewport: parsed.viewport,
+          browser: parsed.browser,
+          ...(parsed.mode ? { mode: parsed.mode } : {}),
+          sha256: snapshot.sha256,
+        });
       }
       continue;
     }
-    const browsers = info?.browsers?.length ? info.browsers : ['chromium'];
+    const browsers = (info?.browsers?.length ? info.browsers : ['chromium']).filter((b) =>
+      VALID_BROWSERS.has(b),
+    );
     for (const viewport of info?.viewports ?? []) {
+      if (!Number.isInteger(viewport) || viewport <= 0) continue;
       for (const browser of browsers) {
         shots.push({ route, viewport, browser, sha256: info?.sha256 ?? '' });
       }
@@ -182,19 +200,20 @@ export function manifestWithoutStaleShots<T extends BaselineManifest>(
     }
     const snapshots = { ...originalSnapshots };
     for (const key of Object.keys(snapshots)) {
-      const slash = key.indexOf('/');
-      if (slash <= 0) continue;
-      const viewport = Number(key.slice(0, slash));
-      const browser = key.slice(slash + 1);
-      if (staleKeys.has(targetKey({ route, viewport, browser }))) delete snapshots[key];
+      const parsed = parseSnapshotKey(key);
+      if (!parsed) continue;
+      if (staleKeys.has(targetKey({ route, ...parsed }))) delete snapshots[key];
     }
     const remaining = Object.entries(snapshots);
     if (remaining.length === 0) {
       delete routes[route];
       continue;
     }
-    const viewports = [...new Set(remaining.map(([key]) => Number(key.slice(0, key.indexOf('/')))))];
-    const browsers = [...new Set(remaining.map(([key]) => key.slice(key.indexOf('/') + 1)))];
+    const parsedRemaining = remaining
+      .map(([key]) => parseSnapshotKey(key))
+      .filter((p): p is NonNullable<typeof p> => p !== null);
+    const viewports = [...new Set(parsedRemaining.map((p) => p.viewport))];
+    const browsers = [...new Set(parsedRemaining.map((p) => p.browser))];
     const shaStillPresent = remaining.some(([, snapshot]) => snapshot.sha256 === info.sha256);
     routes[route] = {
       ...info,
@@ -390,7 +409,8 @@ export function formatPrunePlan(plan: PrunePlan, apply: boolean): string {
   else {
     lines.push('Stale shots removed from the tip:');
     for (const shot of plan.staleShots) {
-      lines.push(`  ${shot.route} ${shot.viewport} ${shot.browser} ${shot.sha256}`);
+      const modeTag = shot.mode ? ` (${shot.mode})` : '';
+      lines.push(`  ${shot.route} ${shot.viewport}${modeTag} ${shot.browser} ${shot.sha256}`);
     }
   }
 
@@ -482,7 +502,10 @@ export function staleFilesToDelete(
 }
 
 function storagePath(shot: PruneShot): string {
-  return baselineStoragePath(shot.route, shot.viewport, shot.browser as 'chromium');
+  if (!VALID_BROWSERS.has(shot.browser)) {
+    throw new Error(`Invalid baseline browser in prune plan: "${shot.browser}"`);
+  }
+  return baselineStoragePath(shot.route, shot.viewport, shot.browser as 'chromium', shot.mode);
 }
 
 function showOptional(repoDir: string, spec: string): string | null {
@@ -675,6 +698,7 @@ function removeStaleShots(
 ): void {
   if (stale.length === 0) return;
   const scratch = mkdtempSync(join(tmpdir(), 'frontguard-prune-'));
+  chmodSync(scratch, 0o700);
   const worktree = join(scratch, 'wt');
   gitText(repoDir, ['worktree', 'add', '--detach', worktree, expectedTip]);
   try {
@@ -686,11 +710,22 @@ function removeStaleShots(
     const tipShots = shotsFromManifest(manifest);
     const staleKeys = new Set(stale.map((shot) => targetKey(shot)));
     const retained = tipShots.filter((shot) => !staleKeys.has(targetKey(shot)));
+    const baselinesRoot = resolve(worktree, 'baselines');
+    const assertUnderBaselines = (relPath: string): void => {
+      const full = resolve(worktree, relPath);
+      const rel = relative(baselinesRoot, full);
+      if (!rel || rel.startsWith(`..${sep}`) || rel === '..' || rel.includes('\0')) {
+        throw new Error(`Refusing to delete path outside baselines/: ${relPath}`);
+      }
+    };
     for (const shot of staleFilesToDelete(stale, retained)) {
       const png = storagePath(shot);
+      assertUnderBaselines(png);
       gitText(worktree, ['rm', '-f', '--ignore-unmatch', '--', png]);
       for (const suffix of ['.aria.txt', '.json', '.md']) {
-        gitText(worktree, ['rm', '-f', '--ignore-unmatch', '--', png.replace(/\.png$/, suffix)]);
+        const sibling = png.replace(/\.png$/, suffix);
+        assertUnderBaselines(sibling);
+        gitText(worktree, ['rm', '-f', '--ignore-unmatch', '--', sibling]);
       }
     }
     const next = manifestWithoutStaleShots(manifest, stale);

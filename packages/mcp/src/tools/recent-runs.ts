@@ -11,16 +11,19 @@ import { z } from 'zod';
 import type { CloudClient, CloudRun } from '../client/cloud.js';
 import { isRegressionResult } from './_regression.js';
 import { matchesRepo } from './_runs.js';
+import { capSingleLine, MAX_LABEL_LENGTH, MAX_URL_LENGTH } from './_sanitize.js';
 
 export const recentRunsInputSchema = {
   repo: z
     .string()
     .min(1)
+    .max(256)
     .optional()
     .describe('Optional `owner/name` filter.'),
   branch: z
     .string()
     .min(1)
+    .max(256)
     .optional()
     .describe(
       'Optional branch hint. Matched against the commit SHA (prefix) or PR number — the cloud-api does not yet track branch directly, so this is best-effort.',
@@ -107,19 +110,19 @@ export async function recentRuns(
   return {
     count: filtered.length,
     runs: filtered.map((r) => ({
-      runId: r.id,
+      runId: capSingleLine(r.id, MAX_LABEL_LENGTH),
       status: r.status,
-      url: r.url,
+      url: capSingleLine(r.url, MAX_URL_LENGTH),
       createdAt: r.createdAt,
       completedAt: r.completedAt,
       durationMs: r.duration,
       routesCount: r.routes?.length ?? 0,
       regressionsCount: regressionsCount(r),
       baselinesApproved: Boolean(r.baselinesApproved),
-      reportUrl: r.reportUrl,
-      repo: r.github ? `${r.github.owner}/${r.github.repo}` : undefined,
+      reportUrl: r.reportUrl ? capSingleLine(r.reportUrl, MAX_URL_LENGTH) : null,
+      repo: r.github ? capSingleLine(`${r.github.owner}/${r.github.repo}`, MAX_LABEL_LENGTH) : undefined,
       prNumber: r.github?.prNumber,
-      commitSha: r.github?.commitSha,
+      commitSha: r.github?.commitSha ? capSingleLine(r.github.commitSha, MAX_LABEL_LENGTH) : undefined,
     })),
   };
 }

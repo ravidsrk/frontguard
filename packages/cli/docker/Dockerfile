@@ -97,13 +97,17 @@ RUN npm install -g /opt/frontguard/frontguard-cli.tgz \
 # Workspace: the user mounts their repo at /workspace and the renderer reads
 # their frontguard.config.{ts,js,json} from CWD.
 # -----------------------------------------------------------------------------
+RUN mkdir -p /workspace && chown pwuser:pwuser /workspace
 WORKDIR /workspace
 
 # Render-time env defaults: disable telemetry inside the image (CI/build
 # contexts shouldn't beacon home), and reduce Playwright render variation.
 ENV FRONTGUARD_TELEMETRY=0 \
+    FRONTGUARD_CHROMIUM_NO_SANDBOX=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     NODE_ENV=production
+
+USER pwuser
 
 ENTRYPOINT ["frontguard"]
 CMD ["run"]

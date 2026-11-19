@@ -10,7 +10,6 @@
  * @module sandbox/verify-fix
  */
 
-import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
 import type {
   DiffResult,
@@ -21,6 +20,9 @@ import type {
 import type { Sandbox } from './types.js';
 import { LocalSandbox } from './local.js';
 import { DaytonaSandbox } from './daytona.js';
+import { assertSafeCssPatch } from './css-sanitize.js';
+import { readPngSafe } from '../diff/png-safe.js';
+import { pageUrl } from '../discovery/story-url.js';
 import { logger } from '../utils/logger.js';
 import { compareDiffToThreshold } from '../diff/threshold.js';
 
@@ -35,8 +37,8 @@ export function createSandbox(kind: 'local' | 'daytona'): Sandbox {
  */
 export function diffPercentageBetween(a: Buffer, b: Buffer): number {
   try {
-    const imgA = PNG.sync.read(a);
-    const imgB = PNG.sync.read(b);
+    const imgA = readPngSafe(a);
+    const imgB = readPngSafe(b);
     if (imgA.width !== imgB.width || imgA.height !== imgB.height) return 100;
     const total = imgA.width * imgA.height;
     if (total === 0) return 100;
@@ -81,9 +83,12 @@ export async function verifyFix(
 
   const requestedKind = opts.sandbox ?? 'local';
   let sandbox = opts.sandboxImpl ?? createSandbox(requestedKind);
-  const url = new URL(diff.route.path, opts.baseUrl).href;
 
   try {
+    const url = pageUrl(opts.baseUrl, diff.route.path, diff.route.discoveredVia);
+    if (fix.fixType === 'css') {
+      assertSafeCssPatch(fix.patch);
+    }
     try {
       await sandbox.create();
     } catch (createErr) {

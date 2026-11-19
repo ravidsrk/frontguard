@@ -170,6 +170,7 @@ export async function analyzeWithAI(
       baseUrl: config.baseUrl,
       maxOutputTokens: config.maxOutputTokens,
       timeoutMs: config.timeoutMs,
+      allowFallback: config.allowFallback,
       label: `analyze ${diff.route.path} @${diff.viewport}`,
     },
     {

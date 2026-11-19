@@ -21,6 +21,7 @@ import { PNG } from 'pngjs';
 import { PIXELMATCH_OPTIONS } from '../core/fingerprint.js';
 import { compareDiffToThreshold } from './threshold.js';
 import type { ScreenshotResult, DiffResult, DiffCluster } from '../core/types.js';
+import { readPngSafe } from './png-safe.js';
 import { computeSSIM, computeRegionSimilarity } from './ssim.js';
 import { extractDiffClusters, attributeClustersToDom } from './regions.js';
 import { logger } from '../utils/logger.js';
@@ -97,7 +98,7 @@ export function compareScreenshot(
   let bp: PNG;
 
   try {
-    cp = PNG.sync.read(current.buffer);
+    cp = readPngSafe(current.buffer);
   } catch (err) {
     return errorResult(
       current,
@@ -106,7 +107,7 @@ export function compareScreenshot(
   }
 
   try {
-    bp = PNG.sync.read(baseline);
+    bp = readPngSafe(baseline);
   } catch (err) {
     return errorResult(
       current,
@@ -126,11 +127,7 @@ export function compareScreenshot(
       `Dimension mismatch: current=${cp.width}×${cp.height}, ` +
       `baseline=${bp.width}×${bp.height}. ` +
       `Images were padded to the larger dimensions for comparison.`;
-    const maxWidth = Math.max(cp.width, bp.width);
-    const maxHeight = Math.max(cp.height, bp.height);
-
-    cp = padToSize(cp, maxWidth, maxHeight);
-    bp = padToSize(bp, maxWidth, maxHeight);
+    [bp, cp] = padPairToMaxSize(bp, cp);
   }
 
   // --- Run pixelmatch --------------------------------------------------------
@@ -198,7 +195,7 @@ export function compareScreenshot(
   if (wmax > 64) result.windowMax = wmax;
 
   if (noteMsg) {
-    result.error = noteMsg;
+    result.dimensionNote = noteMsg;
   }
 
   // --- Extract connected-component diff clusters -----------------------------
@@ -250,8 +247,10 @@ export function compareScreenshot(
     }
 
     // Localized cluster anti-dilution guard:
-    // Prevent global background whitespace from masking a dense, localized UI mutation
-    // (e.g. a broken button or badge on a large page) whose local chromaSSIM < 0.70.
+    // Never allow SSIM to flip a confirmed localized regression (wmax > 64),
+    // any cluster too large for chromaSSIM evaluation (> 65536 px²), or a
+    // dense localized mutation whose chromaSSIM < 0.70.
+    const hasSkippedChromaCluster = clusters.some((cluster) => cluster.chromaSSIM === undefined);
     const hasSevereLocalizedChange = clusters.some(
       (cluster) =>
         cluster.rawDiffPixels >= 32 &&
@@ -261,7 +260,13 @@ export function compareScreenshot(
         cluster.chromaSSIM < 0.70,
     );
 
-    if (ssim !== undefined && ssim > ssimThreshold && !hasSevereLocalizedChange) {
+    if (
+      ssim !== undefined &&
+      ssim > ssimThreshold &&
+      wmax <= 64 &&
+      !hasSkippedChromaCluster &&
+      !hasSevereLocalizedChange
+    ) {
       logger.debug(
         `SSIM override: ${current.route.path} @ ${current.viewport}px — ` +
           `pixel diff ${diffPercentage.toFixed(2)}% but SSIM ${ssim.toFixed(4)} (perceptually identical)`,
@@ -323,30 +328,43 @@ function errorResult(current: ScreenshotResult, message: string): DiffResult {
 }
 
 /**
- * Pad (or keep) a PNG to the given dimensions.
+ * Pad a pair of PNGs to their common max dimensions.
  *
- * The original image is composited at the top-left corner; any extra
- * pixels are filled with transparent black (0, 0, 0, 0).
+ * Out-of-bounds pixels in one image where the other image has valid pixels are
+ * filled with a maximally contrasting opaque color so transparent-black content
+ * in the larger image cannot hide behind zero-filled padding.
  */
-function padToSize(src: PNG, targetWidth: number, targetHeight: number): PNG {
-  if (src.width === targetWidth && src.height === targetHeight) {
-    return src;
+function padPairToMaxSize(bp: PNG, cp: PNG): [PNG, PNG] {
+  const maxW = Math.max(bp.width, cp.width);
+  const maxH = Math.max(bp.height, cp.height);
+  const outBp = new PNG({ width: maxW, height: maxH, fill: true });
+  const outCp = new PNG({ width: maxW, height: maxH, fill: true });
+
+  const copyInto = (src: PNG, dst: PNG): void => {
+    const srcRow = src.width * 4;
+    const dstRow = dst.width * 4;
+    for (let y = 0; y < src.height; y++) {
+      src.data.copy(dst.data, y * dstRow, y * srcRow, y * srcRow + srcRow);
+    }
+  };
+  copyInto(bp, outBp);
+  copyInto(cp, outCp);
+
+  const fillContrast = (dst: PNG, other: PNG, x: number, y: number): void => {
+    const idx = (y * dst.width + x) << 2;
+    dst.data[idx] = other.data[idx] < 128 ? 255 : 0;
+    dst.data[idx + 1] = other.data[idx + 1] < 128 ? 255 : 0;
+    dst.data[idx + 2] = other.data[idx + 2] < 128 ? 255 : 0;
+    dst.data[idx + 3] = 255;
+  };
+
+  for (let y = 0; y < maxH; y++) {
+    for (let x = 0; x < maxW; x++) {
+      const inBp = x < bp.width && y < bp.height;
+      const inCp = x < cp.width && y < cp.height;
+      if (inBp && !inCp) fillContrast(outCp, outBp, x, y);
+      else if (inCp && !inBp) fillContrast(outBp, outCp, x, y);
+    }
   }
-
-  const padded = new PNG({ width: targetWidth, height: targetHeight, fill: true });
-  // fill: true initialises data to 0 (transparent black)
-
-  const srcBytesPerRow = src.width * 4;
-  const dstBytesPerRow = targetWidth * 4;
-
-  for (let y = 0; y < src.height; y++) {
-    src.data.copy(
-      padded.data,
-      y * dstBytesPerRow,           // destination offset (start of row in padded)
-      y * srcBytesPerRow,           // source start
-      y * srcBytesPerRow + srcBytesPerRow, // source end
-    );
-  }
-
-  return padded;
+  return [outBp, outCp];
 }

@@ -16,6 +16,9 @@ export const DEFAULT_SENSITIVE_SELECTORS: readonly string[] = [
   'input[autocomplete="new-password"]',
   'input[autocomplete="one-time-code"]',
   'input[autocomplete^="cc-"]',
+  'input[name*="card" i]',
+  'input[name*="cvv" i]',
+  'input[name*="cvc" i]',
   '[data-frontguard-redact]',
   '[data-sensitive]',
 ] as const;
@@ -43,33 +46,70 @@ export function resolveRedactSelectors(
 
 /**
  * In-page function passed to `page.evaluate(applySensitiveRedactionInPage, selectors)`
- * that walks the document and any open shadow roots, masking text/value pixels
- * on matching elements while preserving their exact bounding box dimensions,
- * borders, and layout flow.
+ * that walks the document, open shadow roots, and same-origin iframes, masking
+ * text, autofill, SVG, media, and descendant pixels on matching elements while
+ * preserving exact element box geometry.
  */
 export function applySensitiveRedactionInPage(selectors: string[]): number {
-  const combined = selectors.join(', ');
-  if (!combined) return 0;
+  if (!selectors || selectors.length === 0) return 0;
 
+  const MEDIA_TAGS = new Set([
+    'IMG',
+    'VIDEO',
+    'CANVAS',
+    'SVG',
+    'PICTURE',
+    'OBJECT',
+    'EMBED',
+    'IFRAME',
+  ]);
   let redactedCount = 0;
+
+  const maskElement = (htmlEl: HTMLElement): void => {
+    if (!htmlEl || !htmlEl.style) return;
+    if (!htmlEl.hasAttribute('data-frontguard-redact-prev-style')) {
+      htmlEl.setAttribute(
+        'data-frontguard-redact-prev-style',
+        htmlEl.getAttribute('style') ?? '',
+      );
+    }
+    htmlEl.style.setProperty('color', 'transparent', 'important');
+    htmlEl.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
+    htmlEl.style.setProperty('text-shadow', 'none', 'important');
+    htmlEl.style.setProperty('caret-color', 'transparent', 'important');
+    htmlEl.style.setProperty('background-image', 'none', 'important');
+    htmlEl.style.setProperty('fill', 'transparent', 'important');
+    htmlEl.style.setProperty('stroke', 'transparent', 'important');
+    const tag = typeof htmlEl.tagName === 'string' ? htmlEl.tagName.toUpperCase() : '';
+    if (MEDIA_TAGS.has(tag)) {
+      htmlEl.style.setProperty('filter', 'brightness(0)', 'important');
+    }
+  };
+
   const visitRoot = (root: Document | ShadowRoot): void => {
-    try {
-      const matches = root.querySelectorAll(combined);
-      for (const el of matches) {
-        const htmlEl = el as HTMLElement;
-        if (!htmlEl.hasAttribute('data-frontguard-redact-prev-style')) {
-          htmlEl.setAttribute(
-            'data-frontguard-redact-prev-style',
-            htmlEl.getAttribute('style') ?? '',
-          );
-        }
-        htmlEl.style.setProperty('color', 'transparent', 'important');
-        htmlEl.style.setProperty('text-shadow', 'none', 'important');
-        htmlEl.style.setProperty('caret-color', 'transparent', 'important');
-        redactedCount += 1;
+    const matched = new Set<Element>();
+    for (const sel of selectors) {
+      if (!sel) continue;
+      try {
+        const list = root.querySelectorAll(sel);
+        for (const el of list) matched.add(el);
+      } catch {
+        // Evaluate selectors individually so one invalid custom selector never disables defaults
       }
-    } catch {
-      // Ignore invalid custom selector errors in isolated roots
+    }
+
+    for (const el of matched) {
+      const htmlEl = el as HTMLElement;
+      htmlEl.setAttribute('data-frontguard-redacted', '1');
+      maskElement(htmlEl);
+      if (typeof htmlEl.querySelectorAll === 'function') {
+        const descendants = htmlEl.querySelectorAll('*');
+        for (const child of descendants) {
+          (child as HTMLElement).setAttribute('data-frontguard-redacted', '1');
+          maskElement(child as HTMLElement);
+        }
+      }
+      redactedCount += 1;
     }
 
     const allElements = root.querySelectorAll('*');
@@ -77,11 +117,103 @@ export function applySensitiveRedactionInPage(selectors: string[]): number {
       if (el.shadowRoot) {
         visitRoot(el.shadowRoot);
       }
+      const tag = typeof el.tagName === 'string' ? el.tagName.toUpperCase() : '';
+      if (tag === 'IFRAME') {
+        try {
+          const frameDoc = (el as HTMLIFrameElement).contentDocument;
+          if (frameDoc) visitRoot(frameDoc);
+        } catch {
+          // Cross-origin iframe — already masked if iframe itself matched
+        }
+      }
     }
   };
 
   visitRoot(document);
   return redactedCount;
+}
+
+/**
+ * In-page scrubber executed after screenshot capture and before DOM snapshot /
+ * element box extraction / text snapshot extraction so sensitive plaintext
+ * never reaches serialized HTML, `domElements[].textPreview`, or ARIA/text
+ * snapshots.
+ */
+export function scrubRedactedDomInPage(selectors: string[]): void {
+  const SCRUB_ATTRS = ['alt', 'title', 'aria-label', 'data-value'];
+
+  const scrubNode = (el: HTMLElement): void => {
+    if (!el || typeof el.setAttribute !== 'function') return;
+    el.setAttribute('data-frontguard-redacted', '1');
+    const tag = typeof el.tagName === 'string' ? el.tagName.toUpperCase() : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') {
+      try {
+        (el as HTMLInputElement | HTMLTextAreaElement).value = '[REDACTED]';
+      } catch {
+        // Ignore read-only/file inputs
+      }
+      el.setAttribute('value', '[REDACTED]');
+      if (typeof el.removeAttribute === 'function') {
+        el.removeAttribute('placeholder');
+      }
+    }
+    for (const attr of SCRUB_ATTRS) {
+      if (typeof el.hasAttribute === 'function' && el.hasAttribute(attr)) {
+        el.setAttribute(attr, '[REDACTED]');
+      }
+    }
+    const children = el.childNodes;
+    if (children) {
+      for (let i = 0; i < children.length; i++) {
+        const node = children[i];
+        if (node && node.nodeType === 3 && node.nodeValue && node.nodeValue.trim().length > 0) {
+          node.nodeValue = '[REDACTED]';
+        }
+      }
+    }
+  };
+
+  const visitRoot = (root: Document | ShadowRoot): void => {
+    const targets = new Set<Element>();
+    try {
+      for (const el of root.querySelectorAll('[data-frontguard-redacted]')) targets.add(el);
+    } catch {
+      // ignore
+    }
+    for (const sel of selectors) {
+      if (!sel) continue;
+      try {
+        for (const el of root.querySelectorAll(sel)) targets.add(el);
+      } catch {
+        // ignore invalid custom selector
+      }
+    }
+    for (const el of targets) {
+      const htmlEl = el as HTMLElement;
+      scrubNode(htmlEl);
+      if (typeof htmlEl.querySelectorAll === 'function') {
+        for (const desc of htmlEl.querySelectorAll('*')) {
+          scrubNode(desc as HTMLElement);
+        }
+      }
+    }
+
+    const allElements = root.querySelectorAll('*');
+    for (const el of allElements) {
+      if (el.shadowRoot) visitRoot(el.shadowRoot);
+      const tag = typeof el.tagName === 'string' ? el.tagName.toUpperCase() : '';
+      if (tag === 'IFRAME') {
+        try {
+          const frameDoc = (el as HTMLIFrameElement).contentDocument;
+          if (frameDoc) visitRoot(frameDoc);
+        } catch {
+          // Cross-origin iframe
+        }
+      }
+    }
+  };
+
+  visitRoot(document);
 }
 
 /**
@@ -94,6 +226,7 @@ export function restoreSensitiveRedactionInPage(): void {
     for (const el of matches) {
       const prev = el.getAttribute('data-frontguard-redact-prev-style');
       el.removeAttribute('data-frontguard-redact-prev-style');
+      el.removeAttribute('data-frontguard-redacted');
       if (prev) {
         el.setAttribute('style', prev);
       } else {
@@ -106,35 +239,49 @@ export function restoreSensitiveRedactionInPage(): void {
       if (el.shadowRoot) {
         visitRoot(el.shadowRoot);
       }
+      const tag = typeof el.tagName === 'string' ? el.tagName.toUpperCase() : '';
+      if (tag === 'IFRAME') {
+        try {
+          const frameDoc = (el as HTMLIFrameElement).contentDocument;
+          if (frameDoc) visitRoot(frameDoc);
+        } catch {
+          // Cross-origin iframe
+        }
+      }
     }
   };
 
   visitRoot(document);
 }
 
+const SENSITIVE_ATTR_RE =
+  /\b(?:type\s*=\s*["']?password["']?|autocomplete\s*=\s*["']?(?:current-password|new-password|one-time-code|cc-[a-z0-9-]+)["']?|name\s*=\s*["']?[^"'>]*(?:card|cvv|cvc)[^"'>]*["']?|data-(?:frontguard-redact(?:ed)?|sensitive)\b)/i;
+
 /**
- * Scrubs sensitive `value="..."` attributes from serialized DOM HTML snapshots
- * so password, credit-card, OTP, and `[data-frontguard-redact]` values are
- * never persisted in `domSnapshot` or transmitted to LLM providers.
+ * Scrubs sensitive `value="..."`, `placeholder="..."`, `<textarea>` bodies,
+ * and `[data-frontguard-redact]`/`[data-sensitive]` element text from
+ * serialized DOM HTML snapshots so plaintext is never persisted or sent to LLMs.
  */
 export function redactSensitiveDomHtml(html: string): string {
   if (!html) return html;
 
-  return html.replace(/<input\b[^>]*>/gi, (tag) => {
-    const isPassword = /\btype\s*=\s*["']?password["']?/i.test(tag);
-    const isSensitiveAutocomplete =
-      /\bautocomplete\s*=\s*["']?(?:current-password|new-password|one-time-code|cc-[a-z0-9-]+)["']?/i.test(
-        tag,
-      );
-    const isExplicitRedact = /\bdata-(?:frontguard-redact|sensitive)\b/i.test(tag);
-
-    if (!isPassword && !isSensitiveAutocomplete && !isExplicitRedact) {
-      return tag;
-    }
-
-    return tag.replace(
-      /\bvalue\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
-      'value="[REDACTED]"',
-    );
+  let out = html.replace(/<input\b[^>]*>/gi, (tag) => {
+    if (!SENSITIVE_ATTR_RE.test(tag)) return tag;
+    return tag
+      .replace(/\bvalue\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, 'value="[REDACTED]"')
+      .replace(/\bplaceholder\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, 'placeholder="[REDACTED]"');
   });
+
+  out = out.replace(/<textarea\b([^>]*)>([\s\S]*?)<\/textarea>/gi, (full, attrs: string) => {
+    if (!SENSITIVE_ATTR_RE.test(attrs)) return full;
+    return `<textarea${attrs}>[REDACTED]</textarea>`;
+  });
+
+  out = out.replace(
+    /<([a-z][a-z0-9-]*)\b([^>]*\bdata-(?:frontguard-redact(?:ed)?|sensitive)\b[^>]*)>([\s\S]*?)<\/\1>/gi,
+    (_full, tag: string, attrs: string, body: string) =>
+      `<${tag}${attrs}>${body.replace(/>([^<]+)</g, '>[REDACTED]<').replace(/^([^<]+)$/, '[REDACTED]')}</${tag}>`,
+  );
+
+  return out;
 }

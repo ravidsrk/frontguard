@@ -8,7 +8,9 @@
  */
 
 import type { Reporter, PipelineStage, RunResult, DiffResult, PerfReport } from '../core/types.js';
+import { isHttpUrl } from '../discovery/story-url.js';
 import { logger } from '../utils/logger.js';
+import { redact } from '../utils/redact.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -16,8 +18,52 @@ import { logger } from '../utils/logger.js';
 
 const COMMENT_MARKER = '<!-- frontguard-report -->';
 const MAX_COMMENT_SIZE = 60_000; // GitHub's comment limit is ~65536, leave margin
+const MAX_COMMENT_PAGES = 10;
+const TRUSTED_BOT_LOGINS = new Set([
+  'github-actions[bot]',
+  'frontguard[bot]',
+  'frontguard-bot[bot]',
+]);
 const DEFAULT_GITHUB_API = 'https://api.github.com';
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
+
+function escapeHtmlInline(text: string): string {
+  return redact(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeMarkdownText(text: string): string {
+  return redact(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]')
+    .replace(/\|/g, '\\|')
+    .replace(/@([a-zA-Z0-9-]+)/g, '@\u200b$1');
+}
+
+function escapeBlockquote(text: string): string {
+  return escapeMarkdownText(text)
+    .split(/\r?\n/)
+    .map((line) => `> ${line.replace(/^(\s*\/)/, '$1\u200b')}`)
+    .join('\n');
+}
+
+function markdownFence(content: string, lang: string): string {
+  const clean = redact(content);
+  let longest = 2;
+  const runs = clean.match(/`+/g);
+  if (runs) {
+    for (const r of runs) if (r.length > longest) longest = r.length;
+  }
+  const fence = '`'.repeat(longest + 1);
+  return `${fence}${lang}\n${clean}\n${fence}`;
+}
 
 /** Formats a perf metric value with its unit (ms → s, bytes → KB). */
 function formatPerfValue(value: number, unit: string): string {
@@ -35,7 +81,8 @@ function formatDeltaPct(frac: number): string {
 }
 
 /** Inline code span. A longer fence keeps backticks inside the excerpt literal. */
-function markdownCode(text: string): string {
+function markdownCode(raw: string): string {
+  const text = redact(raw).replace(/[\r\n]+/g, ' ').replace(/\|/g, '\\|');
   let run = 0;
   let longest = 0;
   for (let i = 0; i < text.length; i++) {
@@ -108,7 +155,7 @@ export class GitHubPRReporter implements Reporter {
   onStageComplete(_stage: PipelineStage, _detail?: string): void {}
 
   onError(error: Error): void {
-    logger.error(`GitHub PR reporter error: ${error.message}`);
+    logger.error(`GitHub PR reporter error: ${redact(error.message)}`);
   }
 
   async onComplete(result: RunResult): Promise<void> {
@@ -116,7 +163,9 @@ export class GitHubPRReporter implements Reporter {
       const markdown = this.generateComment(result);
       await this.postComment(markdown);
     } catch (err) {
-      logger.error(`Failed to post GitHub PR comment: ${err instanceof Error ? err.message : String(err)}`);
+      logger.error(
+        `Failed to post GitHub PR comment: ${redact(err instanceof Error ? err.message : String(err))}`,
+      );
     }
   }
 
@@ -158,7 +207,11 @@ export class GitHubPRReporter implements Reporter {
       const passingText = this.textSnapshotSection(result);
       if (passingText) sections.push(passingText);
       sections.push(this.generateFooter(result));
-      return sections.join('\n\n');
+      let passingMarkdown = redact(sections.join('\n\n'));
+      if (passingMarkdown.length > MAX_COMMENT_SIZE) {
+        passingMarkdown = this.truncateComment(passingMarkdown, result);
+      }
+      return passingMarkdown;
     }
 
     // Header with badge
@@ -207,7 +260,7 @@ export class GitHubPRReporter implements Reporter {
     // Footer
     sections.push(this.generateFooter(result));
 
-    let markdown = sections.join('\n\n');
+    let markdown = redact(sections.join('\n\n'));
 
     // Size check — truncate if needed
     if (markdown.length > MAX_COMMENT_SIZE) {
@@ -223,7 +276,9 @@ export class GitHubPRReporter implements Reporter {
     for (const row of result.textSnapshots) {
       if (row.status === 'match') continue;
       const detail = row.excerpt ? ` (${markdownCode(row.excerpt)})` : '';
-      lines.push(`- \`${row.route}\` @ ${row.viewport}px [${row.browser}] ${row.kind}: ${row.status}${detail}`);
+      lines.push(
+        `- ${markdownCode(row.route)} @ ${row.viewport}px [${escapeMarkdownText(row.browser)}] ${escapeMarkdownText(row.kind)}: ${escapeMarkdownText(row.status)}${detail}`,
+      );
     }
     if (lines.length === 4) lines.push('- All captured text snapshots match.');
     return lines.join('\n');
@@ -267,7 +322,7 @@ export class GitHubPRReporter implements Reporter {
     const lines: string[] = ['## ❌ Regressions', ''];
 
     for (const diff of regressions) {
-      const label = `\`${diff.route.path}\` @ ${diff.viewport}px (${diff.browser})`;
+      const label = `${markdownCode(escapeHtmlInline(diff.route.path))} @ ${diff.viewport}px (${escapeHtmlInline(diff.browser)})`;
       const windowNote =
         diff.windowMax !== undefined && diff.windowMax > 64
           ? `, 16×16 window ${diff.windowMax}`
@@ -279,6 +334,11 @@ export class GitHubPRReporter implements Reporter {
       // Embed image thumbnails when upload URLs are available; otherwise fall
       // back to a text-only summary (legacy behaviour).
       lines.push(this.renderImageGrid(diff));
+
+      if (diff.dimensionNote) {
+        lines.push(escapeBlockquote(`Note: ${diff.dimensionNote}`));
+        lines.push('');
+      }
 
       // AI analysis with a classification badge.
       if (diff.aiAnalysis) {
@@ -292,11 +352,14 @@ export class GitHubPRReporter implements Reporter {
 
         lines.push(`> ${severityEmoji} **AI Analysis** — ${classBadge} (${Math.round(ai.confidence * 100)}% confidence)`);
         lines.push(`>`);
-        lines.push(`> ${ai.explanation}`);
+        lines.push(escapeBlockquote(ai.explanation));
         if (ai.suggestedFix && !diff.suggestedFix) {
           lines.push(`>`);
-          lines.push(`> **Suggested fix:** ${ai.suggestedFix}`);
+          lines.push(escapeBlockquote(`**Suggested fix:** ${ai.suggestedFix}`));
         }
+        lines.push('');
+      } else if (diff.aiError) {
+        lines.push(escapeBlockquote(`AI analysis unavailable: ${diff.aiError}`));
         lines.push('');
       }
 
@@ -365,7 +428,7 @@ export class GitHubPRReporter implements Reporter {
       for (const p of withViolations) {
         for (const v of p.violations) {
           lines.push(
-            `| \`${p.route}\` | ${p.viewport}px | ${v.metric} | ${formatPerfValue(v.actual, v.unit)} | ${formatPerfValue(v.budget, v.unit)} |`,
+            `| ${markdownCode(p.route)} | ${p.viewport}px | ${escapeMarkdownText(v.metric)} | ${formatPerfValue(v.actual, v.unit)} | ${formatPerfValue(v.budget, v.unit)} |`,
           );
         }
       }
@@ -380,7 +443,7 @@ export class GitHubPRReporter implements Reporter {
       for (const p of withRegressions) {
         for (const r of p.regressions ?? []) {
           lines.push(
-            `| \`${p.route}\` | ${p.viewport}px | ${r.metric} | ${formatPerfValue(r.previous, r.unit)} | ${formatPerfValue(r.current, r.unit)} | ${formatDeltaPct(r.deltaPct)} |`,
+            `| ${markdownCode(p.route)} | ${p.viewport}px | ${escapeMarkdownText(r.metric)} | ${formatPerfValue(r.previous, r.unit)} | ${formatPerfValue(r.current, r.unit)} | ${formatDeltaPct(r.deltaPct)} |`,
           );
         }
       }
@@ -400,10 +463,12 @@ export class GitHubPRReporter implements Reporter {
     const lines: string[] = ['## 🧩 Third-party scripts', ''];
     for (const t of changed) {
       lines.push(`<details>`);
-      lines.push(`<summary>\`${t.route}\` @ ${t.viewport}px — ${t.added.length} added, ${t.removed.length} removed</summary>`);
+      lines.push(
+        `<summary>${markdownCode(escapeHtmlInline(t.route))} @ ${t.viewport}px — ${t.added.length} added, ${t.removed.length} removed</summary>`,
+      );
       lines.push('');
-      for (const o of t.added) lines.push(`- ➕ \`${o}\``);
-      for (const o of t.removed) lines.push(`- ➖ \`${o}\``);
+      for (const o of t.added) lines.push(`- ➕ ${markdownCode(o)}`);
+      for (const o of t.removed) lines.push(`- ➖ ${markdownCode(o)}`);
       lines.push('');
       lines.push('</details>');
       lines.push('');
@@ -428,21 +493,21 @@ export class GitHubPRReporter implements Reporter {
     const lines: string[] = [];
     lines.push('<details open>');
     lines.push(
-      `<summary>🔧 Suggested fix — ${fix.category} (${Math.round(fix.confidence * 100)}% confidence)</summary>`,
+      `<summary>🔧 Suggested fix — ${escapeHtmlInline(fix.category)} (${Math.round(fix.confidence * 100)}% confidence)</summary>`,
     );
     lines.push('');
     lines.push(badge);
     lines.push('');
-    lines.push(`> ${fix.explanation}`);
+    lines.push(escapeBlockquote(fix.explanation));
     lines.push('');
-    if (fix.target) lines.push(`Target: \`${fix.target}\``);
+    if (fix.target) lines.push(`Target: ${markdownCode(fix.target)}`);
     lines.push('');
-    // Present CSS as a diff block (additions) for "Apply Fix" copy-paste.
-    lines.push('```diff');
-    for (const line of fix.patch.split('\n')) {
-      lines.push(`+ ${line}`);
-    }
-    lines.push('```');
+    // Present CSS as a diff block with a dynamic fence so backticks cannot escape.
+    const diffBody = fix.patch
+      .split('\n')
+      .map((line) => `+ ${line}`)
+      .join('\n');
+    lines.push(markdownFence(diffBody, 'diff'));
     lines.push('');
     lines.push('</details>');
     lines.push('');
@@ -458,7 +523,9 @@ export class GitHubPRReporter implements Reporter {
 
     for (const r of withViolations) {
       lines.push(`<details>`);
-      lines.push(`<summary>${r.route} @ ${r.viewport}px — ${r.violations.length} violation(s)</summary>`);
+      lines.push(
+        `<summary>${escapeHtmlInline(r.route)} @ ${r.viewport}px — ${r.violations.length} violation(s)</summary>`,
+      );
       lines.push('');
       lines.push('| Impact | Rule | Description | Element |');
       lines.push('|--------|------|-------------|---------|');
@@ -467,9 +534,12 @@ export class GitHubPRReporter implements Reporter {
           v.impact === 'critical' ? '🔴' :
           v.impact === 'serious' ? '🟠' :
           v.impact === 'moderate' ? '🟡' : '🔵';
-        const target = (v.nodes[0]?.target?.join(', ') ?? '').replace(/\|/g, '\\|');
+        const target = v.nodes[0]?.target?.join(', ') ?? '';
+        const ruleCell = isHttpUrl(v.helpUrl)
+          ? `[${escapeMarkdownText(v.id)}](${encodeURI(v.helpUrl).replace(/\)/g, '%29')})`
+          : escapeMarkdownText(v.id);
         lines.push(
-          `| ${emoji} ${v.impact} | [${v.id}](${v.helpUrl}) | ${v.help.replace(/\|/g, '\\|')} | \`${target}\` |`,
+          `| ${emoji} ${escapeMarkdownText(v.impact)} | ${ruleCell} | ${escapeMarkdownText(v.help)} | ${markdownCode(target)} |`,
         );
       }
       lines.push('');
@@ -483,15 +553,23 @@ export class GitHubPRReporter implements Reporter {
     const lines: string[] = ['## ⚠️ Warnings', ''];
 
     for (const diff of warnings) {
-      const label = `\`${diff.route.path}\` @ ${diff.viewport}px (${diff.browser})`;
+      const label = `${markdownCode(escapeHtmlInline(diff.route.path))} @ ${diff.viewport}px (${escapeHtmlInline(diff.browser)})`;
       lines.push(`<details>`);
       lines.push(`<summary>${label} — ${diff.diffPercentage.toFixed(2)}% changed</summary>`);
       lines.push('');
 
       lines.push(this.renderImageGrid(diff));
 
+      if (diff.dimensionNote) {
+        lines.push(escapeBlockquote(`Note: ${diff.dimensionNote}`));
+        lines.push('');
+      }
+
       if (diff.aiAnalysis) {
-        lines.push(`> **AI:** ${diff.aiAnalysis.explanation}`);
+        lines.push(escapeBlockquote(`**AI:** ${diff.aiAnalysis.explanation}`));
+        lines.push('');
+      } else if (diff.aiError) {
+        lines.push(escapeBlockquote(`AI analysis unavailable: ${diff.aiError}`));
         lines.push('');
       }
 
@@ -506,11 +584,6 @@ export class GitHubPRReporter implements Reporter {
 
   /**
    * Renders a baseline/current/diff image grid for a diff.
-   *
-   * If image URLs were uploaded (`baselineImageUrl` etc.), produces an HTML
-   * `<table>` of 280px-wide thumbnails linking to full-size images. If no URLs
-   * are present (no image upload configured), falls back to a text summary —
-   * preserving the previous behaviour.
    */
   private renderImageGrid(diff: DiffResult): string {
     const hasImages =
@@ -522,10 +595,11 @@ export class GitHubPRReporter implements Reporter {
       return `> 📸 **Baseline → Current** (${diff.diffPercentage.toFixed(2)}% diff)\n`;
     }
 
-    const cell = (url: string | undefined, alt: string): string =>
-      url
-        ? `<a href="${url}" target="_blank"><img src="${url}" width="280" alt="${alt}"/></a>`
-        : '<em>n/a</em>';
+    const cell = (url: string | undefined, alt: string): string => {
+      if (!url || !isHttpUrl(url)) return '<em>n/a</em>';
+      const safeUrl = escapeHtmlInline(url);
+      return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer"><img src="${safeUrl}" width="280" alt="${alt}"/></a>`;
+    };
 
     return [
       '<table>',
@@ -543,11 +617,11 @@ export class GitHubPRReporter implements Reporter {
   private generateNewPagesSection(newPages: DiffResult[], result: RunResult): string {
     const lines: string[] = ['## 🆕 New Pages', ''];
 
-    const pageList = newPages.map((d) => `- \`${d.route.path}\` @ ${d.viewport}px`);
+    const pageList = newPages.map((d) => `- ${markdownCode(d.route.path)} @ ${d.viewport}px`);
     lines.push(...pageList);
     lines.push('');
     if (result.baselineRefusal) {
-      lines.push(`> Baselines were not written. ${result.baselineRefusal}`);
+      lines.push(escapeBlockquote(`Baselines were not written. ${result.baselineRefusal}`));
       lines.push('> The pixel status is unchanged.');
     } else if (result.baselineUpdate) {
       lines.push(
@@ -595,7 +669,7 @@ export class GitHubPRReporter implements Reporter {
             default: return '–';
           }
         });
-        lines.push(`| \`${route}\` | ${browser} | ${cells.join(' | ')} |`);
+        lines.push(`| ${markdownCode(route)} | ${escapeMarkdownText(browser)} | ${cells.join(' | ')} |`);
       }
     }
 
@@ -607,7 +681,7 @@ export class GitHubPRReporter implements Reporter {
     return `---\n` +
       `<sub>🛡️ Frontguard visual regression test · ` +
       `${result.summary.total} comparisons in ${totalSec}s · ` +
-      `📎 Report directory: \`${result.config.outputDir}\`</sub>`;
+      `📎 Report directory: ${markdownCode(result.config.outputDir)}</sub>`;
   }
 
   private truncateComment(markdown: string, result: RunResult): string {
@@ -677,7 +751,28 @@ export class GitHubPRReporter implements Reporter {
   }
 
   private async findExistingComment(headers: Record<string, string>): Promise<number | null> {
-    for (let page = 1; ; page += 1) {
+    let authenticatedLogin: string | null | undefined;
+    const getAuthenticatedLogin = async (): Promise<string | null> => {
+      if (authenticatedLogin !== undefined) return authenticatedLogin;
+      try {
+        const res = await fetch(`${this.apiUrl}/user`, {
+          headers,
+          signal: AbortSignal.timeout(this.requestTimeoutMs),
+        });
+        if (!res.ok) {
+          authenticatedLogin = null;
+          return null;
+        }
+        const data = (await res.json()) as { login?: unknown };
+        authenticatedLogin = typeof data.login === 'string' ? data.login.toLowerCase() : null;
+        return authenticatedLogin;
+      } catch {
+        authenticatedLogin = null;
+        return null;
+      }
+    };
+
+    for (let page = 1; page <= MAX_COMMENT_PAGES; page += 1) {
       const url = `${this.apiUrl}/repos/${this.owner}/${this.repo}/issues/${this.prNumber}/comments?per_page=100&page=${page}`;
       const response = await fetch(url, {
         headers,
@@ -693,15 +788,27 @@ export class GitHubPRReporter implements Reporter {
         throw new Error(`GitHub API error (${response.status}): ${await response.text()}`);
       }
 
-      const comments = await response.json() as Array<{id: number; body?: string}>;
+      const comments = (await response.json()) as Array<{
+        id: number;
+        body?: string;
+        user?: { login?: string; type?: string } | null;
+      }>;
       for (const comment of comments) {
-        if (comment.body?.includes(COMMENT_MARKER)) {
+        if (!comment.body?.includes(COMMENT_MARKER)) continue;
+        const login = comment.user?.login?.toLowerCase();
+        if (!login) continue;
+        if (TRUSTED_BOT_LOGINS.has(login)) {
+          return comment.id;
+        }
+        const me = await getAuthenticatedLogin();
+        if (me !== null && login === me) {
           return comment.id;
         }
       }
 
       if (comments.length < 100) return null;
     }
+    return null;
   }
 
   private async createComment(body: string, headers: Record<string, string>): Promise<void> {

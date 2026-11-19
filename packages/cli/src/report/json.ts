@@ -10,6 +10,7 @@
 
 import type { Reporter, PipelineStage, RunResult, DiffResult, DiffCluster } from '../core/types.js';
 import { DEFAULT_AI_MODELS } from '../core/config.js';
+import { redactDeep } from '../utils/redact.js';
 
 // ---------------------------------------------------------------------------
 // JSON Reporter
@@ -30,16 +31,16 @@ export class JSONReporter implements Reporter {
   }
 
   onError(error: Error): void {
-    const output = {
+    const output = redactDeep({
       error: true,
       message: error.message,
       stack: error.stack,
-    };
+    });
     console.log(JSON.stringify(output, null, 2));
   }
 
   onComplete(result: RunResult): void {
-    const output = serializeRunResult(result);
+    const output = redactDeep(serializeRunResult(result));
     console.log(JSON.stringify(output, null, 2));
   }
 }
@@ -88,6 +89,8 @@ interface SerializedDiff {
     verified: boolean;
     error?: string;
   };
+  aiError?: string;
+  dimensionNote?: string;
   error?: string;
 }
 
@@ -216,6 +219,14 @@ function serializeDiff(diff: DiffResult): SerializedDiff {
       verified: diff.fixVerification.verified,
       error: diff.fixVerification.error,
     };
+  }
+
+  if (diff.aiError) {
+    serialized.aiError = diff.aiError;
+  }
+
+  if (diff.dimensionNote) {
+    serialized.dimensionNote = diff.dimensionNote;
   }
 
   if (diff.error) {

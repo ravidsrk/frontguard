@@ -9,6 +9,9 @@
  */
 
 import type { Sandbox, SandboxPatch, SandboxScreenshotParams } from './types.js';
+import { assertSafeCssPatch } from './css-sanitize.js';
+import { assertHttpUrl } from '../discovery/story-url.js';
+import { chromiumLaunchArgs } from '../render/chromium-args.js';
 import { logger } from '../utils/logger.js';
 import { cropToMaxHeight } from '../render/crop.js';
 
@@ -32,7 +35,7 @@ export class LocalSandbox implements Sandbox {
 
   async applyPatch(patch: SandboxPatch): Promise<void> {
     if (patch.type === 'css') {
-      this.cssPatches.push(patch.content);
+      this.cssPatches.push(assertSafeCssPatch(patch.content));
     } else {
       // HTML/config patches can't be applied via simple injection — log and skip.
       logger.debug(`LocalSandbox: ignoring non-CSS patch of type "${patch.type}"`);
@@ -40,15 +43,43 @@ export class LocalSandbox implements Sandbox {
   }
 
   async screenshot(params: SandboxScreenshotParams): Promise<Buffer> {
+    const target = assertHttpUrl(params.url, 'sandbox url');
     const pw = await import('playwright');
     const engine = pw[params.browser];
-    const browser = await engine.launch({ headless: true });
+    const browser = await engine.launch({
+      headless: true,
+      args: params.browser === 'chromium' ? chromiumLaunchArgs() : undefined,
+    });
     try {
       const context = await browser.newContext({
         viewport: { width: params.viewport, height: params.viewportHeight ?? 720 },
       });
+      // Restrict sandbox browser egress strictly to the target origin.
+      if (typeof (context as { route?: unknown }).route === 'function') {
+        await context.route('**/*', async (route) => {
+          try {
+            const reqUrl = route.request().url();
+            if (reqUrl.startsWith('about:')) {
+              await route.continue();
+              return;
+            }
+            const parsed = new URL(reqUrl);
+            if (parsed.origin === target.origin) {
+              await route.continue();
+            } else {
+              await route.abort('blockedbyclient');
+            }
+          } catch {
+            try {
+              await route.abort('blockedbyclient');
+            } catch {
+              // Context closed mid-flight
+            }
+          }
+        });
+      }
       const page = await context.newPage();
-      await page.goto(params.url, { waitUntil: 'networkidle', timeout: 30_000 });
+      await page.goto(target.href, { waitUntil: 'networkidle', timeout: 30_000 });
 
       // Disable animations for stable screenshots.
       await page.addStyleTag({

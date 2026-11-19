@@ -30,9 +30,16 @@ import { pageUrl } from '../discovery/story-url.js';
 import { STORYBOOK_READY_SCRIPT } from '../discovery/storybook.js';
 import { captureStableScreenshot } from './stability.js';
 import {
+  chromiumLaunchArgs,
+  matchesBlockedUrl,
+  resolveFreezeTimestamp,
+} from './chromium-args.js';
+export { matchesBlockedUrl, resolveFreezeTimestamp };
+import {
   applySensitiveRedactionInPage,
   redactSensitiveDomHtml,
   resolveRedactSelectors,
+  scrubRedactedDomInPage,
 } from './redaction.js';
 import { extractDomElementBoxes } from './dom-elements.js';
 import { measureHorizontalOverflow } from './horizontal-overflow.js';
@@ -185,51 +192,6 @@ async function waitForDocumentFonts(page: Page, rpath: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Deterministic rendering helpers (clock freeze & network request blocking)
-// ---------------------------------------------------------------------------
-
-/**
- * Resolve `freezeTime` config (`true`, epoch ms number, or ISO 8601 string)
- * to a numeric epoch millisecond timestamp, or `null` when disabled.
- */
-export function resolveFreezeTimestamp(
-  freezeTime: boolean | number | string | undefined,
-): number | null {
-  if (freezeTime === undefined || freezeTime === false) return null;
-  if (freezeTime === true) return 1704067200000; // 2024-01-01T00:00:00.000Z
-  if (typeof freezeTime === 'number') return freezeTime;
-  if (typeof freezeTime === 'string') {
-    const parsed = Date.parse(freezeTime);
-    return Number.isNaN(parsed) ? null : parsed;
-  }
-  return null;
-}
-
-/**
- * Check whether a request URL matches any configured `blockUrls` pattern.
- * Supports `*` wildcards as well as case-insensitive substring matching.
- */
-export function matchesBlockedUrl(url: string, patterns: string[]): boolean {
-  const lowerUrl = url.toLowerCase();
-  for (const rawPattern of patterns) {
-    const pattern = rawPattern.trim();
-    if (!pattern) continue;
-    const lowerPattern = pattern.toLowerCase();
-    if (lowerPattern.includes('*')) {
-      const escaped = lowerPattern
-        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-        .replace(/\*/g, '.*');
-      if (new RegExp(`^${escaped}$`, 'i').test(url) || new RegExp(escaped, 'i').test(url)) {
-        return true;
-      }
-    } else if (lowerUrl.includes(lowerPattern)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// ---------------------------------------------------------------------------
 // Browser engine map
 // ---------------------------------------------------------------------------
 
@@ -342,10 +304,7 @@ export async function renderPages(
       logger.debug(`Launching ${engine}…`);
       const launcher = engines[engine];
       const browser = await launcher.launch({
-        // Headless by default; use reasonable args for stability
-        args: engine === 'chromium'
-          ? ['--disable-gpu', '--no-sandbox', '--disable-setuid-sandbox']
-          : undefined,
+        args: engine === 'chromium' ? chromiumLaunchArgs() : undefined,
       });
       browserMap.set(engine, browser);
     } catch (err) {
@@ -496,12 +455,16 @@ export async function executeTask(
       typeof (context as { route?: unknown }).route === 'function'
     ) {
       await context.route('**/*', async (route) => {
-        const reqUrl = route.request().url();
-        if (matchesBlockedUrl(reqUrl, blockUrls)) {
-          blockedRequestsCount++;
-          await route.abort('blockedbyclient');
-        } else {
-          await route.continue();
+        try {
+          const reqUrl = route.request().url();
+          if (matchesBlockedUrl(reqUrl, blockUrls)) {
+            blockedRequestsCount++;
+            await route.abort('blockedbyclient');
+          } else {
+            await route.continue();
+          }
+        } catch {
+          // Ignore errors when context/page closes mid-flight
         }
       });
     }
@@ -708,9 +671,22 @@ export async function executeTask(
     }
 
     // --- Evaluate performance collection script if injected by plugin ----------
+    let perfMetrics: ScreenshotResult['perfMetrics'];
     const perfScript = (config as { _perfScript?: string })._perfScript;
     if (typeof perfScript === 'string' && perfScript.trim().length > 0) {
-      await page.evaluate(perfScript).catch(() => {});
+      const rawPerf = await page.evaluate(perfScript).catch(() => undefined);
+      if (
+        rawPerf &&
+        typeof rawPerf === 'object' &&
+        typeof (rawPerf as { pageWeight?: unknown }).pageWeight === 'number'
+      ) {
+        perfMetrics = rawPerf as ScreenshotResult['perfMetrics'];
+      }
+    }
+
+    // --- Scrub sensitive DOM nodes BEFORE capturing HTML or element previews ---
+    if (redactSelectors.length > 0) {
+      await page.evaluate(scrubRedactedDomInPage, redactSelectors).catch(() => {});
     }
 
     // --- Capture DOM snapshot (with optional sensitive attribute scrubbing) ----
@@ -746,6 +722,7 @@ export async function executeTask(
       ...(stabilityMetadata !== undefined ? { stability: stabilityMetadata } : {}),
       ...(domElements.length > 0 ? { domElements } : {}),
       ...(hx ? { horizontalOverflow: hx } : {}),
+      ...(perfMetrics ? { perfMetrics } : {}),
       ...(blockUrls.length > 0 || blockedRequestsCount > 0 ? { blockedRequestsCount } : {}),
     };
   } catch (err) {
