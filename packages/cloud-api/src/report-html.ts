@@ -1,6 +1,7 @@
 import type { Run } from './types.js';
 import { PACKAGE_VERSION } from './version.js';
 import { compareDiffToThreshold } from './threshold.js';
+import { safeJsonForScript } from './dashboard/render.js';
 
 export function generateReportHtml(run: Run): string {
   const resultsRows = (run.results || [])
@@ -133,15 +134,15 @@ export function generateReportHtml(run: Run): string {
       </div>
       <div class="meta-card">
         <label>Status</label>
-        <div class="value status-${run.status}">${run.status.toUpperCase()}</div>
+        <div class="value status-${escapeHtml(run.status)}">${escapeHtml(run.status.toUpperCase())}</div>
       </div>
       <div class="meta-card">
         <label>Created</label>
-        <div class="value">${run.createdAt}</div>
+        <div class="value">${escapeHtml(run.createdAt)}</div>
       </div>
       <div class="meta-card">
         <label>Completed</label>
-        <div class="value">${run.completedAt || '—'}</div>
+        <div class="value">${escapeHtml(run.completedAt || '—')}</div>
       </div>
       <div class="meta-card">
         <label>Threshold</label>
@@ -149,7 +150,7 @@ export function generateReportHtml(run: Run): string {
       </div>
       <div class="meta-card">
         <label>Browsers</label>
-        <div class="value">${run.browsers.join(', ')}</div>
+        <div class="value">${escapeHtml(run.browsers.join(', '))}</div>
       </div>
     </div>
 
@@ -189,10 +190,10 @@ export function generateReportHtml(run: Run): string {
     </table>
 
     <div class="actions">
-      <button class="btn btn-approve" id="approveBtn" onclick="approveBaselines()">
+      <button class="btn btn-approve" id="approveBtn" type="button">
         ✓ Approve Baselines
       </button>
-      <button class="btn btn-reject" id="rejectBtn" onclick="rejectBaselines()">
+      <button class="btn btn-reject" id="rejectBtn" type="button">
         ✗ Reject
       </button>
     </div>
@@ -200,37 +201,51 @@ export function generateReportHtml(run: Run): string {
     <div id="actionStatus" style="margin-bottom:1rem;font-size:0.875rem;"></div>
 
     <div class="footer">
-      Frontguard v${PACKAGE_VERSION} · Visual regression testing for the modern web
+      Frontguard v${escapeHtml(PACKAGE_VERSION)} · Visual regression testing for the modern web
     </div>
   </div>
 
   <script>
-    const RUN_ID = '${run.id}';
+    (function () {
+      const RUN_ID = ${safeJsonForScript(run.id)};
 
-    async function approveBaselines() {
-      const btn = document.getElementById('approveBtn');
-      const status = document.getElementById('actionStatus');
-      btn.disabled = true;
-      try {
-        const res = await fetch('/v1/baselines/' + RUN_ID + '/approve', { method: 'POST' });
-        const data = await res.json();
-        if (data.approved) {
-          status.innerHTML = '<span style="color:#4ade80;">✓ Baselines approved successfully.</span>';
-        } else {
-          status.innerHTML = '<span style="color:#f87171;">Failed to approve baselines.</span>';
-        }
-      } catch (err) {
-        const msg = (err.message || 'Unknown error').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        status.innerHTML = '<span style="color:#f87171;">Error: ' + msg + '</span>';
-      } finally {
-        btn.disabled = false;
+      function setStatus(color, text) {
+        const status = document.getElementById('actionStatus');
+        if (!status) return;
+        status.textContent = '';
+        const span = document.createElement('span');
+        span.style.color = color;
+        span.textContent = text;
+        status.appendChild(span);
       }
-    }
 
-    async function rejectBaselines() {
-      const status = document.getElementById('actionStatus');
-      status.innerHTML = '<span style="color:#facc15;">Baselines rejected. No changes saved.</span>';
-    }
+      async function approveBaselines() {
+        const btn = document.getElementById('approveBtn');
+        if (btn) btn.disabled = true;
+        try {
+          const res = await fetch('/v1/baselines/' + encodeURIComponent(RUN_ID) + '/approve', { method: 'POST' });
+          const data = await res.json();
+          if (data && data.approved) {
+            setStatus('#4ade80', '✓ Baselines approved successfully.');
+          } else {
+            setStatus('#f87171', 'Failed to approve baselines.');
+          }
+        } catch (err) {
+          setStatus('#f87171', 'Error: ' + ((err && err.message) || 'Unknown error'));
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      }
+
+      function rejectBaselines() {
+        setStatus('#facc15', 'Baselines rejected. No changes saved.');
+      }
+
+      const approveBtn = document.getElementById('approveBtn');
+      const rejectBtn = document.getElementById('rejectBtn');
+      if (approveBtn) approveBtn.addEventListener('click', approveBaselines);
+      if (rejectBtn) rejectBtn.addEventListener('click', rejectBaselines);
+    })();
   </script>
 </body>
 </html>`;

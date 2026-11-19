@@ -11,6 +11,12 @@
 import type { Monitor } from '../db/monitors.js';
 import type { Store } from '../db/store.js';
 import { compareDiffToThreshold } from '../threshold.js';
+import {
+  assertSafeSlackWebhookUrl,
+  type HostResolver,
+} from '../security/render-target.js';
+
+const ALERT_FETCH_TIMEOUT_MS = 10_000;
 
 /** A single regression or check-failure alert from a monitor run. */
 export interface MonitorAlert {
@@ -207,12 +213,16 @@ export async function sendSlackAlert(
   monitor: Monitor,
   alerts: MonitorAlert[],
   fetchImpl: typeof fetch = fetch,
+  opts?: { resolveHost?: HostResolver },
 ): Promise<AlertDeliveryResult> {
   try {
+    await assertSafeSlackWebhookUrl(webhookUrl, opts);
     const res = await fetchImpl(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildSlackPayload(monitor, alerts)),
+      redirect: 'error',
+      signal: AbortSignal.timeout(ALERT_FETCH_TIMEOUT_MS),
     });
     return { channel: 'slack', ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}` };
   } catch (err) {
@@ -232,6 +242,7 @@ export async function sendPagerDutyAlert(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildPagerDutyPayload(routingKey, monitor, alerts)),
+      signal: AbortSignal.timeout(ALERT_FETCH_TIMEOUT_MS),
     });
     return { channel: 'pagerduty', ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}` };
   } catch (err) {
@@ -284,6 +295,7 @@ export async function sendUsageWarningEmail(
         html,
         tags: [{ name: 'kind', value: `usage-${tone}` }],
       }),
+      signal: AbortSignal.timeout(ALERT_FETCH_TIMEOUT_MS),
     });
     return { channel: 'email', ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}` };
   } catch (err) {
@@ -315,6 +327,7 @@ export async function sendEmailAlert(
         subject: `🚨 Frontguard: ${alerts.length} regression(s) on ${monitor.name}`,
         html: buildEmailHtml(monitor, alerts),
       }),
+      signal: AbortSignal.timeout(ALERT_FETCH_TIMEOUT_MS),
     });
     return { channel: 'email', ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}` };
   } catch (err) {
@@ -331,11 +344,12 @@ export async function dispatchAlerts(
   monitor: Monitor,
   alerts: MonitorAlert[],
   fetchImpl: typeof fetch = fetch,
+  opts?: { resolveHost?: HostResolver },
 ): Promise<AlertDeliveryResult[]> {
   if (alerts.length === 0) return [];
   const results: AlertDeliveryResult[] = [];
   if (monitor.alerts?.slack) {
-    results.push(await sendSlackAlert(monitor.alerts.slack, monitor, alerts, fetchImpl));
+    results.push(await sendSlackAlert(monitor.alerts.slack, monitor, alerts, fetchImpl, opts));
   }
   if (monitor.alerts?.email && monitor.alerts.email.length > 0) {
     results.push(await sendEmailAlert(env, monitor.alerts.email, monitor, alerts, fetchImpl));
@@ -363,6 +377,7 @@ export async function dispatchAlertsWithState(
   alerts: MonitorAlert[],
   now: Date = new Date(),
   fetchImpl: typeof fetch = fetch,
+  opts?: { resolveHost?: HostResolver },
 ): Promise<StatefulDispatchResult> {
   if (alerts.length === 0) return { reason: 'no-alerts', deliveries: [] };
 
@@ -379,7 +394,7 @@ export async function dispatchAlertsWithState(
     return { reason: 'duplicate', deliveries: [] };
   }
 
-  const deliveries = await dispatchAlerts(env, monitor, alerts, fetchImpl);
+  const deliveries = await dispatchAlerts(env, monitor, alerts, fetchImpl, opts);
 
   // Record the fingerprint so an identical regression set won't re-alert.
   await store.setAlertState({

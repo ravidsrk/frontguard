@@ -22,6 +22,8 @@ export interface Team {
   plan: string;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
+  /** Stripe Unix timestamp of the last applied billing event (ordering guard). */
+  stripeLastEventCreated?: number;
   createdAt: string;
 }
 
@@ -89,6 +91,8 @@ export interface TeamUsage {
   month: string;
   runsCount: number;
   screenshotsCount: number;
+  sandboxMinutesUsed?: number;
+  aiCallsUsed?: number;
   memberCount: number;
   perMember: Array<{ userId: string; runsCount: number; screenshotsCount: number }>;
 }
@@ -126,6 +130,8 @@ export interface TeamStore {
   getTeam(id: string): Promise<Team | null>;
   /** Resolves a team by its Stripe subscription id (fallback when webhook metadata is absent). */
   getTeamByStripeSubscriptionId(subscriptionId: string): Promise<Team | null>;
+  /** Resolves a team by its Stripe customer id (fallback for invoice events). */
+  getTeamByStripeCustomerId(customerId: string): Promise<Team | null>;
   updateTeam(id: string, patch: Partial<Team>): Promise<void>;
   deleteTeam(id: string): Promise<boolean>;
   listTeamsForUser(userId: string): Promise<Array<Team & { role: TeamRole }>>;
@@ -141,6 +147,7 @@ export interface TeamStore {
   getInvitationByToken(token: string): Promise<TeamInvitation | null>;
   listInvitations(teamId: string): Promise<TeamInvitation[]>;
   acceptInvitation(token: string, at: string): Promise<TeamInvitation | null>;
+  revokeInvitation(id: string, teamId: string): Promise<boolean>;
 
   createProject(project: TeamProject): Promise<void>;
   getProjectById(id: string): Promise<TeamProject | null>;

@@ -13,13 +13,13 @@
 #   1. builder  — npm install + tsup build (produces dist/index.js for sanity)
 #   2. runtime  — pruned deps + wrangler/miniflare + src/ for hot reload-less run
 #
-# The runtime image starts on port 8787 and persists all state under /data so
-# `docker volume`s survive container restarts.
+# The runtime image starts on port 8787 as non-root user `node` and persists
+# all state under /data so `docker volume`s survive container restarts.
 
 # -----------------------------------------------------------------------------
 # Stage 1 — builder
 # -----------------------------------------------------------------------------
-FROM node:20-bookworm-slim AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -39,7 +39,7 @@ RUN npm run build
 # -----------------------------------------------------------------------------
 # Stage 2 — runtime
 # -----------------------------------------------------------------------------
-FROM node:20-bookworm-slim AS runtime
+FROM node:22-bookworm-slim AS runtime
 
 ENV NODE_ENV=production \
     WRANGLER_SEND_METRICS=false \
@@ -65,10 +65,13 @@ COPY tsconfig.json wrangler.toml ./
 COPY src ./src
 COPY --from=builder /app/dist ./dist
 
-# Entrypoint script: applies D1 migrations once per data volume, then launches
-# wrangler with the persistence directory pointed at /data.
+# Entrypoint script: validates required secrets, writes container env bindings
+# to .dev.vars for wrangler dev --local, applies D1 migrations (failing closed
+# on error), then launches wrangler with persistence pointed at /data.
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh \
+    && mkdir -p /data/wrangler \
+    && chown -R node:node /app /data
 
 # Persistent state (SQLite DB, R2 blobs, KV) lives here. Mount a named volume
 # from compose so it survives `docker compose down`.
@@ -84,11 +87,12 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # node_modules/.bin which is not on PATH by default in non-login shells).
 ENV PATH="/app/node_modules/.bin:${PATH}"
 
+# Drop root privileges before running the service (Trivy DS-0002).
+USER node
+
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
-CMD ["npx", "wrangler", "dev", \
+CMD ["wrangler", "dev", \
      "--local", \
      "--ip", "0.0.0.0", \
      "--port", "8787", \
-     "--persist-to", "/data/wrangler", \
-     "--var", "PUBLIC_BASE_URL:http://localhost:8787", \
-     "--var", "API_BASE_URL:http://localhost:8787"]
+     "--persist-to", "/data/wrangler"]

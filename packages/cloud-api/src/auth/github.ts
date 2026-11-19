@@ -53,6 +53,7 @@ export async function exchangeCodeForToken(
       code,
       redirect_uri: config.redirectUri,
     }),
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`GitHub token exchange failed: ${res.status}`);
   const data = (await res.json()) as { access_token?: string; error?: string };
@@ -63,8 +64,8 @@ export async function exchangeCodeForToken(
 }
 
 /**
- * Fetches the authenticated GitHub user's profile. Resolves a primary email
- * via the `/user/emails` endpoint when the profile email is hidden.
+ * Fetches the authenticated GitHub user's profile. Resolves a verified email
+ * via `/user/emails` so unverified addresses can never satisfy team invitation matching.
  */
 export async function fetchGitHubUser(
   token: string,
@@ -75,21 +76,34 @@ export async function fetchGitHubUser(
     Accept: 'application/vnd.github+json',
     'User-Agent': 'frontguard-cloud-api',
   };
-  const res = await fetchImpl('https://api.github.com/user', { headers });
+  const res = await fetchImpl('https://api.github.com/user', {
+    headers,
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!res.ok) throw new Error(`GitHub user fetch failed: ${res.status}`);
   const profile = (await res.json()) as { id: number; login: string; email: string | null };
 
   let email = profile.email;
-  if (!email) {
-    try {
-      const emailsRes = await fetchImpl('https://api.github.com/user/emails', { headers });
-      if (emailsRes.ok) {
-        const emails = (await emailsRes.json()) as Array<{ email: string; primary: boolean; verified: boolean }>;
-        email = emails.find((e) => e.primary && e.verified)?.email ?? emails[0]?.email ?? null;
+  try {
+    const emailsRes = await fetchImpl('https://api.github.com/user/emails', {
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (emailsRes.ok) {
+      const emails = (await emailsRes.json()) as Array<{
+        email: string;
+        primary: boolean;
+        verified: boolean;
+      }>;
+      if (Array.isArray(emails) && emails.length > 0) {
+        const verifiedPrimary = emails.find((e) => e.primary && e.verified === true)?.email;
+        const verifiedFallback = emails.find((e) => e.verified === true)?.email;
+        // If `/user/emails` returned entries, only accept a verified address.
+        email = verifiedPrimary ?? verifiedFallback ?? null;
       }
-    } catch {
-      /* email is optional */
     }
+  } catch {
+    /* email is optional */
   }
   return { id: profile.id, login: profile.login, email };
 }

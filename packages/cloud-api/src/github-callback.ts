@@ -69,6 +69,7 @@ export async function completeCheckRun(
         authorization: `Bearer ${env.FRONTGUARD_CALLBACK_SECRET}`,
       },
       body: JSON.stringify({
+        runId: run.id,
         owner: run.github.owner,
         repo: run.github.repo,
         commitSha: run.github.commitSha,
@@ -80,6 +81,7 @@ export async function completeCheckRun(
         total: outcome.total,
         detailsUrl,
       }),
+      signal: AbortSignal.timeout(15_000),
     },
   );
   return res.ok;

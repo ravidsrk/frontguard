@@ -22,6 +22,12 @@ import { isProduction, type Bindings } from '../db/factory.js';
 /** Cookie name carrying the signed dashboard session. */
 export const SESSION_COOKIE = 'fg_session';
 
+/** Form field name carrying the session-bound CSRF token. */
+export const CSRF_FIELD = '_csrf';
+
+/** Request header name carrying the session-bound CSRF token. */
+export const CSRF_HEADER = 'x-csrf-token';
+
 /** Session lifetime (7 days), in seconds. */
 export const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
@@ -93,6 +99,20 @@ function base64url(bytes: Uint8Array): string {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/** Decodes URL-safe base64 (no padding) back to a UTF-8 string. */
+function decodeBase64urlToUtf8(input: string): string | null {
+  if (!/^[A-Za-z0-9_-]+$/.test(input)) return null;
+  const padded = input.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (input.length % 4)) % 4);
+  try {
+    const bin = atob(padded);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
 /** Computes the base64url HMAC-SHA256 signature of `data` with `secret`. */
 async function sign(data: string, secret: string): Promise<string> {
   const key = await crypto.subtle.importKey(
@@ -130,9 +150,10 @@ export async function createSessionCookie(
   now = new Date(),
 ): Promise<string> {
   const expiry = Math.floor(now.getTime() / 1000) + maxAge;
-  // encodeURIComponent does not escape `.`; do so explicitly so the userId can
-  // never introduce extra `.` separators into the `userId.expiry.sig` format.
-  const payload = `${encodeURIComponent(userId).replace(/\./g, '%2E')}.${expiry}`;
+  // Base64url-encode userId (URL- and cookie-safe alphabet with no `%` or `.`),
+  // so Hono's cookie decoder never mutates the signed payload on round-trip.
+  const encodedUser = base64url(new TextEncoder().encode(userId));
+  const payload = `${encodedUser}.${expiry}`;
   const signature = await sign(payload, secret);
   return `${payload}.${signature}`;
 }
@@ -163,9 +184,31 @@ export async function verifySessionCookie(
   if (!Number.isFinite(expiry)) return null;
   if (Math.floor(now.getTime() / 1000) >= expiry) return null;
 
-  try {
-    return decodeURIComponent(encodedUser);
-  } catch {
-    return null;
-  }
+  return decodeBase64urlToUtf8(encodedUser);
+}
+
+/**
+ * Derives a stateless HMAC-SHA256 CSRF token bound to a specific signed session
+ * cookie value. Cannot be forged without the server's session secret and cannot
+ * be replayed across different user sessions.
+ */
+export async function createCsrfToken(
+  sessionCookieValue: string,
+  secret: string,
+): Promise<string> {
+  return sign(`csrf:${sessionCookieValue}`, secret);
+}
+
+/**
+ * Verifies a submitted CSRF token against the active session cookie value
+ * using constant-time comparison.
+ */
+export async function verifyCsrfToken(
+  sessionCookieValue: string | undefined | null,
+  candidate: string | undefined | null,
+  secret: string,
+): Promise<boolean> {
+  if (!sessionCookieValue || !candidate) return false;
+  const expected = await createCsrfToken(sessionCookieValue, secret);
+  return safeEqual(candidate, expected);
 }

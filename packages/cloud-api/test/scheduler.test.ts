@@ -172,9 +172,23 @@ describe('scheduler', () => {
 
   it('dispatches an error alert when the check does not compare', async () => {
     const store = getMemoryStore();
-    const monitor = makeMonitor({ alerts: { slack: 'https://hook' } });
+    const monitor = makeMonitor({
+      alerts: { slack: 'https://hooks.slack.com/services/T00/B00/XXX' },
+    });
     await store.createMonitor(monitor);
     const now = new Date('2026-01-01T12:00:00Z');
+
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
+        return new Response(
+          JSON.stringify({ Status: 0, Answer: [{ type: 1, data: '54.230.1.1' }] }),
+          { status: 200, headers: { 'Content-Type': 'application/dns-json' } },
+        );
+      }
+      return realFetch(input, init);
+    }) as unknown as typeof fetch;
 
     let slackCalls = 0;
     const fakeFetch = (async () => {
@@ -182,11 +196,15 @@ describe('scheduler', () => {
       return new Response('{}', { status: 200 });
     }) as unknown as typeof fetch;
 
-    const { alerts } = await runMonitor({}, store, monitor, now, fakeFetch);
-    // No comparison is a check failure, so the error alert is dispatched.
-    expect(alerts).toHaveLength(1);
-    expect(alerts[0].kind).toBe('error');
-    expect(slackCalls).toBe(1);
+    try {
+      const { alerts } = await runMonitor({}, store, monitor, now, fakeFetch);
+      // No comparison is a check failure, so the error alert is dispatched.
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].kind).toBe('error');
+      expect(slackCalls).toBe(1);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 
   it('REL-2: tick 1 establishes baseline from current screenshots; tick 2 detects regression', async () => {

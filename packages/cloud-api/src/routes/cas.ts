@@ -15,6 +15,14 @@ import { Hono, type Context } from 'hono';
 import { getPlan } from '../billing/plans.js';
 import type { Bindings } from '../db/factory.js';
 import type { Store, User } from '../db/store.js';
+import { can } from '../db/teams.js';
+import {
+  casMemoryStore,
+  MAX_CAS_MEMORY_BLOBS,
+  resetCasMemoryStore,
+} from '../storage/cas-memory.js';
+
+export { MAX_CAS_MEMORY_BLOBS, resetCasMemoryStore };
 
 /** Minimal R2 bucket interface supporting `head`, `get`, and `put`. */
 export interface CasR2Bucket {
@@ -32,21 +40,26 @@ type Variables = { store: Store; userId: string };
 /** Maximum number of hashes allowed in a single `POST /v1/cas/check` call. */
 export const MAX_CAS_CHECK_HASHES = 1000;
 
+/** Bounded concurrency for R2 head() lookups during `POST /v1/cas/check`. */
+const CAS_CHECK_CONCURRENCY = 20;
+
 /** Maximum size in bytes of a single CAS PNG blob (25 MB). */
 export const MAX_CAS_BLOB_BYTES = 25 * 1024 * 1024;
 
-/** Maximum number of blobs retained in the fallback in-memory CAS store. */
-export const MAX_CAS_MEMORY_BLOBS = 500;
+/** Standard 8-byte PNG file signature (`\x89PNG\r\n\x1a\n`). */
+const PNG_MAGIC = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 const SHA256_LOWER_HEX_RE = /^[0-9a-f]{64}$/;
 const SHA256_HEX_RE = /^[0-9a-fA-F]{64}$/;
 
-/** In-memory CAS blob fallback used when `SCREENSHOT_BUCKET` is not bound. */
-const casMemoryStore = new Map<string, Uint8Array>();
-
-/** Resets the in-memory CAS blob store (test helper). */
-export function resetCasMemoryStore(): void {
-  casMemoryStore.clear();
+/** Returns true iff `buf` begins with the 8-byte PNG magic header. */
+export function hasPngSignature(buf: ArrayBuffer | Uint8Array): boolean {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  if (bytes.byteLength < PNG_MAGIC.byteLength) return false;
+  for (let i = 0; i < PNG_MAGIC.byteLength; i++) {
+    if (bytes[i] !== PNG_MAGIC[i]) return false;
+  }
+  return true;
 }
 
 function currentMonth(): string {
@@ -104,30 +117,52 @@ async function readBoundedBody(
   return { ok: true, buffer: merged.buffer };
 }
 
-/** Resolves the tenant scope (`teamId ?? user.id`) and billing context for CAS storage keys. */
+type CasTenantResult =
+  | { ok: true; scope: string; userId: string; teamId?: string; planId: string }
+  | { ok: false; status: 403; error: string };
+
+/**
+ * Resolves the tenant scope (`teamId ?? user.id`) and billing context for CAS storage keys.
+ * Fails closed with 403 when `?teamId=` is specified for a team the caller does not
+ * belong to, or when a write is attempted by a read-only team `viewer`.
+ */
 async function resolveCasTenant(
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
-): Promise<{ scope: string; userId: string; teamId?: string; planId: string }> {
+  requireWrite = false,
+): Promise<CasTenantResult> {
   const userId = c.get('userId');
   const store = c.get('store');
   const queryTeamId = c.req.query('teamId');
-  if (queryTeamId && store) {
+  if (queryTeamId) {
+    if (!store) {
+      return { ok: false, status: 403, error: 'Not a member of the requested team' };
+    }
     const member = await store.getMember(queryTeamId, userId);
-    if (member) {
-      const team = await store.getTeam(queryTeamId);
+    if (!member) {
+      return { ok: false, status: 403, error: 'Not a member of the requested team' };
+    }
+    if (requireWrite && !can(member.role, 'run_tests')) {
       return {
-        scope: queryTeamId,
-        userId,
-        teamId: queryTeamId,
-        planId: team?.plan ?? 'free',
+        ok: false,
+        status: 403,
+        error: 'Read-only viewers cannot upload CAS blobs to a team',
       };
     }
+    const team = await store.getTeam(queryTeamId);
+    return {
+      ok: true,
+      scope: queryTeamId,
+      userId,
+      teamId: queryTeamId,
+      planId: team?.plan ?? 'free',
+    };
   }
   const user = store ? await store.getUser(userId) : null;
   const userWithTeam = user as (User & { teamId?: string }) | null;
   const teamId = userWithTeam?.teamId;
   const scope = teamId ?? user?.id ?? userId;
   return {
+    ok: true,
     scope,
     userId,
     teamId,
@@ -186,23 +221,40 @@ casRoutes.post('/check', async (c) => {
     hashes.push(h);
   }
 
-  const { scope } = await resolveCasTenant(c);
+  const tenant = await resolveCasTenant(c, false);
+  if (!tenant.ok) return c.json({ error: tenant.error }, tenant.status);
+
+  const { scope } = tenant;
   const bucket = getCasBucket(c.env);
+  const uniqueHashes = [...new Set(hashes)];
+  const foundByHash = new Map<string, boolean>();
+
+  if (bucket) {
+    let cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(CAS_CHECK_CONCURRENCY, uniqueHashes.length) },
+      async () => {
+        while (cursor < uniqueHashes.length) {
+          const idx = cursor++;
+          const hash = uniqueHashes[idx]!;
+          const key = casObjectKey(scope, hash);
+          const headObj =
+            typeof bucket.head === 'function' ? await bucket.head(key) : await bucket.get(key);
+          foundByHash.set(hash, headObj !== null && headObj !== undefined);
+        }
+      },
+    );
+    await Promise.all(workers);
+  } else {
+    for (const hash of uniqueHashes) {
+      foundByHash.set(hash, casMemoryStore.has(casObjectKey(scope, hash)));
+    }
+  }
+
   const existing: string[] = [];
   const missing: string[] = [];
-
   for (const hash of hashes) {
-    const key = casObjectKey(scope, hash);
-    let found = false;
-    if (bucket) {
-      const headObj =
-        typeof bucket.head === 'function' ? await bucket.head(key) : await bucket.get(key);
-      found = headObj !== null && headObj !== undefined;
-    } else {
-      found = casMemoryStore.has(key);
-    }
-
-    if (found) {
+    if (foundByHash.get(hash)) {
       existing.push(hash);
     } else {
       missing.push(hash);
@@ -227,24 +279,17 @@ casRoutes.put('/blobs/:sha256', async (c) => {
     );
   }
 
-  const readResult = await readBoundedBody(c.req.raw, MAX_CAS_BLOB_BYTES);
-  if (!readResult.ok) {
-    if (readResult.reason === 'empty') {
-      return c.json({ error: 'Blob payload must not be empty' }, 400);
-    }
-    return c.json({ error: 'Blob payload exceeds maximum size of 25 MB' }, 413);
-  }
-  const buf = readResult.buffer;
+  const tenant = await resolveCasTenant(c, true);
+  if (!tenant.ok) return c.json({ error: tenant.error }, tenant.status);
 
-  const actualHash = await sha256Hex(buf);
-  if (actualHash !== sha256) {
-    return c.json({ error: 'SHA-256 digest mismatch' }, 400);
-  }
-
-  const { scope, userId, teamId, planId } = await resolveCasTenant(c);
+  const { scope, userId, teamId, planId } = tenant;
   const key = casObjectKey(scope, sha256);
   const bucket = getCasBucket(c.env);
   const store = c.get('store');
+
+  if (store && (await store.accountWritesClosed(userId))) {
+    return c.json({ error: 'Account erasure is in progress' }, 409);
+  }
 
   let alreadyExists = false;
   if (bucket) {
@@ -255,11 +300,45 @@ casRoutes.put('/blobs/:sha256', async (c) => {
     alreadyExists = casMemoryStore.has(key);
   }
 
+  // Pre-check monthly screenshot quota BEFORE buffering up to 25 MB of upload body.
+  const plan = getPlan(planId);
+  const screenshotLimit = plan.limits.screenshotsPerMonth;
+  const month = currentMonth();
+  const meterTeam = Boolean(teamId && plan.id !== 'free');
+  if (!alreadyExists && store && screenshotLimit !== null) {
+    const currentCount = meterTeam
+      ? (await store.getTeamUsage(teamId!, month)).screenshotsCount
+      : (await store.getUsage(userId, month)).screenshotsCount;
+    if (currentCount >= screenshotLimit) {
+      return c.json(
+        {
+          error: `Monthly screenshot limit reached (${screenshotLimit} on the ${plan.name} plan).`,
+          limit: screenshotLimit,
+        },
+        402,
+      );
+    }
+  }
+
+  const readResult = await readBoundedBody(c.req.raw, MAX_CAS_BLOB_BYTES);
+  if (!readResult.ok) {
+    if (readResult.reason === 'empty') {
+      return c.json({ error: 'Blob payload must not be empty' }, 400);
+    }
+    return c.json({ error: 'Blob payload exceeds maximum size of 25 MB' }, 413);
+  }
+  const buf = readResult.buffer;
+
+  if (!hasPngSignature(buf)) {
+    return c.json({ error: 'Invalid PNG payload: missing PNG signature' }, 400);
+  }
+
+  const actualHash = await sha256Hex(buf);
+  if (actualHash !== sha256) {
+    return c.json({ error: 'SHA-256 digest mismatch' }, 400);
+  }
+
   if (!alreadyExists && store) {
-    const plan = getPlan(planId);
-    const screenshotLimit = plan.limits.screenshotsPerMonth;
-    const month = currentMonth();
-    const meterTeam = Boolean(teamId && plan.id !== 'free');
     if (screenshotLimit !== null) {
       const reserved = meterTeam
         ? await store.tryReserveTeamScreenshots(teamId!, month, screenshotLimit, 1)
@@ -314,9 +393,11 @@ casRoutes.get('/blobs/:sha256', async (c) => {
     return c.json({ error: 'Invalid SHA-256 hash: must be a 64-character hex string' }, 400);
   }
 
+  const tenant = await resolveCasTenant(c, false);
+  if (!tenant.ok) return c.json({ error: tenant.error }, tenant.status);
+
   const sha256 = sha256Param.toLowerCase();
-  const { scope } = await resolveCasTenant(c);
-  const key = casObjectKey(scope, sha256);
+  const key = casObjectKey(tenant.scope, sha256);
   const bucket = getCasBucket(c.env);
 
   let bytes: Uint8Array | null = null;

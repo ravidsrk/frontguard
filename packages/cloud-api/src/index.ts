@@ -2,7 +2,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import type { Run } from "./types.js";
-import { processRun, type ProcessorEnv } from "./processor.js";
+import { NO_COMPARISON_ERROR, processRun, type ProcessorEnv } from "./processor.js";
 import type { BaselineRestore, BaselineBucket } from "./daytona-runner.js";
 import {
   emitRunTelemetry,
@@ -15,10 +15,19 @@ import {
   isProductionMisconfigured,
   type Bindings,
 } from "./db/factory.js";
-import { apiRateLimiter } from "./rate-limit.js";
+import {
+  apiRateLimiter,
+  clientIpFromHeaders,
+  enforceRateLimit,
+} from "./rate-limit.js";
 import { currentMonth, type Store } from "./db/store.js";
 import { hashKey } from "./auth/keys.js";
 import { allocateDemoUserId } from "./auth/demo-user.js";
+import {
+  canUserApproveRun,
+  canUserDeleteRun,
+  isRunAccessibleByUser,
+} from "./auth/run-access.js";
 import { authRoutes } from "./routes/auth.js";
 import { keyRoutes } from "./routes/keys.js";
 import { screenshotRoutes } from "./routes/screenshots.js";
@@ -35,7 +44,7 @@ import { monitorRoutes } from "./routes/monitors.js";
 import { dashboardRoutes, sessionDashboardRoutes } from "./routes/dashboard.js";
 import { hasValidSessionSecret } from "./auth/session.js";
 import { teamRoutes } from "./routes/teams.js";
-import { can } from "./db/teams.js";
+import { can, roleAtLeast } from "./db/teams.js";
 import { billingRoutes } from "./routes/billing.js";
 import { checkLimit, getPlan } from "./billing/plans.js";
 import {
@@ -43,6 +52,7 @@ import {
   MAX_VIEWPORTS,
   MAX_BROWSERS,
   MAX_FAN_OUT,
+  clampLimit,
   plannedScreenshotCount,
 } from "./limits.js";
 import { evaluateSpendCap } from "./billing/spend-cap.js";
@@ -52,18 +62,39 @@ import { PACKAGE_VERSION } from "./version.js";
 import {
   SafeRenderTargetError,
   assertSafeRenderTarget,
+  assertSafeRoutePaths,
 } from "./security/render-target.js";
+import {
+  approvalsToReviewEvents,
+  deriveRunPixelmatchStatus,
+  evaluatePromotionGate,
+} from "./review-policy.js";
 import { recordDeadLetter } from "./dead-letter.js";
 import { OPENAPI_SPEC } from "./openapi-spec.js";
 
 // ---------------------------------------------------------------------------
-// Types
+// Types & helpers
 // ---------------------------------------------------------------------------
 type Variables = {
   apiKey: string;
   userId: string;
   store: Store;
 };
+
+/** Constant-time UTF-8 string comparison (Workers + Node safe). */
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const aBytes = new TextEncoder().encode(a);
+  const bBytes = new TextEncoder().encode(b);
+  const maxLen = Math.max(aBytes.length, bBytes.length);
+  let diff = aBytes.length ^ bBytes.length;
+  for (let i = 0; i < maxLen; i++) {
+    diff |= (aBytes[i] ?? 0) ^ (bBytes[i] ?? 0);
+  }
+  return diff === 0;
+}
+
+const LOCALHOST_ORIGIN_RE = /^http:\/\/localhost(:\d+)?$/;
+const VERCEL_ID_RE = /^[a-zA-Z0-9_-]{1,128}$/;
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -75,24 +106,27 @@ const runRequestSchema = z.object({
   routes: z
     .array(
       z.object({
-        path: z.string(),
+        path: z.string().min(1),
         name: z.string().optional(),
       }),
     )
+    .min(1)
     .max(MAX_ROUTES)
     .optional(),
   viewports: z
     .array(z.number().int().min(320).max(3840))
+    .min(1)
     .max(MAX_VIEWPORTS)
     .optional(),
   browsers: z
     .array(z.enum(["chromium", "firefox", "webkit"]))
+    .min(1)
     .max(MAX_BROWSERS)
     .optional(),
   threshold: z.number().min(0).max(1).optional(),
   ai: z
     .object({
-      provider: z.string(),
+      provider: z.string().min(1),
       model: z.string().optional(),
     })
     .nullable()
@@ -112,17 +146,29 @@ const runRequestSchema = z.object({
   installationId: z.number().int().optional(),
 });
 
+const approveBaselineOptionsSchema = z
+  .object({
+    actorKind: z.enum(["human", "agent", "model"]).optional(),
+    confirmHumanReview: z.boolean().optional(),
+    judgeMode: z.boolean().optional(),
+    axeBlocked: z.boolean().optional(),
+    axeViolationSummary: z.string().max(500).optional(),
+  })
+  .optional();
+
 // ---------------------------------------------------------------------------
-// Middleware — CORS (explicit origins)
+// Middleware — CORS (explicit origins; localhost allowed strictly outside prod)
 // ---------------------------------------------------------------------------
 app.use(
   "*",
   cors({
-    origin: (origin) => {
+    origin: (origin, c) => {
       const allowed = ["https://frontguard.dev", "https://www.frontguard.dev"];
       if (!origin) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
       if (allowed.includes(origin)) return origin;
+      if (!isProduction(c.env) && LOCALHOST_ORIGIN_RE.test(origin)) {
+        return origin;
+      }
       return undefined;
     },
     credentials: true,
@@ -139,6 +185,15 @@ app.use("*", async (c, next) => {
   c.header("X-XSS-Protection", "0");
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
   c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  if (isProduction(c.env)) {
+    c.header(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains",
+    );
+  }
+  if (!c.res.headers.has("Content-Security-Policy")) {
+    c.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -211,8 +266,13 @@ app.route("/dashboard", sessionDashboardRoutes);
 // Middleware — Auth for all /v1/* routes
 // ---------------------------------------------------------------------------
 app.use("/v1/*", async (c, next) => {
+  const clientIp = clientIpFromHeaders((name) => c.req.header(name));
   const apiKey = c.req.header("Authorization")?.replace("Bearer ", "");
-  if (!apiKey) return c.json({ error: "Missing API key" }, 401);
+  if (!apiKey) {
+    const blocked = enforceRateLimit(c, `unauth:${clientIp}`);
+    if (blocked) return blocked;
+    return c.json({ error: "Missing API key" }, 401);
+  }
 
   const store = c.get("store");
   let userId: string;
@@ -221,7 +281,11 @@ app.use("/v1/*", async (c, next) => {
     // Production: resolve the key hash to a user.
     const keyHash = await hashKey(apiKey);
     const record = await store.getApiKey(keyHash);
-    if (!record) return c.json({ error: "Invalid API key" }, 401);
+    if (!record) {
+      const blocked = enforceRateLimit(c, `unauth:${clientIp}`);
+      if (blocked) return blocked;
+      return c.json({ error: "Invalid API key" }, 401);
+    }
     userId = record.userId;
     await store.touchApiKey(keyHash, new Date().toISOString());
   } else {
@@ -243,21 +307,11 @@ app.use("/v1/*", async (c, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// Middleware — Rate limiting for all /v1/* routes
+// Middleware — Rate limiting for all /v1/* routes (keyed per authenticated user)
 // ---------------------------------------------------------------------------
 app.use("/v1/*", async (c, next) => {
-  const apiKey = c.get("apiKey");
-  const keyHash = await hashKey(apiKey);
-  const result = apiRateLimiter.check(keyHash);
-
-  c.header("X-RateLimit-Limit", String(result.limit));
-  c.header("X-RateLimit-Remaining", String(result.remaining));
-  c.header("X-RateLimit-Reset", String(Math.ceil(result.resetAt / 1000)));
-
-  if (!result.allowed) {
-    return c.json({ error: "Rate limit exceeded. Try again later." }, 429);
-  }
-
+  const blocked = enforceRateLimit(c, `user:${c.get("userId")}`);
+  if (blocked) return blocked;
   await next();
 });
 
@@ -291,8 +345,33 @@ app.post("/v1/run", async (c) => {
 
   const data = parsed.data;
 
+  // Cross-service contract (#401): checkRunId / installationId may only be
+  // supplied by authenticated GitHub App service-to-service requests.
+  if (data.checkRunId !== undefined || data.installationId !== undefined) {
+    const expectedSecret = c.env?.FRONTGUARD_CALLBACK_SECRET;
+    const providedSecret = c.req.header("X-Frontguard-Callback-Secret");
+    if (
+      !expectedSecret ||
+      !providedSecret ||
+      !timingSafeEqualStr(providedSecret, expectedSecret)
+    ) {
+      return c.json(
+        {
+          error:
+            "checkRunId and installationId require authenticated service-to-service authorization",
+        },
+        403,
+      );
+    }
+  }
+
+  const routes = data.routes ?? [{ path: "/" }];
+  const viewports = data.viewports ?? [1440];
+  const browsers = data.browsers ?? ["chromium"];
+
   try {
     await assertSafeRenderTarget(data.url);
+    assertSafeRoutePaths(data.url, routes);
   } catch (err) {
     if (err instanceof SafeRenderTargetError) {
       return c.json({ error: err.message }, 400);
@@ -303,9 +382,10 @@ app.post("/v1/run", async (c) => {
   const store = c.get("store");
   const userId = c.get("userId");
 
-  const routes = data.routes ?? [{ path: "/" }];
-  const viewports = data.viewports ?? [1440];
-  const browsers = data.browsers ?? ["chromium"];
+  if (await store.accountWritesClosed(userId)) {
+    return c.json({ error: "Account erasure is in progress" }, 409);
+  }
+
   const plannedScreenshots = plannedScreenshotCount(
     routes,
     viewports,
@@ -341,14 +421,27 @@ app.post("/v1/run", async (c) => {
 
   // Plan enforcement (Task 8.2, DM-3): resolve plan from team scope when present.
   // Paid team plans meter against a shared team_usage pool; personal/free runs
-  // stay on the per-user counter. A team's plan may only be claimed by a member.
+  // stay on the per-user counter. Reject mismatched ?teamId= vs projectId and
+  // enforce run_tests capability so read-only viewers cannot bill team quota.
   const queryTeamId = c.req.query("teamId");
+  if (queryTeamId && projectTeamId && queryTeamId !== projectTeamId) {
+    return c.json(
+      { error: "teamId does not match the project's team" },
+      400,
+    );
+  }
   const billingTeamId = queryTeamId ?? projectTeamId;
   let planId = "free";
   if (billingTeamId) {
     const member = await store.getMember(billingTeamId, userId);
     if (!member)
       return c.json({ error: "Not a member of the requested team" }, 403);
+    if (!can(member.role, "run_tests")) {
+      return c.json(
+        { error: "Read-only viewers cannot submit team runs" },
+        403,
+      );
+    }
     const team = await store.getTeam(billingTeamId);
     if (team) planId = team.plan;
   } else {
@@ -368,14 +461,25 @@ app.post("/v1/run", async (c) => {
   const month = currentMonth();
   const meterTeam = billingTeamId != null && plan.id !== "free";
 
-  // Enforce monthly sandbox compute minutes cap (sandboxMinutesPerMonth) before
-  // allocating a cloud sandbox run.
+  // Gate AI classification on plan entitlement before reserving run/screenshot quota.
+  const aiCallsLimit = plan.limits.aiCallsPerMonth;
+  if (data.ai && aiCallsLimit === 0) {
+    return c.json(
+      {
+        error: `AI diff classification is not available on the ${plan.name} plan.`,
+        upgradeUrl: "https://frontguard.dev/pricing",
+      },
+      402,
+    );
+  }
+
+  // Enforce monthly sandbox compute minutes cap (sandboxMinutesPerMonth) using
+  // the monotonic usage counter so deleted runs cannot reset monthly usage.
   const sandboxLimit = plan.limits.sandboxMinutesPerMonth;
   if (sandboxLimit !== null) {
-    const existingRuns = await store.listRuns(userId);
-    const usedSandboxMinutes = existingRuns
-      .filter((r) => r.createdAt.startsWith(month) && typeof r.duration === "number" && r.duration > 0)
-      .reduce((acc, r) => acc + Math.max(1, Math.ceil((r.duration ?? 0) / 60_000)), 0);
+    const usedSandboxMinutes = meterTeam
+      ? ((await store.getTeamUsage(billingTeamId!, month)).sandboxMinutesUsed ?? 0)
+      : ((await store.getUsage(userId, month)).sandboxMinutesUsed ?? 0);
     const sandboxCheck = checkLimit(plan, "sandboxMinutesPerMonth", usedSandboxMinutes);
     if (!sandboxCheck.allowed) {
       return c.json(
@@ -466,6 +570,54 @@ app.post("/v1/run", async (c) => {
     }
   }
 
+  // Reserve AI classification budget when AI analysis is requested.
+  if (data.ai) {
+    if (aiCallsLimit !== null) {
+      const reservedAi = meterTeam
+        ? await store.tryReserveTeamAiCalls(
+            billingTeamId!,
+            month,
+            aiCallsLimit,
+            plannedScreenshots,
+          )
+        : await store.tryReserveAiCalls(
+            userId,
+            month,
+            aiCallsLimit,
+            plannedScreenshots,
+          );
+      if (!reservedAi) {
+        if (meterTeam) {
+          await store.incrementTeamUsage(
+            billingTeamId!,
+            month,
+            -1,
+            -plannedScreenshots,
+          );
+        } else {
+          await store.incrementUsage(userId, month, -1, -plannedScreenshots);
+        }
+        const usage = meterTeam
+          ? await store.getTeamUsage(billingTeamId!, month)
+          : await store.getUsage(userId, month);
+        return c.json(
+          {
+            error: `Monthly AI classification limit reached (${aiCallsLimit} on the ${plan.name} plan).`,
+            limit: aiCallsLimit,
+            current: usage.aiCallsUsed ?? 0,
+            requested: plannedScreenshots,
+            upgradeUrl: "https://frontguard.dev/pricing",
+          },
+          402,
+        );
+      }
+    } else if (meterTeam) {
+      await store.incrementTeamAiCalls(billingTeamId!, month, plannedScreenshots);
+    } else {
+      await store.incrementAiCalls(userId, month, plannedScreenshots);
+    }
+  }
+
   const runId = crypto.randomUUID();
   const run: Run = {
     id: runId,
@@ -494,7 +646,16 @@ app.post("/v1/run", async (c) => {
   try {
     const u = await store.getUser(userId);
     if (u) {
-      await evaluateSpendCap(c.env ?? {}, store, u, plan, currentMonth());
+      await evaluateSpendCap(
+        c.env ?? {},
+        store,
+        u,
+        plan,
+        month,
+        new Date(),
+        fetch,
+        meterTeam ? billingTeamId : undefined,
+      );
     }
   } catch (err) {
     console.warn("[spend-cap] evaluation failed", err);
@@ -555,11 +716,13 @@ app.post("/v1/run", async (c) => {
   // Process async — mutates `run`, then persists the final state. The env
   // binding carries DAYTONA_API_KEY (Workers has no Node env). Keep the
   // promise alive past the 202 response via waitUntil (REL-1).
+  const allowAi = Boolean(run.ai) && plan.limits.aiCallsPerMonth !== 0;
   const processing = processRun(
     run,
     (c.env ?? {}) as ProcessorEnv,
     onScreenshots,
     baselineRestore,
+    { allowAi },
   )
     .catch((err: Error) => {
       run.status = "failed";
@@ -579,10 +742,34 @@ app.post("/v1/run", async (c) => {
           attempt: 1,
         });
       });
-      // Complete the originating GitHub Check Run, if this run came from CI.
-      if (run.github) void completeCheckRun(c.env ?? {}, run);
-      // Export OTLP metrics (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
-      void emitRunTelemetry((c.env ?? {}) as OtelEnv, runMetricsFromRun(run));
+
+      // Record monotonic sandbox minutes so deleting runs cannot bypass caps.
+      if (
+        typeof run.duration === "number" &&
+        Number.isFinite(run.duration) &&
+        run.duration > 0
+      ) {
+        const minutes = Math.max(1, Math.ceil(run.duration / 60_000));
+        try {
+          if (meterTeam) {
+            await store.addTeamSandboxMinutes(billingTeamId!, month, minutes);
+          } else {
+            await store.addSandboxMinutes(userId, month, minutes);
+          }
+        } catch {
+          /* non-fatal */
+        }
+      }
+
+      // Await GitHub Check Run callback & OTLP export inside waitUntil so
+      // Cloudflare Workers does not terminate the isolate mid-flight.
+      const sideEffects: Promise<unknown>[] = [
+        emitRunTelemetry((c.env ?? {}) as OtelEnv, runMetricsFromRun(run)),
+      ];
+      if (run.github) {
+        sideEffects.push(completeCheckRun(c.env ?? {}, run));
+      }
+      await Promise.allSettled(sideEffects);
     });
   try {
     c.executionCtx.waitUntil(processing);
@@ -610,26 +797,12 @@ app.get("/v1/runs/:id", async (c) => {
   const store = c.get("store");
   const userId = c.get("userId");
   const id = c.req.param("id");
+  if (!(await isRunAccessibleByUser(store, id, userId))) {
+    return c.json({ error: "Run not found" }, 404);
+  }
   const run = await store.getRun(id);
   if (!run) return c.json({ error: "Run not found" }, 404);
-
-  // Allow access if the user owns the run directly.
-  if ((await store.getRunOwner(id)) === userId) {
-    return c.json(run);
-  }
-
-  // Allow access if the run belongs to a project in a team the user is a member of.
-  if (run.projectId) {
-    const project = await store.getProjectById(run.projectId);
-    if (project) {
-      const member = await store.getMember(project.teamId, userId);
-      if (member) {
-        return c.json(run);
-      }
-    }
-  }
-
-  return c.json({ error: "Run not found" }, 404);
+  return c.json(run);
 });
 
 // ---------------------------------------------------------------------------
@@ -645,6 +818,7 @@ app.get("/v1/runs", async (c) => {
   const store = c.get("store");
   const userId = c.get("userId");
   const teamId = c.req.query("teamId");
+  const limit = clampLimit(c.req.query("limit"), 50, 200);
 
   if (teamId) {
     const member = await store.getMember(teamId, userId);
@@ -653,7 +827,7 @@ app.get("/v1/runs", async (c) => {
     const runs = await store.listRuns(userId, {
       teamIds: [teamId],
       includeOwn: false,
-      limit: 50,
+      limit,
     });
     return c.json({ runs, total: runs.length });
   }
@@ -661,7 +835,7 @@ app.get("/v1/runs", async (c) => {
   const teams = await store.listTeamsForUser(userId);
   const runs = await store.listRuns(userId, {
     teamIds: teams.map((t) => t.id),
-    limit: 50,
+    limit,
   });
   return c.json({ runs, total: runs.length });
 });
@@ -673,24 +847,20 @@ app.get("/v1/reports/:id", async (c) => {
   const store = c.get("store");
   const userId = c.get("userId");
   const id = c.req.param("id");
+  if (!(await isRunAccessibleByUser(store, id, userId))) {
+    return c.json({ error: "Run not found" }, 404);
+  }
   const run = await store.getRun(id);
   if (!run) return c.json({ error: "Run not found" }, 404);
-
-  // Check access: user must own the run or be a member of its project's team.
-  let hasAccess = (await store.getRunOwner(id)) === userId;
-  if (!hasAccess && run.projectId) {
-    const project = await store.getProjectById(run.projectId);
-    if (project) {
-      const member = await store.getMember(project.teamId, userId);
-      if (member) hasAccess = true;
-    }
-  }
-  if (!hasAccess) return c.json({ error: "Run not found" }, 404);
 
   if (run.status !== "completed") {
     return c.json({ error: "Run not yet completed", status: run.status }, 202);
   }
   if (run.reportHtml) {
+    c.header(
+      "Content-Security-Policy",
+      "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; object-src 'none'",
+    );
     return c.html(run.reportHtml);
   }
   return c.json({ error: "No report available" }, 404);
@@ -704,18 +874,53 @@ app.post("/v1/baselines/:runId/approve", async (c) => {
   const userId = c.get("userId");
   const id = c.req.param("runId");
   const run = await store.getRun(id);
-  if (!run) return c.json({ error: "Run not found" }, 404);
-
-  // Check access: user must own the run or be a member of its project's team.
-  let hasAccess = (await store.getRunOwner(id)) === userId;
-  if (!hasAccess && run.projectId) {
-    const project = await store.getProjectById(run.projectId);
-    if (project) {
-      const member = await store.getMember(project.teamId, userId);
-      if (member && can(member.role, "run_tests")) hasAccess = true;
-    }
+  if (!run || !(await isRunAccessibleByUser(store, id, userId))) {
+    return c.json({ error: "Run not found" }, 404);
   }
-  if (!hasAccess) return c.json({ error: "Run not found" }, 404);
+
+  if (!(await canUserApproveRun(store, id, userId))) {
+    return c.json(
+      {
+        error:
+          "Only a designated reviewer or team admin/owner can approve baselines",
+      },
+      403,
+    );
+  }
+
+  const rawBody = await c.req.json().catch(() => undefined);
+  const parsedOpts = approveBaselineOptionsSchema.safeParse(rawBody);
+  if (!parsedOpts.success) {
+    return c.json({ error: "Invalid approval options" }, 400);
+  }
+  const opts = parsedOpts.data;
+
+  const existingApprovals = await store.listApprovals(id);
+  const nowIso = new Date().toISOString();
+  const events = approvalsToReviewEvents([
+    { reviewerUserId: userId, status: "approved", createdAt: nowIso },
+    ...existingApprovals,
+  ]);
+  const gate = evaluatePromotionGate({
+    reviews: events,
+    actorKind: opts?.actorKind ?? "human",
+    confirmHumanReview: opts?.confirmHumanReview ?? true,
+    judgeMode: opts?.judgeMode ?? false,
+    axeBlocked: opts?.axeBlocked ?? false,
+    axeViolationSummary: opts?.axeViolationSummary,
+    pixelmatchStatus: deriveRunPixelmatchStatus(run, NO_COMPARISON_ERROR),
+  });
+  if (!gate.allowed) {
+    return c.json(
+      {
+        approved: false,
+        runId: id,
+        error: gate.reason,
+        tally: gate.tally,
+      },
+      409,
+    );
+  }
 
   await store.updateRun(id, { baselinesApproved: true });
   await promoteRunCurrentScreenshotsToBaseline(store, id);
@@ -743,14 +948,32 @@ app.delete("/v1/runs/:id", async (c) => {
   const store = c.get("store");
   const id = c.req.param("id");
   const userId = c.get("userId");
-  const deleted = await store.deleteRun(id, userId);
+  const run = await store.getRun(id);
+  if (!run) {
+    return c.json({ deleted: false });
+  }
+  const ownerId = await store.getRunOwner(id);
+  const allowed = await canUserDeleteRun(store, id, userId);
+  if (!allowed) {
+    const visibleOrFormerOwner =
+      ownerId === userId || (await isRunAccessibleByUser(store, id, userId));
+    if (visibleOrFormerOwner) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+    return c.json({ deleted: false });
+  }
+
+  const effectiveOwner = ownerId ?? userId;
+  const blobs = getScreenshotStore(c.env?.SCREENSHOTS as R2Bucket | undefined);
+  const attachments = await store.listAttachments(id);
+  const deleted = await store.deleteRun(id, effectiveOwner);
   if (deleted) {
-    // Best-effort cleanup of R2 screenshot blobs for this run.
+    // Best-effort cleanup of R2 screenshot and attachment blobs for this run.
     try {
-      const blobs = getScreenshotStore(
-        c.env?.SCREENSHOTS as R2Bucket | undefined,
-      );
-      await blobs.deleteRun(userId, id);
+      await blobs.deleteRun(effectiveOwner, id);
+      for (const att of attachments) {
+        await blobs.delete(att.r2Key);
+      }
     } catch {
       /* non-fatal */
     }
@@ -776,6 +999,19 @@ app.get("/v1/usage", async (c) => {
 // POST /v1/integrations/vercel/install — Register a Vercel integration install
 // ---------------------------------------------------------------------------
 app.post("/v1/integrations/vercel/install", async (c) => {
+  const configuredSecret = c.env?.VERCEL_INTEGRATION_SECRET;
+  if (configuredSecret) {
+    const provided = c.req.header("X-Vercel-Integration-Secret");
+    if (!provided || !timingSafeEqualStr(provided, configuredSecret)) {
+      return c.json(
+        { error: "Invalid Vercel integration authorization" },
+        403,
+      );
+    }
+  } else if (isProduction(c.env)) {
+    return c.json({ error: "Vercel integration is not configured" }, 503);
+  }
+
   const store = c.get("store");
   const userId = c.get("userId");
   let body: {
@@ -783,31 +1019,61 @@ app.post("/v1/integrations/vercel/install", async (c) => {
     vercelTeamId?: string | null;
     vercelUserId?: string | null;
     installationType?: string;
+    teamId?: string;
+    projectId?: string;
   };
   try {
     body = (await c.req.json()) as typeof body;
   } catch {
     return c.json({ error: "Invalid JSON body" }, 400);
   }
-  if (!body.configurationId) {
-    return c.json({ error: "configurationId is required" }, 400);
+  if (!body.configurationId || !VERCEL_ID_RE.test(body.configurationId)) {
+    return c.json({ error: "configurationId is required and must be valid" }, 400);
+  }
+  if (body.vercelTeamId && !VERCEL_ID_RE.test(body.vercelTeamId)) {
+    return c.json({ error: "Invalid vercelTeamId" }, 400);
+  }
+  if (body.vercelUserId && !VERCEL_ID_RE.test(body.vercelUserId)) {
+    return c.json({ error: "Invalid vercelUserId" }, 400);
   }
 
   const teamKey = body.vercelTeamId ?? body.configurationId;
-  const teamId = `vercel_${teamKey}`;
+  const teamId = body.teamId ?? `vercel_${teamKey}`;
   const now = new Date().toISOString();
   const existing = await store.getTeam(teamId);
-  if (!existing) {
+  if (existing) {
+    // Prevent cross-tenant takeover / audit injection: caller must be an active
+    // admin or owner of the existing team.
+    const member = await store.getMember(teamId, userId);
+    if (!member || !roleAtLeast(member.role, "admin")) {
+      return c.json(
+        { error: "Only team owners/admins can manage Vercel installations" },
+        403,
+      );
+    }
+  } else if (body.teamId) {
+    return c.json({ error: "Team not found" }, 404);
+  } else {
     await store.createTeam(
       {
         id: teamId,
-        name: body.vercelTeamId ? `Vercel (${body.vercelTeamId})` : `Vercel (${body.configurationId})`,
+        name: body.vercelTeamId
+          ? `Vercel (${body.vercelTeamId})`
+          : `Vercel (${body.configurationId})`,
         plan: "free",
         createdAt: now,
       },
       userId,
     );
   }
+
+  if (body.projectId) {
+    const project = await store.getProjectById(body.projectId);
+    if (!project || project.teamId !== teamId) {
+      return c.json({ error: "Project not found in target team" }, 404);
+    }
+  }
+
   await store.recordActivity({
     id: crypto.randomUUID(),
     teamId,
@@ -819,6 +1085,7 @@ app.post("/v1/integrations/vercel/install", async (c) => {
       vercelTeamId: body.vercelTeamId ?? null,
       vercelUserId: body.vercelUserId ?? null,
       installationType: body.installationType ?? "external",
+      ...(body.projectId ? { projectId: body.projectId } : {}),
     }),
     createdAt: now,
   });

@@ -19,6 +19,7 @@ import { migration005BackgroundFailures } from './005-background-failures.js';
 import { migration006MonitorProjectId } from './006-monitor-project-id.js';
 import { migration007AccountWriteLocks } from './007-account-write-locks.js';
 import { migration008PendingRunUpdates } from './008-pending-run-updates.js';
+import { migration009MeteringBillingMonitorRunId } from './009-metering-billing-monitor-run-id.js';
 import type { Migration } from './types.js';
 
 export type { Migration } from './types.js';
@@ -36,4 +37,5 @@ export const MIGRATIONS: readonly Migration[] = [
   migration006MonitorProjectId,
   migration007AccountWriteLocks,
   migration008PendingRunUpdates,
+  migration009MeteringBillingMonitorRunId,
 ];

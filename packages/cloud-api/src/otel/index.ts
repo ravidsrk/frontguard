@@ -97,9 +97,9 @@ function attr(key: string, value: string): unknown {
  * gauge. Exposed for testing.
  */
 export function buildOtlpMetricsPayload(metrics: RunMetrics, nowMs: number): unknown {
-  const timeUnixNano = String(Math.round(nowMs) * 1_000_000);
+  const timeUnixNano = (BigInt(Math.round(nowMs)) * 1_000_000n).toString();
+  // Omit high-cardinality `run.id` from metric attributes to prevent TSDB cardinality explosion.
   const pointAttrs = [
-    attr('run.id', metrics.runId),
     attr('run.status', metrics.status),
     ...Object.entries(metrics.attributes ?? {}).map(([k, v]) => attr(k, v)),
   ];
@@ -154,6 +154,7 @@ export async function sendOtlpMetrics(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10_000),
     });
     return { ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}` };
   } catch (err) {

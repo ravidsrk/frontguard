@@ -18,30 +18,45 @@ import { getStore, isProduction } from '../db/factory.js';
 import type { Store } from '../db/store.js';
 import { allocateDemoUserId } from '../auth/demo-user.js';
 import { generateApiKey, hashKey, MAX_KEYS_PER_USER } from '../auth/keys.js';
+import { clientIpFromHeaders, enforceRateLimit } from '../rate-limit.js';
 
 type Variables = { store: Store; userId: string };
 
 export const keyRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-// Per-router auth: resolve the caller to a userId.
+// Per-router auth + rate limiting: resolve the caller to a userId.
 keyRoutes.use('*', async (c, next) => {
+  const clientIp = clientIpFromHeaders((name) => c.req.header(name));
   const apiKey = c.req.header('Authorization')?.replace('Bearer ', '');
-  if (!apiKey) return c.json({ error: 'Missing API key' }, 401);
+  if (!apiKey) {
+    const blocked = enforceRateLimit(c, `unauth:${clientIp}`);
+    if (blocked) return blocked;
+    return c.json({ error: 'Missing API key' }, 401);
+  }
 
   const store = getStore(c.env);
   c.set('store', store);
 
+  let userId: string;
   if (isProduction(c.env)) {
     const record = await store.getApiKey(await hashKey(apiKey));
-    if (!record) return c.json({ error: 'Invalid API key' }, 401);
-    c.set('userId', record.userId);
+    if (!record) {
+      const blocked = enforceRateLimit(c, `unauth:${clientIp}`);
+      if (blocked) return blocked;
+      return c.json({ error: 'Invalid API key' }, 401);
+    }
+    userId = record.userId;
   } else {
-    const userId = await allocateDemoUserId(store, apiKey);
+    userId = await allocateDemoUserId(store, apiKey);
     if (!(await store.getUser(userId))) {
       await store.createUser({ id: userId, plan: 'free', createdAt: new Date().toISOString() });
     }
-    c.set('userId', userId);
   }
+
+  const blocked = enforceRateLimit(c, `user:${userId}`);
+  if (blocked) return blocked;
+
+  c.set('userId', userId);
   await next();
 });
 
@@ -63,10 +78,14 @@ keyRoutes.get('/', async (c) => {
 // POST /v1/keys — mint a new key.
 keyRoutes.post('/', async (c) => {
   const store = c.get('store');
+  const userId = c.get('userId');
+  if (await store.accountWritesClosed(userId)) {
+    return c.json({ error: 'Account erasure is in progress' }, 409);
+  }
   const body = (await c.req.json().catch(() => ({}))) as { name?: string };
   const name = (body.name ?? 'API key').slice(0, 100);
 
-  const existingKeys = await store.listApiKeys(c.get('userId'));
+  const existingKeys = await store.listApiKeys(userId);
   if (existingKeys.length >= MAX_KEYS_PER_USER) {
     return c.json(
       { error: 'API key limit reached', limit: MAX_KEYS_PER_USER },

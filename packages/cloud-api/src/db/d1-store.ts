@@ -22,6 +22,8 @@ import type {
 } from './store.js';
 import { erasureBlockedBySoleOwnership } from './account-erasure.js';
 import { withUserMutation } from './account-writes.js';
+import { deleteCasMemoryPrefix } from '../storage/cas-memory.js';
+import { clampLimit } from '../limits.js';
 import type { Monitor, MonitorRun, MonitorRunStatus, MonitorAlertState } from './monitors.js';
 import { isMonitorDue } from './monitors.js';
 import type {
@@ -75,6 +77,13 @@ interface RunRow {
 
 const OPTIMISTIC_MAX_RETRIES = 5;
 
+/** Column projection for run list / baseline queries — intentionally omits multi-MB `report_html`. */
+const RUN_SUMMARY_COLUMNS =
+  'id, user_id, project_id, status, config, results, NULL AS report_html, routes_count, regressions_count, baselines_approved, error, created_at, completed_at, version';
+
+/** Maximum teamIds bound into a single D1 `IN (...)` query (D1 hard cap is 100 params). */
+const D1_TEAM_ID_CHUNK_SIZE = 50;
+
 class OptimisticConflictError extends Error {
   constructor(entity: string, id: string) {
     super(`optimistic concurrency conflict: ${entity} ${id}`);
@@ -93,6 +102,9 @@ function runConfig(run: Run): string {
     ai: run.ai,
     reportUrl: run.reportUrl,
     projectId: run.projectId,
+    ...(typeof run.duration === 'number' && Number.isFinite(run.duration)
+      ? { duration: run.duration }
+      : {}),
     // CI linkage (owner/repo/prNumber/commitSha). Folded into the config blob
     // rather than dedicated columns so no schema migration is required. The MCP
     // `list_regressions` / `recent_runs` tools filter on this, so dropping it
@@ -115,6 +127,7 @@ function rowToRun(row: RunRow): Run {
     ai: cfg.ai ?? null,
     createdAt: row.created_at,
     completedAt: row.completed_at ?? undefined,
+    duration: typeof cfg.duration === 'number' && Number.isFinite(cfg.duration) ? cfg.duration : undefined,
     results: row.results ? (JSON.parse(row.results) as Run['results']) : null,
     reportUrl: cfg.reportUrl ?? null,
     reportHtml: row.report_html ?? undefined,
@@ -223,43 +236,45 @@ export class D1Store implements Store {
     afterWritten?: () => Promise<void>,
   ): Promise<FinishedRunCommit> {
     return withUserMutation(userId, async () => {
+      // Park the update ONLY while BOTH the erasure lock and user row exist.
       const saved = await this.savePendingRunUpdate(userId, run);
+      if (saved) return 'pending';
+
       const user = await this.getUser(userId);
       if (!user) {
         await this.deletePendingRunUpdate(run.id);
         return 'skipped';
       }
-      if (!(await this.accountWritesClosed(userId))) {
-        await this.updateRun(run.id, run);
-        await this.deletePendingRunUpdate(run.id);
-        await afterWritten?.();
-        return 'written';
+      if (await this.accountWritesClosed(userId)) {
+        // Lock was acquired between the first attempt and now; retry with the
+        // same atomic EXISTS(users) + EXISTS(account_write_locks) guard — never force.
+        const savedRetry = await this.savePendingRunUpdate(userId, run);
+        return savedRetry ? 'pending' : 'skipped';
       }
-      if (!saved) await this.savePendingRunUpdate(userId, run, true);
-      return 'pending';
+      await this.updateRun(run.id, run);
+      await this.deletePendingRunUpdate(run.id);
+      await afterWritten?.();
+      return 'written';
     });
   }
 
-  private async savePendingRunUpdate(userId: string, run: Run, force = false): Promise<boolean> {
+  private async savePendingRunUpdate(userId: string, run: Run): Promise<boolean> {
     const payload = JSON.stringify(run);
     const updatedAt = new Date().toISOString();
-    const sql = force
-      ? `INSERT INTO pending_run_updates (run_id, user_id, payload, updated_at) VALUES (?, ?, ?, ?)
-         ON CONFLICT(run_id) DO UPDATE SET user_id = excluded.user_id, payload = excluded.payload, updated_at = excluded.updated_at`
-      : `INSERT INTO pending_run_updates (run_id, user_id, payload, updated_at)
-         SELECT ?, ?, ?, ?
-         WHERE EXISTS (SELECT 1 FROM account_write_locks WHERE user_id = ?)
-           AND EXISTS (SELECT 1 FROM users WHERE id = ?)
-         ON CONFLICT(run_id) DO UPDATE SET
-           user_id = excluded.user_id,
-           payload = excluded.payload,
-           updated_at = excluded.updated_at
-         WHERE EXISTS (SELECT 1 FROM account_write_locks WHERE user_id = excluded.user_id)
-           AND EXISTS (SELECT 1 FROM users WHERE id = excluded.user_id)`;
-    const statement = this.db.prepare(sql);
-    const res = force
-      ? await statement.bind(run.id, userId, payload, updatedAt).run()
-      : await statement.bind(run.id, userId, payload, updatedAt, userId, userId).run();
+    const sql = `INSERT INTO pending_run_updates (run_id, user_id, payload, updated_at)
+       SELECT ?, ?, ?, ?
+       WHERE EXISTS (SELECT 1 FROM account_write_locks WHERE user_id = ?)
+         AND EXISTS (SELECT 1 FROM users WHERE id = ?)
+       ON CONFLICT(run_id) DO UPDATE SET
+         user_id = excluded.user_id,
+         payload = excluded.payload,
+         updated_at = excluded.updated_at
+       WHERE EXISTS (SELECT 1 FROM account_write_locks WHERE user_id = excluded.user_id)
+         AND EXISTS (SELECT 1 FROM users WHERE id = excluded.user_id)`;
+    const res = await this.db
+      .prepare(sql)
+      .bind(run.id, userId, payload, updatedAt, userId, userId)
+      .run();
     return (res.meta?.changes ?? 0) > 0;
   }
 
@@ -268,6 +283,10 @@ export class D1Store implements Store {
   }
 
   private async flushPendingRunUpdates(userId: string): Promise<void> {
+    if (!(await this.getUser(userId))) {
+      await this.db.prepare(`DELETE FROM pending_run_updates WHERE user_id = ?`).bind(userId).run();
+      return;
+    }
     const { results } = await this.db
       .prepare(`SELECT run_id, payload FROM pending_run_updates WHERE user_id = ?`)
       .bind(userId)
@@ -302,12 +321,19 @@ export class D1Store implements Store {
       return { erased: false, userId, runs: 0, baselines: 0, reports: 0, reason: 'sole-owner' };
     }
 
+    // Close writes BEFORE snapshotting runs/attachments/solo-teams so concurrent
+    // uploads cannot race past the snapshot window.
+    await this.closeAccountWrites(userId);
+
     const { results: runRows } = await this.db
-      .prepare(`SELECT id, report_html FROM runs WHERE user_id = ?`)
+      .prepare(
+        `SELECT id, CASE WHEN report_html IS NOT NULL AND report_html != '' THEN 1 ELSE 0 END AS has_report
+         FROM runs WHERE user_id = ?`,
+      )
       .bind(userId)
-      .all<{ id: string; report_html: string | null }>();
+      .all<{ id: string; has_report: number }>();
     const runIds = runRows.map((row) => row.id);
-    const reports = runRows.filter((row) => row.report_html != null && row.report_html !== '').length;
+    const reports = runRows.filter((row) => Number(row.has_report) === 1).length;
     const baselineRow = await this.db
       .prepare(
         `SELECT COUNT(*) AS n FROM screenshots WHERE type = 'baseline' AND run_id IN (SELECT id FROM runs WHERE user_id = ?)`,
@@ -316,11 +342,59 @@ export class D1Store implements Store {
       .first<{ n: number | bigint }>();
     const baselines = Number(baselineRow?.n ?? 0);
 
-    await this.closeAccountWrites(userId);
+    // Collect attachment R2 keys for both owned runs and cross-user attachments uploaded by userId.
+    const { results: attachmentRows } = await this.db
+      .prepare(
+        `SELECT r2_key FROM run_attachments
+         WHERE run_id IN (SELECT id FROM runs WHERE user_id = ?)
+            OR r2_key LIKE ?`,
+      )
+      .bind(userId, `${userId}/%`)
+      .all<{ r2_key: string }>();
+
+    // Identify solo teams where userId is the only remaining member.
+    const { results: soloTeamRows } = await this.db
+      .prepare(
+        `SELECT team_id FROM team_members
+         WHERE user_id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM team_members other
+             WHERE other.team_id = team_members.team_id AND other.user_id != ?
+           )`,
+      )
+      .bind(userId, userId)
+      .all<{ team_id: string }>();
+    const soloTeamIds = soloTeamRows.map((r) => r.team_id);
+
+    // Collect any runs in solo teams owned by other former members so their blobs are purged too.
+    const soloTeamExtraRuns: Array<{ id: string; user_id: string }> = [];
+    for (const soloTeamId of soloTeamIds) {
+      const { results: extraRuns } = await this.db
+        .prepare(
+          `SELECT id, user_id FROM runs
+           WHERE project_id IN (SELECT id FROM team_projects WHERE team_id = ?)
+             AND user_id != ?`,
+        )
+        .bind(soloTeamId, userId)
+        .all<{ id: string; user_id: string }>();
+      soloTeamExtraRuns.push(...extraRuns);
+    }
+
     if (blobs) {
       try {
         for (const id of runIds) {
           await blobs.deleteRun(userId, id);
+        }
+        for (const att of attachmentRows) {
+          await blobs.delete?.(att.r2_key);
+        }
+        await blobs.deletePrefix?.(`${userId}/`);
+        await blobs.deletePrefix?.(`cas/${userId}/`);
+        for (const extra of soloTeamExtraRuns) {
+          await blobs.deleteRun(extra.user_id, extra.id);
+        }
+        for (const soloTeamId of soloTeamIds) {
+          await blobs.deletePrefix?.(`cas/${soloTeamId}/`);
         }
       } catch {
         await this.reopenAccountWrites(userId);
@@ -335,7 +409,37 @@ export class D1Store implements Store {
       }
     }
 
+    deleteCasMemoryPrefix(`cas/${userId}/`);
+    for (const soloTeamId of soloTeamIds) {
+      deleteCasMemoryPrefix(`cas/${soloTeamId}/`);
+    }
+
+    const nowIso = new Date().toISOString();
     const statements: D1PreparedStatement[] = [
+      // Statement 0: atomic sole-owner guard inside the same D1 batch transaction.
+      // Because `account_write_locks` already has a PK row for `userId`, inserting
+      // when `userId` has become a sole owner of a multi-member team triggers a
+      // PRIMARY KEY violation and rolls back the entire erasure batch atomically.
+      this.db
+        .prepare(
+          `INSERT INTO account_write_locks (user_id, closed_at)
+           SELECT ?, ?
+           WHERE EXISTS (
+             SELECT 1 FROM team_members tm_self
+             WHERE tm_self.user_id = ? AND tm_self.role = 'owner'
+               AND EXISTS (
+                 SELECT 1 FROM team_members tm_other
+                 WHERE tm_other.team_id = tm_self.team_id AND tm_other.user_id != ?
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM team_members tm_coowner
+                 WHERE tm_coowner.team_id = tm_self.team_id
+                   AND tm_coowner.user_id != ?
+                   AND tm_coowner.role = 'owner'
+               )
+           )`,
+        )
+        .bind(userId, nowIso, userId, userId, userId),
       this.db
         .prepare(
           `DELETE FROM background_failures
@@ -357,8 +461,12 @@ export class D1Store implements Store {
         )
         .bind(userId, userId),
       this.db
-        .prepare(`DELETE FROM run_attachments WHERE run_id IN (SELECT id FROM runs WHERE user_id = ?)`)
-        .bind(userId),
+        .prepare(
+          `DELETE FROM run_attachments
+           WHERE run_id IN (SELECT id FROM runs WHERE user_id = ?)
+              OR r2_key LIKE ?`,
+        )
+        .bind(userId, `${userId}/%`),
       this.db
         .prepare(`DELETE FROM screenshots WHERE run_id IN (SELECT id FROM runs WHERE user_id = ?)`)
         .bind(userId),
@@ -377,18 +485,67 @@ export class D1Store implements Store {
         )
         .bind(userId, userId),
       this.db.prepare(`DELETE FROM monitors WHERE user_id = ?`).bind(userId),
-      this.db.prepare(`DELETE FROM team_members WHERE user_id = ?`).bind(userId),
       this.db.prepare(`DELETE FROM team_activity WHERE user_id = ?`).bind(userId),
+      // Redact PII from remaining team_activity rows where another member targeted this user.
+      this.db
+        .prepare(`UPDATE team_activity SET target = '[erased]', metadata = NULL WHERE target = ?`)
+        .bind(userId),
     ];
+
     if (user.email) {
       statements.push(
         this.db
           .prepare(`DELETE FROM team_invitations WHERE email IS NOT NULL AND lower(email) = lower(?)`)
           .bind(user.email),
+        this.db
+          .prepare(
+            `UPDATE team_activity SET target = '[erased]', metadata = NULL
+             WHERE target IS NOT NULL AND lower(target) = lower(?)`,
+          )
+          .bind(user.email),
       );
     }
+    if (user.githubLogin) {
+      statements.push(
+        this.db
+          .prepare(
+            `DELETE FROM team_invitations WHERE github_login IS NOT NULL AND lower(github_login) = lower(?)`,
+          )
+          .bind(user.githubLogin),
+        this.db
+          .prepare(
+            `UPDATE team_activity SET target = '[erased]', metadata = NULL
+             WHERE target IS NOT NULL AND lower(target) = lower(?)`,
+          )
+          .bind(user.githubLogin),
+      );
+    }
+
+    // Remove memberships and delete solo teams cleanly (including Stripe metadata & projects).
+    statements.push(this.db.prepare(`DELETE FROM team_members WHERE user_id = ?`).bind(userId));
+    for (const soloTeamId of soloTeamIds) {
+      statements.push(
+        this.db.prepare(`DELETE FROM team_activity WHERE team_id = ?`).bind(soloTeamId),
+        this.db.prepare(`DELETE FROM team_invitations WHERE team_id = ?`).bind(soloTeamId),
+        this.db.prepare(`DELETE FROM team_usage WHERE team_id = ?`).bind(soloTeamId),
+        this.db.prepare(`DELETE FROM team_projects WHERE team_id = ?`).bind(soloTeamId),
+        this.db.prepare(`DELETE FROM teams WHERE id = ?`).bind(soloTeamId),
+      );
+    }
+
     statements.push(this.db.prepare(`DELETE FROM users WHERE id = ?`).bind(userId));
-    await this.db.batch(statements);
+
+    try {
+      await this.db.batch(statements);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/UNIQUE|PRIMARY KEY|account_write_locks/i.test(msg)) {
+        await this.reopenAccountWrites(userId);
+        return { erased: false, userId, runs: 0, baselines: 0, reports: 0, reason: 'sole-owner' };
+      }
+      throw err;
+    }
+
     return { erased: true, userId, runs: runIds.length, baselines, reports };
   }
 
@@ -457,31 +614,63 @@ export class D1Store implements Store {
   }
   async listRuns(userId: string, opts: ListRunsOptions = {}): Promise<Run[]> {
     const { limit = 50, teamIds = [], includeOwn = true } = opts;
-    const clauses: string[] = [];
-    const binds: unknown[] = [];
+    const safeLimit = clampLimit(limit, 50, 200);
+    if (!includeOwn && teamIds.length === 0) return [];
+
+    // Fast path when total bound parameters stay well below D1's 100-param cap.
+    if (teamIds.length <= D1_TEAM_ID_CHUNK_SIZE) {
+      const clauses: string[] = [];
+      const binds: unknown[] = [];
+      if (includeOwn) {
+        // Registered team-project runs are visible ONLY via active teamIds so
+        // removed members lose visibility immediately.
+        clauses.push('(user_id = ? AND project_id IS NULL)');
+        binds.push(userId);
+      }
+      if (teamIds.length > 0) {
+        const placeholders = teamIds.map(() => '?').join(', ');
+        clauses.push(
+          `project_id IN (SELECT id FROM team_projects WHERE team_id IN (${placeholders}))`,
+        );
+        binds.push(...teamIds);
+      }
+      binds.push(safeLimit);
+      const { results } = await this.db
+        .prepare(
+          `SELECT ${RUN_SUMMARY_COLUMNS} FROM runs WHERE ${clauses.join(' OR ')} ORDER BY created_at DESC LIMIT ?`,
+        )
+        .bind(...binds)
+        .all<RunRow>();
+      return results.map(rowToRun);
+    }
+
+    // Chunked path for users belonging to > D1_TEAM_ID_CHUNK_SIZE teams.
+    const byId = new Map<string, Run>();
     if (includeOwn) {
-      clauses.push('user_id = ?');
-      binds.push(userId);
+      const { results } = await this.db
+        .prepare(
+          `SELECT ${RUN_SUMMARY_COLUMNS} FROM runs WHERE user_id = ? AND project_id IS NULL ORDER BY created_at DESC LIMIT ?`,
+        )
+        .bind(userId, safeLimit)
+        .all<RunRow>();
+      for (const row of results) byId.set(row.id, rowToRun(row));
     }
-    if (teamIds.length > 0) {
-      // Runs are scoped to a team via their project. Expand the team list into
-      // positional placeholders (D1 has no array binding).
-      const placeholders = teamIds.map(() => '?').join(', ');
-      clauses.push(
-        `project_id IN (SELECT id FROM team_projects WHERE team_id IN (${placeholders}))`,
-      );
-      binds.push(...teamIds);
+    for (let i = 0; i < teamIds.length; i += D1_TEAM_ID_CHUNK_SIZE) {
+      const chunk = teamIds.slice(i, i + D1_TEAM_ID_CHUNK_SIZE);
+      const placeholders = chunk.map(() => '?').join(', ');
+      const { results } = await this.db
+        .prepare(
+          `SELECT ${RUN_SUMMARY_COLUMNS} FROM runs
+           WHERE project_id IN (SELECT id FROM team_projects WHERE team_id IN (${placeholders}))
+           ORDER BY created_at DESC LIMIT ?`,
+        )
+        .bind(...chunk, safeLimit)
+        .all<RunRow>();
+      for (const row of results) byId.set(row.id, rowToRun(row));
     }
-    // Nothing to scope to (e.g. explicit team-only with an empty team set).
-    if (clauses.length === 0) return [];
-    binds.push(limit);
-    const { results } = await this.db
-      .prepare(
-        `SELECT * FROM runs WHERE ${clauses.join(' OR ')} ORDER BY created_at DESC LIMIT ?`,
-      )
-      .bind(...binds)
-      .all<RunRow>();
-    return results.map(rowToRun);
+    return [...byId.values()]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, safeLimit);
   }
   async updateRun(id: string, patch: Partial<Run>): Promise<void> {
     for (let attempt = 0; attempt < OPTIMISTIC_MAX_RETRIES; attempt++) {
@@ -645,6 +834,111 @@ export class D1Store implements Store {
       .run();
   }
 
+  async addSandboxMinutes(userId: string, month: string, minutes: number): Promise<void> {
+    const delta = Math.max(0, Math.ceil(minutes));
+    if (delta <= 0) return;
+    await this.db
+      .prepare(
+        `INSERT INTO usage (user_id, month, runs_count, screenshots_count, sandbox_minutes_used, ai_calls_used)
+         VALUES (?, ?, 0, 0, ?, 0)
+         ON CONFLICT(user_id, month) DO UPDATE SET
+           sandbox_minutes_used = sandbox_minutes_used + excluded.sandbox_minutes_used`,
+      )
+      .bind(userId, month, delta)
+      .run();
+  }
+
+  async addTeamSandboxMinutes(teamId: string, month: string, minutes: number): Promise<void> {
+    const delta = Math.max(0, Math.ceil(minutes));
+    if (delta <= 0) return;
+    await this.db
+      .prepare(
+        `INSERT INTO team_usage (team_id, month, runs_count, screenshots_count, sandbox_minutes_used)
+         VALUES (?, ?, 0, 0, ?)
+         ON CONFLICT(team_id, month) DO UPDATE SET
+           sandbox_minutes_used = sandbox_minutes_used + excluded.sandbox_minutes_used`,
+      )
+      .bind(teamId, month, delta)
+      .run();
+  }
+
+  async tryReserveAiCalls(userId: string, month: string, limit: number, amount: number): Promise<boolean> {
+    if (amount <= 0) return true;
+    const results = await this.db.batch([
+      this.db
+        .prepare(
+          `INSERT OR IGNORE INTO usage (user_id, month, runs_count, screenshots_count, sandbox_minutes_used, ai_calls_used)
+           VALUES (?, ?, 0, 0, 0, 0)`,
+        )
+        .bind(userId, month),
+      this.db
+        .prepare(
+          `UPDATE usage SET ai_calls_used = ai_calls_used + ?
+           WHERE user_id = ? AND month = ? AND ai_calls_used + ? <= ?`,
+        )
+        .bind(amount, userId, month, amount, limit),
+    ]);
+    const update = results[1] as { meta?: { changes?: number } };
+    return (update.meta?.changes ?? 0) > 0;
+  }
+
+  async tryReserveTeamAiCalls(teamId: string, month: string, limit: number, amount: number): Promise<boolean> {
+    if (amount <= 0) return true;
+    const results = await this.db.batch([
+      this.db
+        .prepare(
+          `INSERT OR IGNORE INTO team_usage (team_id, month, runs_count, screenshots_count, sandbox_minutes_used, ai_calls_used)
+           VALUES (?, ?, 0, 0, 0, 0)`,
+        )
+        .bind(teamId, month),
+      this.db
+        .prepare(
+          `UPDATE team_usage SET ai_calls_used = ai_calls_used + ?
+           WHERE team_id = ? AND month = ? AND ai_calls_used + ? <= ?`,
+        )
+        .bind(amount, teamId, month, amount, limit),
+    ]);
+    const update = results[1] as { meta?: { changes?: number } };
+    return (update.meta?.changes ?? 0) > 0;
+  }
+
+  async incrementAiCalls(userId: string, month: string, amount: number): Promise<void> {
+    if (amount === 0) return;
+    await this.db
+      .prepare(
+        `INSERT INTO usage (user_id, month, runs_count, screenshots_count, sandbox_minutes_used, ai_calls_used)
+         VALUES (?, ?, 0, 0, 0, MAX(0, ?))
+         ON CONFLICT(user_id, month) DO UPDATE SET
+           ai_calls_used = MAX(0, ai_calls_used + ?)`,
+      )
+      .bind(userId, month, amount, amount)
+      .run();
+  }
+
+  async incrementTeamAiCalls(teamId: string, month: string, amount: number): Promise<void> {
+    if (amount === 0) return;
+    await this.db
+      .prepare(
+        `INSERT INTO team_usage (team_id, month, runs_count, screenshots_count, sandbox_minutes_used, ai_calls_used)
+         VALUES (?, ?, 0, 0, 0, MAX(0, ?))
+         ON CONFLICT(team_id, month) DO UPDATE SET
+           ai_calls_used = MAX(0, ai_calls_used + ?)`,
+      )
+      .bind(teamId, month, amount, amount)
+      .run();
+  }
+
+  async recordStripeEvent(eventId: string, eventType: string, created: number, teamId?: string): Promise<boolean> {
+    const res = await this.db
+      .prepare(
+        `INSERT OR IGNORE INTO stripe_webhook_events (event_id, event_type, created, team_id, processed_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .bind(eventId, eventType, created, teamId ?? null, new Date().toISOString())
+      .run();
+    return (res.meta?.changes ?? 0) > 0;
+  }
+
   async getUsage(userId: string, month: string): Promise<UsageRecord> {
     const row = await this.db
       .prepare(`SELECT * FROM usage WHERE user_id = ? AND month = ?`)
@@ -656,8 +950,10 @@ export class D1Store implements Store {
           month,
           runsCount: Number(row.runs_count ?? 0),
           screenshotsCount: Number(row.screenshots_count ?? 0),
+          sandboxMinutesUsed: Number(row.sandbox_minutes_used ?? 0),
+          aiCallsUsed: Number(row.ai_calls_used ?? 0),
         }
-      : { userId, month, runsCount: 0, screenshotsCount: 0 };
+      : { userId, month, runsCount: 0, screenshotsCount: 0, sandboxMinutesUsed: 0, aiCallsUsed: 0 };
   }
   async getUsageAlertState(userId: string, month: string): Promise<UsageAlertState | null> {
     const row = await this.db
@@ -897,13 +1193,14 @@ export class D1Store implements Store {
   async addMonitorRun(run: MonitorRun): Promise<void> {
     await this.db
       .prepare(
-        `INSERT INTO monitor_runs (id, monitor_id, user_id, status, regressions_count, attempts, screenshots, error, created_at, completed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO monitor_runs (id, monitor_id, user_id, run_id, status, regressions_count, attempts, screenshots, error, created_at, completed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         run.id,
         run.monitorId,
         run.userId,
+        run.runId ?? null,
         run.status,
         run.regressionsCount,
         run.attempts,
@@ -915,9 +1212,10 @@ export class D1Store implements Store {
       .run();
   }
   async listMonitorRuns(monitorId: string, limit = 50): Promise<MonitorRun[]> {
+    const safeLimit = clampLimit(limit, 50, 200);
     const { results } = await this.db
       .prepare(`SELECT * FROM monitor_runs WHERE monitor_id = ? ORDER BY created_at DESC LIMIT ?`)
-      .bind(monitorId, limit)
+      .bind(monitorId, safeLimit)
       .all<Record<string, unknown>>();
     return results.map(monitorRunFromRow);
   }
@@ -984,6 +1282,7 @@ export class D1Store implements Store {
   }
   async listBackgroundFailures(opts: ListBackgroundFailuresOptions = {}): Promise<BackgroundFailure[]> {
     const { kind, sourceId, limit = 50 } = opts;
+    const safeLimit = clampLimit(limit, 50, 200);
     let query = `SELECT * FROM background_failures`;
     const binds: unknown[] = [];
     const clauses: string[] = [];
@@ -997,21 +1296,35 @@ export class D1Store implements Store {
     }
     if (clauses.length > 0) query += ` WHERE ${clauses.join(' AND ')}`;
     query += ` ORDER BY created_at DESC LIMIT ?`;
-    binds.push(limit);
+    binds.push(safeLimit);
     const { results } = await this.db.prepare(query).bind(...binds).all<Record<string, unknown>>();
     return results.map(backgroundFailureFromRow);
   }
 
   // Teams --------------------------------------------------------------------
   async createTeam(team: Team, ownerUserId: string): Promise<void> {
-    await this.db
-      .prepare(
-        `INSERT INTO teams (id, name, plan, stripe_customer_id, stripe_subscription_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(team.id, team.name, team.plan, team.stripeCustomerId ?? null, team.stripeSubscriptionId ?? null, team.createdAt)
-      .run();
-    await this.addMember({ teamId: team.id, userId: ownerUserId, role: 'owner', createdAt: team.createdAt });
+    await this.db.batch([
+      this.db
+        .prepare(
+          `INSERT INTO teams (id, name, plan, stripe_customer_id, stripe_subscription_id, stripe_last_event_created, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          team.id,
+          team.name,
+          team.plan,
+          team.stripeCustomerId ?? null,
+          team.stripeSubscriptionId ?? null,
+          team.stripeLastEventCreated ?? 0,
+          team.createdAt,
+        ),
+      this.db
+        .prepare(
+          `INSERT INTO team_members (team_id, user_id, role, reviewer, created_at) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(team_id, user_id) DO UPDATE SET role = excluded.role`,
+        )
+        .bind(team.id, ownerUserId, 'owner', 0, team.createdAt),
+    ]);
   }
   async getTeam(id: string): Promise<Team | null> {
     const row = await this.db.prepare(`SELECT * FROM teams WHERE id = ?`).bind(id).first<Record<string, unknown>>();
@@ -1024,6 +1337,13 @@ export class D1Store implements Store {
       .first<Record<string, unknown>>();
     return row ? teamFromRow(row) : null;
   }
+  async getTeamByStripeCustomerId(customerId: string): Promise<Team | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM teams WHERE stripe_customer_id = ?`)
+      .bind(customerId)
+      .first<Record<string, unknown>>();
+    return row ? teamFromRow(row) : null;
+  }
   async updateTeam(id: string, patch: Partial<Team>): Promise<void> {
     for (let attempt = 0; attempt < OPTIMISTIC_MAX_RETRIES; attempt++) {
       const row = await this.db.prepare(`SELECT * FROM teams WHERE id = ?`).bind(id).first<Record<string, unknown>>();
@@ -1033,22 +1353,34 @@ export class D1Store implements Store {
       const t = { ...current, ...patch };
       const res = await this.db
         .prepare(
-          `UPDATE teams SET name = ?, plan = ?, stripe_customer_id = ?, stripe_subscription_id = ?, version = version + 1 WHERE id = ? AND version = ?`,
+          `UPDATE teams SET name = ?, plan = ?, stripe_customer_id = ?, stripe_subscription_id = ?, stripe_last_event_created = ?, version = version + 1 WHERE id = ? AND version = ?`,
         )
-        .bind(t.name, t.plan, t.stripeCustomerId ?? null, t.stripeSubscriptionId ?? null, id, version)
+        .bind(
+          t.name,
+          t.plan,
+          t.stripeCustomerId ?? null,
+          t.stripeSubscriptionId ?? null,
+          t.stripeLastEventCreated ?? 0,
+          id,
+          version,
+        )
         .run();
       if ((res.meta?.changes ?? 0) > 0) return;
     }
     throw new OptimisticConflictError('team', id);
   }
   async deleteTeam(id: string): Promise<boolean> {
-    await this.db.prepare(`DELETE FROM team_activity WHERE team_id = ?`).bind(id).run();
-    await this.db.prepare(`DELETE FROM team_members WHERE team_id = ?`).bind(id).run();
-    await this.db.prepare(`DELETE FROM team_invitations WHERE team_id = ?`).bind(id).run();
-    // CASCADE (DM-2): deleting projects removes project-scoped runs and children.
-    await this.db.prepare(`DELETE FROM team_projects WHERE team_id = ?`).bind(id).run();
-    const res = await this.db.prepare(`DELETE FROM teams WHERE id = ?`).bind(id).run();
-    return (res.meta?.changes ?? 0) > 0;
+    const results = await this.db.batch([
+      this.db.prepare(`DELETE FROM team_activity WHERE team_id = ?`).bind(id),
+      this.db.prepare(`DELETE FROM team_members WHERE team_id = ?`).bind(id),
+      this.db.prepare(`DELETE FROM team_invitations WHERE team_id = ?`).bind(id),
+      this.db.prepare(`DELETE FROM team_usage WHERE team_id = ?`).bind(id),
+      // CASCADE (DM-2): deleting projects removes project-scoped runs and children.
+      this.db.prepare(`DELETE FROM team_projects WHERE team_id = ?`).bind(id),
+      this.db.prepare(`DELETE FROM teams WHERE id = ?`).bind(id),
+    ]);
+    const deleteRes = results[5] as { meta?: { changes?: number } } | undefined;
+    return (deleteRes?.meta?.changes ?? 0) > 0;
   }
   async listTeamsForUser(userId: string): Promise<Array<Team & { role: TeamRole }>> {
     const { results } = await this.db
@@ -1131,11 +1463,22 @@ export class D1Store implements Store {
     return row ? invitationFromRow(row) : null;
   }
   async listInvitations(teamId: string): Promise<TeamInvitation[]> {
+    const nowIso = new Date().toISOString();
     const { results } = await this.db
-      .prepare(`SELECT * FROM team_invitations WHERE team_id = ? AND accepted_at IS NULL`)
-      .bind(teamId)
+      .prepare(
+        `SELECT * FROM team_invitations
+         WHERE team_id = ? AND accepted_at IS NULL AND expires_at IS NOT NULL AND expires_at > ?`,
+      )
+      .bind(teamId, nowIso)
       .all<Record<string, unknown>>();
     return results.map(invitationFromRow);
+  }
+  async revokeInvitation(id: string, teamId: string): Promise<boolean> {
+    const res = await this.db
+      .prepare(`DELETE FROM team_invitations WHERE id = ? AND team_id = ? AND accepted_at IS NULL`)
+      .bind(id, teamId)
+      .run();
+    return (res.meta?.changes ?? 0) > 0;
   }
   async acceptInvitation(token: string, at: string): Promise<TeamInvitation | null> {
     const inv = await this.getInvitationByToken(token);
@@ -1180,23 +1523,27 @@ export class D1Store implements Store {
   }
 
   async listProjectRuns(projectId: string, limit = 50, offset = 0, userId?: string): Promise<Run[]> {
+    const safeLimit = clampLimit(limit, 50, 200);
+    const safeOffset = Math.max(0, Math.floor(Number.isFinite(offset) ? offset : 0));
     const isRegisteredProject = (await this.getProjectById(projectId)) !== null;
     const { results } =
       isRegisteredProject || !userId
         ? await this.db
-            .prepare(`SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`)
-            .bind(projectId, limit, offset)
+            .prepare(
+              `SELECT ${RUN_SUMMARY_COLUMNS} FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+            )
+            .bind(projectId, safeLimit, safeOffset)
             .all<RunRow>()
         : await this.db
             .prepare(
-              `SELECT * FROM runs WHERE project_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+              `SELECT ${RUN_SUMMARY_COLUMNS} FROM runs WHERE project_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
             )
-            .bind(projectId, userId, limit, offset)
+            .bind(projectId, userId, safeLimit, safeOffset)
             .all<RunRow>();
     if (results.length > 0) return results.map(rowToRun);
-    if (!userId) return [];
+    if (!userId || isRegisteredProject) return [];
     const { results: userRows } = await this.db
-      .prepare(`SELECT * FROM runs WHERE user_id = ? ORDER BY created_at DESC`)
+      .prepare(`SELECT ${RUN_SUMMARY_COLUMNS} FROM runs WHERE user_id = ? ORDER BY created_at DESC`)
       .bind(userId)
       .all<RunRow>();
     return userRows
@@ -1206,7 +1553,7 @@ export class D1Store implements Store {
           r.projectId === projectId ||
           Boolean(r.github?.owner && r.github?.repo && `${r.github.owner}/${r.github.repo}` === projectId),
       )
-      .slice(offset, offset + limit);
+      .slice(safeOffset, safeOffset + safeLimit);
   }
   async getProjectBaseline(projectId: string, userId?: string): Promise<Run | null> {
     const isRegisteredProject = (await this.getProjectById(projectId)) !== null;
@@ -1214,20 +1561,22 @@ export class D1Store implements Store {
       isRegisteredProject || !userId
         ? await this.db
             .prepare(
-              `SELECT * FROM runs WHERE project_id = ? AND baselines_approved = 1 ORDER BY created_at DESC LIMIT 1`,
+              `SELECT ${RUN_SUMMARY_COLUMNS} FROM runs WHERE project_id = ? AND baselines_approved = 1 ORDER BY created_at DESC LIMIT 1`,
             )
             .bind(projectId)
             .first<RunRow>()
         : await this.db
             .prepare(
-              `SELECT * FROM runs WHERE project_id = ? AND user_id = ? AND baselines_approved = 1 ORDER BY created_at DESC LIMIT 1`,
+              `SELECT ${RUN_SUMMARY_COLUMNS} FROM runs WHERE project_id = ? AND user_id = ? AND baselines_approved = 1 ORDER BY created_at DESC LIMIT 1`,
             )
             .bind(projectId, userId)
             .first<RunRow>();
     if (row) return rowToRun(row);
-    if (!userId) return null;
+    if (!userId || isRegisteredProject) return null;
     const { results: approvedRows } = await this.db
-      .prepare(`SELECT * FROM runs WHERE user_id = ? AND baselines_approved = 1 ORDER BY created_at DESC`)
+      .prepare(
+        `SELECT ${RUN_SUMMARY_COLUMNS} FROM runs WHERE user_id = ? AND baselines_approved = 1 ORDER BY created_at DESC`,
+      )
       .bind(userId)
       .all<RunRow>();
     for (const candidate of approvedRows) {
@@ -1286,9 +1635,10 @@ export class D1Store implements Store {
       .run();
   }
   async listActivity(teamId: string, limit = 50): Promise<TeamActivity[]> {
+    const safeLimit = clampLimit(limit, 50, 200);
     const { results } = await this.db
       .prepare(`SELECT * FROM team_activity WHERE team_id = ? ORDER BY created_at DESC LIMIT ?`)
-      .bind(teamId, limit)
+      .bind(teamId, safeLimit)
       .all<Record<string, unknown>>();
     return results.map(activityFromRow);
   }
@@ -1309,6 +1659,8 @@ export class D1Store implements Store {
       month,
       runsCount: Number(row?.runs_count ?? 0),
       screenshotsCount: Number(row?.screenshots_count ?? 0),
+      sandboxMinutesUsed: Number(row?.sandbox_minutes_used ?? 0),
+      aiCallsUsed: Number(row?.ai_calls_used ?? 0),
       memberCount: members.length,
       perMember,
     };
@@ -1322,6 +1674,8 @@ function teamFromRow(row: Record<string, unknown>): Team {
     plan: String(row.plan ?? 'free'),
     stripeCustomerId: row.stripe_customer_id != null ? String(row.stripe_customer_id) : undefined,
     stripeSubscriptionId: row.stripe_subscription_id != null ? String(row.stripe_subscription_id) : undefined,
+    stripeLastEventCreated:
+      row.stripe_last_event_created != null ? Number(row.stripe_last_event_created) : undefined,
     createdAt: String(row.created_at),
   };
 }
@@ -1410,6 +1764,7 @@ function monitorRunFromRow(row: Record<string, unknown>): MonitorRun {
     id: String(row.id),
     monitorId: String(row.monitor_id),
     userId: String(row.user_id),
+    ...(row.run_id != null ? { runId: String(row.run_id) } : {}),
     status: String(row.status) as MonitorRunStatus,
     regressionsCount: Number(row.regressions_count ?? 0),
     attempts: Number(row.attempts ?? 1),

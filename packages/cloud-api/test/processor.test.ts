@@ -164,22 +164,51 @@ describe('processRun — Daytona branch', () => {
     expect(run.error).toBe('sandbox boom');
   });
 
-  it('forwards OPENAI_API_KEY and ANTHROPIC_API_KEY from env to executeInSandbox', async () => {
+  it('forwards only the requested AI provider key and omits all AI keys when AI is disabled', async () => {
     executeInSandbox.mockResolvedValue({
       results: [{ route: '/', viewport: 1440, status: 'unchanged', diffPercentage: 0 }],
       reportHtml: '<html>ok</html>',
+      duration: 4200,
     });
-    const run = makeRun({ ai: { provider: 'openai', model: 'gpt-4o' } });
-    await processRun(run, {
+    const openaiRun = makeRun({ ai: { provider: 'openai', model: 'gpt-4o' } });
+    await processRun(openaiRun, {
       DAYTONA_API_KEY: 'dt_key',
       OPENAI_API_KEY: 'sk-openai-test',
       ANTHROPIC_API_KEY: 'sk-ant-test',
     });
-    expect(executeInSandbox).toHaveBeenCalledOnce();
+    expect(executeInSandbox).toHaveBeenCalledTimes(1);
     expect(executeInSandbox.mock.calls[0]![0]).toMatchObject({
       daytonaApiKey: 'dt_key',
       openaiKey: 'sk-openai-test',
-      anthropicKey: 'sk-ant-test',
     });
+    expect(executeInSandbox.mock.calls[0]![0].anthropicKey).toBeUndefined();
+    expect(openaiRun.duration).toBe(4200);
+
+    // Non-AI run receives neither platform AI key.
+    const noAiRun = makeRun({ ai: null });
+    await processRun(noAiRun, {
+      DAYTONA_API_KEY: 'dt_key',
+      OPENAI_API_KEY: 'sk-openai-test',
+      ANTHROPIC_API_KEY: 'sk-ant-test',
+    });
+    expect(executeInSandbox.mock.calls[1]![0].openaiKey).toBeUndefined();
+    expect(executeInSandbox.mock.calls[1]![0].anthropicKey).toBeUndefined();
+
+    // Disallowed-by-plan run (`allowAi: false`) also strips platform AI keys.
+    const blockedAiRun = makeRun({ ai: { provider: 'anthropic', model: 'claude-3-7-sonnet' } });
+    await processRun(
+      blockedAiRun,
+      {
+        DAYTONA_API_KEY: 'dt_key',
+        OPENAI_API_KEY: 'sk-openai-test',
+        ANTHROPIC_API_KEY: 'sk-ant-test',
+      },
+      undefined,
+      undefined,
+      { allowAi: false },
+    );
+    expect(executeInSandbox.mock.calls[2]![0].openaiKey).toBeUndefined();
+    expect(executeInSandbox.mock.calls[2]![0].anthropicKey).toBeUndefined();
+    expect(executeInSandbox.mock.calls[2]![0].ai).toBeUndefined();
   });
 });

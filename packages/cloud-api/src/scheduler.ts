@@ -21,9 +21,11 @@ import { getStore, type Bindings } from './db/factory.js';
 import type { Monitor, MonitorRun, MonitorRunStatus } from './db/monitors.js';
 import type { Store } from './db/store.js';
 import { currentMonth } from './db/store.js';
-import { processRun, type ProcessorEnv } from './processor.js';
+import { can } from './db/teams.js';
+import { NO_COMPARISON_ERROR, processRun, type ProcessorEnv } from './processor.js';
 import { dispatchAlertsWithState, type MonitorAlert, type AlertEnv } from './alerts/index.js';
 import { getPlan, hasFeature } from './billing/plans.js';
+import { plannedScreenshotCount } from './limits.js';
 import type { Run } from './types.js';
 import { getScreenshotStore, type R2Bucket } from './storage/screenshots.js';
 import {
@@ -89,6 +91,41 @@ export type SchedulerEnv = Bindings & AlertEnv & ProcessorEnv;
 interface CheckAttempt {
   run: Run;
   screenshotRefs: MonitorScreenshotRef[];
+  hasPriorBaseline: boolean;
+}
+
+/**
+ * Re-verifies that the monitor owner is still an active member with `run_tests`
+ * capability on the monitor's team project. If revoked (or project deleted),
+ * pauses and unlinks the monitor so cron ticks cannot keep reading team baselines.
+ */
+async function verifyMonitorProjectAccess(
+  store: Store,
+  monitor: Monitor,
+): Promise<{ ok: true; teamId?: string } | { ok: false; reason: string }> {
+  if (!monitor.projectId) return { ok: true };
+  const project = await store.getProjectById(monitor.projectId);
+  if (!project) {
+    await store.updateMonitor(monitor.id, {
+      enabled: false,
+      projectId: undefined,
+      leasedUntil: undefined,
+    });
+    return { ok: false, reason: 'Monitor project no longer exists; monitor disabled.' };
+  }
+  const member = await store.getMember(project.teamId, monitor.userId);
+  if (!member || !can(member.role, 'run_tests')) {
+    await store.updateMonitor(monitor.id, {
+      enabled: false,
+      projectId: undefined,
+      leasedUntil: undefined,
+    });
+    return {
+      ok: false,
+      reason: 'Monitor owner is no longer authorized for this project; monitor disabled.',
+    };
+  }
+  return { ok: true, teamId: project.teamId };
 }
 
 /**
@@ -119,7 +156,8 @@ function buildErrorAlert(monitor: Monitor, message: string): MonitorAlert {
 
 /**
  * Resolves baselines for the next monitor check (REL-2):
- *   1. Approved project baseline, when the monitor is project-scoped.
+ *   1. Approved project baseline, when the monitor is project-scoped (and owner
+ *      is still an active team member with `run_tests` permission).
  *   2. Approved baseline via `baseline_approvals` on a prior process run.
  *   3. Most recent successful run's persisted screenshots (last-run-as-baseline).
  */
@@ -131,6 +169,11 @@ async function resolveMonitorBaseline(
   if (!bucket) return undefined;
 
   if (monitor.projectId) {
+    const project = await store.getProjectById(monitor.projectId);
+    if (!project) return undefined;
+    const member = await store.getMember(project.teamId, monitor.userId);
+    if (!member || !can(member.role, 'run_tests')) return undefined;
+
     const baselineRun = await store.getProjectBaseline(monitor.projectId, monitor.userId);
     if (baselineRun) {
       const approvedRefs = buildMonitorScreenshotRefs(
@@ -173,6 +216,7 @@ async function attemptCheck(
   store: Store,
 ): Promise<CheckAttempt> {
   const baselineRestore = await resolveMonitorBaseline(store, monitor, env.SCREENSHOTS as R2Bucket | undefined);
+  const hasPriorBaseline = baselineRestore !== undefined;
 
   const run: Run = {
     id: crypto.randomUUID(),
@@ -196,14 +240,14 @@ async function attemptCheck(
     await persistScreenshots(store, blobs, monitor.userId, run.id, shots, monitor.routes);
   };
 
-  await processRun(run, env, onScreenshots, baselineRestore);
+  await processRun(run, env, onScreenshots, baselineRestore, { allowAi: false });
   await store.commitFinishedRun(monitor.userId, run);
 
   const screenshotRefs = buildMonitorScreenshotRefs(
     monitor.routes,
     await store.listScreenshots(run.id),
   );
-  return { run, screenshotRefs };
+  return { run, screenshotRefs, hasPriorBaseline };
 }
 
 /**
@@ -217,19 +261,59 @@ export async function runMonitor(
   now: Date,
   fetchImpl: typeof fetch = fetch,
 ): Promise<MonitorExecution> {
+  // Re-verify active project team membership before reading baselines or executing.
+  const access = await verifyMonitorProjectAccess(store, monitor);
+  if (!access.ok) {
+    const monitorRun: MonitorRun = {
+      id: crypto.randomUUID(),
+      monitorId: monitor.id,
+      userId: monitor.userId,
+      status: 'error',
+      regressionsCount: 0,
+      attempts: 0,
+      error: access.reason,
+      createdAt: now.toISOString(),
+      completedAt: new Date().toISOString(),
+    };
+    await store.addMonitorRun(monitorRun);
+    return { alerts: [], run: monitorRun };
+  }
+
   let alerts: MonitorAlert[] = [];
   let status: MonitorRunStatus = 'passed';
   let lastError: string | undefined;
   let attempts = 0;
   let succeeded = false;
   let screenshotRefs: MonitorScreenshotRef[] = [];
+  let lastRunId: string | undefined;
+  let totalDurationMs = 0;
 
   while (attempts < MAX_ATTEMPTS && !succeeded) {
     attempts++;
     try {
       const attempt = await attemptCheck(monitor, now, env, store);
-      const { run } = attempt;
+      const { run, hasPriorBaseline } = attempt;
+      lastRunId = run.id;
       screenshotRefs = attempt.screenshotRefs;
+      if (typeof run.duration === 'number' && Number.isFinite(run.duration) && run.duration > 0) {
+        totalDurationMs += run.duration;
+      }
+
+      // First capture for a monitor with no prior baseline: persist captured
+      // screenshots as the initial baseline so subsequent ticks can diff cleanly
+      // instead of deadlocking forever on NO_COMPARISON_ERROR.
+      if (
+        run.status === 'failed' &&
+        !hasPriorBaseline &&
+        run.error === NO_COMPARISON_ERROR &&
+        screenshotRefs.length > 0
+      ) {
+        status = 'passed';
+        alerts = [];
+        lastError = undefined;
+        succeeded = true;
+        break;
+      }
 
       // processRun marks failures on the run without throwing (REL-6).
       if (run.status === 'failed') {
@@ -259,11 +343,12 @@ export async function runMonitor(
     alerts = [buildErrorAlert(monitor, lastError)];
   }
 
-  // Persist the run history record.
+  // Persist the run history record, linking directly to the underlying `runs.id`.
   const monitorRun: MonitorRun = {
     id: crypto.randomUUID(),
     monitorId: monitor.id,
     userId: monitor.userId,
+    ...(lastRunId ? { runId: lastRunId } : {}),
     status,
     regressionsCount: alerts.filter((a) => a.kind !== 'error').length,
     attempts,
@@ -282,8 +367,28 @@ export async function runMonitor(
     leasedUntil: undefined,
   });
 
-  // Meter usage against the owner's plan (the monitor run counts as one run).
-  await store.incrementUsage(monitor.userId, currentMonth(now), 1, 0);
+  // Meter runs, screenshots, and monotonic sandbox minutes against the owning pool.
+  const month = currentMonth(now);
+  const screenshotCount = plannedScreenshotCount(monitor.routes, monitor.viewports, ['chromium']);
+  const sandboxMinutes = totalDurationMs > 0 ? Math.max(1, Math.ceil(totalDurationMs / 60_000)) : 0;
+  let meterTeamId: string | undefined;
+  if (access.teamId) {
+    const team = await store.getTeam(access.teamId);
+    if (team && getPlan(team.plan).id !== 'free') {
+      meterTeamId = team.id;
+    }
+  }
+  if (meterTeamId) {
+    await store.incrementTeamUsage(meterTeamId, month, 1, screenshotCount);
+    if (sandboxMinutes > 0) {
+      await store.addTeamSandboxMinutes(meterTeamId, month, sandboxMinutes);
+    }
+  } else {
+    await store.incrementUsage(monitor.userId, month, 1, screenshotCount);
+    if (sandboxMinutes > 0) {
+      await store.addSandboxMinutes(monitor.userId, month, sandboxMinutes);
+    }
+  }
 
   if (alerts.length > 0) {
     await dispatchAlertsWithState(env, store, monitor, alerts, now, fetchImpl);
@@ -296,7 +401,7 @@ export async function runMonitor(
       userId: monitor.userId,
       error: lastError,
       attempt: attempts,
-      context: { monitorRunId: monitorRun.id },
+      context: { monitorRunId: monitorRun.id, runId: lastRunId },
     });
   }
 
@@ -351,13 +456,17 @@ export async function runScheduledChecks(
   const prunedUsers = new Set<string>();
   let pruned = 0;
 
-  // Cache plan eligibility per user across the tick.
+  // Cache plan eligibility + erasure state per user across the tick.
   const monitoringAllowed = new Map<string, boolean>();
   async function canMonitor(userId: string): Promise<boolean> {
     const cached = monitoringAllowed.get(userId);
     if (cached !== undefined) return cached;
+    if (await store.accountWritesClosed(userId)) {
+      monitoringAllowed.set(userId, false);
+      return false;
+    }
     const user = await store.getUser(userId);
-    const allowed = hasFeature(getPlan(user?.plan), 'productionMonitoring');
+    const allowed = Boolean(user) && hasFeature(getPlan(user?.plan), 'productionMonitoring');
     monitoringAllowed.set(userId, allowed);
     return allowed;
   }

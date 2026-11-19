@@ -28,7 +28,17 @@ import { getPlan, checkLimit, hasFeature } from "../billing/plans.js";
 import {
   SafeRenderTargetError,
   assertSafeRenderTarget,
+  assertSafeRoutePaths,
+  assertSafeSlackWebhookUrl,
 } from "../security/render-target.js";
+import {
+  MAX_ALERT_EMAILS,
+  MAX_FAN_OUT,
+  MAX_ROUTES,
+  MAX_VIEWPORTS,
+  clampLimit,
+} from "../limits.js";
+import { enforceRateLimit, testAlertRateLimiter } from "../rate-limit.js";
 
 type Variables = { store: Store; userId: string };
 
@@ -46,14 +56,14 @@ const baseShape = {
   name: z.string().min(1).max(100),
   url: z.url(),
   projectId: z.string().min(1).optional(),
-  routes: z.array(z.string()).min(1),
-  viewports: z.array(z.number().int().min(320).max(3840)),
+  routes: z.array(z.string().min(1)).min(1).max(MAX_ROUTES),
+  viewports: z.array(z.number().int().min(320).max(3840)).min(1).max(MAX_VIEWPORTS),
   intervalMinutes: z.number().int().min(5).max(10_080),
   alertThreshold: z.number().min(0).max(1),
   alerts: z
     .object({
       slack: z.url().optional(),
-      email: z.array(z.email()).optional(),
+      email: z.array(z.email()).max(MAX_ALERT_EMAILS).optional(),
       pagerduty: z.string().min(1).optional(),
     })
     .optional(),
@@ -87,8 +97,21 @@ monitorRoutes.post("/", async (c) => {
       400,
     );
   }
+  const d = parsed.data;
+  if (d.routes.length * d.viewports.length > MAX_FAN_OUT) {
+    return c.json(
+      {
+        error: `Monitor fan-out exceeds maximum of ${MAX_FAN_OUT} screenshots per check (${d.routes.length} routes × ${d.viewports.length} viewports).`,
+      },
+      400,
+    );
+  }
   try {
-    await assertSafeRenderTarget(parsed.data.url);
+    await assertSafeRenderTarget(d.url);
+    assertSafeRoutePaths(d.url, d.routes);
+    if (d.alerts?.slack) {
+      await assertSafeSlackWebhookUrl(d.alerts.slack);
+    }
   } catch (err) {
     if (err instanceof SafeRenderTargetError) {
       return c.json({ error: err.message }, 400);
@@ -98,6 +121,9 @@ monitorRoutes.post("/", async (c) => {
 
   const store = c.get("store");
   const userId = c.get("userId");
+  if (await store.accountWritesClosed(userId)) {
+    return c.json({ error: "Account erasure is in progress" }, 409);
+  }
 
   // Plan enforcement (Task 8.2): production monitoring is a paid feature and
   // the number of monitors is plan-capped.
@@ -126,7 +152,6 @@ monitorRoutes.post("/", async (c) => {
     );
   }
 
-  const d = parsed.data;
   if (d.projectId) {
     const project = await store.getProjectById(d.projectId);
     if (!project) return c.json({ error: "Project not found" }, 404);
@@ -179,6 +204,17 @@ monitorRoutes.patch("/:id", async (c) => {
       400,
     );
   }
+  const nextUrl = parsed.data.url ?? m.url;
+  const nextRoutes = parsed.data.routes ?? m.routes;
+  const nextViewports = parsed.data.viewports ?? m.viewports;
+  if (nextRoutes.length * nextViewports.length > MAX_FAN_OUT) {
+    return c.json(
+      {
+        error: `Monitor fan-out exceeds maximum of ${MAX_FAN_OUT} screenshots per check (${nextRoutes.length} routes × ${nextViewports.length} viewports).`,
+      },
+      400,
+    );
+  }
   if (parsed.data.projectId) {
     const project = await store.getProjectById(parsed.data.projectId);
     if (!project) return c.json({ error: "Project not found" }, 404);
@@ -187,15 +223,21 @@ monitorRoutes.patch("/:id", async (c) => {
       return c.json({ error: "Forbidden" }, 403);
     }
   }
-  if (parsed.data.url) {
-    try {
+  try {
+    if (parsed.data.url) {
       await assertSafeRenderTarget(parsed.data.url);
-    } catch (err) {
-      if (err instanceof SafeRenderTargetError) {
-        return c.json({ error: err.message }, 400);
-      }
-      throw err;
     }
+    if (parsed.data.url || parsed.data.routes) {
+      assertSafeRoutePaths(nextUrl, nextRoutes);
+    }
+    if (parsed.data.alerts?.slack) {
+      await assertSafeSlackWebhookUrl(parsed.data.alerts.slack);
+    }
+  } catch (err) {
+    if (err instanceof SafeRenderTargetError) {
+      return c.json({ error: err.message }, 400);
+    }
+    throw err;
   }
   await store.updateMonitor(id, parsed.data);
   return c.json(await store.getMonitor(id));
@@ -215,7 +257,7 @@ monitorRoutes.get("/:id/runs", async (c) => {
   const m = await store.getMonitor(id);
   if (!m || m.userId !== c.get("userId"))
     return c.json({ error: "Monitor not found" }, 404);
-  const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 200);
+  const limit = clampLimit(c.req.query("limit"), 50, 200);
   const runs = await store.listMonitorRuns(id, limit);
   return c.json({ runs, total: runs.length });
 });
@@ -223,10 +265,28 @@ monitorRoutes.get("/:id/runs", async (c) => {
 // POST /v1/monitors/:id/test-alert — send a sample alert to configured channels (Task 6.2).
 monitorRoutes.post("/:id/test-alert", async (c) => {
   const store = c.get("store");
+  const userId = c.get("userId");
   const id = c.req.param("id");
   const m = await store.getMonitor(id);
-  if (!m || m.userId !== c.get("userId"))
+  if (!m || m.userId !== userId)
     return c.json({ error: "Monitor not found" }, 404);
+
+  // Plan + rate-limit checks prevent downgraded or abusive callers from using
+  // Frontguard's Resend/Slack credentials as a spam relay.
+  const user = await store.getUser(userId);
+  const plan = getPlan(user?.plan);
+  if (!hasFeature(plan, "productionMonitoring")) {
+    return c.json(
+      {
+        error: `Production monitoring is not available on the ${plan.name} plan.`,
+        upgradeUrl: "https://frontguard.dev/pricing",
+      },
+      402,
+    );
+  }
+  const blocked = enforceRateLimit(c, `test-alert:${userId}`, testAlertRateLimiter);
+  if (blocked) return blocked;
+
   const hasChannel =
     !!m.alerts?.slack ||
     (!!m.alerts?.email && m.alerts.email.length > 0) ||
@@ -236,6 +296,22 @@ monitorRoutes.post("/:id/test-alert", async (c) => {
       { error: "No alert channels configured for this monitor" },
       400,
     );
+  }
+  if (m.alerts?.email && m.alerts.email.length > MAX_ALERT_EMAILS) {
+    return c.json(
+      { error: `Too many alert emails (maximum ${MAX_ALERT_EMAILS})` },
+      400,
+    );
+  }
+  if (m.alerts?.slack) {
+    try {
+      await assertSafeSlackWebhookUrl(m.alerts.slack);
+    } catch (err) {
+      if (err instanceof SafeRenderTargetError) {
+        return c.json({ error: err.message }, 400);
+      }
+      throw err;
+    }
   }
   const sample: MonitorAlert[] = [
     {
@@ -247,7 +323,7 @@ monitorRoutes.post("/:id/test-alert", async (c) => {
     },
   ];
   // Test alerts bypass dedup/snooze on purpose (always delivered).
-  const deliveries = await dispatchAlerts(c.env as AlertEnv, m, sample, fetch);
+  const deliveries = await dispatchAlerts((c.env ?? {}) as AlertEnv, m, sample, fetch);
   return c.json({ sent: true, deliveries });
 });
 

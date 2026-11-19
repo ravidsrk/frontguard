@@ -36,10 +36,21 @@ import {
   userMatchesInvitation,
 } from "../teams/invitation-match.js";
 import { getPlan, checkLimit } from "../billing/plans.js";
+import { syncUserPlanFromTeams } from "../billing/spend-cap.js";
 import type { AlertEnv } from "../alerts/index.js";
-import { purgeTeamRunBlobs } from "../storage/purge-team-blobs.js";
+import {
+  purgeProjectRunBlobs,
+  purgeTeamRunBlobs,
+} from "../storage/purge-team-blobs.js";
 import { promoteRunCurrentScreenshotsToBaseline } from "../storage/persist-screenshots.js";
 import type { R2Bucket } from "../storage/screenshots.js";
+import {
+  approvalsToReviewEvents,
+  deriveRunPixelmatchStatus,
+  evaluatePromotionGate,
+} from "../review-policy.js";
+import { NO_COMPARISON_ERROR } from "../processor.js";
+import { clampLimit } from "../limits.js";
 
 type Variables = { store: Store; userId: string };
 
@@ -112,6 +123,11 @@ const reviewerSchema = z.object({ reviewer: z.boolean() });
 const reviewSchema = z.object({
   status: z.enum(["approved", "rejected"]),
   comment: z.string().max(2000).optional(),
+  actorKind: z.enum(["human", "agent", "model"]).optional(),
+  confirmHumanReview: z.boolean().optional(),
+  judgeMode: z.boolean().optional(),
+  axeBlocked: z.boolean().optional(),
+  axeViolationSummary: z.string().max(500).optional(),
 });
 const projectSchema = z.object({
   name: z.string().min(1).max(100),
@@ -181,13 +197,44 @@ teamRoutes.delete("/:id", async (c) => {
   const id = c.req.param("id");
   const guard = await requireCap(store, id, c.get("userId"), "manage_team");
   if (!guard.ok) return c.json({ error: "Forbidden" }, guard.status);
+  const owners = (await store.listMembers(id)).filter((m) => m.role === "owner");
   await purgeTeamRunBlobs(
     store,
     id,
     c.env?.SCREENSHOTS as R2Bucket | undefined,
   );
   const deleted = await store.deleteTeam(id);
+  if (deleted) {
+    for (const owner of owners) {
+      await syncUserPlanFromTeams(store, owner.userId);
+    }
+  }
   return c.json({ deleted });
+});
+
+teamRoutes.get("/:id/invitations", async (c) => {
+  const store = c.get("store");
+  const id = c.req.param("id");
+  const guard = await requireCap(store, id, c.get("userId"), "manage_members");
+  if (!guard.ok) return c.json({ error: "Forbidden" }, guard.status);
+  const invitations = await store.listInvitations(id);
+  return c.json({
+    invitations: invitations.map(({ token: _token, ...rest }) => rest),
+    total: invitations.length,
+  });
+});
+
+teamRoutes.delete("/:id/invitations/:invitationId", async (c) => {
+  const store = c.get("store");
+  const id = c.req.param("id");
+  const invitationId = c.req.param("invitationId");
+  const guard = await requireCap(store, id, c.get("userId"), "manage_members");
+  if (!guard.ok) return c.json({ error: "Forbidden" }, guard.status);
+  const revoked = await store.revokeInvitation(invitationId, id);
+  if (revoked) {
+    await logActivity(store, id, c.get("userId"), "invitation.revoked", invitationId);
+  }
+  return c.json({ revoked });
 });
 
 teamRoutes.post("/:id/invitations", async (c) => {
@@ -435,8 +482,24 @@ teamRoutes.delete("/:id/members/:userId", async (c) => {
   }
 
   const removed = await store.removeMember(id, targetUserId);
-  if (removed)
+  if (removed) {
+    // Pause and unlink any monitors owned by the removed member targeting this
+    // team's projects so cron ticks cannot continue reading team baselines.
+    const teamProjects = await store.listProjects(id);
+    const teamProjectIds = new Set(teamProjects.map((p) => p.id));
+    if (teamProjectIds.size > 0) {
+      const memberMonitors = await store.listMonitors(targetUserId);
+      for (const m of memberMonitors) {
+        if (m.projectId && teamProjectIds.has(m.projectId)) {
+          await store.updateMonitor(m.id, { enabled: false, projectId: undefined });
+        }
+      }
+    }
+    if (target.role === "owner") {
+      await syncUserPlanFromTeams(store, targetUserId);
+    }
     await logActivity(store, id, actorId, "member.removed", targetUserId);
+  }
   return c.json({ removed });
 });
 
@@ -481,9 +544,18 @@ teamRoutes.post("/:id/projects", async (c) => {
 teamRoutes.delete("/:id/projects/:projectId", async (c) => {
   const store = c.get("store");
   const id = c.req.param("id");
+  const projectId = c.req.param("projectId");
   const guard = await requireCap(store, id, c.get("userId"), "run_tests");
   if (!guard.ok) return c.json({ error: "Forbidden" }, guard.status);
-  const deleted = await store.deleteProject(c.req.param("projectId"), id);
+  const project = await store.getProjectById(projectId);
+  if (project && project.teamId === id) {
+    await purgeProjectRunBlobs(
+      store,
+      projectId,
+      c.env?.SCREENSHOTS as R2Bucket | undefined,
+    );
+  }
+  const deleted = await store.deleteProject(projectId, id);
   return c.json({ deleted });
 });
 
@@ -498,7 +570,10 @@ teamRoutes.get("/:teamId/projects/:projectId/runs", async (c) => {
   const project = await store.getProjectById(projectId);
   if (!project || project.teamId !== teamId)
     return c.json({ error: "Project not found" }, 404);
-  const runs = await store.listProjectRuns(projectId, 50);
+  const limit = clampLimit(c.req.query("limit"), 50, 200);
+  const rawOffset = Number(c.req.query("offset") ?? 0);
+  const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.floor(rawOffset) : 0;
+  const runs = await store.listProjectRuns(projectId, limit, offset);
   return c.json({ runs, total: runs.length });
 });
 
@@ -568,9 +643,45 @@ teamRoutes.post(
     await store.addApproval(approval);
 
     if (parsed.data.status === "approved") {
+      const allApprovals = await store.listApprovals(runId);
+      const gate = evaluatePromotionGate({
+        reviews: approvalsToReviewEvents(allApprovals),
+        actorKind: parsed.data.actorKind ?? "human",
+        confirmHumanReview: parsed.data.confirmHumanReview ?? true,
+        judgeMode: parsed.data.judgeMode ?? false,
+        axeBlocked: parsed.data.axeBlocked ?? false,
+        axeViolationSummary: parsed.data.axeViolationSummary,
+        pixelmatchStatus: deriveRunPixelmatchStatus(run, NO_COMPARISON_ERROR),
+      });
+
+      if (!gate.allowed) {
+        await logActivity(
+          store,
+          teamId,
+          userId,
+          "baseline.approval_blocked",
+          runId,
+          { projectId, reason: gate.reason, tally: gate.tally },
+        );
+        return c.json(
+          {
+            reviewed: true,
+            status: parsed.data.status,
+            promoted: false,
+            error: gate.reason,
+            tally: gate.tally,
+            approval,
+          },
+          409,
+        );
+      }
+
       await store.updateRun(runId, { baselinesApproved: true });
       await promoteRunCurrentScreenshotsToBaseline(store, runId);
+    } else if (run.baselinesApproved) {
+      await store.updateRun(runId, { baselinesApproved: false });
     }
+
     await logActivity(
       store,
       teamId,
@@ -596,7 +707,15 @@ teamRoutes.get(
     const teamId = c.req.param("teamId");
     const guard = await requireCap(store, teamId, c.get("userId"), "view");
     if (!guard.ok) return c.json({ error: "Team not found" }, guard.status);
-    const reviews = await store.listApprovals(c.req.param("runId"));
+    const projectId = c.req.param("projectId");
+    const runId = c.req.param("runId");
+    const project = await store.getProjectById(projectId);
+    if (!project || project.teamId !== teamId)
+      return c.json({ error: "Project not found" }, 404);
+    const run = await store.getRun(runId);
+    if (!run || run.projectId !== projectId)
+      return c.json({ error: "Run not found" }, 404);
+    const reviews = await store.listApprovals(runId);
     return c.json({ reviews, total: reviews.length });
   },
 );
@@ -608,7 +727,8 @@ teamRoutes.get("/:id/activity", async (c) => {
   const id = c.req.param("id");
   const guard = await requireCap(store, id, c.get("userId"), "view");
   if (!guard.ok) return c.json({ error: "Team not found" }, guard.status);
-  const activity = await store.listActivity(id, 50);
+  const limit = clampLimit(c.req.query("limit"), 50, 200);
+  const activity = await store.listActivity(id, limit);
   return c.json({ activity, total: activity.length });
 });
 

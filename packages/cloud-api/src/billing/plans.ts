@@ -15,12 +15,30 @@ export interface PlanLimits {
   runsPerMonth: number | null;
   screenshotsPerMonth: number | null;
   sandboxMinutesPerMonth: number | null;
+  aiCallsPerMonth: number | null;
   historyRetentionDays: number;
   teamMembers: number | null;
   monitors: number | null;
   productionMonitoring: boolean;
   ssoSaml: boolean;
   casUnchangedDeduplication: boolean;
+}
+
+/** Numeric tier ordering used to derive a user's effective plan across teams. */
+export const PLAN_RANK: Record<PlanId, number> = {
+  free: 0,
+  pro: 1,
+  business: 2,
+};
+
+/** Returns the highest-ranked plan from a collection of plan ids. */
+export function highestPlanId(planIds: readonly (string | undefined)[]): PlanId {
+  let best: PlanId = 'free';
+  for (const raw of planIds) {
+    const p = getPlan(raw).id;
+    if (PLAN_RANK[p] > PLAN_RANK[best]) best = p;
+  }
+  return best;
 }
 
 /** A plan definition. */
@@ -42,6 +60,7 @@ export const PLANS: Record<PlanId, Plan> = {
       runsPerMonth: 50,
       screenshotsPerMonth: 500,
       sandboxMinutesPerMonth: 30,
+      aiCallsPerMonth: 0,
       historyRetentionDays: 7,
       teamMembers: 1,
       monitors: 1,
@@ -58,6 +77,7 @@ export const PLANS: Record<PlanId, Plan> = {
       runsPerMonth: 500,
       screenshotsPerMonth: 35000,
       sandboxMinutesPerMonth: 500,
+      aiCallsPerMonth: 500,
       historyRetentionDays: 30,
       teamMembers: 10,
       monitors: 10,
@@ -74,6 +94,7 @@ export const PLANS: Record<PlanId, Plan> = {
       runsPerMonth: null,
       screenshotsPerMonth: null,
       sandboxMinutesPerMonth: 3000,
+      aiCallsPerMonth: 5000,
       historyRetentionDays: 90,
       teamMembers: 50,
       monitors: null,
@@ -103,7 +124,13 @@ export interface LimitCheck {
  */
 export function checkLimit(
   plan: Plan,
-  metric: 'runsPerMonth' | 'screenshotsPerMonth' | 'teamMembers' | 'monitors' | 'sandboxMinutesPerMonth',
+  metric:
+    | 'runsPerMonth'
+    | 'screenshotsPerMonth'
+    | 'teamMembers'
+    | 'monitors'
+    | 'sandboxMinutesPerMonth'
+    | 'aiCallsPerMonth',
   current: number,
   amount = 1,
 ): LimitCheck {
