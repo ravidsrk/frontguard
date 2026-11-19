@@ -43,7 +43,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.6",
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^13.2.0",
     "eslint": "^10.14.0",
     "tsup": "^9.0.0",
     "tsx": "^4.23.15",
