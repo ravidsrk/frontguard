@@ -46,7 +46,7 @@ const SOFTWARE_JSON_LD = {
       name: "Free CLI",
       price: "0",
       priceCurrency: "USD",
-      description: "MIT-licensed CLI. Bring your own OpenAI or Anthropic key.",
+      description: "MIT-licensed CLI. Bring your own OpenAI, Anthropic, Gemini, or custom baseUrl key.",
     },
   ],
 };

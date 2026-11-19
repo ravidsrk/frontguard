@@ -4,7 +4,8 @@ import { MONO } from "./home-data";
 const AI_JSON_LINES = [
   { text: "{", highlight: false },
   { text: '  "route": "/dashboard",', highlight: false },
-  { text: '  "classification": "critical",', highlight: true },
+  { text: '  "classification": "regression",', highlight: true },
+  { text: '  "severity": "critical",', highlight: true },
   { text: '  "confidence": 0.92,', highlight: true },
   {
     text: '  "explanation": "Sidebar CTA button collapsed from 36px to 0px height",',
@@ -70,7 +71,7 @@ export function ArchitecturalPillars() {
                 ),
               }}
             >
-              <span>.frontguard/results/report.json</span>
+              <span>./frontguard-report/report.json</span>
               <span style={s("color: var(--success);")}>
                 deterministic exitCode: 1
               </span>

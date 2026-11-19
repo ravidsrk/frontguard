@@ -170,9 +170,6 @@ export function PipelineAndInspector() {
                 cluster with local Chroma SSIM and wavelet CW-SSIM.
               </p>
             </div>
-            <div className="fg-todo-note">
-              TODO: pair interactive inspector with high-res production screenshot capture
-            </div>
           </div>
 
           <div

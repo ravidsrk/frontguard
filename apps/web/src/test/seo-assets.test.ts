@@ -216,11 +216,22 @@ describe('root route — global head and security headers', () => {
         'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
       }),
     )
+    expect(SECURITY_HEADERS['Content-Security-Policy']).not.toMatch(/script-src[^;]*unsafe-inline/)
+    expect(SECURITY_HEADERS['Content-Security-Policy']).not.toContain('unsafe-eval')
+    expect(SECURITY_HEADERS['Content-Security-Policy']).toContain("object-src 'none'")
+    expect(SECURITY_HEADERS['Content-Security-Policy']).toContain("frame-ancestors 'none'")
+    expect(SECURITY_HEADERS['Content-Security-Policy']).toContain("base-uri 'self'")
+    expect(SECURITY_HEADERS['Content-Security-Policy']).toContain('upgrade-insecure-requests')
+
     const publicHeaders = readPublic('_headers')
     expect(publicHeaders).toContain('X-Content-Type-Options: nosniff')
     expect(publicHeaders).toContain('X-Frame-Options: DENY')
     expect(publicHeaders).toContain('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload')
     expect(publicHeaders).toContain("Content-Security-Policy: default-src 'self'")
+    expect(publicHeaders).not.toMatch(/script-src[^;]*unsafe-inline/)
+    expect(publicHeaders).not.toContain('unsafe-eval')
+    expect(publicHeaders).toContain("object-src 'none'")
+    expect(publicHeaders).toContain('upgrade-insecure-requests')
   })
 })
 

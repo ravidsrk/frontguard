@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { copyText } from "../../lib/clipboard";
 
 export const MONO = "'JetBrains Mono', monospace";
 export const SANS = "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif";
@@ -448,32 +449,37 @@ export const PLUGINS = [
 export const LIFECYCLE_HOOKS_TEXT =
   "setup · beforeDiscover · afterDiscover · beforeRender · afterRender · afterCompare · afterRun · onError · teardown";
 
-export function useCopy(): [boolean, (text: string) => void] {
-  const [copied, setCopied] = useState(false);
+export type CopyStatus = "idle" | "copied" | "failed";
+
+export function useCopy(): [boolean, (text: string) => Promise<void>, CopyStatus] {
+  const [status, setStatus] = useState<CopyStatus>("idle");
+  const attemptRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
+      attemptRef.current += 1;
       if (timerRef.current !== null) {
         clearTimeout(timerRef.current);
       }
     };
   }, []);
 
-  const copy = (text: string) => {
-    try {
-      navigator.clipboard?.writeText(text);
-    } catch {
-      /* ignore clipboard errors in headless environments */
-    }
-    setCopied(true);
+  const copy = async (text: string) => {
+    const attempt = ++attemptRef.current;
     if (timerRef.current !== null) {
       clearTimeout(timerRef.current);
-    }
-    timerRef.current = setTimeout(() => {
-      setCopied(false);
       timerRef.current = null;
+    }
+    const ok = await copyText(text);
+    if (attempt !== attemptRef.current) return;
+    setStatus(ok ? "copied" : "failed");
+    timerRef.current = setTimeout(() => {
+      if (attempt === attemptRef.current) {
+        setStatus("idle");
+        timerRef.current = null;
+      }
     }, 1800);
   };
-  return [copied, copy];
+  return [status === "copied", copy, status];
 }

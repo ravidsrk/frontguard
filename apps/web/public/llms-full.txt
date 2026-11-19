@@ -27,7 +27,7 @@ Frontguard is an open-source CLI with pre-release cloud components. The CLI is M
 ## What Frontguard Does
 
 - Configurable consensus — projects can opt into multiple captures per route; pixel comparison uses SSIM as a fallback
-- Optional AI classification — screenshot evidence, basic route metadata, and optional accessibility findings go directly to the configured OpenAI or Anthropic provider
+- Optional AI classification — screenshot evidence, basic route metadata, and optional accessibility findings go directly to the configured OpenAI, Anthropic, or Gemini provider (or a custom OpenAI-compatible `baseUrl`)
 - Experimental fixes — CSS suggestions and sandbox verification are separate opt-ins; unverified suggestions remain labeled
 - Plugin architecture — nine lifecycle hooks; built-ins for accessibility (axe-core), Figma compare, perf budgets, monitor, third-party-script drift
 - CI-ready — generated workflows preserve JSON and HTML artifacts; source PR reporting remains pending external release validation, and remote thumbnails require a configured `imageUpload` backend
@@ -63,7 +63,7 @@ Frontguard terminal (uses the generated config):
 ```bash
 npx -p @frontguard/cli frontguard doctor
 npx -p @frontguard/cli frontguard guide [topic] [--json]
-npx -p @frontguard/cli frontguard update-baselines
+npx -p @frontguard/cli frontguard update-baselines --confirm-baselines
 git push origin frontguard-baselines # before CI comparisons
 npx -p @frontguard/cli frontguard run --wait-for-stability --redact-sensitive --color-scheme dark --freeze-time 2026-01-01T00:00:00Z --seed-random 42 --block-urls "*google-analytics.com*"
 ```
@@ -218,7 +218,7 @@ Cloud source is included in `packages/cloud-api`, but its Compose path is not a 
 
 ### How do I install Frontguard?
 
-Install `@frontguard/cli`, run `frontguard init`, start the app in a separate terminal, wait for the generated config `baseUrl`, run `frontguard update-baselines`, push `frontguard-baselines`, then run `frontguard run` using that config.
+Install `@frontguard/cli`, run `frontguard init`, start the app in a separate terminal, wait for the generated config `baseUrl`, run `frontguard update-baselines --confirm-baselines`, push `frontguard-baselines`, then run `frontguard run` using that config.
 
 ### How does Frontguard handle cross-OS rendering differences?
 

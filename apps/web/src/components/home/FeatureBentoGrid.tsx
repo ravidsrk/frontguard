@@ -13,7 +13,7 @@ import {
 } from "./home-data";
 
 export function FeatureBentoGrid() {
-  const [configCopied, copyConfig] = useCopy();
+  const [configCopied, copyConfig, configCopyStatus] = useCopy();
   const [configExpanded, setConfigExpanded] = useState(false);
 
   return (
@@ -35,9 +35,6 @@ export function FeatureBentoGrid() {
               Built for real frontend repositories: monorepos, dynamic
               hydration, authenticated routes, and multi-viewport matrices.
             </p>
-          </div>
-          <div className="fg-todo-note">
-            TODO: confirm top 3 feature selection (Git-native baselines, Frame convergence, Smart rendering)
           </div>
         </div>
 
@@ -188,7 +185,11 @@ export function FeatureBentoGrid() {
                 ),
               }}
             >
-              {configCopied ? "Copied ✓" : "Copy"}
+              {configCopied
+                ? "Copied ✓"
+                : configCopyStatus === "failed"
+                  ? "Copy failed"
+                  : "Copy"}
             </button>
           </div>
 

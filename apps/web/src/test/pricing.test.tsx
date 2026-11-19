@@ -97,4 +97,22 @@ describe('/pricing', () => {
     expect(await screen.findByText('copied ✓')).toBeInTheDocument()
     expect(writeText).toHaveBeenCalledWith('npm install @frontguard/cli')
   })
+
+  it('reports clipboard failure on the CTA band without false success', async () => {
+    setClipboard({ writeText: vi.fn().mockRejectedValue(new Error('denied')) })
+
+    await renderPricing()
+    fireEvent.click(
+      screen.getByRole('button', { name: /copy command: npm install @frontguard\/cli/i }),
+    )
+
+    expect(await screen.findByText('copy failed')).toBeInTheDocument()
+  })
+
+  it('includes --confirm-baselines in the install FAQ answer', async () => {
+    await renderPricing()
+    expect(
+      screen.getByText(/frontguard update-baselines --confirm-baselines/),
+    ).toBeInTheDocument()
+  })
 })
