@@ -311,16 +311,16 @@ describe('text snapshots beside a pixel comparison', () => {
 });
 
 describe('text snapshots on baseline update', () => {
-  it('writes the sibling text before the PNG', async () => {
+  it('writes the sibling text only after the PNG succeeds', async () => {
     mocks.aria = 'line\r\n';
     const output = reporter();
 
     const result = await updateBaselines(config(), output);
 
-    expect(mocks.textFile).toHaveBeenCalledWith('/', 1440, 'chromium', '.aria.txt', 'line');
+    expect(mocks.textFile).toHaveBeenCalledWith('/', 1440, 'chromium', '.aria.txt', 'line', undefined);
     expect(mocks.writeBaseline).toHaveBeenCalledOnce();
     const wroteText = mocks.textFile.mock.invocationCallOrder.at(-1) ?? 0;
-    expect(wroteText).toBeLessThan(mocks.writeBaseline.mock.invocationCallOrder[0]);
+    expect(wroteText).toBeGreaterThan(mocks.writeBaseline.mock.invocationCallOrder[0]);
     expect(result.baselineUpdate).toBe(true);
     expect(result.diffs[0]?.status).toBe('new');
     expect(result.textSnapshots?.[0]?.status).toBe('new');

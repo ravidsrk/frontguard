@@ -12,7 +12,9 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Reporter, PipelineStage, RunResult, DiffResult } from '../core/types.js';
 import { loadReview } from '../cli/load-review.js';
+import { isHttpUrl } from '../discovery/story-url.js';
 import { logger } from '../utils/logger.js';
+import { redact } from '../utils/redact.js';
 
 // ---------------------------------------------------------------------------
 // HTML Reporter
@@ -38,7 +40,7 @@ export class HTMLReporter implements Reporter {
   onError(error: Error): void {
     this.delegate?.onError(error);
     this.errors.push(error);
-    logger.error(`Pipeline error captured for HTML report: ${error.message}`);
+    logger.error(`Pipeline error captured for HTML report: ${redact(error.message)}`);
   }
 
   async onComplete(result: RunResult): Promise<void> {
@@ -204,15 +206,20 @@ function statusIcon(status: string): string {
 
 function severityBadge(severity: string): string {
   const cls = severity === 'critical' ? 'badge-critical' : severity === 'warning' ? 'badge-warning' : 'badge-info';
-  return `<span class="badge ${cls}">${severity}</span>`;
+  return `<span class="badge ${cls}">${escapeHtml(severity)}</span>`;
+}
+
+function safeCssToken(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
 function escapeHtml(str: string): string {
-  return str
+  return redact(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function bufferToDataUri(buf: Buffer | undefined): string {
@@ -276,7 +283,7 @@ function renderHeader(result: RunResult): string {
 }
 
 function renderSidebarItem(path: string, status: string, index: number): string {
-  return `<li class="route-item" data-index="${index}" data-status="${status}" data-route="${escapeHtml(path)}">
+  return `<li class="route-item" data-index="${index}" data-status="${escapeHtml(status)}" data-route="${escapeHtml(path)}">
         ${statusIcon(status)}
         <span class="route-path">${escapeHtml(path)}</span>
       </li>`;
@@ -286,10 +293,11 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
   const routeFragment = safeFilenameFragment(path);
 
   const diffCards = diffs.map((diff, diffIdx) => {
-    const prefix = `${index}_${routeFragment}_${diff.viewport}_${diff.browser}_${diffIdx}`;
-    const baselineSrc = resolveImage(diff.baselineImage, `${prefix}_baseline`);
-    const currentSrc = resolveImage(diff.currentImage, `${prefix}_current`);
-    const diffSrc = resolveImage(diff.diffImage, `${prefix}_diff`);
+    const browserToken = safeCssToken(String(diff.browser)) || 'browser';
+    const prefix = `${index}_${routeFragment}_${diff.viewport}_${browserToken}_${diffIdx}`;
+    const baselineSrc = escapeHtml(resolveImage(diff.baselineImage, `${prefix}_baseline`));
+    const currentSrc = escapeHtml(resolveImage(diff.currentImage, `${prefix}_current`));
+    const diffSrc = escapeHtml(resolveImage(diff.diffImage, `${prefix}_diff`));
     const hasClusters = Boolean(diff.clusters && diff.clusters.length > 0);
 
     const pills: string[] = [];
@@ -415,6 +423,11 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
           ${ai.suggestedFix && !diff.suggestedFix ? `<p><strong>Suggested fix:</strong> ${escapeHtml(ai.suggestedFix)}</p>` : ''}
           <p class="confidence">Confidence: ${Math.round(ai.confidence * 100)}%</p>
         </div>`;
+    } else if (diff.aiError) {
+      aiSection = `<div class="ai-analysis">
+          <h4>🤖 AI Analysis</h4>
+          <p>${escapeHtml(diff.aiError)}</p>
+        </div>`;
     }
 
     let fixSection = '';
@@ -424,7 +437,7 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
       const verifyClass = verified === true ? 'fix-verified' : verified === false ? 'fix-unverified' : 'fix-suggested';
       const verifyLabel =
         verified === true ? '✓ Verified' : verified === false ? '⚠ Unverified' : '💡 Suggested';
-      const patchId = `patch-${prefix}`;
+      const patchId = safeCssToken(`patch-${prefix}`);
       fixSection = `<div class="fix-panel ${verifyClass}">
           <h4>🔧 Suggested Fix <span class="fix-badge">${verifyLabel}</span>
             <span class="confidence">${Math.round(fix.confidence * 100)}% · ${escapeHtml(fix.category)}</span>
@@ -457,14 +470,16 @@ function renderRouteDetail(path: string, diffs: DiffResult[], index: number, res
           )}"`
         : '';
 
-    return `<div class="diff-card status-${diff.status}${hasClusters ? ' bboxes-visible' : ''}" data-view-mode="side-by-side"${clustersAttr}>
+    const statusToken = safeCssToken(String(diff.status)) || 'unknown';
+    return `<div class="diff-card status-${statusToken}${hasClusters ? ' bboxes-visible' : ''}" data-view-mode="side-by-side"${clustersAttr}>
         <div class="diff-header">
           ${statusIcon(diff.status)}
-          <span class="diff-label">${diff.viewport}px · ${diff.browser}</span>
+          <span class="diff-label">${diff.viewport}px · ${escapeHtml(String(diff.browser))}</span>
           ${pills.join('\n          ')}
           <span class="diff-percentage">${diff.diffPercentage.toFixed(2)}% changed</span>
         </div>
         ${diff.error ? `<div class="diff-error">${escapeHtml(diff.error)}</div>` : ''}
+        ${diff.dimensionNote ? `<div class="diff-note">${escapeHtml(diff.dimensionNote)}</div>` : ''}
         ${stabilityBanner}
         ${viewToolbar}
         <div class="image-row">
@@ -527,9 +542,13 @@ function renderAccessibilitySection(result: RunResult): string {
     const rows = r.violations
       .map((v) => {
         const target = escapeHtml(v.nodes[0]?.target?.join(', ') ?? '');
-        return `<tr class="a11y-${v.impact}">
-            <td><span class="a11y-impact a11y-impact-${v.impact}">${v.impact}</span></td>
-            <td><a href="${escapeHtml(v.helpUrl)}" target="_blank" rel="noopener">${escapeHtml(v.id)}</a></td>
+        const impactToken = safeCssToken(String(v.impact)) || 'minor';
+        const ruleCell = isHttpUrl(v.helpUrl)
+          ? `<a href="${escapeHtml(v.helpUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(v.id)}</a>`
+          : `<span>${escapeHtml(v.id)}</span>`;
+        return `<tr class="a11y-${impactToken}">
+            <td><span class="a11y-impact a11y-impact-${impactToken}">${escapeHtml(String(v.impact))}</span></td>
+            <td>${ruleCell}</td>
             <td>${escapeHtml(v.help)}</td>
             <td><code>${target}</code></td>
           </tr>`;

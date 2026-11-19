@@ -11,6 +11,16 @@
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import type { Reporter, PipelineStage, RunResult } from '../core/types.js';
+import { redact } from '../utils/redact.js';
+
+// Strip ANSI CSI/OSC/DCS/ESC sequences and C0/C1 control chars (preserving \n and \t).
+const TERMINAL_ESCAPE_RE =
+  /\u001b(?:\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[PX^_][\s\S]*?\u001b\\|\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])|[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
+
+/** Strips terminal escape sequences and redacts secrets from untrusted console strings. */
+export function sanitizeConsoleText(text: string): string {
+  return redact(text).replace(TERMINAL_ESCAPE_RE, '');
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -58,7 +68,7 @@ export class ConsoleReporter implements Reporter {
   onStageStart(stage: PipelineStage, detail?: string): void {
     this.currentStage = stage;
     const label = STAGE_LABELS[stage] ?? stage;
-    const text = detail ? `${label} ${chalk.dim(`— ${detail}`)}` : label;
+    const text = detail ? `${label} ${chalk.dim(`— ${sanitizeConsoleText(detail)}`)}` : label;
 
     this.spinner = ora({
       text,
@@ -72,14 +82,14 @@ export class ConsoleReporter implements Reporter {
 
     const label = STAGE_LABELS[stage] ?? stage;
     const bar = progressBar(current, total);
-    const detailSuffix = detail ? ` ${chalk.dim(detail)}` : '';
+    const detailSuffix = detail ? ` ${chalk.dim(sanitizeConsoleText(detail))}` : '';
     this.spinner.text = `${label} ${bar}${detailSuffix}`;
   }
 
   onStageComplete(stage: PipelineStage, detail?: string): void {
     if (this.spinner) {
       const label = STAGE_LABELS[stage] ?? stage;
-      const text = detail ? `${label} ${chalk.dim(`— ${detail}`)}` : label;
+      const text = detail ? `${label} ${chalk.dim(`— ${sanitizeConsoleText(detail)}`)}` : label;
       this.spinner.succeed(text);
       this.spinner = null;
     }
@@ -87,11 +97,12 @@ export class ConsoleReporter implements Reporter {
   }
 
   onError(error: Error): void {
+    const safeMsg = sanitizeConsoleText(error.message);
     if (this.spinner) {
-      this.spinner.fail(chalk.red(error.message));
+      this.spinner.fail(chalk.red(safeMsg));
       this.spinner = null;
     } else {
-      console.error(chalk.red(`\n  ✘ ${error.message}`));
+      console.error(chalk.red(`\n  ✘ ${safeMsg}`));
     }
   }
 
@@ -158,10 +169,10 @@ export class ConsoleReporter implements Reporter {
           : chalk.red('✘ FAIL');
       const score = `${Math.round(j.confidence * 100)}%`;
       console.log(
-        `    ${statusLabel}  ${chalk.bold(j.route.path)} @ ${j.viewport}px [${j.browser}]  ${chalk.dim(`(confidence: ${score})`)}`,
+        `    ${statusLabel}  ${chalk.bold(sanitizeConsoleText(j.route.path))} @ ${j.viewport}px [${sanitizeConsoleText(j.browser)}]  ${chalk.dim(`(confidence: ${score})`)}`,
       );
       if (j.error) {
-        console.log(chalk.red(`      ${j.error}`));
+        console.log(chalk.red(`      ${sanitizeConsoleText(j.error)}`));
       } else if (j.issues.length > 0) {
         for (const issue of j.issues) {
           const sevColor =
@@ -171,8 +182,8 @@ export class ConsoleReporter implements Reporter {
                 ? chalk.yellow
                 : chalk.dim;
           console.log(
-            `      ${sevColor(`[${issue.severity}]`)} ${issue.category}: ${issue.description}` +
-              (issue.suggestion ? chalk.dim(` — ${issue.suggestion}`) : ''),
+            `      ${sevColor(`[${sanitizeConsoleText(issue.severity)}]`)} ${sanitizeConsoleText(issue.category)}: ${sanitizeConsoleText(issue.description)}` +
+              (issue.suggestion ? chalk.dim(` — ${sanitizeConsoleText(issue.suggestion)}`) : ''),
           );
         }
       }
@@ -197,15 +208,15 @@ export class ConsoleReporter implements Reporter {
     console.log(chalk.yellow.bold(`  ♿ ACCESSIBILITY (${total} violation${total !== 1 ? 's' : ''})`));
     console.log('');
     for (const r of withViolations) {
-      console.log(chalk.yellow(`    ${r.route} @ ${r.viewport}px`));
+      console.log(chalk.yellow(`    ${sanitizeConsoleText(r.route)} @ ${r.viewport}px`));
       for (const v of r.violations) {
         const impactColor =
           v.impact === 'critical' ? chalk.red :
           v.impact === 'serious' ? chalk.redBright :
           v.impact === 'moderate' ? chalk.yellow : chalk.blue;
-        const target = v.nodes[0]?.target?.join(', ') ?? '';
+        const target = sanitizeConsoleText(v.nodes[0]?.target?.join(', ') ?? '');
         console.log(
-          `      ${impactColor(`[${v.impact}]`)} ${chalk.bold(v.id)}: ${v.help}` +
+          `      ${impactColor(`[${sanitizeConsoleText(v.impact)}]`)} ${chalk.bold(sanitizeConsoleText(v.id))}: ${sanitizeConsoleText(v.help)}` +
             (target ? chalk.dim(` (${target})`) : ''),
         );
       }
@@ -225,16 +236,16 @@ export class ConsoleReporter implements Reporter {
     console.log(chalk.yellow.bold('  ⚡ PERFORMANCE'));
     console.log('');
     for (const p of perf) {
-      console.log(chalk.yellow(`    ${p.route} @ ${p.viewport}px`));
+      console.log(chalk.yellow(`    ${sanitizeConsoleText(p.route)} @ ${p.viewport}px`));
       for (const v of p.violations) {
         console.log(
-          `      ${chalk.bold(v.metric)}: ${formatPerf(v.actual, v.unit)} ` +
+          `      ${chalk.bold(sanitizeConsoleText(v.metric))}: ${formatPerf(v.actual, v.unit)} ` +
             chalk.dim(`(budget ${formatPerf(v.budget, v.unit)})`),
         );
       }
       for (const r of p.regressions ?? []) {
         console.log(
-          `      ${chalk.bold(r.metric)}: ${formatPerf(r.current, r.unit)} ` +
+          `      ${chalk.bold(sanitizeConsoleText(r.metric))}: ${formatPerf(r.current, r.unit)} ` +
             chalk.red(`(↑ ${formatDeltaPct(r.deltaPct)} since last run`) +
             chalk.dim(`, was ${formatPerf(r.previous, r.unit)})`),
         );
@@ -255,9 +266,9 @@ export class ConsoleReporter implements Reporter {
     console.log(chalk.cyan.bold('  🧩 THIRD-PARTY SCRIPTS'));
     console.log('');
     for (const t of changed) {
-      console.log(chalk.cyan(`    ${t.route} @ ${t.viewport}px`));
-      for (const o of t.added) console.log(`      ${chalk.green('+')} ${o}`);
-      for (const o of t.removed) console.log(`      ${chalk.red('-')} ${o}`);
+      console.log(chalk.cyan(`    ${sanitizeConsoleText(t.route)} @ ${t.viewport}px`));
+      for (const o of t.added) console.log(`      ${chalk.green('+')} ${sanitizeConsoleText(o)}`);
+      for (const o of t.removed) console.log(`      ${chalk.red('-')} ${sanitizeConsoleText(o)}`);
       console.log('');
     }
   }
@@ -297,8 +308,8 @@ export class ConsoleReporter implements Reporter {
           return padCenter(icon, 8);
         });
 
-        const routeLabel = padRight(route, routeColWidth);
-        const browserLabel = padRight(browser, browserColWidth);
+        const routeLabel = padRight(sanitizeConsoleText(route), routeColWidth);
+        const browserLabel = padRight(sanitizeConsoleText(browser), browserColWidth);
         console.log(`  ${routeLabel}${browserLabel}${cells.join(' ')}`);
       }
     }
@@ -319,7 +330,7 @@ export class ConsoleReporter implements Reporter {
       const largest = diff.clusters[0];
       let clusterDesc = `${diff.clusters.length} cluster${diff.clusters.length !== 1 ? 's' : ''} — largest (${largest.bbox.x}, ${largest.bbox.y}) ${largest.bbox.width}×${largest.bbox.height}px`;
       if (largest.targetSelector) {
-        clusterDesc += ` → ${largest.targetSelector}`;
+        clusterDesc += ` → ${sanitizeConsoleText(largest.targetSelector)}`;
       }
       const simParts: string[] = [];
       if (largest.chromaSSIM !== undefined) {
@@ -335,6 +346,10 @@ export class ConsoleReporter implements Reporter {
     }
     if (metricParts.length > 0) {
       console.log(chalk.dim(`    Metrics: ${metricParts.join(' · ')}`));
+    }
+
+    if (diff.dimensionNote) {
+      console.log(chalk.dim(`    Note: ${sanitizeConsoleText(diff.dimensionNote)}`));
     }
 
     if (diff.stability && !diff.stability.settled) {
@@ -359,7 +374,7 @@ export class ConsoleReporter implements Reporter {
     console.log('');
 
     for (const diff of regressions) {
-      const label = `${diff.route.path} @ ${diff.viewport}px`;
+      const label = `${sanitizeConsoleText(diff.route.path)} @ ${diff.viewport}px`;
       console.log(chalk.red(`    ${label}`));
       console.log(chalk.dim(`    Diff: ${diff.diffPercentage.toFixed(2)}% pixels changed`));
       if (diff.windowMax !== undefined && diff.windowMax > 64) {
@@ -374,11 +389,17 @@ export class ConsoleReporter implements Reporter {
           ai.severity === 'warning' ? chalk.yellow :
           chalk.blue;
 
-        console.log(chalk.dim(`    AI: `) + severityColor(`[${ai.severity}]`) + ` ${ai.explanation}`);
+        console.log(
+          chalk.dim(`    AI: `) +
+            severityColor(`[${sanitizeConsoleText(ai.severity)}]`) +
+            ` ${sanitizeConsoleText(ai.explanation)}`,
+        );
         if (ai.suggestedFix && !diff.suggestedFix) {
-          console.log(chalk.dim(`    Fix: `) + ai.suggestedFix);
+          console.log(chalk.dim(`    Fix: `) + sanitizeConsoleText(ai.suggestedFix));
         }
         console.log(chalk.dim(`    Confidence: ${Math.round(ai.confidence * 100)}%`));
+      } else if (diff.aiError) {
+        console.log(chalk.yellow(`    AI (advisory): ${sanitizeConsoleText(diff.aiError)}`));
       }
 
       // Structured AI fix (Task 4.3)
@@ -393,12 +414,14 @@ export class ConsoleReporter implements Reporter {
               : chalk.dim('suggested');
         console.log(
           chalk.cyan(`    🔧 Fix available `) +
-            chalk.dim(`(${Math.round(fix.confidence * 100)}% confidence, ${fix.category}) `) +
+            chalk.dim(
+              `(${Math.round(fix.confidence * 100)}% confidence, ${sanitizeConsoleText(fix.category)}) `,
+            ) +
             badge,
         );
-        console.log(chalk.dim(`    ${fix.explanation}`));
+        console.log(chalk.dim(`    ${sanitizeConsoleText(fix.explanation)}`));
         // Indent the patch.
-        for (const line of fix.patch.split('\n')) {
+        for (const line of sanitizeConsoleText(fix.patch).split('\n')) {
           console.log(chalk.green(`      ${line}`));
         }
       }
@@ -419,13 +442,15 @@ export class ConsoleReporter implements Reporter {
     console.log('');
 
     for (const diff of warnings) {
-      const label = `${diff.route.path} @ ${diff.viewport}px`;
+      const label = `${sanitizeConsoleText(diff.route.path)} @ ${diff.viewport}px`;
       console.log(chalk.yellow(`    ${label}`));
       console.log(chalk.dim(`    Diff: ${diff.diffPercentage.toFixed(2)}% pixels changed`));
       this.printDiffTelemetry(diff);
 
       if (diff.aiAnalysis) {
-        console.log(chalk.dim(`    AI: `) + diff.aiAnalysis.explanation);
+        console.log(chalk.dim(`    AI: `) + sanitizeConsoleText(diff.aiAnalysis.explanation));
+      } else if (diff.aiError) {
+        console.log(chalk.yellow(`    AI (advisory): ${sanitizeConsoleText(diff.aiError)}`));
       }
 
       console.log('');
@@ -443,8 +468,10 @@ export class ConsoleReporter implements Reporter {
       return;
     }
     for (const row of notable) {
-      console.log(`  ${row.kind} ${row.status}: ${row.route} @ ${row.viewport}px [${row.browser}]`);
-      if (row.excerpt) console.log(chalk.dim(`  ${row.excerpt}`));
+      console.log(
+        `  ${sanitizeConsoleText(row.kind)} ${sanitizeConsoleText(row.status)}: ${sanitizeConsoleText(row.route)} @ ${row.viewport}px [${sanitizeConsoleText(row.browser)}]`,
+      );
+      if (row.excerpt) console.log(chalk.dim(`  ${sanitizeConsoleText(row.excerpt)}`));
     }
     console.log(chalk.dim('  A text mismatch does not pass or fail the pixel comparison.'));
     console.log('');
@@ -456,9 +483,11 @@ export class ConsoleReporter implements Reporter {
     console.log(chalk.bold('  HORIZONTAL OVERFLOW — not a pixel result'));
     for (const row of rows) {
       console.log(
-        `  ${row.route} @ ${row.viewport}px [${row.browser}] scroll ${row.scrollWidth} > inner ${row.innerWidth}`,
+        `  ${sanitizeConsoleText(row.route)} @ ${row.viewport}px [${sanitizeConsoleText(row.browser)}] scroll ${row.scrollWidth} > inner ${row.innerWidth}`,
       );
-      for (const el of row.elements) console.log(`    ${el.selector} ${el.overflowPx}px`);
+      for (const el of row.elements) {
+        console.log(`    ${sanitizeConsoleText(el.selector)} ${el.overflowPx}px`);
+      }
     }
     console.log(chalk.dim('  This does not change the exit code.'));
     console.log('');
@@ -467,7 +496,7 @@ export class ConsoleReporter implements Reporter {
   private printNewPages(result: RunResult): void {
     if (result.baselineRefusal) {
       console.log(chalk.red.bold('  ✘ BASELINES NOT WRITTEN'));
-      console.log(chalk.red(`  ${result.baselineRefusal}`));
+      console.log(chalk.red(`  ${sanitizeConsoleText(result.baselineRefusal)}`));
       console.log('');
       return;
     }
@@ -522,7 +551,7 @@ export class ConsoleReporter implements Reporter {
     console.log(`  ${parts.join(chalk.dim(' · '))}`);
 
     // Report path
-    const reportPath = `${config.outputDir}/report.html`;
+    const reportPath = sanitizeConsoleText(`${config.outputDir}/report.html`);
     console.log(chalk.dim(`  Report: ${reportPath}`));
 
     // Timing

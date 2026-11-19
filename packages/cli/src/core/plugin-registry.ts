@@ -71,24 +71,28 @@ export function shortNameOf(packageName: string): string {
   return unscoped.startsWith(PLUGIN_PREFIX) ? unscoped.slice(PLUGIN_PREFIX.length) : unscoped;
 }
 
+const VALID_PLUGIN_NAME_RE =
+  /^(?:@[a-z0-9][a-z0-9._-]*\/)?frontguard-plugin-[a-z0-9][a-z0-9._-]*$/;
+
 /** Validates that a package name follows the plugin naming convention. */
 export function isValidPluginName(packageName: string): boolean {
-  const unscoped = packageName.startsWith('@')
-    ? packageName.slice(packageName.indexOf('/') + 1)
-    : packageName;
-  return unscoped.startsWith(PLUGIN_PREFIX) && unscoped.length > PLUGIN_PREFIX.length;
+  return (
+    packageName.length <= 214 &&
+    !packageName.includes('..') &&
+    VALID_PLUGIN_NAME_RE.test(packageName)
+  );
 }
 
 /** Builds the install command args for a package manager. */
 export function installArgs(pm: PackageManager, packageName: string): string[] {
   switch (pm) {
     case 'pnpm':
-      return ['add', '-D', packageName];
+      return ['add', '-D', '--', packageName];
     case 'yarn':
-      return ['add', '-D', packageName];
+      return ['add', '-D', '--', packageName];
     case 'npm':
     default:
-      return ['install', '-D', packageName];
+      return ['install', '-D', '--', packageName];
   }
 }
 
@@ -96,12 +100,12 @@ export function installArgs(pm: PackageManager, packageName: string): string[] {
 export function uninstallArgs(pm: PackageManager, packageName: string): string[] {
   switch (pm) {
     case 'pnpm':
-      return ['remove', packageName];
+      return ['remove', '--', packageName];
     case 'yarn':
-      return ['remove', packageName];
+      return ['remove', '--', packageName];
     case 'npm':
     default:
-      return ['uninstall', packageName];
+      return ['uninstall', '--', packageName];
   }
 }
 
@@ -142,6 +146,11 @@ export async function uninstallPlugin(
   opts: { cwd?: string; pm?: PackageManager; exec?: typeof execFileAsync } = {},
 ): Promise<{ packageName: string }> {
   const packageName = resolvePackageName(identifier);
+  if (!isValidPluginName(packageName)) {
+    throw new Error(
+      `"${packageName}" is not a valid Frontguard plugin. Plugins must be named "${PLUGIN_PREFIX}*".`,
+    );
+  }
   const cwd = opts.cwd ?? process.cwd();
   const pm = opts.pm ?? detectPackageManager(cwd);
   const exec = opts.exec ?? execFileAsync;
@@ -257,6 +266,11 @@ export async function loadPlugin(
   importer: (spec: string) => Promise<unknown> = (spec) => import(spec),
 ): Promise<FrontguardPlugin> {
   const packageName = resolvePackageName(identifier);
+  if (!isValidPluginName(packageName)) {
+    throw new Error(
+      `"${packageName}" is not a valid Frontguard plugin. Plugins must be named "${PLUGIN_PREFIX}*".`,
+    );
+  }
   let mod: unknown;
   try {
     mod = await importer(packageName);

@@ -20,9 +20,34 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ImageUploadConfig } from '../core/types.js';
+
+function sanitizeKeySegment(raw: string, fallback: string): string {
+  const cleaned = raw
+    .replace(/\.\.+/g, '_')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^[_.-]+|[_.-]+$/g, '');
+  return cleaned || fallback;
+}
+
+function resolveContainedPath(baseDir: string, key: string): string {
+  if (!key || key.includes('\0') || key.includes('\\') || isAbsolute(key)) {
+    throw new Error(`Invalid image upload key: "${key}"`);
+  }
+  const parts = key.split('/');
+  if (parts.some((p) => !p || p === '.' || p === '..')) {
+    throw new Error(`Invalid image upload key: "${key}"`);
+  }
+  const base = resolve(baseDir);
+  const full = resolve(base, ...parts);
+  const rel = relative(base, full);
+  if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    throw new Error(`Image upload key escapes target directory: "${key}"`);
+  }
+  return full;
+}
 
 /**
  * Contract implemented by every image uploader.
@@ -55,9 +80,15 @@ export function buildImageKey(params: {
   browser: string;
   type: 'baseline' | 'current' | 'diff';
 }): string {
+  const safeProject = sanitizeKeySegment(params.project, 'project');
+  const safeRunId = sanitizeKeySegment(params.runId, 'run');
+  const safeBrowser = sanitizeKeySegment(params.browser, 'chromium');
   const safeRoute =
-    params.route.replace(/^\/+/, '').replace(/[^a-zA-Z0-9._-]+/g, '_') || 'root';
-  return `${params.project}/${params.runId}/${safeRoute}-${params.viewport}-${params.browser}-${params.type}.png`;
+    params.route
+      .replace(/^\/+/, '')
+      .replace(/\.\.+/g, '_')
+      .replace(/[^a-zA-Z0-9._-]+/g, '_') || 'root';
+  return `${safeProject}/${safeRunId}/${safeRoute}-${params.viewport}-${safeBrowser}-${params.type}.png`;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,14 +104,14 @@ export class LocalUploader implements ImageUploader {
   }
 
   async upload(key: string, buffer: Buffer): Promise<string> {
-    const filePath = join(this.baseDir, key);
+    const filePath = resolveContainedPath(this.baseDir, key);
     mkdirSync(dirname(filePath), { recursive: true });
     writeFileSync(filePath, buffer);
-    return this.getUrl(key);
+    return pathToFileURL(filePath).href;
   }
 
   getUrl(key: string): string {
-    return pathToFileURL(join(this.baseDir, key)).href;
+    return pathToFileURL(resolveContainedPath(this.baseDir, key)).href;
   }
 
   async delete(): Promise<void> {
@@ -108,26 +139,27 @@ export class GitHubArtifactUploader implements ImageUploader {
   private readonly runId?: string;
 
   constructor(stageDir = resolve(process.cwd(), '.frontguard', 'artifacts')) {
-    this.stageDir = stageDir;
+    this.stageDir = resolve(stageDir);
     this.serverUrl = process.env.GITHUB_SERVER_URL ?? 'https://github.com';
     this.repo = process.env.GITHUB_REPOSITORY;
     this.runId = process.env.GITHUB_RUN_ID;
   }
 
   async upload(key: string, buffer: Buffer): Promise<string> {
-    const filePath = join(this.stageDir, key);
+    const filePath = resolveContainedPath(this.stageDir, key);
     mkdirSync(dirname(filePath), { recursive: true });
     writeFileSync(filePath, buffer);
     return this.getUrl(key);
   }
 
   getUrl(key: string): string {
+    const filePath = resolveContainedPath(this.stageDir, key);
     // When running in GitHub Actions, link to the run's artifacts page.
     if (this.repo && this.runId) {
       return `${this.serverUrl}/${this.repo}/actions/runs/${this.runId}#artifacts:${key}`;
     }
     // Outside CI, fall back to a file URL.
-    return pathToFileURL(join(this.stageDir, key)).href;
+    return pathToFileURL(filePath).href;
   }
 
   async delete(): Promise<void> {

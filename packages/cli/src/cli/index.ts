@@ -14,7 +14,7 @@
  */
 
 import { Command } from 'commander';
-import { duplicateBaselineKeyMessage, loadConfig } from '../core/config.js';
+import { configSchema, duplicateBaselineKeyMessage, loadConfig } from '../core/config.js';
 import { runPipeline, runJudgePipeline, updateBaselines } from '../core/pipeline.js';
 import {
   installPlugin,
@@ -24,7 +24,7 @@ import {
   detectPackageManager,
 } from '../core/plugin-registry.js';
 import { runDoctor } from './doctor.js';
-import { runPruneBaselines } from './prune-baselines.js';
+import { loadPruneBaselines } from './load-prune.js';
 import { collectAgedIgnores, formatAgedIgnores } from './aged-ignores.js';
 import { runInit } from './init.js';
 import { GUIDE_TOPICS, getGuideTopic, formatGuideIndex } from './guide.js';
@@ -39,6 +39,7 @@ import { ConsoleReporter } from '../report/console.js';
 import { HTMLReporter } from '../report/html.js';
 import { createReporter } from '../report/factory.js';
 import { logger, setLogLevel } from '../utils/logger.js';
+import { redact } from '../utils/redact.js';
 import { FixPatternDB } from '../storage/fix-patterns.js';
 import {
   createMonitorPlugin,
@@ -49,18 +50,21 @@ import {
   resolveMonitorUrls,
 } from '../plugins/monitor.js';
 import type { FrontguardConfig, BrowserEngine } from '../core/types.js';
-import { writeFileSync } from 'node:fs';
+import { realpathSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CLI_VERSION as VERSION } from '../version.js';
 
-// Global error handlers
+// Global error handlers (operational/uncaught errors exit 2, never 1)
 process.on('unhandledRejection', (reason) => {
-  console.error('[frontguard] Unhandled promise rejection:', reason instanceof Error ? reason.message : reason);
-  process.exitCode = 1;
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.error('[frontguard] Unhandled promise rejection:', redact(msg));
+  process.exitCode = 2;
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('[frontguard] Uncaught exception:', error.message);
-  process.exit(1);
+  console.error('[frontguard] Uncaught exception:', redact(error.message));
+  process.exit(2);
 });
 
 // ---------------------------------------------------------------------------
@@ -104,6 +108,7 @@ export async function buildConfig(
 
   if (opts.url && typeof opts.url === 'string') {
     config.baseUrl = opts.url;
+    config.explicitBaseUrl = true;
   }
 
   if (opts.routes && typeof opts.routes === 'string') {
@@ -210,6 +215,14 @@ export async function buildConfig(
     );
   }
 
+  // Re-validate the merged config (catches invalid CLI overrides like --browsers, --url, --routes)
+  const validated = configSchema.safeParse(config);
+  if (!validated.success) {
+    const details = validated.error.issues.map((i) => i.message).join('; ');
+    throw new Error(`Invalid Frontguard config: ${details}`);
+  }
+  config = validated.data as FrontguardConfig;
+
   // Schema validation ran on the file. Overrides can still collide.
   const collision = duplicateBaselineKeyMessage(config);
   if (collision) {
@@ -225,6 +238,7 @@ export async function buildConfig(
 
 function formatFatalError(err: unknown): string {
   const error = err instanceof Error ? err : new Error(String(err));
+  const safeMessage = redact(error.message);
 
   const lines: string[] = [];
   lines.push('');
@@ -232,18 +246,18 @@ function formatFatalError(err: unknown): string {
   lines.push('║                   FRONTGUARD ERROR                      ║');
   lines.push('╚══════════════════════════════════════════════════════════╝');
   lines.push('');
-  lines.push(`  ${error.message}`);
+  lines.push(`  ${safeMessage}`);
 
   // Provide actionable hints for common errors
-  if (error.message.includes('ECONNREFUSED') || error.message.includes('Cannot reach')) {
+  if (safeMessage.includes('ECONNREFUSED') || safeMessage.includes('Cannot reach')) {
     lines.push('');
     lines.push('  Hint: Is your dev server running?');
     lines.push('  Try: npm run dev (in another terminal)');
-  } else if (error.message.includes('Config file not found') || error.message.includes('No base URL')) {
+  } else if (safeMessage.includes('Config file not found') || safeMessage.includes('No base URL')) {
     lines.push('');
     lines.push('  Hint: Run `frontguard init` to create a config file,');
     lines.push('  or pass --url to specify the base URL directly.');
-  } else if (error.message.includes('browserType.launch')) {
+  } else if (safeMessage.includes('browserType.launch')) {
     lines.push('');
     lines.push('  Hint: Playwright browsers may not be installed.');
     lines.push('  Try: npx playwright install');
@@ -253,7 +267,7 @@ function formatFatalError(err: unknown): string {
 
   if (process.env.FRONTGUARD_DEBUG === '1' || process.env.DEBUG) {
     lines.push('Stack trace:');
-    lines.push(error.stack ?? '(no stack)');
+    lines.push(redact(error.stack ?? '(no stack)'));
   } else {
     lines.push('  Set FRONTGUARD_DEBUG=1 for full stack trace.');
   }
@@ -281,6 +295,18 @@ export async function main(argv?: string[]): Promise<number> {
     .description('Local visual regression testing with reviewed git baselines and optional model-assisted analysis')
     .version(VERSION)
     .option('--no-telemetry', 'Disable anonymous usage telemetry');
+
+  /** Reads `telemetry` from config if present; fails closed to `false` on unreadable config. */
+  const readTelemetryConfig = async (configPath?: string): Promise<boolean | undefined> => {
+    try {
+      return (await loadConfig(configPath)).telemetry;
+    } catch (err) {
+      if (!configPath && err instanceof Error && err.message.startsWith('No Frontguard config found.')) {
+        return undefined;
+      }
+      return false;
+    }
+  };
 
   /** Helper: emit a telemetry event, honoring --no-telemetry and config. */
   const emitTelemetry = async (
@@ -441,7 +467,12 @@ export async function main(argv?: string[]): Promise<number> {
         logger.info('─'.repeat(60));
 
         // Exit code
-        exitCode = runExitCode(summary, result.fingerprintCheck);
+        exitCode = runExitCode(
+          summary,
+          result.fingerprintCheck,
+          summary.regressions,
+          result.perfBudgetFailed === true,
+        );
         if (exitCode === 2) {
           logger.error('❌ Visual comparison could not complete');
         } else if (summary.regressions > 0) {
@@ -451,6 +482,8 @@ export async function main(argv?: string[]): Promise<number> {
             `❌ ${summary.newPages} new screenshot(s) require review; ` +
               'accept them with `frontguard update-baselines --confirm-baselines`',
           );
+        } else if (result.perfBudgetFailed) {
+          logger.error('❌ Performance budget(s) exceeded');
         } else {
           logger.info('✅ No regressions detected');
         }
@@ -510,7 +543,7 @@ export async function main(argv?: string[]): Promise<number> {
           exitCode = result.exitCode;
           return;
         }
-        await emitTelemetry({ command: 'init', version: VERSION });
+        await emitTelemetry({ command: 'init', version: VERSION }, await readTelemetryConfig());
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;
@@ -610,6 +643,7 @@ export async function main(argv?: string[]): Promise<number> {
     .option('--shard <shard>', 'Refused. A shard does not see every baseline.')
     .action(async (opts: { apply?: boolean; config?: string; routes?: string; shard?: string }) => {
       try {
+        const { runPruneBaselines } = await loadPruneBaselines();
         exitCode = await runPruneBaselines({
           cwd: process.cwd(),
           apply: opts.apply === true,
@@ -634,13 +668,14 @@ export async function main(argv?: string[]): Promise<number> {
     )
     .option('--older-than <days>', 'List rules strictly older than this many days')
     .option('-c, --config <path>', 'Config file path')
-    .action(async (opts: { olderThan: string; config?: string }) => {
-      const days = Number(opts.olderThan);
-      if (!Number.isInteger(days) || days < 0) {
+    .action(async (opts: { olderThan?: string; config?: string }) => {
+      const rawDays = typeof opts.olderThan === 'string' ? opts.olderThan.trim() : '';
+      if (!/^\d+$/.test(rawDays)) {
         logger.error('--older-than must be a whole number of days');
         exitCode = 2;
         return;
       }
+      const days = Number(rawDays);
       try {
         const config = await loadConfig(opts.config);
         const text = formatAgedIgnores(collectAgedIgnores(config, days, new Date()), days);
@@ -662,7 +697,7 @@ export async function main(argv?: string[]): Promise<number> {
     .action(async () => {
       try {
         exitCode = await runDoctor(process.cwd());
-        await emitTelemetry({ command: 'doctor', version: VERSION });
+        await emitTelemetry({ command: 'doctor', version: VERSION }, await readTelemetryConfig());
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;
@@ -703,11 +738,7 @@ export async function main(argv?: string[]): Promise<number> {
           logger.info(`📜 Recent monitoring history (${historyDir}):`);
           // Print the table to stdout so it can be piped/captured cleanly.
           console.log(formatHistoryTable(records));
-          try {
-            telemetryConfig = (await loadConfig(opts.config as string | undefined)).telemetry;
-          } catch {
-            telemetryConfig = undefined;
-          }
+          telemetryConfig = await readTelemetryConfig(opts.config as string | undefined);
           await emitTelemetry({ command: 'monitor', version: VERSION }, telemetryConfig);
           exitCode = 0;
           return;
@@ -908,7 +939,10 @@ export async function main(argv?: string[]): Promise<number> {
             `  export default { plugins: [plugin()] };`,
         );
         exitCode = 0;
-        await emitTelemetry({ command: 'plugin-install', version: VERSION });
+        await emitTelemetry(
+          { command: 'plugin-install', version: VERSION },
+          await readTelemetryConfig(),
+        );
       } catch (err) {
         logger.error(formatFatalError(err));
         exitCode = 2;
@@ -1024,7 +1058,19 @@ export async function main(argv?: string[]): Promise<number> {
 // Auto-run when executed directly (not imported)
 // ---------------------------------------------------------------------------
 
-main(process.argv).then((code) => process.exit(code)).catch((err) => {
-  console.error('[frontguard] Fatal:', err instanceof Error ? err.message : err);
-  process.exit(2);
-});
+function isDirectExecution(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return resolve(entry) === resolve(fileURLToPath(import.meta.url));
+  }
+}
+
+if (isDirectExecution()) {
+  main(process.argv).then((code) => process.exit(code)).catch((err) => {
+    console.error('[frontguard] Fatal:', redact(err instanceof Error ? err.message : String(err)));
+    process.exit(2);
+  });
+}

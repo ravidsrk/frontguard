@@ -17,6 +17,11 @@ function sha256(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
+const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+function pngBytes(tag: string): Buffer {
+  return Buffer.concat([PNG_SIG, Buffer.from(tag)]);
+}
+
 /** Compare-mode reads fail closed when CI is set and the fixture has no origin. */
 async function compareStorage(cwd: string): Promise<GitOrphanStorage> {
   const previous = process.env.CI;
@@ -119,9 +124,9 @@ describe('frontguard review', () => {
   });
 
   it('writes one accepted shot and leaves the other two untouched', async () => {
-    const first = Buffer.from('png-a');
-    const second = Buffer.from('png-b');
-    const third = Buffer.from('png-c');
+    const first = pngBytes('png-a');
+    const second = pngBytes('png-b');
+    const third = pngBytes('png-c');
     writeManifest([
       shot('/a', place('a', first)),
       shot('/b', place('b', second)),
@@ -168,9 +173,9 @@ describe('frontguard review', () => {
   });
 
   it('a filter writes only the named shot', async () => {
-    const chosen = Buffer.from('png-b');
+    const chosen = pngBytes('png-b');
     writeManifest([
-      shot('/a', place('a', Buffer.from('png-a'))),
+      shot('/a', place('a', pngBytes('png-a'))),
       shot('/b', place('b', chosen)),
     ]);
     const out = await runReview({
@@ -187,7 +192,7 @@ describe('frontguard review', () => {
   });
 
   it('copies a CI png byte for byte and refuses a fingerprint mismatch', async () => {
-    const png = Buffer.from('ci-png-bytes');
+    const png = pngBytes('ci-png-bytes');
     await writeCiReport(reportDir, '/pricing', png);
     const copied = await runReview({
       cwd: repoDir,
@@ -237,8 +242,8 @@ describe('frontguard review', () => {
   });
 
   it('records the previous manifest sha on a later acceptance', async () => {
-    const previous = Buffer.from('old-png');
-    const next = Buffer.from('new-png');
+    const previous = pngBytes('old-png');
+    const next = pngBytes('new-png');
     const previousSha = sha256(previous);
     const storage = new GitOrphanStorage(repoDir, { mode: 'update', offline: true });
     await storage.init();
@@ -308,7 +313,7 @@ describe('frontguard review', () => {
 
   it('writes with a bogus origin and does not fetch', async () => {
     git('remote', 'add', 'origin', join(repoDir, 'no-such-remote'));
-    const png = Buffer.from('offline-png');
+    const png = pngBytes('offline-png');
     writeManifest([shot('/pricing', place('pricing', png))]);
     const out = await runReview({
       cwd: repoDir,
@@ -322,8 +327,8 @@ describe('frontguard review', () => {
   });
 
   it('does not let a missing shot cancel an accepted one', async () => {
-    const keep = Buffer.from('keep-png');
-    const gone = Buffer.from('gone-png');
+    const keep = pngBytes('keep-png');
+    const gone = pngBytes('gone-png');
     const goneSha = sha256(gone);
     const writer = new GitOrphanStorage(repoDir, { mode: 'update', offline: true });
     await writer.init();
@@ -401,7 +406,7 @@ describe('frontguard review', () => {
   });
 
   it('stamps the captured color scheme instead of the global setting', async () => {
-    const png = Buffer.from('dark-png');
+    const png = pngBytes('dark-png');
     const config = { ...baseConfig(reportDir), colorScheme: 'light' as const };
     mkdirSync(reportDir, { recursive: true });
     writeReviewManifest(
@@ -460,7 +465,7 @@ describe('frontguard review', () => {
   });
 
   it('accepts a symlink that stays inside the report directory', async () => {
-    const png = Buffer.from('inside-png');
+    const png = pngBytes('inside-png');
     const rel = place('real', png);
     symlinkSync(join(reportDir, rel), join(reportDir, 'images', 'link.png'));
     writeManifest([shot('/pricing', 'images/link.png')]);

@@ -206,14 +206,16 @@ export interface AIConfig {
   baseUrl?: string;
   /** Output-token cap per call, including reasoning/thinking tokens. Default 8192. */
   maxOutputTokens?: number;
-  /** Wall-clock limit per HTTP attempt in milliseconds. Default 120000. */
+  /** Wall-clock limit per HTTP attempt in milliseconds. Default 120000, max 300000. */
   timeoutMs?: number;
   /**
    * Maximum model calls per run (analysis, fix generation and judge combined).
    * Calls past the cap are skipped and reported; pixel results do not change.
-   * Unset means no cap.
+   * Defaults to 50 when omitted. Explicit 0 skips all model calls.
    */
   maxCalls?: number;
+  /** Opt in to Anthropic server-side fallback beta header. Default false. */
+  allowFallback?: boolean;
 }
 
 export type { AICallRecord, AIErrorKind } from '../diff/ai-provider.js';
@@ -391,6 +393,8 @@ export interface FrontguardConfig {
    * Does not turn off animation freeze or font waiting; `smartRender: false` does.
    */
   includeAllRoutes?: boolean;
+  /** True when `baseUrl` was passed explicitly via CLI `--url` (prevents preview-URL env overrides). */
+  explicitBaseUrl?: boolean;
   /** Number of parallel browser workers (default `4`). */
   workers: number;
   /** Page navigation timeout in milliseconds (default `30 000`). */
@@ -653,6 +657,15 @@ export interface ScreenshotResult {
   mode?: string;
   /** Resolved capture mode settings used for this screenshot. */
   modeConfig?: CaptureModeConfig;
+  /** Performance metrics collected directly from `page.evaluate`, immune to DOM spoofing. */
+  perfMetrics?: {
+    resources: number;
+    pageWeight: number;
+    ttfb: number;
+    domContentLoaded: number;
+    lcp?: number;
+    cls?: number;
+  };
 }
 
 /** Severity/impact level of an accessibility violation (axe-core scale). */
@@ -729,6 +742,10 @@ export interface DiffResult {
   aiAnalysis?: AIAnalysis;
   /** Set when AI analysis was skipped because `ai.maxCalls` was reached. Pixel status is unchanged. */
   aiSkipped?: 'budget';
+  /** Non-blocking advisory AI error message; pixel status stays unchanged. */
+  aiError?: string;
+  /** Non-error notice when baseline and current dimensions differed and were padded. */
+  dimensionNote?: string;
   /** Error message when `status` is `'error'`. */
   error?: string;
   /** SSIM score when SSIM fallback was computed (0–1). */
@@ -1020,6 +1037,8 @@ export interface RunResult {
   horizontalOverflow?: HorizontalOverflowReport[];
   /** Performance budget results, if the perf-budgets plugin ran. */
   perf?: PerfReport[];
+  /** True when perf-budgets violated a budget with `failOnBudgetExceeded: true`. */
+  perfBudgetFailed?: boolean;
   /** Third-party script inventory changes, if the third-party-scripts plugin ran. */
   thirdPartyScripts?: ThirdPartyScriptResult[];
   /** Model-as-judge verdicts (Task 8.4), if judge mode ran. */
@@ -1195,10 +1214,11 @@ export interface BaselineStorage {
   readBaseline(route: string, viewport: number, browser: BrowserEngine, mode?: string): Promise<Buffer | null>;
   /** Write (or overwrite) a baseline image. */
   writeBaseline(route: string, viewport: number, browser: BrowserEngine, buffer: Buffer, mode?: string): Promise<void>;
-  /** Write multiple baseline images (and optional manifest) in a single transaction. */
+  /** Write multiple baseline images (and optional manifest / sibling text files) in a single transaction. */
   writeBaselines?(
     entries: Array<{ route: string; viewport: number; browser?: BrowserEngine; mode?: string; buffer: Buffer }>,
     manifest?: BaselineManifest,
+    textFiles?: Array<{ route: string; viewport: number; browser?: BrowserEngine; mode?: string; suffix: string; body: string }>,
   ): Promise<void>;
   /** Read the baseline manifest. Returns `null` if none exists. */
   readManifest(): Promise<BaselineManifest | null>;

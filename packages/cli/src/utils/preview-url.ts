@@ -12,6 +12,7 @@
  */
 
 import { logger } from './logger.js';
+import { isHttpUrl } from '../discovery/story-url.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -126,6 +127,10 @@ export function detectPreviewUrl(): string | null {
       const value = process.env[envVar];
       if (value && value.trim().length > 0) {
         const url = normalizeUrl(value, platform.needsHttps);
+        if (!isHttpUrl(url)) {
+          logger.warn(`Ignoring unsafe preview URL from $${envVar}: only http:// and https:// URLs are allowed`);
+          continue;
+        }
         logger.info(`Detected preview URL: ${url} (${platform.name} via $${envVar})`);
         return url;
       }

@@ -77,6 +77,7 @@ export async function runPruneBaselines(options: {
     routes: config.routes,
     viewports: config.viewports,
     browsers: config.browsers,
+    modes: config.modes,
   });
   const mergeBase = commits.length > 0 ? mergeBaseCommit(options.cwd) : '';
   const plan = planBaselinePrune({

@@ -22,7 +22,10 @@ export function runExitCode(
   summary: RunResult['summary'],
   fingerprintCheck?: Pick<FingerprintCheck, 'strictFailure'>,
   failureCount = summary.regressions,
+  perfBudgetFailed = false,
 ): 0 | 1 | 2 {
   if (fingerprintCheck?.strictFailure) return 2;
-  return comparisonExitCode(summary, failureCount);
+  const code = comparisonExitCode(summary, failureCount);
+  if (code === 0 && perfBudgetFailed) return 1;
+  return code;
 }

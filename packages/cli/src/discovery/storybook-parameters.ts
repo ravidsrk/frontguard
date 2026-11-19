@@ -8,9 +8,10 @@
  * @module discovery/storybook-parameters
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { CsfFile } from '@storybook/csf-tools';
+import { chromiumLaunchArgs } from '../render/chromium-args.js';
 import { logger } from '../utils/logger.js';
 
 /** Per-story Frontguard overrides from `parameters.frontguard`. */
@@ -235,9 +236,24 @@ export function collectStorybookSearchRoots(explicitRoot?: string): string[] {
 }
 
 function resolveStoryFile(importPath: string, searchRoots: string[]): string | null {
+  if (!importPath || importPath.includes('\0') || isAbsolute(importPath)) return null;
   for (const root of searchRoots) {
-    const candidate = resolve(root, importPath);
-    if (existsSync(candidate)) return candidate;
+    const base = resolve(root);
+    const candidate = resolve(base, importPath);
+    const rel = relative(base, candidate);
+    if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) continue;
+    if (!existsSync(candidate)) continue;
+    try {
+      const realBase = realpathSync(base);
+      const realCand = realpathSync(candidate);
+      const realRel = relative(realBase, realCand);
+      if (!realRel || realRel === '..' || realRel.startsWith(`..${sep}`) || isAbsolute(realRel)) {
+        continue;
+      }
+      return realCand;
+    } catch {
+      continue;
+    }
   }
   return null;
 }
@@ -259,7 +275,7 @@ async function enrichFromPreview(
     const { chromium } = await import('playwright');
     browser = await chromium.launch({
       headless: true,
-      args: ['--disable-gpu', '--no-sandbox', '--disable-setuid-sandbox'],
+      args: chromiumLaunchArgs(),
     });
   } catch (err) {
     logger.debug(
@@ -342,11 +358,12 @@ export async function resolveStoryFrontguardParameters(
   const needsEnrichment: string[] = [];
 
   for (const entry of entries) {
-    const fromIndex = entry.parameters?.frontguard;
+    const fromIndex = normalizeFrontguardParams(entry.parameters?.frontguard);
     if (fromIndex) {
       resolved.set(entry.id, fromIndex);
       continue;
     }
+    if (entry.parameters?.frontguard !== undefined) continue;
     needsEnrichment.push(entry.id);
   }
 

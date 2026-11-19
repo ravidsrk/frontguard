@@ -13,6 +13,8 @@ import { join } from 'node:path';
 import type { FrontguardPlugin, PluginContext } from '../core/plugins.js';
 import type { DiffResult, RunResult, FrontguardConfig, Route, RouteEntry } from '../core/types.js';
 import { compareDiffToThreshold } from '../diff/threshold.js';
+import { assertHttpUrl, isHttpUrl } from '../discovery/story-url.js';
+import { redactDeep } from '../utils/redact.js';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -83,25 +85,42 @@ export function urlToSlug(url: string): string {
     .toLowerCase();
 }
 
-/** Resolve config-backed route entries into absolute monitor URLs. */
+/** Resolve config-backed route entries into origin-bound HTTP(S) monitor URLs. */
 export function resolveMonitorUrls(
   routes: RouteEntry[] | undefined,
   baseUrl: string,
 ): string[] {
-  const entries = routes && routes.length > 0 ? routes : [baseUrl];
-  return entries.map((entry) =>
-    new URL(typeof entry === 'string' ? entry : entry.path, baseUrl).href,
-  );
+  const base = assertHttpUrl(baseUrl, 'monitor baseUrl');
+  if (!routes || routes.length === 0) return [base.href];
+  return routes.map((entry) => {
+    const raw = typeof entry === 'string' ? entry : entry.path;
+    if (!raw || raw.startsWith('//') || raw.includes('\\') || /[\u0000-\u001f\u007f]/.test(raw)) {
+      throw new Error(`[frontguard-monitor] Route path "${raw}" is not an origin-bound path`);
+    }
+    let resolved: URL;
+    try {
+      resolved = new URL(raw, base);
+    } catch {
+      throw new Error(`[frontguard-monitor] Invalid route path: ${raw}`);
+    }
+    if (!isHttpUrl(resolved.href) || resolved.origin !== base.origin) {
+      throw new Error(
+        `[frontguard-monitor] Route "${raw}" resolves outside baseUrl origin (${base.origin})`,
+      );
+    }
+    return resolved.href;
+  });
 }
 
 /**
  * Send an alert payload to a webhook URL.
  */
 export async function sendWebhookAlert(webhookUrl: string, payload: AlertPayload): Promise<void> {
+  assertHttpUrl(webhookUrl, 'monitor webhook');
   const response = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(redactDeep(payload)),
   });
   if (!response.ok) {
     // Log but don't throw — alert failures shouldn't break the run
@@ -127,7 +146,7 @@ function saveHistoryEntry(
   const now = Date.now();
   lastHistoryTimestampMs = now > lastHistoryTimestampMs ? now : lastHistoryTimestampMs + 1;
   const filename = `${lastHistoryTimestampMs}.json`;
-  writeFileSync(join(dir, filename), JSON.stringify(entry, null, 2));
+  writeFileSync(join(dir, filename), JSON.stringify(redactDeep(entry), null, 2));
 
   // Prune old entries
   const files = readdirSync(dir)
@@ -200,11 +219,12 @@ export function createMonitorPlugin(config: MonitorConfig): FrontguardPlugin {
       }
 
       for (const url of config.urls) {
-        try {
-          new URL(url);
-        } catch {
+        if (!isHttpUrl(url)) {
           throw new Error(`[frontguard-monitor] Invalid URL: ${url}`);
         }
+      }
+      if (config.alerts?.webhook && !isHttpUrl(config.alerts.webhook)) {
+        throw new Error(`[frontguard-monitor] Invalid webhook URL: ${config.alerts.webhook}`);
       }
 
       if (config.historyDir) {
@@ -311,7 +331,7 @@ export function createMonitorPlugin(config: MonitorConfig): FrontguardPlugin {
           alerted,
           alerts: [...alerts],
         };
-        writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+        writeFileSync(summaryPath, JSON.stringify(redactDeep(summary), null, 2));
       }
 
       // Store summary in metadata for reporters

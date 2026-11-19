@@ -9,10 +9,21 @@
  */
 
 import type { Browser, Page } from 'playwright';
+import { isNamedMode } from '../core/fingerprint.js';
 import type { FrontguardPlugin, PluginContext } from '../core/plugins.js';
 import type { BrowserEngine, ScreenshotResult, TextSnapshotReport } from '../core/types.js';
 import { pageUrl } from '../discovery/story-url.js';
 import { STORYBOOK_READY_SCRIPT } from '../discovery/storybook.js';
+import {
+  chromiumLaunchArgs,
+  matchesBlockedUrl,
+  resolveFreezeTimestamp,
+} from '../render/chromium-args.js';
+import {
+  applySensitiveRedactionInPage,
+  resolveRedactSelectors,
+  scrubRedactedDomInPage,
+} from '../render/redaction.js';
 import { executeRouteActions } from '../render/route-actions.js';
 import { GitOrphanStorage } from '../storage/git-orphan.js';
 import { logger } from '../utils/logger.js';
@@ -26,7 +37,18 @@ export interface TextSnapshotConfig {
   markdown?: string;
 }
 
+export interface PendingTextSnapshot {
+  route: string;
+  viewport: number;
+  browser: BrowserEngine;
+  mode?: string;
+  suffix: string;
+  body: string;
+}
+
 const WRITE_KEY = 'tw';
+export const TEXT_SNAPSHOT_BATCH_KEY = 'text-snapshot:batch-writes';
+export const TEXT_SNAPSHOT_PENDING_KEY = 'text-snapshot:pending';
 
 export function normalizeTextSnapshot(text: string): string {
   return text.replace(/\r\n/g, '\n').replace(/\n$/, '');
@@ -70,6 +92,7 @@ export function createTextSnapshotPlugin(config: TextSnapshotConfig = {}): Front
       reports = [];
       if (kinds.length === 0) return;
       const writing = ctx.metadata.get(WRITE_KEY) === true;
+      const batchWrites = writing && ctx.metadata.get(TEXT_SNAPSHOT_BATCH_KEY) === true;
       const pw = await import('playwright').catch(() => null);
       if (!pw) {
         const message = 'Text snapshots need playwright installed.';
@@ -77,9 +100,18 @@ export function createTextSnapshotPlugin(config: TextSnapshotConfig = {}): Front
         logger.warn(message);
         return;
       }
-      const storage = new GitOrphanStorage(process.cwd(), { mode: writing ? 'update' : 'compare' });
-      await storage.init();
-      const pending: Array<{ shot: ScreenshotResult; kind: TextSnapshotReport['kind']; suffix: string; body: string }> = [];
+      let storage: GitOrphanStorage | null = null;
+      if (!batchWrites) {
+        storage = new GitOrphanStorage(process.cwd(), { mode: writing ? 'update' : 'compare' });
+        await storage.init();
+      }
+      const pending: Array<{
+        shot: ScreenshotResult;
+        kind: TextSnapshotReport['kind'];
+        suffix: string;
+        body: string;
+        mode?: string;
+      }> = [];
       const groups = new Map<BrowserEngine, ScreenshotResult[]>();
       for (const shot of shots) {
         const list = groups.get(shot.browser);
@@ -89,17 +121,19 @@ export function createTextSnapshotPlugin(config: TextSnapshotConfig = {}): Front
       const markFailed = (shot: ScreenshotResult): void => {
         for (const item of kinds) reports.push({ ...shotKey(shot), kind: item.kind, status: 'error' });
       };
-      for (const [name, shots] of groups) {
+      for (const [name, groupedShots] of groups) {
         let browser: Browser;
         try {
           browser = await launchEngine(pw as PlaywrightEngines, name);
         } catch (err) {
           if (writing) throw err;
-          for (const shot of shots) markFailed(shot);
+          for (const shot of groupedShots) markFailed(shot);
           continue;
         }
         try {
-          for (const shot of shots) {
+          for (const shot of groupedShots) {
+            const rawMode = shot.mode ?? shot.route.mode;
+            const shotMode = isNamedMode(rawMode) ? rawMode.trim() : undefined;
             let captured: Captured[];
             try {
               captured = await captureShot(browser, shot, ctx, config);
@@ -117,10 +151,17 @@ export function createTextSnapshotPlugin(config: TextSnapshotConfig = {}): Front
               }
               const body = normalizeTextSnapshot(item.body);
               if (writing) {
-                pending.push({ shot, kind: item.kind, suffix, body });
+                pending.push({ shot, kind: item.kind, suffix, body, mode: shotMode });
                 continue;
               }
-              const previous = await storage.textFile(shot.route.path, shot.viewport, shot.browser, suffix);
+              const previous = await storage!.textFile(
+                shot.route.path,
+                shot.viewport,
+                shot.browser,
+                suffix,
+                undefined,
+                shotMode,
+              );
               const status = previous === null ? 'new' : previous === body ? 'match' : 'mismatch';
               reports.push({
                 ...shotKey(shot),
@@ -134,9 +175,31 @@ export function createTextSnapshotPlugin(config: TextSnapshotConfig = {}): Front
           await browser.close();
         }
       }
-      for (const item of pending) {
-        await storage.textFile(item.shot.route.path, item.shot.viewport, item.shot.browser, item.suffix, item.body);
-        reports.push({ ...shotKey(item.shot), kind: item.kind, status: 'new' });
+      if (batchWrites) {
+        const staged: PendingTextSnapshot[] = pending.map((item) => ({
+          route: item.shot.route.path,
+          viewport: item.shot.viewport,
+          browser: item.shot.browser,
+          ...(item.mode ? { mode: item.mode } : {}),
+          suffix: item.suffix,
+          body: item.body,
+        }));
+        ctx.metadata.set(TEXT_SNAPSHOT_PENDING_KEY, staged);
+        for (const item of pending) {
+          reports.push({ ...shotKey(item.shot), kind: item.kind, status: 'new' });
+        }
+      } else {
+        for (const item of pending) {
+          await storage!.textFile(
+            item.shot.route.path,
+            item.shot.viewport,
+            item.shot.browser,
+            item.suffix,
+            item.body,
+            item.mode,
+          );
+          reports.push({ ...shotKey(item.shot), kind: item.kind, status: 'new' });
+        }
       }
       ctx.metadata.set('text-snapshot:reports', reports);
     },
@@ -156,7 +219,7 @@ async function launchEngine(pw: PlaywrightEngines, name: BrowserEngine): Promise
   if (!engine || typeof engine.launch !== 'function') throw new Error(`Browser "${name}" is not available`);
   return engine.launch({
     headless: true,
-    ...(name === 'chromium' ? { args: ['--disable-gpu', '--no-sandbox', '--disable-setuid-sandbox'] } : {}),
+    ...(name === 'chromium' ? { args: chromiumLaunchArgs() } : {}),
   });
 }
 
@@ -167,18 +230,32 @@ async function captureShot(
   config: TextSnapshotConfig,
 ): Promise<Captured[]> {
   const timeoutMs = ctx.config.pageTimeout ?? 30_000;
-  const colorScheme = shot.route.colorScheme ?? ctx.config.colorScheme;
-  const context = await browser.newContext({
+  const modeCfg = shot.modeConfig ?? shot.route.modeConfig;
+  const colorScheme = modeCfg?.colorScheme ?? shot.route.colorScheme ?? ctx.config.colorScheme;
+  const contextOptions: Record<string, unknown> = {
     viewport: { width: shot.viewport, height: ctx.config.viewportHeight ?? 720 },
     ...(ctx.config.auth?.storageState ? { storageState: ctx.config.auth.storageState } : {}),
     ...(colorScheme ? { colorScheme } : {}),
-  });
+    ...(modeCfg?.reducedMotion ? { reducedMotion: modeCfg.reducedMotion } : {}),
+    ...(modeCfg?.forcedColors ? { forcedColors: modeCfg.forcedColors } : {}),
+    ...(modeCfg?.contrast ? { contrast: modeCfg.contrast } : {}),
+    ...(modeCfg?.locale ? { locale: modeCfg.locale } : {}),
+    ...(modeCfg?.timezoneId ? { timezoneId: modeCfg.timezoneId } : {}),
+  };
+  const context = await browser.newContext(contextOptions);
   try {
     const blockUrls = [...(ctx.config.blockUrls ?? []), ...(shot.route.blockUrls ?? [])];
     if (blockUrls.length > 0 && typeof context.route === 'function') {
       await context.route('**/*', async (route) => {
-        if (urlBlocked(route.request().url(), blockUrls)) await route.abort('blockedbyclient');
-        else await route.continue();
+        try {
+          if (matchesBlockedUrl(route.request().url(), blockUrls)) {
+            await route.abort('blockedbyclient');
+          } else {
+            await route.continue();
+          }
+        } catch {
+          // Ignore errors when context closes mid-flight
+        }
       });
     }
     const page = await context.newPage();
@@ -192,6 +269,11 @@ async function captureShot(
       await executeRouteActions(page, shot.route.actions, timeoutMs);
     }
     if (shot.route.discoveredVia === 'storybook') await waitForStorybook(page, shot, timeoutMs);
+    const redactSelectors = resolveRedactSelectors(ctx.config.redactSensitive);
+    if (redactSelectors.length > 0 && typeof page.evaluate === 'function') {
+      await page.evaluate(applySensitiveRedactionInPage, redactSelectors).catch(() => {});
+      await page.evaluate(scrubRedactedDomInPage, redactSelectors).catch(() => {});
+    }
     const out: Captured[] = [];
     if (config.aria) out.push(await readAria(page));
     if (config.json) out.push(await readText(page, 'json', config.json));
@@ -203,7 +285,7 @@ async function captureShot(
 }
 
 async function freezeAndSeed(page: Page, shot: ScreenshotResult, ctx: PluginContext): Promise<void> {
-  const frozen = frozenAt(shot.route.freezeTime ?? ctx.config.freezeTime);
+  const frozen = resolveFreezeTimestamp(shot.route.freezeTime ?? ctx.config.freezeTime);
   if (frozen !== null) {
     const clock = page as Page & { clock?: { setFixedTime?: (time: number) => Promise<void> } };
     if (typeof clock.clock?.setFixedTime === 'function') await clock.clock.setFixedTime(frozen).catch(() => {});
@@ -229,33 +311,6 @@ async function waitForStorybook(page: Page, shot: ScreenshotResult, timeoutMs: n
       `Storybook ready-wait failed for ${shot.route.path}: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-}
-
-function frozenAt(freezeTime: boolean | number | string | undefined): number | null {
-  if (freezeTime === undefined || freezeTime === false) return null;
-  if (freezeTime === true) return 1704067200000;
-  if (typeof freezeTime === 'number') return freezeTime;
-  if (typeof freezeTime === 'string') {
-    const parsed = Date.parse(freezeTime);
-    return Number.isNaN(parsed) ? null : parsed;
-  }
-  return null;
-}
-
-function urlBlocked(url: string, patterns: string[]): boolean {
-  const lowerUrl = url.toLowerCase();
-  for (const rawPattern of patterns) {
-    const pattern = rawPattern.trim();
-    if (!pattern) continue;
-    const lowerPattern = pattern.toLowerCase();
-    if (lowerPattern.includes('*')) {
-      const escaped = lowerPattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-      if (new RegExp(`^${escaped}$`, 'i').test(url) || new RegExp(escaped, 'i').test(url)) return true;
-    } else if (lowerUrl.includes(lowerPattern)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 async function readAria(page: Page): Promise<Captured> {

@@ -84,10 +84,16 @@ function packageJson(spec: PluginSpec): string {
   );
 }
 
+function sanitizeJsDocText(text: string): string {
+  return text.replace(/\*\//g, '*\\/').replace(/[\r\n]+/g, ' ').trim();
+}
+
 function indexTs(spec: PluginSpec): string {
-  const fnName = `create${pascal(spec.shortName)}Plugin`;
+  const typeName = pascal(spec.shortName);
+  const fnName = `create${typeName}Plugin`;
+  const safeDesc = sanitizeJsDocText(spec.description);
   return `/**
- * ${spec.description}
+ * ${safeDesc}
  *
  * A Frontguard plugin. Implement one or more lifecycle hooks; only \`name\` is
  * required. See https://frontguard.dev/docs/guides/create-plugin for the full
@@ -104,7 +110,7 @@ export interface FrontguardPlugin {
 }
 
 /** Configuration for the ${spec.shortName} plugin. */
-export interface ${pascal(spec.shortName)}Options {
+export interface ${typeName}Options {
   /** Example option — replace with your own. */
   enabled?: boolean;
 }
@@ -116,7 +122,7 @@ export interface ${pascal(spec.shortName)}Options {
  * import ${fnName} from '${spec.packageName}';
  * export default { plugins: [${fnName}({ enabled: true })] };
  */
-export function ${fnName}(options: ${pascal(spec.shortName)}Options = {}): FrontguardPlugin {
+export function ${fnName}(options: ${typeName}Options = {}): FrontguardPlugin {
   const enabled = options.enabled ?? true;
   return {
     name: '${spec.shortName}',
@@ -249,13 +255,16 @@ function gitignore(): string {
   return 'node_modules\ndist\n*.log\n';
 }
 
-/** Converts a kebab/space name to PascalCase. */
+/** Converts a kebab/space name to a valid PascalCase TS identifier. */
 export function pascal(input: string): string {
-  return input
+  const out = input
     .split(/[-_\s]+/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join('');
+    .join('')
+    .replace(/[^a-zA-Z0-9_$]/g, '');
+  if (!out) return 'Plugin';
+  return /^[0-9]/.test(out) ? `Plugin${out}` : out;
 }
 
 /**

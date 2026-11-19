@@ -11,6 +11,12 @@
 import { z } from "zod";
 import { baselineStoragePath } from "../storage/git-orphan.js";
 import { DEFAULT_AI_MODELS } from "../diff/ai-provider.js";
+import {
+  isHttpUrl,
+  isOriginBoundPath,
+  isSafeAiBaseUrl,
+} from "../discovery/story-url.js";
+import { containsSecret } from "../utils/redact.js";
 import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
@@ -49,6 +55,9 @@ function storyIndexSchema(name: "ladle" | "histoire") {
         .url({
           error: `Config error at \`${name}.url\`: expected a valid URL`,
         })
+        .refine(isHttpUrl, {
+          message: `Config error at \`${name}.url\`: only http:// and https:// URLs are allowed`,
+        })
         .optional(),
       dir: z.string().min(1).optional(),
       stories: z.array(z.string().min(1)).optional(),
@@ -69,7 +78,12 @@ function storyIndexSchema(name: "ladle" | "histoire") {
 
 /** Zod schema for route-discovery options. */
 const discoverSchema = z.object({
-  startUrl: z.string().min(1, "discover.startUrl must not be empty"),
+  startUrl: z
+    .string()
+    .min(1, "discover.startUrl must not be empty")
+    .refine((u) => isOriginBoundPath(u) || isHttpUrl(u), {
+      message: "discover.startUrl must be an origin-bound path or http(s) URL",
+    }),
   maxDepth: z.number().int().positive().default(3),
   maxRoutes: z.number().int().positive().default(50),
   exclude: z.array(z.string()).default([]),
@@ -86,10 +100,17 @@ const aiConfigSchema = z
   .object({
     provider: z.enum(["openai", "anthropic", "gemini"]),
     model: z.string().min(1, "AI model must not be empty").optional(),
-    baseUrl: z.string().url().optional(),
+    baseUrl: z
+      .string()
+      .url()
+      .refine(isSafeAiBaseUrl, {
+        message: "ai.baseUrl must use https:// (or http:// only for localhost/127.0.0.1/[::1])",
+      })
+      .optional(),
     maxOutputTokens: z.number().int().positive().optional(),
-    timeoutMs: z.number().int().positive().optional(),
-    maxCalls: z.number().int().nonnegative().optional(),
+    timeoutMs: z.number().int().positive().max(300_000).optional(),
+    maxCalls: z.number().int().nonnegative().default(50),
+    allowFallback: z.boolean().optional(),
   })
   .transform((val) => ({
     provider: val.provider,
@@ -97,7 +118,8 @@ const aiConfigSchema = z
     ...(val.baseUrl !== undefined ? { baseUrl: val.baseUrl } : {}),
     ...(val.maxOutputTokens !== undefined ? { maxOutputTokens: val.maxOutputTokens } : {}),
     ...(val.timeoutMs !== undefined ? { timeoutMs: val.timeoutMs } : {}),
-    ...(val.maxCalls !== undefined ? { maxCalls: val.maxCalls } : {}),
+    maxCalls: val.maxCalls,
+    ...(val.allowFallback !== undefined ? { allowFallback: val.allowFallback } : {}),
   }));
 
 /** Zod schema for an ignore rule. */
@@ -216,12 +238,20 @@ const freezeTimeSchema = z.union([
     }),
 ]);
 
+/** Origin-bound relative path starting with `/` (rejects protocol-relative, full URLs, backslashes, control chars). */
+const routePathSchema = z
+  .string()
+  .min(1, "route.path must not be empty")
+  .refine((p) => isOriginBoundPath(p), {
+    message: "route.path must start with '/' and stay within baseUrl origin",
+  });
+
 /**
  * Zod schema for a per-route configuration object.
  * Allows overriding threshold / ignore / viewport / actions / colorScheme per route.
  */
 const routeConfigSchema = z.object({
-  path: z.string().min(1, "route.path must not be empty"),
+  path: routePathSchema,
   threshold: z
     .number()
     .min(0, "route.threshold must be >= 0")
@@ -247,7 +277,7 @@ const routeConfigSchema = z.object({
 });
 
 /** A route entry — either a plain string path or a {@link routeConfigSchema}. */
-const routeEntrySchema = z.union([z.string().min(1), routeConfigSchema]);
+const routeEntrySchema = z.union([routePathSchema, routeConfigSchema]);
 
 export interface ResolvedRouteMode {
   name?: string;
@@ -453,12 +483,16 @@ export const configSchema = z.object({
     .positive()
     .default(1),
 
-  baseUrl: z.url({
-    error: (issue) =>
-      issue.input === undefined
-        ? "Config error at `baseUrl`: this field is required"
-        : "Config error at `baseUrl`: expected a valid URL",
-  }),
+  baseUrl: z
+    .url({
+      error: (issue) =>
+        issue.input === undefined
+          ? "Config error at `baseUrl`: this field is required"
+          : "Config error at `baseUrl`: expected a valid URL",
+    })
+    .refine(isHttpUrl, {
+      message: "Config error at `baseUrl`: only http:// and https:// URLs are allowed",
+    }),
 
   routes: z.array(routeEntrySchema).optional(),
 
@@ -508,6 +542,9 @@ export const configSchema = z.object({
       ),
     })
     .default(true),
+
+  includeAllRoutes: z.boolean().optional(),
+  explicitBaseUrl: z.boolean().optional(),
 
   workers: z
     .number({
@@ -590,12 +627,16 @@ export const configSchema = z.object({
   /** Storybook integration — enumerate routes from a running Storybook server. */
   storybook: z
     .object({
-      url: z.url({
-        error: (issue) =>
-          issue.input === undefined
-            ? "Config error at `storybook.url`: this field is required"
-            : "Config error at `storybook.url`: expected a valid URL",
-      }),
+      url: z
+        .url({
+          error: (issue) =>
+            issue.input === undefined
+              ? "Config error at `storybook.url`: this field is required"
+              : "Config error at `storybook.url`: expected a valid URL",
+        })
+        .refine(isHttpUrl, {
+          message: "Config error at `storybook.url`: only http:// and https:// URLs are allowed",
+        }),
       stories: z.array(z.string().min(1)).optional(),
       exclude: z.array(z.string().min(1)).optional(),
       fetchTimeoutMs: z.number().int().positive().optional(),
@@ -645,6 +686,16 @@ export const configSchema = z.object({
    */
   fingerprint: z.enum(["warn", "strict"]).default("warn"),
 }).superRefine((config, ctx) => {
+  for (const [i, entry] of (config.routes ?? []).entries()) {
+    const p = typeof entry === "string" ? entry : entry.path;
+    if (!isOriginBoundPath(p, config.baseUrl)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Route "${p}" escapes baseUrl origin`,
+        path: ["routes", i],
+      });
+    }
+  }
   const message = duplicateBaselineKeyMessage(config);
   if (!message) return;
   ctx.addIssue({ code: "custom", message, path: ["routes"] });
@@ -715,52 +766,40 @@ const CONFIG_FILES = [
 // Secret Detection
 // ---------------------------------------------------------------------------
 
-/** Patterns that look like hardcoded API keys / tokens. */
-const SECRET_PATTERNS: RegExp[] = [
-  /sk-[A-Za-z0-9]{20,}/, // OpenAI
-  /sk-proj-[A-Za-z0-9_-]{20,}/, // OpenAI project keys
-  /anthropic-[A-Za-z0-9_-]{20,}/, // Anthropic
-  /ghp_[A-Za-z0-9]{36,}/, // GitHub PAT
-  /ghs_[A-Za-z0-9]{36,}/, // GitHub server token
-  /gho_[A-Za-z0-9]{36,}/, // GitHub OAuth
-  /github_pat_[A-Za-z0-9_]{20,}/, // GitHub fine-grained PAT
-  /xai-[A-Za-z0-9]{20,}/, // xAI / Grok
-  /glpat-[A-Za-z0-9_-]{20,}/, // GitLab PAT
-];
-
 /**
  * Recursively scans all string values in a configuration object for
- * patterns that look like hardcoded API keys or tokens.
+ * patterns that look like hardcoded API keys or tokens, guarding against
+ * circular object graphs.
  *
  * Issues `console.warn` for every match found so the user can migrate
  * to environment variables.
- *
- * @param obj  - The configuration object (or sub-value) to scan.
- * @param path - Dot-separated path used in the warning message.
  */
-export function detectSecrets(obj: unknown, path = "config"): void {
+export function detectSecrets(
+  obj: unknown,
+  path = "config",
+  seen = new WeakSet<object>(),
+): void {
   if (typeof obj === "string") {
-    for (const pattern of SECRET_PATTERNS) {
-      if (pattern.test(obj)) {
-        console.warn(
-          `⚠  Possible API key detected at \`${path}\`. ` +
-            "Use environment variables instead of hardcoding secrets in config files.",
-        );
-        break; // one warning per value is enough
-      }
+    if (containsSecret(obj)) {
+      console.warn(
+        `⚠  Possible API key detected at \`${path}\`. ` +
+          "Use environment variables instead of hardcoding secrets in config files.",
+      );
     }
     return;
   }
+
+  if (obj === null || typeof obj !== "object") return;
+  if (seen.has(obj)) return;
+  seen.add(obj);
 
   if (Array.isArray(obj)) {
-    obj.forEach((item, i) => detectSecrets(item, `${path}[${i}]`));
+    obj.forEach((item, i) => detectSecrets(item, `${path}[${i}]`, seen));
     return;
   }
 
-  if (obj !== null && typeof obj === "object") {
-    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-      detectSecrets(value, `${path}.${key}`);
-    }
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    detectSecrets(value, `${path}.${key}`, seen);
   }
 }
 

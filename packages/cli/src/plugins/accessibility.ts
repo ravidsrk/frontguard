@@ -30,6 +30,7 @@ import type {
   RunResult,
 } from '../core/types.js';
 import { pageUrl } from '../discovery/story-url.js';
+import { chromiumLaunchArgs } from '../render/chromium-args.js';
 import { executeRouteActions } from '../render/route-actions.js';
 import { logger } from '../utils/logger.js';
 
@@ -200,7 +201,7 @@ async function auditUrl(
   config: AccessibilityConfig,
   setup: AuditPageSetup,
 ): Promise<RawAxeResults> {
-  const browser = await pw.chromium.launch({ headless: true });
+  const browser = await pw.chromium.launch({ headless: true, args: chromiumLaunchArgs() });
   const timeoutMs = setup.pageTimeout ?? 30_000;
   try {
     const contextOptions: {
@@ -276,13 +277,49 @@ export function createAccessibilityPlugin(config: AccessibilityConfig = {}): Fro
     },
 
     async afterRender(shots: ScreenshotResult[], ctx: PluginContext): Promise<void> {
-      if (!axeAvailable) return;
+      if (ctx.metadata.get('accessibility:offline') === true) {
+        const offlineRaw = ctx.metadata.get('accessibility:offline-results');
+        const offline = Array.isArray(offlineRaw) ? (offlineRaw as AccessibilityResult[]) : [];
+        const wanted = new Set(shots.map((s) => `${s.route.path}:${s.viewport}`));
+        const matched = offline.filter((r) => wanted.has(`${r.route}:${r.viewport}`));
+        collected = matched;
+        ctx.metadata.set(ACCESSIBILITY_RESULTS_KEY, matched);
+        const failing = countFailingViolations(matched, config);
+        if (failing > 0) {
+          throw new Error(
+            `Accessibility check failed: ${failing} violation(s) at or above the configured impact threshold.`,
+          );
+        }
+        const covered = new Set(matched.map((r) => `${r.route}:${r.viewport}`));
+        const missing = [...wanted].filter((k) => !covered.has(k));
+        if (
+          config.failOnViolation &&
+          ctx.metadata.get('accessibility:require-complete') === true &&
+          missing.length > 0
+        ) {
+          throw new Error(
+            `Accessibility check failed: ${missing.length} audit(s) missing from offline review artifact.`,
+          );
+        }
+        return;
+      }
+      if (!axeAvailable) {
+        if (config.failOnViolation) {
+          throw new Error('Accessibility check failed: @axe-core/playwright is not installed');
+        }
+        return;
+      }
       const axe = (await loadAxe()) as {
         default?: unknown;
         AxeBuilder?: unknown;
       } | null;
       const pw = await loadPlaywright();
-      if (!axe || !pw) return;
+      if (!axe || !pw) {
+        if (config.failOnViolation) {
+          throw new Error('Accessibility check failed: @axe-core/playwright is not installed');
+        }
+        return;
+      }
 
       // `@axe-core/playwright` default export is the AxeBuilder class.
       const AxeBuilder = (axe as { default?: unknown }).default ?? axe;

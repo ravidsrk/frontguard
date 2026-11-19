@@ -12,6 +12,7 @@
 import type { BrowserEngine } from '../core/types.js';
 import type { Daytona, Sandbox as DaytonaRemoteSandbox } from '@daytona/sdk';
 import type { Sandbox, SandboxPatch, SandboxScreenshotParams } from './types.js';
+import { assertSafeCssPatch } from './css-sanitize.js';
 import { logger } from '../utils/logger.js';
 import { cropToMaxHeight } from '../render/crop.js';
 
@@ -91,7 +92,7 @@ export class DaytonaSandbox implements Sandbox {
 
   async applyPatch(patch: SandboxPatch): Promise<void> {
     if (patch.type === 'css') {
-      this.cssPatches.push(patch.content);
+      this.cssPatches.push(assertSafeCssPatch(patch.content));
     } else {
       logger.debug(`DaytonaSandbox: ignoring non-CSS patch of type "${patch.type}"`);
     }
