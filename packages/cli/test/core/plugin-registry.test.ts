@@ -65,16 +65,16 @@ describe('isValidPluginName', () => {
 
 describe('installArgs / uninstallArgs', () => {
   it('builds npm args', () => {
-    expect(installArgs('npm', 'p')).toEqual(['install', '-D', 'p']);
-    expect(uninstallArgs('npm', 'p')).toEqual(['uninstall', 'p']);
+    expect(installArgs('npm', 'p')).toEqual(['install', '-D', '--', 'p']);
+    expect(uninstallArgs('npm', 'p')).toEqual(['uninstall', '--', 'p']);
   });
   it('builds pnpm args', () => {
-    expect(installArgs('pnpm', 'p')).toEqual(['add', '-D', 'p']);
-    expect(uninstallArgs('pnpm', 'p')).toEqual(['remove', 'p']);
+    expect(installArgs('pnpm', 'p')).toEqual(['add', '-D', '--', 'p']);
+    expect(uninstallArgs('pnpm', 'p')).toEqual(['remove', '--', 'p']);
   });
   it('builds yarn args', () => {
-    expect(installArgs('yarn', 'p')).toEqual(['add', '-D', 'p']);
-    expect(uninstallArgs('yarn', 'p')).toEqual(['remove', 'p']);
+    expect(installArgs('yarn', 'p')).toEqual(['add', '-D', '--', 'p']);
+    expect(uninstallArgs('yarn', 'p')).toEqual(['remove', '--', 'p']);
   });
 });
 
@@ -136,7 +136,7 @@ describe('filesystem-backed', () => {
       const exec = vi.fn(async () => ({ stdout: '', stderr: '' }));
       const { packageName } = await installPlugin('slack', { cwd: dir, pm: 'npm', exec: exec as never });
       expect(packageName).toBe('frontguard-plugin-slack');
-      expect(exec).toHaveBeenCalledWith('npm', ['install', '-D', 'frontguard-plugin-slack'], { cwd: dir });
+      expect(exec).toHaveBeenCalledWith('npm', ['install', '-D', '--', 'frontguard-plugin-slack'], { cwd: dir });
     });
 
     it('rejects invalid plugin names before running', async () => {
@@ -150,7 +150,7 @@ describe('filesystem-backed', () => {
     it('uninstall calls remove/uninstall', async () => {
       const exec = vi.fn(async () => ({ stdout: '', stderr: '' }));
       await uninstallPlugin('frontguard-plugin-slack', { cwd: dir, pm: 'pnpm', exec: exec as never });
-      expect(exec).toHaveBeenCalledWith('pnpm', ['remove', 'frontguard-plugin-slack'], { cwd: dir });
+      expect(exec).toHaveBeenCalledWith('pnpm', ['remove', '--', 'frontguard-plugin-slack'], { cwd: dir });
     });
   });
 });

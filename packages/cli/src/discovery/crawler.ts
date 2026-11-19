@@ -11,6 +11,8 @@
 
 import type { FrontguardConfig, Route } from '../core/types.js';
 import { logger } from '../utils/logger.js';
+import { assertHttpUrl, isHttpUrl, isOriginBoundPath } from './story-url.js';
+import { chromiumLaunchArgs } from '../render/chromium-args.js';
 
 // Cached Playwright module to avoid repeated dynamic imports
 let _playwrightModule: typeof import('playwright') | undefined;
@@ -90,11 +92,31 @@ function isNonPageFile(url: string): boolean {
   }
 }
 
+/** Linear-time anchored `*` glob matcher (ReDoS-safe). */
+function globMatchAnchored(text: string, pattern: string): boolean {
+  const parts = pattern.split('*');
+  if (parts.length === 1) return text === pattern;
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  if (!text.startsWith(first) || !text.endsWith(last)) return false;
+  if (first.length + last.length > text.length) return false;
+  let pos = first.length;
+  const end = text.length - last.length;
+  for (let i = 1; i < parts.length - 1; i++) {
+    const seg = parts[i];
+    if (!seg) continue;
+    const idx = text.indexOf(seg, pos);
+    if (idx === -1 || idx + seg.length > end) return false;
+    pos = idx + seg.length;
+  }
+  return true;
+}
+
 /**
  * Checks if a URL matches any of the user-provided exclude patterns.
  *
- * Patterns containing `*` are treated as globs (`*` → `.*`) first, and other
- * patterns are tried as RegExp first with a substring fallback.
+ * Patterns containing `*` are treated as globs (`*` → any substring) first,
+ * and other patterns are tried as RegExp first with a substring fallback.
  */
 export function isExcluded(url: string, excludePatterns: string[]): boolean {
   const pathname = (() => {
@@ -107,15 +129,7 @@ export function isExcluded(url: string, excludePatterns: string[]): boolean {
 
   return excludePatterns.some((pattern) => {
     if (pattern.includes('*')) {
-      const escaped = pattern
-        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-        .replace(/\*/g, '.*');
-      try {
-        const globRegex = new RegExp(`^${escaped}$`);
-        return globRegex.test(pathname) || globRegex.test(url);
-      } catch {
-        return pathname.includes(pattern);
-      }
+      return globMatchAnchored(pathname, pattern) || globMatchAnchored(url, pattern);
     }
 
     try {
@@ -161,20 +175,34 @@ export async function discoverRoutes(config: FrontguardConfig): Promise<Route[]>
     exclude = [],
   } = config.discover;
 
-  let baseOrigin: string;
+  let baseUrlObj: URL;
   try {
-    baseOrigin = new URL(config.baseUrl).origin;
-  } catch {
+    baseUrlObj = assertHttpUrl(config.baseUrl, 'baseUrl');
+  } catch (err) {
     throw new Error(
-      `Invalid baseUrl "${config.baseUrl}". ` +
-        'Provide a valid URL like "http://localhost:3000" or "https://example.com".'
+      `Invalid baseUrl "${config.baseUrl}": ${err instanceof Error ? err.message : String(err)}. ` +
+        'Provide a valid http:// or https:// URL like "http://localhost:3000" or "https://example.com".'
     );
   }
+  const baseOrigin = baseUrlObj.origin;
 
-  // Resolve startUrl relative to baseUrl
-  const resolvedStartUrl = startUrl.startsWith('http')
-    ? startUrl
-    : new URL(startUrl, config.baseUrl).href;
+  // Resolve and validate startUrl: must use http(s) and stay on baseOrigin
+  let resolvedStartUrl: string;
+  if (isOriginBoundPath(startUrl, baseUrlObj.href)) {
+    resolvedStartUrl = new URL(startUrl, baseUrlObj).href;
+  } else if (isHttpUrl(startUrl)) {
+    const parsedStart = new URL(startUrl);
+    if (parsedStart.origin !== baseOrigin) {
+      throw new Error(
+        `Invalid discover.startUrl "${startUrl}": origin "${parsedStart.origin}" differs from baseUrl origin "${baseOrigin}".`
+      );
+    }
+    resolvedStartUrl = parsedStart.href;
+  } else {
+    throw new Error(
+      `Invalid discover.startUrl "${startUrl}": must be an origin-bound path or http(s) URL.`
+    );
+  }
 
   // Lazy import to avoid loading Playwright when unused; cached after first load
   if (!_playwrightModule) {
@@ -186,7 +214,7 @@ export async function discoverRoutes(config: FrontguardConfig): Promise<Route[]>
 
   let browser;
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: true, args: chromiumLaunchArgs() });
   } catch (launchErr) {
     try {
       const probe = await fetch(resolvedStartUrl, {
@@ -247,6 +275,10 @@ export async function discoverRoutes(config: FrontguardConfig): Promise<Route[]>
       if (testResponse.status() >= 500) {
         throw new Error(`Server returned ${testResponse.status()}`);
       }
+      const landedUrl = testPage.url();
+      if (!isHttpUrl(landedUrl) || new URL(landedUrl).origin !== baseOrigin) {
+        throw new Error(`Start URL redirected off-origin to "${landedUrl}"`);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await testPage.close();
@@ -263,9 +295,14 @@ export async function discoverRoutes(config: FrontguardConfig): Promise<Route[]>
     }
     await testPage.close();
 
+    // Hard cap on total visited URLs even when responses are non-HTML
+    const maxVisited = Math.max(maxRoutes * 4, 100);
+    let visitedAttempts = 0;
+
     // Main BFS loop
-    while (queue.length > 0 && routes.length < maxRoutes) {
+    while (queue.length > 0 && routes.length < maxRoutes && visitedAttempts < maxVisited) {
       const [currentUrl, depth] = queue.shift()!;
+      visitedAttempts++;
 
       if (depth > maxDepth) continue;
 
@@ -280,6 +317,14 @@ export async function discoverRoutes(config: FrontguardConfig): Promise<Route[]>
           timeout: discoveryTimeout,
         });
 
+        // Verify post-redirect URL stays http(s) and same-origin
+        const finalUrl = page.url();
+        if (!isHttpUrl(finalUrl) || new URL(finalUrl).origin !== baseOrigin) {
+          logger.debug(`Skipping off-origin redirect: ${currentUrl} -> ${finalUrl}`);
+          await page.close();
+          continue;
+        }
+
         // Skip non-HTML responses
         const contentType = response?.headers()['content-type'] ?? '';
         if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
@@ -288,8 +333,8 @@ export async function discoverRoutes(config: FrontguardConfig): Promise<Route[]>
           continue;
         }
 
-        // Extract the path relative to base
-        const currentParsed = new URL(currentUrl);
+        // Extract the path relative to base (from verified final URL)
+        const currentParsed = new URL(finalUrl);
         const rpath = currentParsed.pathname || '/';
 
         // Add to discovered routes (deduplicate by path)
@@ -326,14 +371,15 @@ export async function discoverRoutes(config: FrontguardConfig): Promise<Route[]>
 
         for (const link of links) {
           // Infinite loop protection
-          if (routes.length >= maxRoutes) break;
+          if (routes.length >= maxRoutes || visited.size >= maxVisited) break;
 
           const canonical = canonicalize(link);
 
           // Skip already visited
           if (visited.has(canonical)) continue;
 
-          // Only follow same-origin links
+          // Only follow http(s) same-origin links
+          if (!isHttpUrl(canonical)) continue;
           try {
             const linkOrigin = new URL(canonical).origin;
             if (linkOrigin !== baseOrigin) continue;

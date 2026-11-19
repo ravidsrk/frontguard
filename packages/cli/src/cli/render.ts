@@ -22,6 +22,8 @@ import { Command } from 'commander';
 import { writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import type { BrowserEngine } from '../core/types.js';
+import { chromiumLaunchArgs } from '../render/chromium-args.js';
+import { assertSafeCssPatch } from '../sandbox/css-sanitize.js';
 import { CLI_VERSION as VERSION } from '../version.js';
 
 /** Allowed browser engines (mirrors `sandbox/daytona.ts`). */
@@ -79,19 +81,38 @@ function validateUrl(raw: string): string {
  * the Playwright import cost in tests that inject a stub.
  */
 const playwrightRender: RenderFn = async (params) => {
+  if (params.css.length > 0) {
+    assertSafeCssPatch(params.css);
+  }
+  const targetOrigin = new URL(params.url).origin;
   const pw = await import('playwright');
   const engine = pw[params.browser];
   const browser = await engine.launch({
     headless: true,
-    args:
-      params.browser === 'chromium'
-        ? ['--disable-gpu', '--no-sandbox', '--disable-setuid-sandbox']
-        : undefined,
+    args: params.browser === 'chromium' ? chromiumLaunchArgs() : undefined,
   });
   try {
     const context = await browser.newContext({
       viewport: { width: params.viewport, height: params.viewportHeight },
     });
+    if (typeof (context as { route?: unknown }).route === 'function') {
+      await context.route('**/*', async (route) => {
+        try {
+          const reqUrl = route.request().url();
+          if (reqUrl.startsWith('about:') || new URL(reqUrl).origin === targetOrigin) {
+            await route.continue();
+          } else {
+            await route.abort('blockedbyclient');
+          }
+        } catch {
+          try {
+            await route.abort('blockedbyclient');
+          } catch {
+            // Context closed mid-flight
+          }
+        }
+      });
+    }
     const page = await context.newPage();
     await page.goto(params.url, { waitUntil: 'networkidle', timeout: params.pageTimeoutMs });
 
@@ -212,7 +233,7 @@ export async function renderCli(argv: string[], opts: RenderCliOptions = {}): Pr
 
     let css = '';
     if (o.injectCssFile) {
-      css = await readFile(o.injectCssFile, 'utf8');
+      css = assertSafeCssPatch(await readFile(o.injectCssFile, 'utf8'));
     }
 
     const png = await render({

@@ -11,6 +11,7 @@
  */
 
 import { PNG } from 'pngjs';
+import { assertSafePngBounds } from '../diff/png-safe.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -19,6 +20,14 @@ import { logger } from '../utils/logger.js';
  * If the buffer can't be parsed, the original is returned rather than throwing.
  */
 export async function cropToMaxHeight(buffer: Buffer, maxHeight: number): Promise<Buffer> {
+  try {
+    assertSafePngBounds(buffer);
+  } catch (err) {
+    logger.warn(
+      `Could not parse PNG for cropping: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return buffer;
+  }
   return new Promise<Buffer>((resolve, reject) => {
     const png = new PNG();
     png.parse(buffer, (err, parsed) => {

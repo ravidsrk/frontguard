@@ -38,15 +38,7 @@ import {
 import { compareDiffToThreshold } from '../diff/threshold.js';
 import { analyzeWithAI } from '../diff/ai-vision.js';
 import { AIUsageTracker, formatAIUsage } from './ai-usage.js';
-import {
-  generateFix,
-  FIX_CATEGORIES,
-} from '../diff/ai-fix.js';
-import { verifyFix } from '../sandbox/verify-fix.js';
-import {
-  FixPatternDB,
-  contextHashFor,
-} from '../storage/fix-patterns.js';
+import { loadFixStage } from '../sandbox/load-fix-stage.js';
 import { GitOrphanStorage } from '../storage/git-orphan.js';
 import { uploadImages } from '../storage/upload-stage.js';
 import {
@@ -138,8 +130,9 @@ async function runCapturedPipeline(
   // Stage 0: PREVIEW URL DETECTION
   // -----------------------------------------------------------------------
   const isDefaultUrl =
-    !config.baseUrl ||
-    DEFAULT_URL_PATTERNS.some((pattern) => config.baseUrl.startsWith(pattern));
+    !config.explicitBaseUrl &&
+    (!config.baseUrl ||
+      DEFAULT_URL_PATTERNS.some((pattern) => config.baseUrl.startsWith(pattern)));
 
   if (isDefaultUrl) {
     const previewUrl = detectPreviewUrl();
@@ -698,14 +691,14 @@ async function runCapturedPipeline(
           const diff = aiDiffs[i]?.diff;
           const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
           if (diff) {
-            diff.status = 'error';
-            diff.error = `AI analysis failed: ${msg}`;
+            // Advisory AI failure must never mutate pixel-decided diff.status or exit codes.
+            diff.aiError = `AI analysis failed: ${msg}`;
             completed++;
             rp.onStageProgress(
               'analyze',
               completed,
               aiDiffs.length,
-              `${diff.route.path} → error`,
+              `${diff.route.path} → ai error (pixel status preserved)`,
             );
           }
         }
@@ -756,7 +749,7 @@ async function runCapturedPipeline(
     const regressionDiffs: Array<{ diff: DiffResult; index: number }> = [];
     for (let i = 0; i < diffs.length; i++) {
       const d = diffs[i];
-      if (d.aiAnalysis?.classification === 'regression') {
+      if (d.status === 'regression' && d.aiAnalysis?.classification === 'regression') {
         const paths = tempPaths.get(i);
         if (paths) {
           d.baselineImage = readTemp(paths.baseline);
@@ -777,6 +770,9 @@ async function runCapturedPipeline(
       const fixSpan = trace.start('frontguard.fix');
       const fixStartIndex = aiUsage.count;
 
+      const { generateFix, FIX_CATEGORIES, verifyFix, FixPatternDB, contextHashFor } =
+        await loadFixStage();
+
       // Open the local fix-pattern DB (data moat). Degrades to no-op if
       // better-sqlite3 isn't available.
       const patternDB = new FixPatternDB();
@@ -786,7 +782,16 @@ async function runCapturedPipeline(
         const [, duration] = await timed(async () => {
           // Sequential to bound AI cost and (optional) sandbox usage.
           for (const { diff } of regressionDiffs) {
-            const cachedPattern = patternsOn ? lookupPattern(patternDB, diff) : null;
+            let cachedPattern: ReturnType<typeof patternDB.findAcceptedPattern> = null;
+            if (patternsOn) {
+              for (const cat of FIX_CATEGORIES) {
+                const hit = patternDB.findAcceptedPattern(contextHashFor(diff, cat));
+                if (hit) {
+                  cachedPattern = hit;
+                  break;
+                }
+              }
+            }
             if (!cachedPattern && !aiUsage.tryReserve()) {
               fixSkipped++;
               fixCompleted++;
@@ -805,13 +810,6 @@ async function runCapturedPipeline(
                   diff.fixVerification = await verifyFix(diff, fix, config, {
                     baseUrl: config.baseUrl,
                     sandbox: config.fixSandbox ?? 'local',
-                  });
-                }
-                // Record verified fixes as accepted training signal.
-                if (patternsOn && diff.fixVerification?.verified) {
-                  patternDB.record(fix, contextHashFor(diff, fix.category), true, {
-                    route: diff.route.path,
-                    viewport: diff.viewport,
                   });
                 }
               }
@@ -942,19 +940,4 @@ async function runCapturedPipeline(
     // Plugin hook: teardown — always called, even on error
     await pm.teardown();
   }
-}
-
-/**
- * Probes each fix category's context hash for a previously accepted pattern.
- * The category isn't known before generating, so every category is checked.
- */
-function lookupPattern(
-  patternDB: FixPatternDB,
-  diff: DiffResult,
-): { cssPatch: string; category: (typeof FIX_CATEGORIES)[number] } | null {
-  for (const cat of FIX_CATEGORIES) {
-    const hit = patternDB.findAcceptedPattern(contextHashFor(diff, cat));
-    if (hit) return hit;
-  }
-  return null;
 }

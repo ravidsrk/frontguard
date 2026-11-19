@@ -139,8 +139,10 @@ export const PERF_COLLECTION_SCRIPT = `
       el.id = '__frontguard_perf_data';
       el.textContent = JSON.stringify(metrics);
       document.body.appendChild(el);
+      return metrics;
     } catch(e) {
       // Silently fail — perf collection is best-effort
+      return null;
     }
   })();
 `;
@@ -151,10 +153,11 @@ export const PERF_COLLECTION_SCRIPT = `
 
 /**
  * Extract perf metrics from a DOM snapshot string.
+ * Uses `lastIndexOf` so page content cannot spoof an earlier marker tag.
  */
 export function extractMetricsFromSnapshot(domSnapshot: string): PerfMetrics | null {
   const markerStart = 'id="__frontguard_perf_data">';
-  const idx = domSnapshot.indexOf(markerStart);
+  const idx = domSnapshot.lastIndexOf(markerStart);
   if (idx === -1) return null;
 
   const jsonStart = idx + markerStart.length;
@@ -314,7 +317,7 @@ export function createPerfBudgetPlugin(config: PerfBudgetConfig): FrontguardPlug
     // ----- afterRender -----
     afterRender(shots: ScreenshotResult[], ctx: PluginContext): void {
       for (const shot of shots) {
-        const metrics = extractMetricsFromSnapshot(shot.domSnapshot);
+        const metrics = shot.perfMetrics ?? extractMetricsFromSnapshot(shot.domSnapshot);
         if (metrics) {
           const key = metricKey(shot.route.path, shot.viewport);
           metricsMap.set(key, metrics);
@@ -407,7 +410,7 @@ export function createPerfBudgetPlugin(config: PerfBudgetConfig): FrontguardPlug
       ctx.metadata.set('perf:summary', { total, passed: total - failed, failed });
 
       if (hasBudgetFailures && config.failOnBudgetExceeded) {
-        // Set exit code to indicate failure
+        result.perfBudgetFailed = true;
         process.exitCode = 1;
       }
     },

@@ -24,6 +24,10 @@ describe('pascal', () => {
   it('PascalCases kebab names', () => {
     expect(pascal('my-cool-plugin')).toBe('MyCoolPlugin');
   });
+  it('prefixes digit-leading names so emitted TypeScript identifiers stay valid', () => {
+    expect(pascal('123-alerts')).toBe('Plugin123Alerts');
+    expect(pascal('0')).toBe('Plugin0');
+  });
 });
 
 describe('buildSpec', () => {
@@ -62,6 +66,17 @@ describe('generateFiles', () => {
 
   it('test references the factory', () => {
     expect(byPath['test/index.test.ts']).toContain('createSlackPlugin');
+  });
+
+  it('neutralizes JSDoc comment breakouts in description and digit-leading names', () => {
+    const evil = generateFiles(
+      buildSpec('123-check', { description: 'Safe */ console.log("pwn"); /*' }),
+    );
+    const src = evil.find((f) => f.path === 'src/index.ts')!.content;
+    expect(src).toContain('export interface Plugin123CheckOptions');
+    expect(src).toContain('export function createPlugin123CheckPlugin');
+    expect(src).not.toContain('Safe */ console.log');
+    expect(src).toContain('Safe *\\/ console.log');
   });
 });
 
@@ -110,6 +125,15 @@ describe('writeProject', () => {
     const files = generateFiles(buildSpec('slack'));
     writeProject(dir, files);
     expect(() => writeProject(dir, files, { force: true })).not.toThrow();
+  });
+
+  it('rejects paths escaping targetDir', () => {
+    expect(() =>
+      writeProject(dir, [{ path: '../outside.txt', content: 'x' }]),
+    ).toThrow(/outside target directory/);
+    expect(() =>
+      writeProject(dir, [{ path: '/tmp/abs.txt', content: 'x' }]),
+    ).toThrow(/unsafe file path/);
   });
 });
 

@@ -16,15 +16,19 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { stdin, stdout } from 'node:process';
 import { baselineWriteBlockReason } from './baseline-confirm.js';
 import {
+  baselineSnapshotKey,
   captureRunnerForWrite,
   currentFingerprint,
   emptyBaselineManifest,
   fingerprintDiffs,
+  isNamedMode,
   stampBaselineManifest,
 } from '../core/fingerprint.js';
 import { PluginManager } from '../core/plugins.js';
 import type {
+  AccessibilityResult,
   BrowserEngine,
+  CaptureModeConfig,
   ColorScheme,
   DiffStatus,
   FrontguardConfig,
@@ -33,16 +37,21 @@ import type {
   RunResult,
   ScreenshotResult,
 } from '../core/types.js';
+import { hasPngMagicBytes } from '../diff/png-safe.js';
 import { GitOrphanStorage } from '../storage/git-orphan.js';
+import { parseSnapshotKey } from '../storage/prune-baselines.js';
 import { logger } from '../utils/logger.js';
 
 const REVIEWABLE = new Set<string>(['regression', 'new', 'error', 'missing']);
 const BROWSERS = new Set<string>(['chromium', 'firefox', 'webkit']);
+const SAFE_MODE_RE = /^[a-zA-Z0-9_-]+$/;
 
 export interface ReviewShot {
   route: string;
   viewport: number;
   browser: BrowserEngine;
+  mode?: string;
+  modeConfig?: CaptureModeConfig;
   status: DiffStatus | 'missing';
   current?: string;
   baseline?: string;
@@ -97,9 +106,9 @@ export async function runReview(request: ReviewRequest): Promise<ReviewOutcome> 
     };
   }
 
-  const storage = new GitOrphanStorage(request.cwd, { mode: 'update', offline: true });
-  await storage.init();
-  const existing = (await storage.readManifest()) ?? emptyBaselineManifest();
+  const reader = new GitOrphanStorage(request.cwd, { mode: 'compare', offline: true });
+  await reader.init();
+  const existing = (await reader.readManifest()) ?? emptyBaselineManifest();
   const candidates = reviewableShots(manifest.shots, existing);
   if (candidates.length === 0) {
     return { exitCode: 0, message: 'Nothing to review.', audits: [], written: [] };
@@ -113,7 +122,12 @@ export async function runReview(request: ReviewRequest): Promise<ReviewOutcome> 
     return { exitCode: 0, message: 'No shots accepted.', audits: [], written: [] };
   }
 
-  const refusal = await accessibilityRefusal(request.config, selected.accepted);
+  const refusal = await accessibilityRefusal(
+    request.config,
+    selected.accepted,
+    request.from === true,
+    manifest.accessibility,
+  );
   if (refusal) return { exitCode: 2, message: refusal, audits: [], written: [] };
 
   const prepared = prepareWrites(request.reportDir, selected.accepted, existing);
@@ -124,6 +138,8 @@ export async function runReview(request: ReviewRequest): Promise<ReviewOutcome> 
     if (mismatch) return { exitCode: 2, message: mismatch, audits: [], written: [] };
   }
 
+  const storage = new GitOrphanStorage(request.cwd, { mode: 'update', offline: true });
+  await storage.init();
   const stamped = stampBaselineManifest(
     existing,
     prepared.ready.map((row) => row.screenshot),
@@ -134,6 +150,7 @@ export async function runReview(request: ReviewRequest): Promise<ReviewOutcome> 
       route: row.shot.route,
       viewport: row.shot.viewport,
       browser: row.shot.browser,
+      ...(isNamedMode(row.shot.mode) ? { mode: row.shot.mode } : {}),
       buffer: row.bytes,
     })),
     stamped,
@@ -170,6 +187,13 @@ function prepareWrites(
       return { ready: [], error: `No current image for ${label(shot)}. Nothing was written.` };
     }
     const bytes = readFileSync(current);
+    if (!hasPngMagicBytes(bytes)) {
+      return {
+        ready: [],
+        error: `Current image for ${label(shot)} is not a valid PNG file. Nothing was written.`,
+      };
+    }
+    const mode = isNamedMode(shot.mode) ? shot.mode.trim() : undefined;
     ready.push({
       shot,
       bytes,
@@ -179,9 +203,13 @@ function prepareWrites(
           path: shot.route,
           discoveredVia: shot.discoveredVia,
           ...(shot.colorScheme ? { colorScheme: shot.colorScheme } : {}),
+          ...(mode ? { mode } : {}),
+          ...(shot.modeConfig ? { modeConfig: shot.modeConfig } : {}),
         },
         viewport: shot.viewport,
         browser: shot.browser,
+        ...(mode ? { mode } : {}),
+        ...(shot.modeConfig ? { modeConfig: shot.modeConfig } : {}),
         buffer: bytes,
         domSnapshot: '',
         consoleErrors: [],
@@ -199,12 +227,19 @@ function fingerprintRefusal(rows: readonly Prepared[]): string | null {
     if (!recorded) {
       return `Renderer fingerprint is missing for ${label(row.shot)}. Nothing was written.`;
     }
+    const modeArg = isNamedMode(row.shot.mode)
+      ? {
+          name: row.shot.mode.trim(),
+          settings: row.shot.modeConfig ?? recorded.mode?.settings ?? {},
+        }
+      : undefined;
     const current = currentFingerprint(
       row.shot.browser,
       captureRunnerForWrite(
         { discoveredVia: row.shot.discoveredVia },
         recorded.captureRunner,
       ),
+      modeArg,
     );
     const diffs = fingerprintDiffs(recorded, current);
     if (diffs.length > 0) {
@@ -218,6 +253,8 @@ function fingerprintRefusal(rows: readonly Prepared[]): string | null {
 async function accessibilityRefusal(
   config: FrontguardConfig,
   shots: readonly ReviewShot[],
+  offline = false,
+  offlineResults?: readonly AccessibilityResult[],
 ): Promise<string | null> {
   const plugin = config.plugins?.find((item) => item.name === 'accessibility');
   if (!plugin) return null;
@@ -225,17 +262,42 @@ async function accessibilityRefusal(
   manager.register(plugin);
   const metadata = new Map<string, unknown>();
   metadata.set('accessibility:require-complete', true);
+  if (offline) {
+    metadata.set('accessibility:offline', true);
+    if (offlineResults) metadata.set('accessibility:offline-results', offlineResults);
+  }
   const ctx = { config, logger, metadata };
-  const screenshots: ScreenshotResult[] = shots.map((shot) => ({
-    route: { path: shot.route, discoveredVia: shot.discoveredVia },
-    viewport: shot.viewport,
-    browser: shot.browser,
-    buffer: Buffer.alloc(0),
-    domSnapshot: '',
-    consoleErrors: [],
-    timestamp: Date.now(),
-    duration: 0,
-  }));
+  const routeOpts = new Map<string, Exclude<NonNullable<FrontguardConfig['routes']>[number], string>>();
+  for (const entry of config.routes ?? []) {
+    if (typeof entry !== 'string' && !routeOpts.has(entry.path)) {
+      routeOpts.set(entry.path, entry);
+    }
+  }
+  const screenshots: ScreenshotResult[] = shots.map((shot) => {
+    const cfgRoute = routeOpts.get(shot.route);
+    return {
+      route: {
+        path: shot.route,
+        discoveredVia: shot.discoveredVia,
+        ...(cfgRoute?.waitForSelector ? { waitForSelector: cfgRoute.waitForSelector } : {}),
+        ...(cfgRoute?.actions ? { actions: cfgRoute.actions } : {}),
+        ...(shot.colorScheme ?? cfgRoute?.colorScheme
+          ? { colorScheme: shot.colorScheme ?? cfgRoute?.colorScheme }
+          : {}),
+        ...(isNamedMode(shot.mode) ? { mode: shot.mode.trim() } : {}),
+        ...(shot.modeConfig ? { modeConfig: shot.modeConfig } : {}),
+      },
+      viewport: shot.viewport,
+      browser: shot.browser,
+      ...(isNamedMode(shot.mode) ? { mode: shot.mode.trim() } : {}),
+      ...(shot.modeConfig ? { modeConfig: shot.modeConfig } : {}),
+      buffer: Buffer.alloc(0),
+      domSnapshot: '',
+      consoleErrors: [],
+      timestamp: Date.now(),
+      duration: 0,
+    };
+  });
   try {
     await manager.setup(ctx);
     await manager.runHook('afterRender', screenshots, ctx);
@@ -318,20 +380,27 @@ function reviewableShots(
   shots: readonly ReviewShot[],
   manifest: ReturnType<typeof emptyBaselineManifest>,
 ): ReviewShot[] {
+  const keyOf = (s: Pick<ReviewShot, 'route' | 'viewport' | 'browser' | 'mode'>): string =>
+    `${s.route}\0${s.viewport}\0${isNamedMode(s.mode) ? s.mode.trim() : ''}\0${s.browser}`;
   const listed = shots.filter((shot) => REVIEWABLE.has(shot.status));
-  const seen = new Set(shots.map((shot) => `${shot.route}\0${shot.viewport}\0${shot.browser}`));
+  const seen = new Set(shots.map(keyOf));
   const missing: ReviewShot[] = [];
   for (const [route, entry] of Object.entries(manifest.routes ?? {})) {
     for (const key of Object.keys(entry.snapshots ?? {})) {
-      const [viewportRaw, browser] = key.split('/');
-      const viewport = Number(viewportRaw);
-      if (!BROWSERS.has(browser) || !Number.isFinite(viewport)) continue;
-      const id = `${route}\0${viewport}\0${browser}`;
+      const parsed = parseSnapshotKey(key);
+      if (!parsed) continue;
+      const id = keyOf({
+        route,
+        viewport: parsed.viewport,
+        browser: parsed.browser as BrowserEngine,
+        mode: parsed.mode,
+      });
       if (seen.has(id)) continue;
       missing.push({
         route,
-        viewport,
-        browser: browser as BrowserEngine,
+        viewport: parsed.viewport,
+        browser: parsed.browser as BrowserEngine,
+        ...(parsed.mode ? { mode: parsed.mode } : {}),
         status: 'missing',
       });
     }
@@ -339,7 +408,9 @@ function reviewableShots(
   return [...listed, ...missing];
 }
 
-function readReviewManifest(reportDir: string): { shots: ReviewShot[] } | null {
+function readReviewManifest(
+  reportDir: string,
+): { shots: ReviewShot[]; accessibility?: AccessibilityResult[] } | null {
   const path = resolve(reportDir, 'review.json');
   if (!existsSync(path)) return null;
   let parsed: unknown;
@@ -357,7 +428,11 @@ function readReviewManifest(reportDir: string): { shots: ReviewShot[] } | null {
     if (!shot) return null;
     shots.push(shot);
   }
-  return { shots };
+  const rawA11y = (parsed as { accessibility?: unknown }).accessibility;
+  return {
+    shots,
+    ...(Array.isArray(rawA11y) ? { accessibility: rawA11y as AccessibilityResult[] } : {}),
+  };
 }
 
 function parseShot(item: unknown): ReviewShot | null {
@@ -366,10 +441,21 @@ function parseShot(item: unknown): ReviewShot | null {
   if (typeof row.route !== 'string' || !Number.isFinite(row.viewport)) return null;
   if (typeof row.browser !== 'string' || !BROWSERS.has(row.browser)) return null;
   if (typeof row.status !== 'string') return null;
+  let mode: string | undefined;
+  if (row.mode !== undefined) {
+    if (typeof row.mode !== 'string' || !SAFE_MODE_RE.test(row.mode.trim())) return null;
+    mode = isNamedMode(row.mode) ? row.mode.trim() : undefined;
+  }
+  const modeConfig =
+    row.modeConfig && typeof row.modeConfig === 'object' && !Array.isArray(row.modeConfig)
+      ? (row.modeConfig as CaptureModeConfig)
+      : undefined;
   return {
     route: row.route,
     viewport: Number(row.viewport),
     browser: row.browser as BrowserEngine,
+    ...(mode ? { mode } : {}),
+    ...(modeConfig ? { modeConfig } : {}),
     status: row.status as ReviewShot['status'],
     current: typeof row.current === 'string' ? row.current : undefined,
     baseline: typeof row.baseline === 'string' ? row.baseline : undefined,
@@ -419,13 +505,15 @@ function displayPaths(reportDir: string, shot: ReviewShot): ShotPaths {
   return { baseline: show(shot.baseline), current: show(shot.current), diff: show(shot.diff) };
 }
 
-function label(shot: Pick<ReviewShot, 'route' | 'viewport' | 'browser'>): string {
-  return `${shot.route} @ ${shot.viewport}px [${shot.browser}]`;
+function label(shot: Pick<ReviewShot, 'route' | 'viewport' | 'browser' | 'mode'>): string {
+  const modeTag = isNamedMode(shot.mode) ? ` (${shot.mode.trim()})` : '';
+  return `${shot.route} @ ${shot.viewport}px${modeTag} [${shot.browser}]`;
 }
 
 function auditLine(row: Prepared, user: string, time: string): string {
   const next = createHash('sha256').update(row.bytes).digest('hex');
-  return `audit route=${row.shot.route} viewport=${row.shot.viewport} browser=${row.shot.browser} old=${row.oldSha} new=${next} user=${user} time=${time}`;
+  const modeField = isNamedMode(row.shot.mode) ? ` mode=${row.shot.mode.trim()}` : '';
+  return `audit route=${row.shot.route} viewport=${row.shot.viewport}${modeField} browser=${row.shot.browser} old=${row.oldSha} new=${next} user=${user} time=${time}`;
 }
 
 function gitUser(cwd: string): string {
@@ -493,22 +581,35 @@ export function writeReviewManifest(result: RunResult, outputDir: string): void 
       const prefix = `${index}_${fragment}_${diff.viewport}_${diff.browser}_${diffIdx}`;
       const file = (buf: Buffer | undefined, kind: string): string | undefined =>
         buf && buf.length > 0 ? `images/${prefix}_${kind}.png` : undefined;
+      const mode = isNamedMode(diff.mode ?? diff.route.mode)
+        ? (diff.mode ?? diff.route.mode)!.trim()
+        : undefined;
+      const modeConfig = diff.modeConfig ?? diff.route.modeConfig;
       return {
         route: path,
         viewport: diff.viewport,
         browser: diff.browser,
+        ...(mode ? { mode } : {}),
+        ...(modeConfig ? { modeConfig } : {}),
         status: diff.status,
         discoveredVia: diff.route.discoveredVia,
         colorScheme: diff.route.colorScheme ?? result.config.colorScheme ?? 'light',
         current: file(diff.currentImage, 'current'),
         baseline: file(diff.baselineImage, 'baseline'),
         diff: file(diff.diffImage, 'diff'),
-        fingerprint: currentFingerprint(diff.browser, captureRunnerForWrite(diff.route)),
+        fingerprint: currentFingerprint(
+          diff.browser,
+          captureRunnerForWrite(diff.route),
+          mode ? { name: mode, settings: modeConfig ?? {} } : undefined,
+        ),
       };
     });
   });
+  const payload = result.accessibility?.length
+    ? { shots, accessibility: result.accessibility }
+    : { shots };
   try {
-    writeFileSync(join(outputDir, 'review.json'), `${JSON.stringify({ shots })}\n`);
+    writeFileSync(join(outputDir, 'review.json'), `${JSON.stringify(payload)}\n`);
   } catch (err) {
     logger.debug(
       `Could not write review.json: ${err instanceof Error ? err.message : String(err)}`,
@@ -525,5 +626,6 @@ export function oldShaFromManifest(
   manifest: ReturnType<typeof emptyBaselineManifest>,
   shot: ReviewShot,
 ): string {
-  return manifest.routes?.[shot.route]?.snapshots?.[`${shot.viewport}/${shot.browser}`]?.sha256 ?? 'absent';
+  const key = baselineSnapshotKey(shot.viewport, shot.browser, shot.mode);
+  return manifest.routes?.[shot.route]?.snapshots?.[key]?.sha256 ?? 'absent';
 }

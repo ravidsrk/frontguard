@@ -156,7 +156,37 @@ export async function extractDomElementBoxes(
             }
           }
 
-          const rawText = (el.textContent || '').replace(/\s+/g, ' ').trim();
+          let isRedacted = false;
+          for (let cur: HTMLElement | null = el; cur; cur = cur.parentElement) {
+            if (
+              typeof cur.hasAttribute === 'function' &&
+              (cur.hasAttribute('data-frontguard-redacted') ||
+                cur.hasAttribute('data-frontguard-redact') ||
+                cur.hasAttribute('data-sensitive'))
+            ) {
+              isRedacted = true;
+              break;
+            }
+          }
+          if (!isRedacted && (tagName === 'input' || tagName === 'textarea')) {
+            const typeAttr = (el.getAttribute('type') || '').toLowerCase();
+            const acAttr = (el.getAttribute('autocomplete') || '').toLowerCase();
+            const nameAttr = (el.getAttribute('name') || '').toLowerCase();
+            if (
+              typeAttr === 'password' ||
+              acAttr === 'current-password' ||
+              acAttr === 'new-password' ||
+              acAttr === 'one-time-code' ||
+              acAttr.startsWith('cc-') ||
+              /card|cvv|cvc/.test(nameAttr)
+            ) {
+              isRedacted = true;
+            }
+          }
+
+          const rawText = isRedacted
+            ? ''
+            : (el.textContent || '').replace(/\s+/g, ' ').trim();
           const textPreview =
             rawText.length > 0 ? rawText.slice(0, 80) : undefined;
 

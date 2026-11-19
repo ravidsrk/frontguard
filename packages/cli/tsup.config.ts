@@ -54,6 +54,7 @@ export default defineConfig([
     entry: {
       'cli/index': 'src/cli/index.ts',
       'cli/review-command': 'src/cli/review-command.ts',
+      'cli/prune-baselines': 'src/cli/prune-baselines.ts',
     },
     format: ['esm'],
     target: 'node18',
@@ -86,6 +87,7 @@ export default defineConfig([
     entry: {
       'index': 'src/core/pipeline.ts',
       'plugins/index': 'src/plugins/index.ts',
+      'fix-stage': 'src/sandbox/fix-stage.ts',
     },
     format: ['esm'],
     target: 'node18',

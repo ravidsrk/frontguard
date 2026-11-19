@@ -142,7 +142,7 @@ describe('pipeline SSIM configuration', () => {
     expect(result.diffs[0]?.aiAnalysis?.classification).toBe('intentional');
   });
 
-  it('turns rejected AI analysis into a reported tool error', async () => {
+  it('preserves pixel status and records non-blocking aiError when advisory AI analysis rejects', async () => {
     mocks.analyzeWithAI.mockRejectedValue(new Error('provider unavailable'));
     const aiConfig = config();
     aiConfig.ai = { provider: 'openai', model: 'gpt-4o' };
@@ -151,10 +151,12 @@ describe('pipeline SSIM configuration', () => {
     const result = await runPipeline(aiConfig, output);
 
     expect(result.diffs[0]).toMatchObject({
-      status: 'error',
-      error: 'AI analysis failed: provider unavailable',
+      status: 'regression',
+      aiError: 'AI analysis failed: provider unavailable',
     });
-    expect(result.summary.errors).toBe(1);
+    expect(result.diffs[0]?.error).toBeUndefined();
+    expect(result.summary.errors).toBe(0);
+    expect(result.summary.regressions).toBe(1);
     expect(output.onStageComplete).toHaveBeenCalledWith(
       'analyze',
       expect.stringContaining('1 failed'),

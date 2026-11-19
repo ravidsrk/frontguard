@@ -143,7 +143,7 @@ ${packageManagerSetup}
       - name: Start dev server
         run: |
           ${devCommand} &
-          npx wait-on http://localhost:${port} --timeout 60000
+          node -e "const u='http://localhost:${port}',e=Date.now()+60000;(async()=>{while(Date.now()<e){try{await fetch(u);process.exit(0)}catch{}await new Promise(r=>setTimeout(r,500))}console.error('Timed out waiting for '+u);process.exit(1)})()"
 
       - name: Run Frontguard
         id: frontguard

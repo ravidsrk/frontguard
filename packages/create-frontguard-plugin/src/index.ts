@@ -14,7 +14,7 @@
  */
 
 import { mkdirSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildSpec, generateFiles, type GeneratedFile } from './templates.js';
 
@@ -58,9 +58,17 @@ export function writeProject(
   const mkdirFn = opts.mkdirImpl ?? mkdirSync;
   const existsFn = opts.existsImpl ?? existsSync;
 
+  const base = resolve(targetDir);
   const written: string[] = [];
   for (const file of files) {
-    const abs = join(targetDir, file.path);
+    if (!file.path || file.path.includes('\0') || isAbsolute(file.path)) {
+      throw new Error(`Refusing to write unsafe file path: ${file.path}`);
+    }
+    const abs = resolve(base, file.path);
+    const rel = relative(base, abs);
+    if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+      throw new Error(`Refusing to write path outside target directory: ${file.path}`);
+    }
     if (existsFn(abs) && !opts.force) {
       throw new Error(`Refusing to overwrite existing file: ${abs} (use --force)`);
     }

@@ -280,6 +280,7 @@ describe('judge config and mergeConfigs', () => {
       provider: 'openai',
       model: 'gpt-4.1',
       autoApproveThreshold: 0.85,
+      maxCalls: 50,
     });
     expect(merged.judge).toEqual({
       figmaFileKey: 'fk-base',

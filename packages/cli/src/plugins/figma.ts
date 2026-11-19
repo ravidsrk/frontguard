@@ -13,6 +13,7 @@ import type { DiffResult, ScreenshotResult, RunResult } from '../core/types.js';
 import { logger } from '../utils/logger.js';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
+import { readPngSafe } from '../diff/png-safe.js';
 import { compareDiffToThreshold } from '../diff/threshold.js';
 
 // ---------------------------------------------------------------------------
@@ -153,7 +154,7 @@ export async function fetchDesignReference(
  * Returns the original buffer unchanged if dimensions already match.
  */
 function resizeToMatch(buffer: Buffer, targetWidth: number, targetHeight: number): Buffer {
-  const src = PNG.sync.read(buffer);
+  const src = readPngSafe(buffer);
 
   if (src.width === targetWidth && src.height === targetHeight) {
     return buffer;
@@ -319,13 +320,13 @@ export function createFigmaPlugin(config: FigmaConfig): FrontguardPlugin {
 
         try {
           // Decode the current screenshot to get dimensions
-          const cp = PNG.sync.read(diff.currentImage);
+          const cp = readPngSafe(diff.currentImage);
           const { width, height } = cp;
           const totalPixels = width * height;
 
           // Resize Figma export to match screenshot dimensions
           const resizedFigma = resizeToMatch(figmaBuffer, width, height);
-          const figmaPng = PNG.sync.read(resizedFigma);
+          const figmaPng = readPngSafe(resizedFigma);
 
           // Run pixelmatch
           const diffOutput = new PNG({ width, height });

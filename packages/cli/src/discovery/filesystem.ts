@@ -12,7 +12,7 @@
  * @module discovery/filesystem
  */
 
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { join, relative, parse as parsePath } from 'node:path';
 import type { Route } from '../core/types.js';
 import { logger } from '../utils/logger.js';
@@ -274,8 +274,18 @@ function scanDirectory(
   baseDir: string,
   framework: Framework,
   routes: Route[],
-  dw: Set<string>
+  dw: Set<string>,
+  visitedDirs: Set<string> = new Set(),
 ): void {
+  let realDir: string;
+  try {
+    realDir = realpathSync(dir);
+  } catch {
+    return;
+  }
+  if (visitedDirs.has(realDir)) return;
+  visitedDirs.add(realDir);
+
   let entries: string[];
   try {
     entries = readdirSync(dir);
@@ -311,7 +321,7 @@ function scanDirectory(
         continue;
       }
 
-      scanDirectory(fullPath, baseDir, framework, routes, dw);
+      scanDirectory(fullPath, baseDir, framework, routes, dw, visitedDirs);
     } else if (stat.isFile()) {
       const { name: stem } = parsePath(entry);
 
