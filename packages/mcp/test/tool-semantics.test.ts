@@ -185,16 +185,17 @@ describe('tool semantics (#383)', () => {
   });
 
   describe('promote_baseline', () => {
-    it('describes approval through the accept_baseline endpoint, no promotion, and the all-routes rule', async () => {
+    it('describes explicit run_id, truthful screenshotsPromoted, local-report refusal, and the all-routes rule', async () => {
       const { tools, close } = await connect();
       try {
         const tool = tools.get('promote_baseline');
         const description = tool?.description ?? '';
         expect(description).toMatch(/whole-run approval/);
-        expect(description).toMatch(/same endpoint as `accept_baseline`/);
-        expect(description).toMatch(/promotes no screenshots/);
+        expect(description).toMatch(/explicit `run_id`/);
+        expect(description).toMatch(/returning `screenshotsPromoted` from the Cloud API response/);
         expect(description).toMatch(/`routes` does not scope the approval/);
         expect(description).toMatch(/refused unless every changed route in the run is included/);
+        expect(description).toMatch(/Refused in local-report mode/);
         expect(description).not.toMatch(/scoped to specific routes/);
         expect(tool?.annotations).toMatchObject({ destructiveHint: true, readOnlyHint: false });
         expect(tool?._meta).toMatchObject({ 'anthropic/requiresUserInteraction': true });

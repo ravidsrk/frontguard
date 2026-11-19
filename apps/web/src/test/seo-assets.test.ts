@@ -146,7 +146,7 @@ describe('public SEO assets', () => {
     }
     expect(mcp.api.baseUrl).toBe('https://your-frontguard-api.example.com')
     expect(mcp.tools.find((tool) => tool.name === 'accept_baseline')?.description).toContain(
-      'not implemented',
+      'Refused in local-report mode',
     )
 
     const openapi = JSON.parse(readPublic('openapi.json')) as {

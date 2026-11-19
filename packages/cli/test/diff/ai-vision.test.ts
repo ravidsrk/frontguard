@@ -542,7 +542,7 @@ describe('analyzeWithAI', () => {
     expect(body.max_tokens).toBe(8192);
   });
 
-  it('sends output_config.format and the refusal fallback to the Anthropic API for Claude 5 models', async () => {
+  it('sends output_config.format to Anthropic and only enables refusal fallback when allowFallback is true', async () => {
     fetchSpy.mockResolvedValueOnce(anthropicResponse(validAIJson()) as Response);
 
     await analyzeWithAI(makeDiff(), { provider: 'anthropic', model: 'claude-sonnet-5-5' });
@@ -550,11 +550,19 @@ describe('analyzeWithAI', () => {
     const [url, init] = fetchSpy.mock.calls[0];
     expect(url).toBe('https://api.anthropic.com/v1/messages');
     const headers = init?.headers as Record<string, string>;
-    expect(headers['anthropic-beta']).toBe('server-side-fallback-2026-07-01');
+    expect(headers['anthropic-beta']).toBeUndefined();
     const body = JSON.parse(String(init?.body));
     expect(body.output_config.format.type).toBe('json_schema');
     expect(body.output_config.format.schema.additionalProperties).toBe(false);
-    expect(body.fallbacks).toBe('default');
+    expect(body.fallbacks).toBeUndefined();
+
+    fetchSpy.mockResolvedValueOnce(anthropicResponse(validAIJson()) as Response);
+    await analyzeWithAI(makeDiff(), { provider: 'anthropic', model: 'claude-sonnet-5-5', allowFallback: true });
+    const [, optInInit] = fetchSpy.mock.calls[1];
+    const optInHeaders = optInInit?.headers as Record<string, string>;
+    expect(optInHeaders['anthropic-beta']).toBe('server-side-fallback-2026-07-01');
+    const optInBody = JSON.parse(String(optInInit?.body));
+    expect(optInBody.fallbacks).toBe('default');
   });
 
   it('describes two images when no diff overlay is sent', async () => {
@@ -810,9 +818,11 @@ describe('buildAccessibilityContext', () => {
     expect(result.classification).toBe('regression');
     expect(result.confidence).toBe(0.91);
     const [calledUrl, init] = fetchSpy.mock.calls[0];
-    expect(String(calledUrl)).toContain(
-      'https://custom-gemini.example.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=test-gemini-key',
+    expect(String(calledUrl)).toBe(
+      'https://custom-gemini.example.com/v1beta/models/gemini-3.5-flash-lite:generateContent',
     );
+    expect(String(calledUrl)).not.toContain('key=');
+    expect((init?.headers as Record<string, string>)['x-goog-api-key']).toBe('test-gemini-key');
     expect(String(init?.body ?? '')).toContain('[data-testid=\\"upgrade-btn\\"]');
     fetchSpy.mockRestore();
     delete process.env.FRONTGUARD_GEMINI_KEY;

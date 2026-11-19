@@ -819,7 +819,7 @@ describe('MCP server tools/list + tools/call', () => {
     }
 
     const destructive = [
-      ['promote_baseline', 'Record run approval (promotes no screenshots)'],
+      ['promote_baseline', 'Record run baseline promotion'],
       ['accept_baseline', 'Record whole-run baseline approval'],
     ] as const;
     for (const [name, title] of destructive) {
@@ -847,13 +847,13 @@ describe('MCP server tools/list + tools/call', () => {
     await server.close();
   });
 
-  it('accept_baseline description states run-scoped approval (mcp-6)', async () => {
+  it('accept_baseline description states run-scoped approval and local-report refusal (mcp-6)', async () => {
     const { client, server } = await connectPair();
     const res = await client.listTools();
     const tool = res.tools.find((t) => t.name === 'accept_baseline');
     expect(tool?.description).toMatch(/run-scoped/i);
     expect(tool?.description).toMatch(/confirm_all_regressions_reviewed/i);
-    expect(tool?.description).toMatch(/promotion is not implemented/i);
+    expect(tool?.description).toMatch(/Refused in local-report mode/i);
     await client.close();
     await server.close();
   });

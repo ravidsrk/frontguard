@@ -265,7 +265,7 @@ function registerCoreTools(server: McpServer, writesEnabled: boolean): void {
       {
         ...destructiveAnnotations('Record whole-run baseline approval'),
         description:
-          'Record run-scoped whole-run approval after `confirm_all_regressions_reviewed: true`. Screenshot promotion is not implemented yet; use the CLI or composite Action to update baselines.',
+          'Record run-scoped whole-run approval after `confirm_all_regressions_reviewed: true`. Refused in local-report mode (local reports are read-only). Use the CLI or composite Action to update git baseline screenshots.',
         inputSchema: acceptBaselineInputSchema,
         outputSchema: acceptBaselineOutputSchema,
       },
@@ -304,7 +304,7 @@ function registerExtendedTools(server: McpServer, writesEnabled: boolean): void 
     {
       ...readOnlyAnnotations('Statically check a candidate CSS patch'),
       description:
-        'Statically check a candidate CSS patch for a diff from `list_regressions`: brace balance and declaration syntax, a deny list (`@import`, external `url()`, `expression()`, `display: none !important`, hiding root containers), and whether `target_selector` matches a selector recorded for the diff. It renders nothing and cannot confirm a visual fix: `staticCheck: "pass"` comes with `rendered: false`, so apply the patch locally and re-run `frontguard run` to confirm the pixels.',
+        'Statically check a candidate CSS patch for a diff from `list_regressions` using a CSS parser: brace balance and declaration syntax (including nested `@media`/`@supports`), a deny list (`@import`, `url()`, `image-set()`, `expression()`, `-moz-binding`, `behavior`, and hiding rules like `display: none`, `visibility: hidden`, `opacity: 0`, `clip-path`, zero-scale `transform`, `content-visibility: hidden`), and whether `target_selector` matches a recorded selector. It renders nothing and cannot confirm a visual fix: `staticCheck: "pass"` comes with `rendered: false`, so apply the patch locally and re-run `frontguard run` to confirm the pixels.',
       inputSchema: verifyCssPatchInputSchema,
       outputSchema: verifyCssPatchOutputSchema,
     },
@@ -315,9 +315,9 @@ function registerExtendedTools(server: McpServer, writesEnabled: boolean): void 
     server.registerTool(
       'promote_baseline',
       {
-        ...destructiveAnnotations('Record run approval (promotes no screenshots)'),
+        ...destructiveAnnotations('Record run baseline promotion'),
         description:
-          'Record whole-run approval for a reviewed run after `confirm_reviewed: true`. It calls the same endpoint as `accept_baseline` and promotes no screenshots (`screenshotsPromoted: false`). `routes` does not scope the approval: the call is refused unless every changed route in the run is included. Refused in local-report mode. A human updates baseline files with `frontguard update-baselines --confirm-baselines`.',
+          'Record whole-run approval for an explicit `run_id` after `confirm_reviewed: true`, returning `screenshotsPromoted` from the Cloud API response. `routes` does not scope the approval: the call is refused unless every changed route in the run is included. Refused in local-report mode. A human updates git baseline files with `frontguard update-baselines --confirm-baselines`.',
         inputSchema: promoteBaselineInputSchema,
         outputSchema: promoteBaselineOutputSchema,
       },

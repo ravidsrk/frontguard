@@ -229,6 +229,7 @@ export async function generateFix(
       baseUrl: config.baseUrl,
       maxOutputTokens: config.maxOutputTokens,
       timeoutMs: config.timeoutMs,
+      allowFallback: config.allowFallback,
       label: `fix ${diff.route.path} @${diff.viewport}`,
     },
     {
