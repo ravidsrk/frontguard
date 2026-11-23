@@ -17,7 +17,7 @@ jobs:
   root-action-contract:
     runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || format('codebuild-gha-frontguard-{0}-{1}', github.run_id, github.run_attempt) }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Assert repo-root action.yml exists (int-3 regression guard)
         run: test -f ./action.yml
@@ -47,7 +47,7 @@ jobs:
   subpath-action-contract:
     runs-on: ubuntu-latest  # tests rely on non-root file permissions
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Assert sub-path action.yml exists
         run: test -f ./packages/cli/action.yml
@@ -82,7 +82,7 @@ jobs:
     name: Documented CI path fetches the baseline ref
     runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || format('codebuild-gha-frontguard-{0}-{1}', github.run_id, github.run_attempt) }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
 
