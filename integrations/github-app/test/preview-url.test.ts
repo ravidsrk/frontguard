@@ -1,3 +1,4 @@
+// MergeReady production session check, 23 November 2026 (LEGA-7): a throwaway draft PR, closed without merging.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createHmac, generateKeyPairSync } from 'node:crypto';
 import {
